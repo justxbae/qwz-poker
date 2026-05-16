@@ -31,6 +31,7 @@ const PORT = Number(process.env.PORT || 3000);
 const BOT_TOKEN = process.env.BOT_TOKEN || "";
 const BOT_USERNAME = normalizeBotUsername(process.env.BOT_USERNAME || "qwzpokerbot");
 const APP_NAME = process.env.APP_NAME || "QWZ Poker";
+const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || "";
 const isProduction = process.env.NODE_ENV === "production";
 const HOST = process.env.HOST || (isProduction ? "0.0.0.0" : "127.0.0.1");
 
@@ -40,6 +41,7 @@ const savedStacks = new Map();
 const wallets = new Map();
 const transactions = new Map();
 const starOrders = new Map();
+const loggedAppOpens = new Set();
 const DEFAULT_STACK = 10000;
 const DEFAULT_WALLET = 50000;
 const CASHIER_PACKAGES = [
@@ -102,6 +104,15 @@ async function handleApi(req, res, url) {
     const token = randomId("session");
     const user = normalizeUser(auth.user);
     sessions.set(token, user);
+    if (!loggedAppOpens.has(user.id)) {
+      loggedAppOpens.add(user.id);
+      notifyAdmin("open", "Игрок открыл Mini App", {
+        user,
+        lines: [
+          `Баланс: ${formatNumber(user.balance)} chips`
+        ]
+      });
+    }
     sendJson(res, 200, { token, user });
     return;
   }
@@ -143,6 +154,13 @@ async function handleApi(req, res, url) {
       amount: pack.chips,
       meta: `${pack.stars} Stars · QWZ chips`
     });
+    notifyAdmin("demo_topup", "Demo-пополнение", {
+      user,
+      lines: [
+        `Пакет: ${formatNumber(pack.chips)} chips`,
+        `Баланс: ${formatNumber(user.balance)} chips`
+      ]
+    });
     sendJson(res, 200, { cashier: cashierView(user) });
     return;
   }
@@ -164,6 +182,8 @@ async function handleApi(req, res, url) {
     const order = {
       id: orderId,
       userId: user.id,
+      userName: user.name,
+      username: user.username,
       packageId: pack.id,
       chips: pack.chips,
       stars: pack.stars,
@@ -178,6 +198,14 @@ async function handleApi(req, res, url) {
       payload,
       stars: pack.stars
     });
+    notifyAdmin("stars_invoice", "Создан счет Stars", {
+      user,
+      lines: [
+        `Пакет: ${formatNumber(pack.chips)} chips`,
+        `Стоимость: ${formatNumber(pack.stars)} Stars`,
+        `Order: ${order.id}`
+      ]
+    });
 
     sendJson(res, 200, { invoiceLink, orderId, cashier: cashierView(user) });
     return;
@@ -189,6 +217,14 @@ async function handleApi(req, res, url) {
     prepareInitialStack(user, body);
     const table = createTable(user, body);
     tables.set(table.id, table);
+    notifyAdmin("table_create", "Создан приватный стол", {
+      user,
+      lines: [
+        `Стол: ${table.name}`,
+        `Блайнды: ${table.smallBlind}/${table.bigBlind}`,
+        `Бай-ин: ${formatNumber(table.seats[0]?.stack || 0)} chips`
+      ]
+    });
     sendJson(res, 201, { table: tableView(table, user) });
     return;
   }
@@ -209,11 +245,23 @@ async function handleApi(req, res, url) {
 
     if (req.method === "POST" && action === "join") {
       const body = await readJson(req);
-      if (!table.seats.some((seat) => seat.userId === user.id)) {
+      const wasSeated = table.seats.some((seat) => seat.userId === user.id);
+      if (!wasSeated) {
         prepareInitialStack(user, body);
       }
       joinTable(table, user);
       maybeStartHand(table);
+      if (!wasSeated) {
+        notifyAdmin("table_join", "Игрок сел за стол", {
+          user,
+          lines: [
+            `Стол: ${table.name}`,
+            `Блайнды: ${table.smallBlind}/${table.bigBlind}`,
+            `Стек: ${formatNumber(table.seats.find((seat) => seat.userId === user.id)?.stack || 0)} chips`,
+            `Игроков: ${table.seats.length}/${table.maxPlayers}`
+          ]
+        });
+      }
       sendJson(res, 200, { table: tableView(table, user) });
       return;
     }
@@ -222,6 +270,14 @@ async function handleApi(req, res, url) {
       const result = leaveTable(table, user);
       saveStack(user, result.stack);
       if (result.tableEmpty && table.isPrivate) tables.delete(table.id);
+      notifyAdmin("table_leave", "Игрок вышел из стола", {
+        user,
+        lines: [
+          `Стол: ${table.name}`,
+          `Сохраненный стек: ${formatNumber(result.stack)} chips`,
+          `Баланс: ${formatNumber(user.balance)} chips`
+        ]
+      });
       sendJson(res, 200, { ok: true, balance: user.balance });
       return;
     }
@@ -230,6 +286,14 @@ async function handleApi(req, res, url) {
       const result = leaveTable(table, user);
       saveStack(user, result.stack);
       if (result.tableEmpty && table.isPrivate) tables.delete(table.id);
+      notifyAdmin("table_stand", "Игрок встал из-за стола", {
+        user,
+        lines: [
+          `Стол: ${table.name}`,
+          `Сохраненный стек: ${formatNumber(result.stack)} chips`,
+          `Баланс: ${formatNumber(user.balance)} chips`
+        ]
+      });
       sendJson(res, 200, { table: result.tableEmpty && table.isPrivate ? null : tableView(table, user), balance: user.balance });
       return;
     }
@@ -265,6 +329,15 @@ async function handleApi(req, res, url) {
           title: "Докупка за столом",
           amount: actualAmount,
           meta: `${table.smallBlind}/${table.bigBlind} · ${table.name}`
+        });
+        notifyAdmin("rebuy", "Докупка за столом", {
+          user,
+          lines: [
+            `Стол: ${table.name}`,
+            `Сумма: ${formatNumber(actualAmount)} chips`,
+            `Стек: ${formatNumber(afterStack)} chips`,
+            `Баланс: ${formatNumber(user.balance)} chips`
+          ]
         });
       }
       maybeStartHand(table);
@@ -575,6 +648,16 @@ function processSuccessfulStarPayment(payment) {
     amount: order.chips,
     meta: `${order.stars} Stars · QWZ chips`
   });
+  notifyAdmin("stars_paid", "Оплачено Stars-пополнение", {
+    user: { id: order.userId, name: order.userName, username: order.username },
+    lines: [
+      `Пакет: ${formatNumber(order.chips)} chips`,
+      `Оплата: ${formatNumber(order.stars)} Stars`,
+      `Order: ${order.id}`,
+      `Telegram charge: ${order.telegramPaymentChargeId || "n/a"}`,
+      `Баланс: ${formatNumber(balance)} chips`
+    ]
+  });
 }
 
 function orderFromPayload(payload) {
@@ -595,6 +678,32 @@ async function callTelegram(method, payload) {
     throw error;
   }
   return data;
+}
+
+function notifyAdmin(type, title, { user, lines = [] } = {}) {
+  if (!ADMIN_CHAT_ID || !BOT_TOKEN || BOT_TOKEN.includes("replace_with") || BOT_TOKEN === "test-token") return;
+
+  const text = [
+    `QWZ Poker · ${title}`,
+    `Событие: ${type}`,
+    user ? `Игрок: ${formatUser(user)}` : "",
+    ...lines,
+    `Время: ${new Date().toLocaleString("ru-RU", { timeZone: "Asia/Yekaterinburg" })}`
+  ].filter(Boolean).join("\n");
+
+  callTelegram("sendMessage", {
+    chat_id: ADMIN_CHAT_ID,
+    text,
+    disable_web_page_preview: true
+  }).catch((error) => {
+    console.error("Admin log failed:", error.message);
+  });
+}
+
+function formatUser(user) {
+  const username = user.username ? `@${user.username}` : "без username";
+  const name = user.name || "unknown";
+  return `${name} · ${username} · ID ${user.id}`;
 }
 
 function formatNumber(value) {

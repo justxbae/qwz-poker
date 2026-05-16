@@ -42,6 +42,7 @@ NODE_ENV=production
 HOST=0.0.0.0
 BOT_USERNAME=qwzpokerbot
 BOT_TOKEN=<token from BotFather>
+ADMIN_CHAT_ID=<your Telegram numeric user id for private admin logs>
 APP_NAME=QWZ Poker
 ```
 

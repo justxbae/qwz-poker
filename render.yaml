@@ -15,3 +15,5 @@ services:
         value: qwzpokerbot
       - key: BOT_TOKEN
         sync: false
+      - key: ADMIN_CHAT_ID
+        sync: false
