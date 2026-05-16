@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { calculateRake, rakePreview } from "./economy.js";
+import { calculateRake } from "./economy.js";
 import { resolveShowdown } from "./poker-evaluator.js";
 
 export const ACTION_TIMEOUT_MS = 20000;
@@ -356,8 +356,6 @@ export function publicTable(table, viewerId = "") {
     runoutCardsLeft: table.runoutQueue.length,
     communityCards: table.communityCards,
     pot: table.pot,
-    rake: rakePreview(table.bigBlind),
-    rakeCollected: table.rakeCollected,
     dealerIndex: table.dealerIndex,
     smallBlindIndex: table.smallBlindIndex,
     bigBlindIndex: table.bigBlindIndex,
@@ -368,7 +366,7 @@ export function publicTable(table, viewerId = "") {
     now: Date.now(),
     message: table.message,
     actionLog: table.actionLog,
-    handHistory: table.handHistory,
+    handHistory: publicHandHistory(table.handHistory),
     viewer: {
       isSeated: Boolean(viewerSeat),
       canAct,
@@ -409,6 +407,22 @@ export function publicTable(table, viewerId = "") {
         : seat.cards.map(() => "hidden")
     }))
   };
+}
+
+function publicHandHistory(history) {
+  return history.map((hand) => ({
+    id: hand.id,
+    handNumber: hand.handNumber,
+    at: hand.at,
+    board: hand.board,
+    pots: hand.pots.map((pot) => ({
+      label: pot.label,
+      amount: pot.amount,
+      winners: pot.winners,
+      handDescription: pot.handDescription
+    })),
+    seats: hand.seats
+  }));
 }
 
 function canControlTestPlayers(table, user) {
@@ -631,7 +645,7 @@ function finishShowdown(table) {
     }
 
     const winnerNames = orderedWinners.map((winner) => winner.seat.name).join(", ");
-    summaries.push(`${winnerNames} забирает ${pot.label} ${payoutAmount}${potRake ? `, rake ${potRake}` : ""} (${handDescription})`);
+    summaries.push(`${winnerNames} забирает ${pot.label} ${payoutAmount} (${handDescription})`);
     historyPots.push({
       label: pot.label,
       amount: payoutAmount,
@@ -648,7 +662,6 @@ function finishShowdown(table) {
     ? summaries.join("; ")
     : `Банк ${totalPot} не разыгран`;
   addLog(table, table.message);
-  if (totalRake) addLog(table, `Rake ${totalRake}`);
   recordHandHistory(table, { pots: historyPots, rake: totalRake });
   table.pot = 0;
   table.status = "showdown";

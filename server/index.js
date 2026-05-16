@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ECONOMY, cashierPackages, findCashierPackage, rakePreview } from "./economy.js";
+import { cashierPackages, findCashierPackage } from "./economy.js";
 import {
   act,
   addBuyIn,
@@ -43,8 +43,8 @@ const wallets = new Map();
 const transactions = new Map();
 const starOrders = new Map();
 const loggedAppOpens = new Set();
-const DEFAULT_STACK = 10000;
-const DEFAULT_WALLET = 50000;
+const DEFAULT_STACK = 0;
+const DEFAULT_WALLET = 0;
 
 seedPublicTables();
 
@@ -486,12 +486,6 @@ function cashierView(user) {
     currency: "chips",
     mode: "chips",
     packages: cashierPackages(),
-    economy: {
-      marketingReservePercent: ECONOMY.marketingReservePercent,
-      riskReservePercent: ECONOMY.riskReservePercent,
-      rake: rakePreview(50),
-      withdrawals: ECONOMY.withdrawals
-    },
     transactions: getTransactions(user)
   };
 }
@@ -539,6 +533,11 @@ function prepareInitialStack(user, body = {}) {
   const requested = Number(body.buyInAmount || 0);
   if (!requested) {
     user.stack = getSavedStack(user);
+    if (user.stack <= 0) {
+      const error = new Error("Сначала пополните баланс и выберите бай-ин");
+      error.status = 409;
+      throw error;
+    }
     return;
   }
 
@@ -570,7 +569,7 @@ function getWallet(userId) {
 
 function getTransactions(user) {
   if (!transactions.has(user.id)) {
-    transactions.set(user.id, [
+    transactions.set(user.id, DEFAULT_WALLET > 0 ? [
       {
         id: randomId("tx"),
         type: "credit",
@@ -579,7 +578,7 @@ function getTransactions(user) {
         meta: "QWZ chips",
         createdAt: new Date().toISOString()
       }
-    ]);
+    ] : []);
   }
   return transactions.get(user.id);
 }

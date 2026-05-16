@@ -9,10 +9,11 @@ test("table auto-starts, accepts custom raise, and pays the pot at showdown", as
   const server = await startServer();
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await topUp(auth.token);
     let table = (await request("/api/tables", {
       method: "POST",
       token: auth.token,
-      body: { name: "Flow", maxPlayers: 2, smallBlind: 25 }
+      body: { name: "Flow", maxPlayers: 2, smallBlind: 25, buyInAmount: 10000 }
     })).table;
 
     table = (await request(`/api/tables/${table.id}/add-test-player`, {
@@ -59,7 +60,6 @@ test("table auto-starts, accepts custom raise, and pays the pot at showdown", as
 
     assert.equal(table.status, "showdown");
     assert.equal(table.pot, 0);
-    assert.equal(table.rakeCollected, 25);
     assert.equal(table.seats.reduce((sum, seat) => sum + seat.stack, 0), 19975);
     assert.match(table.message, /забирает банк/);
   } finally {
@@ -71,6 +71,7 @@ test("public lobby tables are seeded and stay available when empty", async () =>
   const server = await startServer();
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await topUp(auth.token);
     const lobby = await request("/api/tables", { token: auth.token });
     const publicTable = lobby.tables.find((table) => !table.isPrivate && table.smallBlind === 25);
 
@@ -103,6 +104,7 @@ test("seated player can control test bots at public system tables", async () => 
   const server = await startServer();
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await topUp(auth.token);
     const lobby = await request("/api/tables", { token: auth.token });
     const publicTable = lobby.tables.find((table) => !table.isPrivate && table.smallBlind === 25);
 
@@ -142,10 +144,11 @@ test("leaving a table persists the player stack in the session", async () => {
   const server = await startServer();
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await topUp(auth.token);
     let table = (await request("/api/tables", {
       method: "POST",
       token: auth.token,
-      body: { name: "Leave", maxPlayers: 2, smallBlind: 25 }
+      body: { name: "Leave", maxPlayers: 2, smallBlind: 25, buyInAmount: 10000 }
     })).table;
 
     table = (await request(`/api/tables/${table.id}/add-test-player`, {
@@ -181,10 +184,11 @@ test("standing keeps the table open as observer and allows sitting again", async
   const server = await startServer();
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await topUp(auth.token);
     let table = (await request("/api/tables", {
       method: "POST",
       token: auth.token,
-      body: { name: "Stand", maxPlayers: 2, smallBlind: 25 }
+      body: { name: "Stand", maxPlayers: 2, smallBlind: 25, buyInAmount: 10000 }
     })).table;
 
     table = (await request(`/api/tables/${table.id}/add-test-player`, {
@@ -221,13 +225,14 @@ test("initial buy-in chooses table stack and spends wallet balance", async () =>
   const server = await startServer();
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await topUp(auth.token, 2);
     const table = (await request("/api/tables", {
       method: "POST",
       token: auth.token,
       body: { name: "BuyIn", maxPlayers: 2, smallBlind: 25, buyInAmount: 20000 }
     })).table;
 
-    assert.equal(table.viewer.balance, 30000);
+    assert.equal(table.viewer.balance, 0);
     assert.equal(table.seats.find((seat) => seat.userId === "dev-user").stack, 20000);
   } finally {
     server.kill();
@@ -240,9 +245,9 @@ test("cashier returns demo packages and records wallet operations", async () => 
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
     let cashier = (await request("/api/cashier", { token: auth.token })).cashier;
 
-    assert.equal(cashier.balance, 50000);
+    assert.equal(cashier.balance, 0);
     assert.equal(cashier.packages.length, 4);
-    assert.equal(cashier.transactions[0].title, "Стартовый баланс");
+    assert.equal(cashier.transactions.length, 0);
 
     cashier = (await request("/api/cashier/demo-topup", {
       method: "POST",
@@ -250,9 +255,15 @@ test("cashier returns demo packages and records wallet operations", async () => 
       body: { packageId: "starter" }
     })).cashier;
 
-    assert.equal(cashier.balance, 60000);
+    assert.equal(cashier.balance, 10000);
     assert.equal(cashier.transactions[0].title, "Пополнение баланса");
     assert.equal(cashier.transactions[0].amount, 10000);
+
+    cashier = (await request("/api/cashier/demo-topup", {
+      method: "POST",
+      token: auth.token,
+      body: { packageId: "starter" }
+    })).cashier;
 
     await request("/api/tables", {
       method: "POST",
@@ -261,7 +272,7 @@ test("cashier returns demo packages and records wallet operations", async () => 
     });
 
     cashier = (await request("/api/cashier", { token: auth.token })).cashier;
-    assert.equal(cashier.balance, 40000);
+    assert.equal(cashier.balance, 0);
     assert.equal(cashier.transactions[0].title, "Бай-ин за стол");
     assert.equal(cashier.transactions[0].amount, 20000);
   } finally {
@@ -273,10 +284,11 @@ test("rebuy adds chips only between hands and spends wallet balance", async () =
   const server = await startServer();
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await topUp(auth.token, 2);
     let table = (await request("/api/tables", {
       method: "POST",
       token: auth.token,
-      body: { name: "Rebuy", maxPlayers: 2, smallBlind: 25 }
+      body: { name: "Rebuy", maxPlayers: 2, smallBlind: 25, buyInAmount: 10000 }
     })).table;
 
     const rebuy = await request(`/api/tables/${table.id}/rebuy`, {
@@ -286,7 +298,7 @@ test("rebuy adds chips only between hands and spends wallet balance", async () =
     });
 
     table = rebuy.table;
-    assert.equal(table.viewer.balance, 45000);
+    assert.equal(table.viewer.balance, 5000);
     assert.equal(table.seats.find((seat) => seat.userId === "dev-user").stack, 15000);
 
     table = (await request(`/api/tables/${table.id}/add-test-player`, {
@@ -323,6 +335,18 @@ async function request(path, options = {}) {
   const data = await response.json();
   if (!response.ok) throw new Error(data.error);
   return data;
+}
+
+async function topUp(token, count = 1) {
+  let cashier = null;
+  for (let index = 0; index < count; index += 1) {
+    cashier = (await request("/api/cashier/demo-topup", {
+      method: "POST",
+      token,
+      body: { packageId: "starter" }
+    })).cashier;
+  }
+  return cashier;
 }
 
 function startServer() {

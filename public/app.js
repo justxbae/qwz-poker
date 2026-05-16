@@ -31,7 +31,6 @@ const cashierPrimaryButton = document.querySelector("#cashierPrimaryButton");
 const cashierTableStack = document.querySelector("#cashierTableStack");
 const cashierTotalBankroll = document.querySelector("#cashierTotalBankroll");
 const cashierPackages = document.querySelector("#cashierPackages");
-const cashierEconomy = document.querySelector("#cashierEconomy");
 const cashierHistory = document.querySelector("#cashierHistory");
 const cashierStatus = document.querySelector("#cashierStatus");
 const profileAvatar = document.querySelector("#profileAvatar");
@@ -342,7 +341,6 @@ function renderCashier(cashier) {
   cashierTableStack.textContent = formatChips(cashier.tableStack || 0);
   cashierTotalBankroll.textContent = formatChips(cashier.totalBankroll || cashier.balance || 0);
   renderCashierPackages(cashier.packages || []);
-  renderCashierEconomy(cashier.economy || {});
   renderCashierHistory(cashier.transactions || []);
 }
 
@@ -363,32 +361,6 @@ function renderCashierPackages(packages) {
 
     button.append(chips, meta, badge);
     cashierPackages.append(button);
-  }
-}
-
-function renderCashierEconomy(economy) {
-  if (!cashierEconomy) return;
-  const rake = economy.rake || {};
-  const withdrawalMethods = economy.withdrawals?.methods || [];
-  cashierEconomy.replaceChildren();
-
-  const rows = [
-    ["Rake cash-game", `${Math.round((rake.percent || 0) * 100)}% · cap ${formatChips(rake.cap || 0)}`],
-    ["No flop, no drop", rake.noFlopNoDrop ? "включено" : "выключено"],
-    ["Маркетинг-резерв", `${Math.round((economy.marketingReservePercent || 0) * 100)}%`],
-    ["Вывод", economy.withdrawals?.enabled ? "активен" : "готовится"]
-  ];
-
-  for (const [label, value] of rows) {
-    const item = document.createElement("div");
-    item.innerHTML = `<span>${label}</span><strong>${value}</strong>`;
-    cashierEconomy.append(item);
-  }
-
-  if (withdrawalMethods.length) {
-    const methods = document.createElement("small");
-    methods.textContent = `Будущие методы вывода: ${withdrawalMethods.map((method) => `${method.title} ${Math.round(method.feePercent * 100)}%`).join(" · ")}`;
-    cashierEconomy.append(methods);
   }
 }
 
@@ -745,8 +717,13 @@ function openBuyInOverlay(intent) {
   const smallBlind = Number(intent.smallBlind || state.selectedSmallBlind || 25);
   const bigBlind = smallBlind * 2;
   const balance = Number(intent.balance ?? state.user?.balance ?? 0);
-  const minAmount = Math.min(balance || 10000, Number(intent.minAmount || Math.max(1000, Math.min(10000, bigBlind * 200))));
-  const maxAmount = Math.max(minAmount, Math.min(balance || 40000, Number(intent.maxAmount || 40000)));
+  if (balance <= 0) {
+    showError("Сначала пополните баланс в кассе");
+    selectLobbyTab("cashier");
+    return;
+  }
+  const minAmount = Math.min(balance, Number(intent.minAmount || Math.max(1000, Math.min(10000, bigBlind * 200))));
+  const maxAmount = Math.max(minAmount, Math.min(balance, Number(intent.maxAmount || 40000)));
   const defaultAmount = clampAmount(Number(intent.defaultAmount || Math.min(20000, maxAmount)), minAmount, maxAmount);
 
   document.querySelector(".buyin-title").textContent = intent.mode === "rebuy" ? "Докупка стека" : "Вход за стол";

@@ -304,7 +304,8 @@ test("showdown distributes main pot and side pot by contribution eligibility", (
   assert.equal(table.seats[0].stack, 275);
   assert.equal(table.seats[1].stack, 300);
   assert.equal(table.seats[2].stack, 100);
-  assert.match(table.message, /Owner забирает банк 275, rake 25/);
+  assert.match(table.message, /Owner забирает банк 275/);
+  assert.doesNotMatch(table.message, /rake/i);
   assert.match(table.message, /Player 2 забирает сайд-пот 1 200/);
 });
 
