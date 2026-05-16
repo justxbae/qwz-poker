@@ -269,7 +269,8 @@ async function auth() {
 
   state.token = data.token;
   state.user = data.user;
-  profile.textContent = `${data.user.name} · ${data.user.balance.toLocaleString("ru-RU")}`;
+  profile.textContent = "•••";
+  profile.title = `${data.user.name} · ${data.user.balance.toLocaleString("ru-RU")} chips`;
   lobbyName.textContent = data.user.name;
   lobbyUsername.textContent = data.user.username ? `@${data.user.username}` : `id ${data.user.id}`;
   lobbyBalance.textContent = data.user.balance.toLocaleString("ru-RU");

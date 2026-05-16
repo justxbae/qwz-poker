@@ -230,8 +230,13 @@ html:not(.dev-mode) .bot-actions {
 }
 
 .topbar {
-  display: none;
-  margin-bottom: 18px;
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+  width: min(430px, 100%);
+  margin: 0 auto 10px;
+  padding: 2px 0 4px;
 }
 
 body.in-game .topbar {
@@ -261,6 +266,56 @@ body.in-game .profile {
   pointer-events: auto;
 }
 
+body.in-game .topbar {
+  display: none;
+}
+
+body:not(.in-game) .topbar-back {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: var(--tg-link);
+  padding: 0;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.topbar-title {
+  display: grid;
+  justify-items: center;
+  min-width: 0;
+  line-height: 1.05;
+}
+
+.topbar-title strong {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--tg-text);
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-title strong span {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--tg-link);
+  color: #fff;
+  font-size: 9px;
+  vertical-align: 1px;
+}
+
+.topbar-title small {
+  margin-top: 2px;
+  color: var(--tg-hint);
+  font-size: 10px;
+  font-weight: 600;
+}
+
 h1,
 h2,
 p {
@@ -286,11 +341,18 @@ h2 {
 }
 
 .profile {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(25, 27, 32, 0.78);
-  padding: 10px 12px;
-  color: var(--muted);
+  justify-self: end;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  min-height: 34px;
+  border: 1px solid rgba(42, 171, 238, 0.26);
+  border-radius: 50%;
+  background: rgba(42, 171, 238, 0.08);
+  color: var(--tg-link);
+  padding: 0;
+  font-size: 16px;
+  font-weight: 800;
 }
 
 .grid {
@@ -581,6 +643,76 @@ h2 {
   border: 1px solid var(--tg-line);
   background: var(--tg-surface-soft);
   color: var(--tg-text);
+}
+
+.home-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.shortcut-card {
+  position: relative;
+  display: grid;
+  justify-items: start;
+  align-content: space-between;
+  min-height: 84px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  color: #fff;
+  padding: 10px;
+  text-align: left;
+  overflow: hidden;
+}
+
+.shortcut-card::after {
+  content: "";
+  position: absolute;
+  right: -18px;
+  bottom: -20px;
+  width: 62px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.shortcut-card span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.shortcut-card strong {
+  position: relative;
+  z-index: 1;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.08;
+}
+
+.shortcut-card.blue {
+  background: linear-gradient(145deg, #2f8cff, #1c62ff);
+}
+
+.shortcut-card.cyan {
+  background: linear-gradient(145deg, #20b7ff, #1682d8);
+}
+
+.shortcut-card.violet {
+  background: linear-gradient(145deg, #8975ff, #5c4ddb);
+}
+
+.shortcut-card.green {
+  background: linear-gradient(145deg, #44c778, #279f5d);
+}
+
+.shortcut-card:disabled {
+  opacity: 0.72;
 }
 
 .section-title {

@@ -10,11 +10,12 @@
   <body>
     <main class="app">
       <section class="topbar">
-        <div>
-          <p class="eyebrow">Telegram poker room</p>
-          <h1>QWZ Poker</h1>
+        <button type="button" class="topbar-back">‹ Назад</button>
+        <div class="topbar-title">
+          <strong>QWZ Poker <span>✓</span></strong>
+          <small>мини-приложение</small>
         </div>
-        <div class="profile" id="profile">...</div>
+        <button type="button" class="profile" id="profile" aria-label="Меню">•••</button>
       </section>
 
       <section class="table-panel game-screen" id="currentTable" hidden>
@@ -174,6 +175,25 @@
             <button id="quickPlayButton" type="button">Быстрый вход</button>
             <button type="button" class="secondary-pill" data-lobby-tab="tables">Все столы</button>
           </div>
+        </section>
+
+        <section class="home-shortcuts" aria-label="Быстрые действия">
+          <button type="button" class="shortcut-card blue" data-lobby-tab="cashier">
+            <span>＋</span>
+            <strong>Пополнить</strong>
+          </button>
+          <button type="button" class="shortcut-card cyan" data-lobby-tab="tables">
+            <span>♠</span>
+            <strong>Столы</strong>
+          </button>
+          <button type="button" class="shortcut-card violet" disabled>
+            <span>★</span>
+            <strong>Задания</strong>
+          </button>
+          <button type="button" class="shortcut-card green" disabled>
+            <span>▣</span>
+            <strong>Турниры</strong>
+          </button>
         </section>
 
         <section class="lobby-card continue-card" id="continueCard" hidden>
