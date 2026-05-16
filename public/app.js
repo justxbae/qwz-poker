@@ -346,22 +346,36 @@ function renderCashier(cashier) {
 
 function renderCashierPackages(packages) {
   cashierPackages.replaceChildren();
-  for (const pack of packages) {
+  packages.forEach((pack, index) => {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "cashier-package";
+    button.className = `cashier-package ${index === 0 ? "starter" : ""}`;
     button.dataset.packageId = pack.id;
 
+    const label = document.createElement("em");
+    label.textContent = packageLabel(pack, index);
     const chips = document.createElement("strong");
     chips.textContent = `${formatChips(pack.chips)} chips`;
     const meta = document.createElement("span");
-    meta.textContent = `${pack.stars} Stars · ${formatChips(pack.chipsPerStar)} chips/Star`;
+    meta.textContent = packageMeta(pack, index);
     const badge = document.createElement("small");
-    badge.textContent = "QWZ";
+    badge.textContent = `${pack.stars} Stars`;
 
-    button.append(chips, meta, badge);
+    button.append(label, chips, meta, badge);
     cashierPackages.append(button);
-  }
+  });
+}
+
+function packageLabel(pack, index) {
+  if (index === 0) return "Starter";
+  if (pack.chips >= 75000) return "Highroller";
+  if (pack.chips >= 30000) return "Deep stack";
+  return "Regular";
+}
+
+function packageMeta(pack, index) {
+  if (index === 0) return "1 buy-in 25/50 · официальный старт";
+  return `${formatChips(pack.chipsPerStar)} chips/Star · для нескольких buy-in`;
 }
 
 function renderCashierHistory(transactions) {
