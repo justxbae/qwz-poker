@@ -72,6 +72,12 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   const displayHost = HOST === "0.0.0.0" ? "127.0.0.1" : HOST;
   console.log(`${APP_NAME} running at http://${displayHost}:${PORT}`);
+  notifyAdmin("server_start", "Admin logs online", {
+    lines: [
+      `Сервер: ${isProduction ? "production" : "development"}`,
+      `Bot: @${BOT_USERNAME}`
+    ]
+  });
 });
 
 setInterval(() => tickTables(tables), 1000);
