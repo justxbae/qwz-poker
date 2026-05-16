@@ -19,6 +19,16 @@ const owner = { id: "owner", name: "Owner", username: "" };
 const player2 = { id: "p2", name: "Player 2", username: "" };
 const player3 = { id: "p3", name: "Player 3", username: "" };
 
+test("table seats expose Telegram profile photos", () => {
+  const table = createTable({ ...owner, photoUrl: "https://example.com/owner.jpg" }, { maxPlayers: 2, smallBlind: 25 });
+  joinTable(table, { ...player2, photoUrl: "https://example.com/player-2.jpg" });
+
+  const view = publicTable(table, owner.id);
+
+  assert.equal(view.seats[0].photoUrl, "https://example.com/owner.jpg");
+  assert.equal(view.seats[1].photoUrl, "https://example.com/player-2.jpg");
+});
+
 test("first hand shows a starting intro before cards are dealt", () => {
   const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
   joinTable(table, player2);

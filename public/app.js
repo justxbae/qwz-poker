@@ -1105,7 +1105,7 @@ function renderCurrentTable(table) {
         index === table.activeSeatIndex ? "Ход" : "",
         seat.folded ? "Fold" : ""
       ].filter(Boolean);
-      node.querySelector(".seat-avatar").textContent = initials(seat.name);
+      renderAvatar(node.querySelector(".seat-avatar"), seat);
       node.querySelector(".seat-name").textContent = seat.name;
       node.querySelector(".seat-meta").textContent = formatChips(seat.stack);
       node.querySelector(".seat-cards").replaceChildren(...renderCards(seat.cards, { animate: shouldAnimateCards }));

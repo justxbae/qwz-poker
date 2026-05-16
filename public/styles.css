@@ -1845,6 +1845,14 @@ body.in-game .game-toolbar [data-panel-tab="waitlist"] {
   font-weight: 900;
 }
 
+.seat-avatar.has-photo {
+  background-color: #171c1e;
+  background-position: center;
+  background-size: cover;
+  color: transparent;
+  font-size: 0;
+}
+
 .seat-plate {
   position: relative;
   display: grid;

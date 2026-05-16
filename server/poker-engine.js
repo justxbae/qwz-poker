@@ -59,6 +59,7 @@ export function joinTable(table, user) {
     userId: user.id,
     name: user.name,
     username: user.username,
+    photoUrl: user.photoUrl || "",
     stack: user.stack || 10000,
     bet: 0,
     totalBet: 0,
@@ -387,6 +388,7 @@ export function publicTable(table, viewerId = "") {
       userId: seat.userId,
       name: seat.name,
       username: seat.username,
+      photoUrl: seat.photoUrl || "",
       stack: seat.stack,
       bet: seat.bet,
       totalBet: seat.totalBet,
@@ -420,6 +422,7 @@ export function createTestUser(index) {
     id: randomId("test"),
     name: `Player ${index}`,
     username: "",
+    photoUrl: "",
     balance: 10000
   };
 }
