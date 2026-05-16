@@ -646,7 +646,8 @@ function syncLimitSelection() {
   }
 }
 
-function selectLobbyTab(tab) {
+function selectLobbyTab(tab, options = {}) {
+  const tabChanged = currentLobbyTab !== tab;
   currentLobbyTab = tab;
   haptic("light");
   document.querySelectorAll("[data-lobby-tab]").forEach((button) => {
@@ -657,6 +658,9 @@ function selectLobbyTab(tab) {
   });
   if (tab === "profile") runAction(loadProfile);
   if (tab === "cashier") runAction(loadCashier);
+  if (tabChanged && !options.keepScroll) {
+    window.requestAnimationFrame(resetScroll);
+  }
   updateTelegramBackButton();
 }
 
@@ -1056,9 +1060,13 @@ async function goToLobby() {
 }
 
 function resetScroll() {
-  window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  const options = { top: 0, left: 0, behavior: "instant" };
+  window.scrollTo(options);
+  document.scrollingElement?.scrollTo?.(options);
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
+  lobby.scrollTop = 0;
+  document.querySelector("[data-lobby-view].active")?.scrollTo?.(options);
 }
 
 async function runAction(action) {

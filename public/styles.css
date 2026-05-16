@@ -3815,6 +3815,17 @@ body.in-game .seat-count-6.seat-3 .bet-spot {
   font-weight: 650;
 }
 
+.buyin-auto:disabled,
+.buyin-auto:disabled:hover,
+.buyin-auto:disabled:focus,
+.buyin-auto:disabled:active {
+  border-color: var(--tg-line);
+  background: rgba(36, 47, 61, 0.58);
+  color: rgba(244, 247, 251, 0.42);
+  opacity: 1;
+  transform: none;
+}
+
 .buyin-info-card {
   align-self: end;
   display: grid;
