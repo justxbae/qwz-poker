@@ -718,13 +718,16 @@ function openBuyInOverlay(intent) {
   const bigBlind = smallBlind * 2;
   const balance = Number(intent.balance ?? state.user?.balance ?? 0);
   if (balance <= 0) {
-    showError("Сначала пополните баланс в кассе");
+    showError("Выберите стартовый пакет, чтобы сесть за открытый стол");
     selectLobbyTab("cashier");
+    cashierStatus.textContent = "Стартовый пакет 5 000 chips подходит для лимита 25/50.";
+    document.querySelector(".cashier-topup-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
-  const minAmount = Math.min(balance, Number(intent.minAmount || Math.max(1000, Math.min(10000, bigBlind * 200))));
-  const maxAmount = Math.max(minAmount, Math.min(balance, Number(intent.maxAmount || 40000)));
-  const defaultAmount = clampAmount(Number(intent.defaultAmount || Math.min(20000, maxAmount)), minAmount, maxAmount);
+  const bounds = buyInBounds(bigBlind, balance, intent);
+  const minAmount = bounds.min;
+  const maxAmount = bounds.max;
+  const defaultAmount = clampAmount(Number(intent.defaultAmount || bounds.defaultAmount), minAmount, maxAmount);
 
   document.querySelector(".buyin-title").textContent = intent.mode === "rebuy" ? "Докупка стека" : "Вход за стол";
   buyInGameType.textContent = `БЛ Холдем ${smallBlind}/${bigBlind}`;
@@ -739,6 +742,20 @@ function openBuyInOverlay(intent) {
   setBuyInAmount(defaultAmount);
   buyInOverlay.hidden = false;
   updateTelegramBackButton();
+}
+
+function buyInBounds(bigBlind, balance, intent = {}) {
+  const minBuyIn = Math.max(bigBlind * 50, bigBlind);
+  const maxBuyIn = Math.max(minBuyIn, bigBlind * 100);
+  const requestedMin = Number(intent.minAmount || minBuyIn);
+  const requestedMax = Number(intent.maxAmount || maxBuyIn);
+  const min = Math.min(balance, requestedMin);
+  const max = Math.max(min, Math.min(balance, requestedMax));
+  return {
+    min,
+    max,
+    defaultAmount: Math.min(maxBuyIn, max)
+  };
 }
 
 function hideBuyInOverlay() {
@@ -941,10 +958,7 @@ async function buyIn() {
     mode: "rebuy",
     tableId: state.currentTableId,
     smallBlind: state.currentTable.smallBlind,
-    balance,
-    minAmount: Math.min(balance, state.currentTable.bigBlind),
-    maxAmount: Math.min(balance, 40000),
-    defaultAmount: Math.min(balance, 10000)
+    balance
   });
 }
 

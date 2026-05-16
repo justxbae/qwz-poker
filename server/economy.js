@@ -3,10 +3,10 @@ export const ECONOMY = {
   depositBalanceType: "deposit",
   bonusBalanceType: "bonus",
   starsPackages: [
-    { id: "starter", chips: 10000, stars: 50 },
-    { id: "regular", chips: 25000, stars: 120 },
-    { id: "deep", chips: 60000, stars: 250 },
-    { id: "highroller", chips: 150000, stars: 600 }
+    { id: "starter", chips: 5000, stars: 50 },
+    { id: "regular", chips: 12000, stars: 120 },
+    { id: "deep", chips: 30000, stars: 250 },
+    { id: "highroller", chips: 75000, stars: 600 }
   ],
   rake: {
     enabled: true,

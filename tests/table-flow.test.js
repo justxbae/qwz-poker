@@ -9,7 +9,7 @@ test("table auto-starts, accepts custom raise, and pays the pot at showdown", as
   const server = await startServer();
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
-    await topUp(auth.token);
+    await topUp(auth.token, 2);
     let table = (await request("/api/tables", {
       method: "POST",
       token: auth.token,
@@ -71,7 +71,7 @@ test("public lobby tables are seeded and stay available when empty", async () =>
   const server = await startServer();
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
-    await topUp(auth.token);
+    await topUp(auth.token, 2);
     const lobby = await request("/api/tables", { token: auth.token });
     const publicTable = lobby.tables.find((table) => !table.isPrivate && table.smallBlind === 25);
 
@@ -104,7 +104,7 @@ test("seated player can control test bots at public system tables", async () => 
   const server = await startServer();
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
-    await topUp(auth.token);
+    await topUp(auth.token, 2);
     const lobby = await request("/api/tables", { token: auth.token });
     const publicTable = lobby.tables.find((table) => !table.isPrivate && table.smallBlind === 25);
 
@@ -144,7 +144,7 @@ test("leaving a table persists the player stack in the session", async () => {
   const server = await startServer();
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
-    await topUp(auth.token);
+    await topUp(auth.token, 2);
     let table = (await request("/api/tables", {
       method: "POST",
       token: auth.token,
@@ -184,7 +184,7 @@ test("standing keeps the table open as observer and allows sitting again", async
   const server = await startServer();
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
-    await topUp(auth.token);
+    await topUp(auth.token, 2);
     let table = (await request("/api/tables", {
       method: "POST",
       token: auth.token,
@@ -225,7 +225,7 @@ test("initial buy-in chooses table stack and spends wallet balance", async () =>
   const server = await startServer();
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
-    await topUp(auth.token, 2);
+    await topUp(auth.token, 4);
     const table = (await request("/api/tables", {
       method: "POST",
       token: auth.token,
@@ -255,15 +255,11 @@ test("cashier returns demo packages and records wallet operations", async () => 
       body: { packageId: "starter" }
     })).cashier;
 
-    assert.equal(cashier.balance, 10000);
+    assert.equal(cashier.balance, 5000);
     assert.equal(cashier.transactions[0].title, "Пополнение баланса");
-    assert.equal(cashier.transactions[0].amount, 10000);
+    assert.equal(cashier.transactions[0].amount, 5000);
 
-    cashier = (await request("/api/cashier/demo-topup", {
-      method: "POST",
-      token: auth.token,
-      body: { packageId: "starter" }
-    })).cashier;
+    cashier = await topUp(auth.token, 3);
 
     await request("/api/tables", {
       method: "POST",
@@ -284,7 +280,7 @@ test("rebuy adds chips only between hands and spends wallet balance", async () =
   const server = await startServer();
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
-    await topUp(auth.token, 2);
+    await topUp(auth.token, 4);
     let table = (await request("/api/tables", {
       method: "POST",
       token: auth.token,
