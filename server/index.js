@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { cashierPackages, depositSettings, findCashierPackage, quoteDeposit } from "./economy.js";
+import { depositSettings, quoteDeposit } from "./economy.js";
 import {
   act,
   addBuyIn,
@@ -141,24 +141,21 @@ async function handleApi(req, res, url) {
 
   if (req.method === "POST" && url.pathname === "/api/cashier/demo-topup") {
     const body = await readJson(req);
-    const pack = findCashierPackage(body.packageId);
-    if (!pack) {
-      sendJson(res, 400, { error: "Пакет пополнения не найден" });
-      return;
-    }
+    const quote = quoteDeposit(body);
 
-    user.balance += pack.chips;
+    user.balance += quote.chips;
     wallets.set(user.id, user.balance);
     recordTransaction(user, {
       type: "credit",
       title: "Пополнение баланса",
-      amount: pack.chips,
-      meta: `${pack.stars} Stars · QWZ chips`
+      amount: quote.chips,
+      meta: `${quote.rubAmount} ₽ · ${quote.stars} Stars`
     });
     notifyAdmin("demo_topup", "Demo-пополнение", {
       user,
       lines: [
-        `Пакет: ${formatNumber(pack.chips)} chips`,
+        `Сумма: ${formatNumber(quote.rubAmount)} ₽`,
+        `Пакет: ${formatNumber(quote.chips)} chips`,
         `Баланс: ${formatNumber(user.balance)} chips`
       ]
     });
@@ -181,7 +178,6 @@ async function handleApi(req, res, url) {
       userId: user.id,
       userName: user.name,
       username: user.username,
-      packageId: quote.packageId,
       rubAmount: quote.rubAmount,
       chips: quote.chips,
       stars: quote.stars,
@@ -483,7 +479,6 @@ function cashierView(user) {
     activeTableCount: activeTables.length,
     currency: "chips",
     mode: "chips",
-    packages: cashierPackages(),
     deposit: depositSettings(),
     transactions: getTransactions(user)
   };

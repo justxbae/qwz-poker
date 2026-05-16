@@ -41,7 +41,6 @@ const cashierMethods = document.querySelector("#cashierMethods");
 const cashierQuoteChips = document.querySelector("#cashierQuoteChips");
 const cashierQuoteStars = document.querySelector("#cashierQuoteStars");
 const cashierPayButton = document.querySelector("#cashierPayButton");
-const cashierPackages = document.querySelector("#cashierPackages");
 const cashierHistory = document.querySelector("#cashierHistory");
 const cashierStatus = document.querySelector("#cashierStatus");
 const profileAvatar = document.querySelector("#profileAvatar");
@@ -186,7 +185,6 @@ async function boot() {
   cashierPresets?.addEventListener("click", onCashierPresetClick);
   cashierMethods?.addEventListener("click", onCashierMethodClick);
   cashierPayButton?.addEventListener("click", () => runAction(payCashierAmount));
-  cashierPackages.addEventListener("click", onCashierPackageClick);
   quickPlayButton.addEventListener("click", () => runAction(quickPlay));
   quickPrivateButton.addEventListener("click", () => runAction(quickCreatePrivateTable));
   continueGameButton.addEventListener("click", continueGame);
@@ -358,7 +356,6 @@ function renderCashier(cashier) {
   cashierTotalBankroll.textContent = formatChips(cashier.totalBankroll || cashier.balance || 0);
   cashierState.deposit = cashier.deposit || null;
   renderCashierControls(cashier.deposit || {});
-  renderCashierPackages(cashier.packages || []);
   renderCashierHistory(cashier.transactions || []);
 }
 
@@ -429,41 +426,6 @@ function cashierQuote() {
   };
 }
 
-function renderCashierPackages(packages) {
-  cashierPackages.replaceChildren();
-  packages.forEach((pack, index) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `cashier-package ${index === 0 ? "starter" : ""}`;
-    button.dataset.packageId = pack.id;
-    button.dataset.rubAmount = String(pack.rubAmount || 0);
-
-    const label = document.createElement("em");
-    label.textContent = packageLabel(pack, index);
-    const chips = document.createElement("strong");
-    chips.textContent = `${formatChips(pack.chips)} chips`;
-    const meta = document.createElement("span");
-    meta.textContent = packageMeta(pack, index);
-    const badge = document.createElement("small");
-    badge.textContent = `${pack.stars} Stars`;
-
-    button.append(label, chips, meta, badge);
-    cashierPackages.append(button);
-  });
-}
-
-function packageLabel(pack, index) {
-  if (index === 0) return "Starter";
-  if (pack.chips >= 75000) return "Highroller";
-  if (pack.chips >= 30000) return "Deep stack";
-  return "Regular";
-}
-
-function packageMeta(pack, index) {
-  if (index === 0) return "1 buy-in 25/50 · официальный старт";
-  return `${formatChips(pack.chipsPerStar)} chips/Star · для нескольких buy-in`;
-}
-
 function renderCashierHistory(transactions) {
   cashierHistory.replaceChildren();
   if (!transactions.length) {
@@ -507,25 +469,12 @@ function formatTransactionMeta(transaction) {
   return parts.join(" · ");
 }
 
-async function onCashierPackageClick(event) {
-  const button = event.target.closest("[data-package-id]");
-  if (!button) return;
-  const rubAmount = Number(button.dataset.rubAmount || 0);
-  if (cashierRubAmount && rubAmount) {
-    cashierRubAmount.value = String(rubAmount);
-    syncCashierQuote();
-  }
-}
-
 async function payCashierAmount() {
   if (cashierState.selectedMethod !== "stars") {
     cashierStatus.textContent = "Этот способ оплаты скоро появится.";
     return;
   }
 
-  cashierPackages.querySelectorAll("button").forEach((item) => {
-    item.disabled = true;
-  });
   if (cashierPayButton) cashierPayButton.disabled = true;
   cashierStatus.textContent = "Открываем оплату Telegram Stars...";
 
@@ -537,9 +486,6 @@ async function payCashierAmount() {
     });
     await openStarsInvoice(data.invoiceLink);
   } finally {
-    cashierPackages.querySelectorAll("button").forEach((item) => {
-      item.disabled = false;
-    });
     if (cashierPayButton) cashierPayButton.disabled = false;
   }
 }

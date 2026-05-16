@@ -239,14 +239,14 @@ test("initial buy-in chooses table stack and spends wallet balance", async () =>
   }
 });
 
-test("cashier returns demo packages and records wallet operations", async () => {
+test("cashier returns deposit settings and records wallet operations", async () => {
   const server = await startServer();
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
     let cashier = (await request("/api/cashier", { token: auth.token })).cashier;
 
     assert.equal(cashier.balance, 0);
-    assert.equal(cashier.packages.length, 4);
+    assert.equal(cashier.packages, undefined);
     assert.equal(cashier.deposit.minRub, 100);
     assert.equal(cashier.deposit.chipsPerRub, 50);
     assert.equal(cashier.deposit.methods.find((method) => method.id === "stars").enabled, true);
@@ -256,7 +256,7 @@ test("cashier returns demo packages and records wallet operations", async () => 
     cashier = (await request("/api/cashier/demo-topup", {
       method: "POST",
       token: auth.token,
-      body: { packageId: "starter" }
+      body: { rubAmount: 100 }
     })).cashier;
 
     assert.equal(cashier.balance, 5000);
@@ -343,7 +343,7 @@ async function topUp(token, count = 1) {
     cashier = (await request("/api/cashier/demo-topup", {
       method: "POST",
       token,
-      body: { packageId: "starter" }
+      body: { rubAmount: 100 }
     })).cashier;
   }
   return cashier;

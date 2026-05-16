@@ -9,12 +9,6 @@ export const ECONOMY = {
     maxRub: 5000,
     presetsRub: [100, 250, 500, 1000]
   },
-  starsPackages: [
-    { id: "starter", chips: 5000, stars: 50 },
-    { id: "regular", chips: 12000, stars: 120 },
-    { id: "deep", chips: 30000, stars: 250 },
-    { id: "highroller", chips: 75000, stars: 600 }
-  ],
   rake: {
     enabled: true,
     percent: 0.05,
@@ -35,18 +29,6 @@ export const ECONOMY = {
   riskReservePercent: 0.1
 };
 
-export function cashierPackages() {
-  return ECONOMY.starsPackages.map((pack) => ({
-    ...pack,
-    rubAmount: Math.round(pack.stars * ECONOMY.deposit.rubPerStar),
-    chipsPerStar: Math.round(pack.chips / pack.stars)
-  }));
-}
-
-export function findCashierPackage(packageId) {
-  return cashierPackages().find((item) => item.id === packageId);
-}
-
 export function depositSettings() {
   return {
     ...ECONOMY.deposit,
@@ -58,17 +40,13 @@ export function depositSettings() {
   };
 }
 
-export function quoteDeposit({ packageId = "", rubAmount = 0 } = {}) {
-  const pack = packageId ? findCashierPackage(packageId) : null;
-  const amountRub = pack
-    ? pack.rubAmount
-    : clamp(Number(rubAmount || ECONOMY.deposit.minRub), ECONOMY.deposit.minRub, ECONOMY.deposit.maxRub);
+export function quoteDeposit({ rubAmount = 0 } = {}) {
+  const amountRub = clamp(Number(rubAmount || ECONOMY.deposit.minRub), ECONOMY.deposit.minRub, ECONOMY.deposit.maxRub);
   const stars = Math.ceil(amountRub / ECONOMY.deposit.rubPerStar);
   return {
-    packageId: pack?.id || "",
     rubAmount: amountRub,
     stars,
-    chips: pack?.chips || Math.round(amountRub * ECONOMY.deposit.chipsPerRub),
+    chips: Math.round(amountRub * ECONOMY.deposit.chipsPerRub),
     chipsPerRub: ECONOMY.deposit.chipsPerRub,
     method: "stars"
   };
