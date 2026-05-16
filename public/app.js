@@ -31,6 +31,7 @@ const cashierPrimaryButton = document.querySelector("#cashierPrimaryButton");
 const cashierTableStack = document.querySelector("#cashierTableStack");
 const cashierTotalBankroll = document.querySelector("#cashierTotalBankroll");
 const cashierPackages = document.querySelector("#cashierPackages");
+const cashierEconomy = document.querySelector("#cashierEconomy");
 const cashierHistory = document.querySelector("#cashierHistory");
 const cashierStatus = document.querySelector("#cashierStatus");
 const profileAvatar = document.querySelector("#profileAvatar");
@@ -341,6 +342,7 @@ function renderCashier(cashier) {
   cashierTableStack.textContent = formatChips(cashier.tableStack || 0);
   cashierTotalBankroll.textContent = formatChips(cashier.totalBankroll || cashier.balance || 0);
   renderCashierPackages(cashier.packages || []);
+  renderCashierEconomy(cashier.economy || {});
   renderCashierHistory(cashier.transactions || []);
 }
 
@@ -355,12 +357,38 @@ function renderCashierPackages(packages) {
     const chips = document.createElement("strong");
     chips.textContent = `${formatChips(pack.chips)} chips`;
     const meta = document.createElement("span");
-    meta.textContent = `${pack.stars} Stars`;
+    meta.textContent = `${pack.stars} Stars · ${formatChips(pack.chipsPerStar)} chips/Star`;
     const badge = document.createElement("small");
     badge.textContent = "QWZ";
 
     button.append(chips, meta, badge);
     cashierPackages.append(button);
+  }
+}
+
+function renderCashierEconomy(economy) {
+  if (!cashierEconomy) return;
+  const rake = economy.rake || {};
+  const withdrawalMethods = economy.withdrawals?.methods || [];
+  cashierEconomy.replaceChildren();
+
+  const rows = [
+    ["Rake cash-game", `${Math.round((rake.percent || 0) * 100)}% · cap ${formatChips(rake.cap || 0)}`],
+    ["No flop, no drop", rake.noFlopNoDrop ? "включено" : "выключено"],
+    ["Маркетинг-резерв", `${Math.round((economy.marketingReservePercent || 0) * 100)}%`],
+    ["Вывод", economy.withdrawals?.enabled ? "активен" : "готовится"]
+  ];
+
+  for (const [label, value] of rows) {
+    const item = document.createElement("div");
+    item.innerHTML = `<span>${label}</span><strong>${value}</strong>`;
+    cashierEconomy.append(item);
+  }
+
+  if (withdrawalMethods.length) {
+    const methods = document.createElement("small");
+    methods.textContent = `Будущие методы вывода: ${withdrawalMethods.map((method) => `${method.title} ${Math.round(method.feePercent * 100)}%`).join(" · ")}`;
+    cashierEconomy.append(methods);
   }
 }
 

@@ -300,10 +300,11 @@ test("showdown distributes main pot and side pot by contribution eligibility", (
 
   assert.equal(table.status, "showdown");
   assert.equal(table.pot, 0);
-  assert.equal(table.seats[0].stack, 300);
+  assert.equal(table.rakeCollected, 25);
+  assert.equal(table.seats[0].stack, 275);
   assert.equal(table.seats[1].stack, 300);
   assert.equal(table.seats[2].stack, 100);
-  assert.match(table.message, /Owner забирает банк 300/);
+  assert.match(table.message, /Owner забирает банк 275, rake 25/);
   assert.match(table.message, /Player 2 забирает сайд-пот 1 200/);
 });
 
@@ -328,9 +329,12 @@ test("showdown records hand history with board, pots, and player results", () =>
   assert.equal(table.status, "showdown");
   assert.equal(table.handHistory.length, 1);
   assert.deepEqual(table.handHistory[0].board, ["4s", "Jc", "9h", "7d", "2c"]);
-  assert.equal(table.handHistory[0].pots[0].amount, 100);
+  assert.equal(table.handHistory[0].rake, 5);
+  assert.equal(table.handHistory[0].pots[0].amount, 95);
+  assert.equal(table.handHistory[0].pots[0].grossAmount, 100);
+  assert.equal(table.handHistory[0].pots[0].rake, 5);
   assert.deepEqual(table.handHistory[0].pots[0].winners, ["Owner"]);
-  assert.equal(table.handHistory[0].seats.find((seat) => seat.name === "Owner").profit, 50);
+  assert.equal(table.handHistory[0].seats.find((seat) => seat.name === "Owner").profit, 45);
 
   const view = publicTable(table, owner.id);
   assert.equal(view.handHistory.length, 1);

@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { calculateRake, rakePreview } from "./economy.js";
 import { resolveShowdown } from "./poker-evaluator.js";
 
 export const ACTION_TIMEOUT_MS = 20000;
@@ -43,6 +44,7 @@ export function createTable(owner, body = {}) {
     message: "Ожидание игроков",
     actionLog: [],
     handHistory: [],
+    rakeCollected: 0,
     seats: [],
     deck: []
   };
@@ -354,6 +356,8 @@ export function publicTable(table, viewerId = "") {
     runoutCardsLeft: table.runoutQueue.length,
     communityCards: table.communityCards,
     pot: table.pot,
+    rake: rakePreview(table.bigBlind),
+    rakeCollected: table.rakeCollected,
     dealerIndex: table.dealerIndex,
     smallBlindIndex: table.smallBlindIndex,
     bigBlindIndex: table.bigBlindIndex,
@@ -585,7 +589,8 @@ function finishByFold(table) {
   table.message = `${winner.name} забирает банк ${table.pot}`;
   addLog(table, table.message);
   recordHandHistory(table, {
-    pots: [{ label: "банк", amount: totalPot, winners: [winner.name], handDescription: "fold" }]
+    pots: [{ label: "банк", amount: totalPot, grossAmount: totalPot, rake: 0, winners: [winner.name], handDescription: "fold" }],
+    rake: 0
   });
   table.pot = 0;
   table.status = "showdown";
@@ -600,14 +605,25 @@ function finishByFold(table) {
 function finishShowdown(table) {
   const totalPot = table.pot;
   const pots = buildPots(table);
+  let rakeLeft = calculateRake({
+    pot: totalPot,
+    bigBlind: table.bigBlind,
+    boardCards: table.communityCards.length
+  });
+  const totalRake = rakeLeft;
   const summaries = [];
   const historyPots = [];
 
   for (const pot of pots) {
+    const potRake = Math.min(pot.amount, rakeLeft);
+    const payoutAmount = pot.amount - potRake;
+    rakeLeft -= potRake;
+    if (payoutAmount <= 0) continue;
+
     const { winners, handDescription } = resolveShowdown(pot.eligible, table.communityCards);
     const orderedWinners = orderWinnersForOddChips(table, winners);
-    const share = Math.floor(pot.amount / orderedWinners.length);
-    let remainder = pot.amount - share * orderedWinners.length;
+    const share = Math.floor(payoutAmount / orderedWinners.length);
+    let remainder = payoutAmount - share * orderedWinners.length;
 
     for (const winner of orderedWinners) {
       winner.seat.stack += share + (remainder > 0 ? 1 : 0);
@@ -615,21 +631,25 @@ function finishShowdown(table) {
     }
 
     const winnerNames = orderedWinners.map((winner) => winner.seat.name).join(", ");
-    summaries.push(`${winnerNames} забирает ${pot.label} ${pot.amount} (${handDescription})`);
+    summaries.push(`${winnerNames} забирает ${pot.label} ${payoutAmount}${potRake ? `, rake ${potRake}` : ""} (${handDescription})`);
     historyPots.push({
       label: pot.label,
-      amount: pot.amount,
+      amount: payoutAmount,
+      grossAmount: pot.amount,
+      rake: potRake,
       winners: orderedWinners.map((winner) => winner.seat.name),
       handDescription
     });
   }
+  table.rakeCollected += totalRake;
   markBustedSeats(table);
 
   table.message = summaries.length
     ? summaries.join("; ")
     : `Банк ${totalPot} не разыгран`;
   addLog(table, table.message);
-  recordHandHistory(table, { pots: historyPots });
+  if (totalRake) addLog(table, `Rake ${totalRake}`);
+  recordHandHistory(table, { pots: historyPots, rake: totalRake });
   table.pot = 0;
   table.status = "showdown";
   table.activeSeatIndex = -1;
@@ -640,12 +660,13 @@ function finishShowdown(table) {
   table.handFinishedAt = Date.now();
 }
 
-function recordHandHistory(table, { pots }) {
+function recordHandHistory(table, { pots, rake = 0 }) {
   const record = {
     id: randomId("hand"),
     handNumber: table.handNumber,
     at: Date.now(),
     board: [...table.communityCards],
+    rake,
     pots,
     seats: table.seats
       .filter((seat) => seat.cards.length > 0)

@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ECONOMY, cashierPackages, findCashierPackage, rakePreview } from "./economy.js";
 import {
   act,
   addBuyIn,
@@ -44,12 +45,6 @@ const starOrders = new Map();
 const loggedAppOpens = new Set();
 const DEFAULT_STACK = 10000;
 const DEFAULT_WALLET = 50000;
-const CASHIER_PACKAGES = [
-  { id: "starter", chips: 10000, stars: 50 },
-  { id: "regular", chips: 25000, stars: 120 },
-  { id: "deep", chips: 60000, stars: 250 },
-  { id: "highroller", chips: 150000, stars: 600 }
-];
 
 seedPublicTables();
 
@@ -146,7 +141,7 @@ async function handleApi(req, res, url) {
 
   if (req.method === "POST" && url.pathname === "/api/cashier/demo-topup") {
     const body = await readJson(req);
-    const pack = CASHIER_PACKAGES.find((item) => item.id === body.packageId);
+    const pack = findCashierPackage(body.packageId);
     if (!pack) {
       sendJson(res, 400, { error: "Пакет пополнения не найден" });
       return;
@@ -173,7 +168,7 @@ async function handleApi(req, res, url) {
 
   if (req.method === "POST" && url.pathname === "/api/cashier/stars-invoice") {
     const body = await readJson(req);
-    const pack = CASHIER_PACKAGES.find((item) => item.id === body.packageId);
+    const pack = findCashierPackage(body.packageId);
     if (!pack) {
       sendJson(res, 400, { error: "Пакет пополнения не найден" });
       return;
@@ -490,7 +485,13 @@ function cashierView(user) {
     activeTableCount: activeTables.length,
     currency: "chips",
     mode: "chips",
-    packages: CASHIER_PACKAGES,
+    packages: cashierPackages(),
+    economy: {
+      marketingReservePercent: ECONOMY.marketingReservePercent,
+      riskReservePercent: ECONOMY.riskReservePercent,
+      rake: rakePreview(50),
+      withdrawals: ECONOMY.withdrawals
+    },
     transactions: getTransactions(user)
   };
 }

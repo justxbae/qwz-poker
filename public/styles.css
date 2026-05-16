@@ -847,6 +847,41 @@ h2 {
   opacity: 0.58;
 }
 
+.cashier-economy {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  border: 1px solid var(--tg-line);
+  border-radius: 14px;
+  background: rgba(18, 27, 37, 0.54);
+  padding: 12px;
+}
+
+.cashier-economy div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--tg-hint);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cashier-economy strong {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 650;
+  text-align: right;
+}
+
+.cashier-economy small {
+  margin-top: 3px;
+  color: rgba(139, 152, 166, 0.9);
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 1.35;
+}
+
 .cashier-status {
   min-height: 18px;
   margin-top: 12px;

@@ -59,7 +59,8 @@ test("table auto-starts, accepts custom raise, and pays the pot at showdown", as
 
     assert.equal(table.status, "showdown");
     assert.equal(table.pot, 0);
-    assert.equal(table.seats.reduce((sum, seat) => sum + seat.stack, 0), 20000);
+    assert.equal(table.rakeCollected, 25);
+    assert.equal(table.seats.reduce((sum, seat) => sum + seat.stack, 0), 19975);
     assert.match(table.message, /забирает банк/);
   } finally {
     server.kill();
