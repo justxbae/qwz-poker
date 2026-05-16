@@ -247,6 +247,10 @@ test("cashier returns demo packages and records wallet operations", async () => 
 
     assert.equal(cashier.balance, 0);
     assert.equal(cashier.packages.length, 4);
+    assert.equal(cashier.deposit.minRub, 100);
+    assert.equal(cashier.deposit.chipsPerRub, 50);
+    assert.equal(cashier.deposit.methods.find((method) => method.id === "stars").enabled, true);
+    assert.equal(cashier.deposit.methods.find((method) => method.id === "ton").enabled, false);
     assert.equal(cashier.transactions.length, 0);
 
     cashier = (await request("/api/cashier/demo-topup", {

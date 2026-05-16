@@ -774,6 +774,141 @@ h2 {
   line-height: 1.35;
 }
 
+.cashier-calculator {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  border: 1px solid var(--tg-line);
+  border-radius: 18px;
+  background: rgba(14, 22, 33, 0.34);
+  padding: 14px;
+}
+
+.cashier-amount-field {
+  position: relative;
+  display: grid;
+  gap: 8px;
+}
+
+.cashier-amount-field span,
+.cashier-quote span {
+  color: var(--tg-hint);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.cashier-amount-field input {
+  width: 100%;
+  border: 1px solid rgba(42, 171, 238, 0.35);
+  border-radius: 14px;
+  background: rgba(9, 16, 25, 0.72);
+  color: #fff;
+  padding: 13px 58px 13px 14px;
+  font: inherit;
+  font-size: 28px;
+  font-weight: 700;
+  outline: none;
+}
+
+.cashier-amount-field small {
+  position: absolute;
+  right: 14px;
+  bottom: 16px;
+  color: var(--tg-link);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.cashier-presets,
+.cashier-methods {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cashier-presets button,
+.cashier-methods button {
+  border: 1px solid var(--tg-line);
+  border-radius: 13px;
+  background: rgba(36, 47, 61, 0.56);
+  color: #fff;
+  padding: 10px 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cashier-methods {
+  grid-template-columns: 1fr;
+  margin-top: 12px;
+}
+
+.cashier-methods button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 54px;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.cashier-methods button.active {
+  border-color: rgba(42, 171, 238, 0.74);
+  background: rgba(42, 171, 238, 0.16);
+}
+
+.cashier-methods button:disabled {
+  opacity: 0.48;
+}
+
+.cashier-methods strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cashier-methods span {
+  color: var(--tg-hint);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.cashier-quote {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cashier-quote div {
+  display: grid;
+  gap: 5px;
+  border-radius: 14px;
+  background: rgba(36, 47, 61, 0.46);
+  padding: 12px;
+}
+
+.cashier-quote strong {
+  color: #fff;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.cashier-pay-button {
+  width: 100%;
+  min-height: 58px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--tg-link);
+  color: #fff;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 750;
+}
+
+.cashier-pay-button:disabled {
+  opacity: 0.62;
+}
+
 .cashier-packages {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

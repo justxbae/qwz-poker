@@ -17,6 +17,10 @@ const state = {
   selectedSmallBlind: 25,
   tables: []
 };
+const cashierState = {
+  deposit: null,
+  selectedMethod: "stars"
+};
 
 const profile = document.querySelector("#profile");
 const lobbyAvatar = document.querySelector("#lobbyAvatar");
@@ -30,6 +34,12 @@ const cashierBalance = document.querySelector("#cashierBalance");
 const cashierPrimaryButton = document.querySelector("#cashierPrimaryButton");
 const cashierTableStack = document.querySelector("#cashierTableStack");
 const cashierTotalBankroll = document.querySelector("#cashierTotalBankroll");
+const cashierRubAmount = document.querySelector("#cashierRubAmount");
+const cashierPresets = document.querySelector("#cashierPresets");
+const cashierMethods = document.querySelector("#cashierMethods");
+const cashierQuoteChips = document.querySelector("#cashierQuoteChips");
+const cashierQuoteStars = document.querySelector("#cashierQuoteStars");
+const cashierPayButton = document.querySelector("#cashierPayButton");
 const cashierPackages = document.querySelector("#cashierPackages");
 const cashierHistory = document.querySelector("#cashierHistory");
 const cashierStatus = document.querySelector("#cashierStatus");
@@ -170,6 +180,10 @@ async function boot() {
   cashierPrimaryButton.addEventListener("click", () => {
     document.querySelector(".cashier-topup-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
+  cashierRubAmount?.addEventListener("input", syncCashierQuote);
+  cashierPresets?.addEventListener("click", onCashierPresetClick);
+  cashierMethods?.addEventListener("click", onCashierMethodClick);
+  cashierPayButton?.addEventListener("click", () => runAction(payCashierAmount));
   cashierPackages.addEventListener("click", onCashierPackageClick);
   quickPlayButton.addEventListener("click", () => runAction(quickPlay));
   quickPrivateButton.addEventListener("click", () => runAction(quickCreatePrivateTable));
@@ -340,8 +354,77 @@ function renderCashier(cashier) {
   cashierBalance.textContent = formatChips(cashier.balance);
   cashierTableStack.textContent = formatChips(cashier.tableStack || 0);
   cashierTotalBankroll.textContent = formatChips(cashier.totalBankroll || cashier.balance || 0);
+  cashierState.deposit = cashier.deposit || null;
+  renderCashierControls(cashier.deposit || {});
   renderCashierPackages(cashier.packages || []);
   renderCashierHistory(cashier.transactions || []);
+}
+
+function renderCashierControls(deposit) {
+  if (!cashierRubAmount || !cashierPresets || !cashierMethods) return;
+
+  cashierRubAmount.min = String(deposit.minRub || 100);
+  cashierRubAmount.max = String(deposit.maxRub || 5000);
+  cashierRubAmount.step = "50";
+  if (!cashierRubAmount.value) cashierRubAmount.value = String(deposit.minRub || 100);
+
+  cashierPresets.replaceChildren(...(deposit.presetsRub || []).map((amount) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.rubAmount = String(amount);
+    button.textContent = `${formatChips(amount)} ₽`;
+    return button;
+  }));
+
+  cashierMethods.replaceChildren(...(deposit.methods || []).map((method) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.method = method.id;
+    button.disabled = !method.enabled;
+    button.className = method.id === cashierState.selectedMethod ? "active" : "";
+    button.innerHTML = `<strong>${method.title}</strong><span>${method.speed}</span>`;
+    return button;
+  }));
+
+  syncCashierQuote();
+}
+
+function onCashierPresetClick(event) {
+  const button = event.target.closest("[data-rub-amount]");
+  if (!button || !cashierRubAmount) return;
+  cashierRubAmount.value = button.dataset.rubAmount;
+  syncCashierQuote();
+}
+
+function onCashierMethodClick(event) {
+  const button = event.target.closest("[data-method]");
+  if (!button || button.disabled) return;
+  cashierState.selectedMethod = button.dataset.method;
+  cashierMethods.querySelectorAll("button").forEach((item) => {
+    item.classList.toggle("active", item.dataset.method === cashierState.selectedMethod);
+  });
+}
+
+function syncCashierQuote() {
+  const quote = cashierQuote();
+  if (cashierQuoteChips) cashierQuoteChips.textContent = `${formatChips(quote.chips)} chips`;
+  if (cashierQuoteStars) cashierQuoteStars.textContent = `${formatChips(quote.stars)} Stars`;
+  if (cashierPayButton) cashierPayButton.textContent = `Пополнить на ${formatChips(quote.chips)} chips`;
+}
+
+function cashierQuote() {
+  const deposit = cashierState.deposit || {};
+  const minRub = Number(deposit.minRub || 100);
+  const maxRub = Number(deposit.maxRub || 5000);
+  const rubPerStar = Number(deposit.rubPerStar || 2);
+  const chipsPerRub = Number(deposit.chipsPerRub || 50);
+  const rubAmount = clampAmount(Number(cashierRubAmount?.value || minRub), minRub, maxRub);
+  const stars = Math.ceil(rubAmount / rubPerStar);
+  return {
+    rubAmount,
+    stars,
+    chips: Math.round(rubAmount * chipsPerRub)
+  };
 }
 
 function renderCashierPackages(packages) {
@@ -351,6 +434,7 @@ function renderCashierPackages(packages) {
     button.type = "button";
     button.className = `cashier-package ${index === 0 ? "starter" : ""}`;
     button.dataset.packageId = pack.id;
+    button.dataset.rubAmount = String(pack.rubAmount || 0);
 
     const label = document.createElement("em");
     label.textContent = packageLabel(pack, index);
@@ -424,22 +508,37 @@ function formatTransactionMeta(transaction) {
 async function onCashierPackageClick(event) {
   const button = event.target.closest("[data-package-id]");
   if (!button) return;
+  const rubAmount = Number(button.dataset.rubAmount || 0);
+  if (cashierRubAmount && rubAmount) {
+    cashierRubAmount.value = String(rubAmount);
+    syncCashierQuote();
+  }
+}
+
+async function payCashierAmount() {
+  if (cashierState.selectedMethod !== "stars") {
+    cashierStatus.textContent = "Этот способ оплаты скоро появится.";
+    return;
+  }
 
   cashierPackages.querySelectorAll("button").forEach((item) => {
     item.disabled = true;
   });
+  if (cashierPayButton) cashierPayButton.disabled = true;
   cashierStatus.textContent = "Открываем оплату Telegram Stars...";
 
   try {
+    const quote = cashierQuote();
     const data = await api("/api/cashier/stars-invoice", {
       method: "POST",
-      body: { packageId: button.dataset.packageId }
+      body: { rubAmount: quote.rubAmount }
     });
     await openStarsInvoice(data.invoiceLink);
   } finally {
     cashierPackages.querySelectorAll("button").forEach((item) => {
       item.disabled = false;
     });
+    if (cashierPayButton) cashierPayButton.disabled = false;
   }
 }
 

@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { cashierPackages, findCashierPackage } from "./economy.js";
+import { cashierPackages, depositSettings, findCashierPackage, quoteDeposit } from "./economy.js";
 import {
   act,
   addBuyIn,
@@ -168,11 +168,7 @@ async function handleApi(req, res, url) {
 
   if (req.method === "POST" && url.pathname === "/api/cashier/stars-invoice") {
     const body = await readJson(req);
-    const pack = findCashierPackage(body.packageId);
-    if (!pack) {
-      sendJson(res, 400, { error: "Пакет пополнения не найден" });
-      return;
-    }
+    const quote = quoteDeposit(body);
     if (!BOT_TOKEN || BOT_TOKEN.includes("replace_with") || BOT_TOKEN === "test-token") {
       sendJson(res, 409, { error: "BOT_TOKEN не настроен для Telegram Stars" });
       return;
@@ -185,25 +181,27 @@ async function handleApi(req, res, url) {
       userId: user.id,
       userName: user.name,
       username: user.username,
-      packageId: pack.id,
-      chips: pack.chips,
-      stars: pack.stars,
+      packageId: quote.packageId,
+      rubAmount: quote.rubAmount,
+      chips: quote.chips,
+      stars: quote.stars,
       status: "pending",
       createdAt: new Date().toISOString()
     };
     starOrders.set(orderId, order);
 
     const invoiceLink = await createStarsInvoiceLink({
-      title: `${formatNumber(pack.chips)} QWZ chips`,
-      description: `Пополнение игрового баланса QWZ Poker на ${formatNumber(pack.chips)} chips`,
+      title: `${formatNumber(quote.chips)} QWZ chips`,
+      description: `Пополнение игрового баланса QWZ Poker на ${formatNumber(quote.chips)} chips`,
       payload,
-      stars: pack.stars
+      stars: quote.stars
     });
     notifyAdmin("stars_invoice", "Создан счет Stars", {
       user,
       lines: [
-        `Пакет: ${formatNumber(pack.chips)} chips`,
-        `Стоимость: ${formatNumber(pack.stars)} Stars`,
+        `Сумма: ${formatNumber(quote.rubAmount)} ₽`,
+        `Пакет: ${formatNumber(quote.chips)} chips`,
+        `Стоимость: ${formatNumber(quote.stars)} Stars`,
         `Order: ${order.id}`
       ]
     });
@@ -486,6 +484,7 @@ function cashierView(user) {
     currency: "chips",
     mode: "chips",
     packages: cashierPackages(),
+    deposit: depositSettings(),
     transactions: getTransactions(user)
   };
 }
@@ -657,6 +656,7 @@ function processSuccessfulStarPayment(payment) {
   notifyAdmin("stars_paid", "Оплачено Stars-пополнение", {
     user: { id: order.userId, name: order.userName, username: order.username },
     lines: [
+      `Сумма: ${formatNumber(order.rubAmount || 0)} ₽`,
       `Пакет: ${formatNumber(order.chips)} chips`,
       `Оплата: ${formatNumber(order.stars)} Stars`,
       `Order: ${order.id}`,
