@@ -153,8 +153,13 @@
               <small id="lobbyUsername">Telegram profile</small>
             </div>
           </div>
-          <div class="wallet-label">QWZ chips</div>
-          <div class="wallet-balance" id="lobbyBalance">0</div>
+          <div class="wallet-balance-row">
+            <div>
+              <div class="wallet-label">QWZ chips</div>
+              <div class="wallet-balance" id="lobbyBalance">0</div>
+            </div>
+            <button type="button" class="wallet-topup-button" id="walletTopupButton" aria-label="Пополнить баланс">+</button>
+          </div>
           <div class="home-metrics">
             <div>
               <span>В игре</span>
@@ -180,11 +185,11 @@
           <button id="continueGameButton" type="button">Вернуться</button>
         </section>
 
-        <section class="lobby-card home-mode-card">
+        <section class="lobby-card home-mode-card telegram-list-card">
           <div>
-            <p class="eyebrow">Режим</p>
+            <p class="eyebrow">Открытый клуб</p>
             <h2>Texas Hold’em cash</h2>
-            <span>2-6 игроков · без реальных денег</span>
+            <span>Первый нативный покерный клуб в Telegram</span>
           </div>
           <button type="button" data-lobby-tab="tables">Столы</button>
         </section>
@@ -213,11 +218,11 @@
           <button type="button" data-lobby-tab="tables">Открыть</button>
         </section>
 
-        <section class="lobby-card home-action-card">
+        <section class="lobby-card home-action-card telegram-list-card">
           <div>
-            <p class="eyebrow">Приватный стол</p>
-            <h2>Игра с друзьями</h2>
-            <span>Создать стол и отправить ссылку</span>
+            <p class="eyebrow">Дополнительно</p>
+            <h2>Приватный стол</h2>
+            <span>Создать закрытый стол по ссылке</span>
           </div>
           <button type="button" id="quickPrivateButton">Создать</button>
         </section>

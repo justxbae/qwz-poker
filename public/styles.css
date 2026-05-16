@@ -322,7 +322,7 @@ h2 {
 .wallet-card,
 .lobby-card {
   border: 1px solid var(--tg-line);
-  border-radius: 18px;
+  border-radius: 16px;
   background:
     linear-gradient(145deg, rgba(36, 47, 61, 0.92), rgba(23, 33, 43, 0.96)),
     var(--tg-secondary-bg);
@@ -482,6 +482,20 @@ h2 {
   text-transform: none;
 }
 
+.wallet-balance-row {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  gap: 12px;
+  align-items: end;
+  margin-top: 16px;
+}
+
+.wallet-balance-row .wallet-label {
+  margin-top: 0;
+}
+
 .wallet-balance {
   margin-top: 4px;
   color: #fff;
@@ -495,6 +509,22 @@ h2 {
   color: var(--tg-hint);
   font-size: 15px;
   font-weight: 600;
+}
+
+.wallet-topup-button {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  min-height: 48px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--tg-link);
+  color: #fff;
+  padding: 0;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 10px 22px rgba(42, 171, 238, 0.28);
 }
 
 .home-metrics {
@@ -511,7 +541,7 @@ h2 {
   gap: 4px;
   min-height: 56px;
   border: 1px solid var(--tg-line);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(14, 22, 33, 0.48);
   padding: 9px 12px;
 }
@@ -656,9 +686,6 @@ h2 {
 
 .home-mode-card {
   min-height: 92px;
-  background:
-    radial-gradient(circle at 88% 52%, rgba(42, 171, 238, 0.18), transparent 28%),
-    linear-gradient(145deg, rgba(36, 47, 61, 0.98), rgba(16, 27, 39, 0.98));
 }
 
 .home-mode-card div {
@@ -676,6 +703,21 @@ h2 {
   color: var(--tg-hint);
   font-size: 13px;
   font-weight: 600;
+}
+
+.telegram-list-card {
+  background: rgba(36, 47, 61, 0.66);
+  box-shadow: none;
+}
+
+.telegram-list-card button {
+  min-width: 76px;
+  min-height: 38px;
+  border-radius: 18px;
+  background: rgba(42, 171, 238, 0.14);
+  color: var(--tg-link);
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .limit-card {

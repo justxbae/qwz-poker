@@ -32,6 +32,7 @@ const lobbyActiveTables = document.querySelector("#lobbyActiveTables");
 const homeActivityText = document.querySelector("#homeActivityText");
 const cashierBalance = document.querySelector("#cashierBalance");
 const cashierPrimaryButton = document.querySelector("#cashierPrimaryButton");
+const walletTopupButton = document.querySelector("#walletTopupButton");
 const cashierTableStack = document.querySelector("#cashierTableStack");
 const cashierTotalBankroll = document.querySelector("#cashierTotalBankroll");
 const cashierRubAmount = document.querySelector("#cashierRubAmount");
@@ -180,6 +181,7 @@ async function boot() {
   cashierPrimaryButton.addEventListener("click", () => {
     document.querySelector(".cashier-topup-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
+  walletTopupButton?.addEventListener("click", () => openCashierTopup());
   cashierRubAmount?.addEventListener("input", syncCashierQuote);
   cashierPresets?.addEventListener("click", onCashierPresetClick);
   cashierMethods?.addEventListener("click", onCashierMethodClick);
@@ -705,6 +707,14 @@ function selectLobbyTab(tab) {
   if (tab === "profile") runAction(loadProfile);
   if (tab === "cashier") runAction(loadCashier);
   updateTelegramBackButton();
+}
+
+function openCashierTopup() {
+  haptic("light");
+  selectLobbyTab("cashier");
+  window.requestAnimationFrame(() => {
+    document.querySelector(".cashier-topup-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 }
 
 async function loadTables() {
