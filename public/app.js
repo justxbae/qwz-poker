@@ -30,6 +30,7 @@ const lobbyBalance = document.querySelector("#lobbyBalance");
 const lobbyTableStack = document.querySelector("#lobbyTableStack");
 const lobbyActiveTables = document.querySelector("#lobbyActiveTables");
 const homeActivityText = document.querySelector("#homeActivityText");
+const homeSessionPill = document.querySelector("#homeSessionPill");
 const cashierBalance = document.querySelector("#cashierBalance");
 const cashierPrimaryButton = document.querySelector("#cashierPrimaryButton");
 const walletTopupButton = document.querySelector("#walletTopupButton");
@@ -539,6 +540,10 @@ function renderProfile(profileData) {
   homeActivityText.textContent = profileData.activeTableCount
     ? `${profileData.activeTableCount} ${plural(profileData.activeTableCount, "стол", "стола", "столов")} · ${formatChips(profileData.tableStack)} за столами`
     : "Выберите стол и начните игру.";
+  if (homeSessionPill) {
+    homeSessionPill.textContent = profileData.activeTableCount ? "активно" : "нет активных";
+    homeSessionPill.dataset.status = profileData.activeTableCount ? "active" : "idle";
+  }
   profileHands.textContent = String(profileData.handsPlayed || 0);
   profileTables.textContent = String(profileData.activeTableCount || 0);
   profileStatus.textContent = profileData.activeTableCount ? "В игре" : "В лобби";
