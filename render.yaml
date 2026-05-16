@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: qwz-poker
+    runtime: node
+    plan: free
+    buildCommand: ""
+    startCommand: node server/index.js
+    healthCheckPath: /api/config
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_NAME
+        value: QWZ Poker
+      - key: BOT_USERNAME
+        value: poker74bot
+      - key: BOT_TOKEN
+        sync: false

@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QWZ Poker</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">Telegram poker room</p>
+          <h1>QWZ Poker</h1>
+        </div>
+        <div class="profile" id="profile">...</div>
+      </section>
+
+      <section class="table-panel game-screen" id="currentTable" hidden>
+        <div class="game-toolbar">
+          <button id="menuButton" class="icon-control" title="Меню" aria-label="Меню">☰</button>
+          <div class="table-id" id="tableCode">#table</div>
+          <button id="quickBuyInButton" class="icon-control" title="Докупить фишки" aria-label="Докупить фишки">+</button>
+          <div class="toolbar-spacer"></div>
+          <button class="icon-control" data-panel-tab="log" title="История" aria-label="История">♠</button>
+          <button class="icon-control" data-panel-tab="info" title="Инфо" aria-label="Инфо">i</button>
+          <button class="icon-control" data-panel-tab="stats" title="Статистика" aria-label="Статистика">◔</button>
+          <button class="icon-control" data-panel-tab="waitlist" title="Лист ожидания" aria-label="Лист ожидания">☷</button>
+          <button id="sitButton" class="sit-button" hidden>Сесть за стол</button>
+        </div>
+        <div class="board">
+          <div class="start-overlay" id="startOverlay" hidden>
+            <div class="start-title" id="startTitle">Игра начинается</div>
+            <div class="start-subtitle" id="startSubtitle">25/50</div>
+          </div>
+          <div class="action-toast" id="actionToast" hidden></div>
+          <div class="street-overlay" id="streetOverlay" hidden>
+            <strong></strong>
+            <span></span>
+          </div>
+          <div class="observer-banner" id="observerBanner" hidden>
+            <div>
+              <strong>Вы наблюдаете за столом</strong>
+              <span id="observerHint">Можно сесть за свободное место и войти в игру.</span>
+            </div>
+            <button id="observerSitButton">Сесть за стол</button>
+          </div>
+          <div class="community" id="communityCards"></div>
+          <div class="table-center">
+            <div class="blinds" id="blinds">25/50</div>
+            <div class="pot-chip-stack" id="potChips" aria-hidden="true"></div>
+            <div class="pot" id="pot">Банк: 0</div>
+          </div>
+          <div class="table-details" id="tableDetails">Texas NL · Блайнды 25/50</div>
+          <div class="status-line" id="tableStatus">Ожидание игроков</div>
+          <div class="seats" id="seats"></div>
+        </div>
+        <div class="betting-actions" id="bettingActions" hidden>
+          <div class="quick-bets">
+            <button type="button" data-bet-preset="min">Мин.</button>
+            <button type="button" data-bet-preset="half">1/2</button>
+            <button type="button" data-bet-preset="pot">Банк</button>
+            <button type="button" data-bet-preset="max">Макс.</button>
+          </div>
+          <button type="button" class="sitout-action" id="quickSitOutButton" title="Отойти" aria-label="Отойти">□</button>
+          <button data-poker-action="fold" class="danger">Fold</button>
+          <button data-poker-action="check" class="secondary">Check</button>
+          <button data-poker-action="call">Call</button>
+          <label>
+            <span id="amountLabel">Raise +</span>
+            <input id="actionAmount" inputmode="numeric" pattern="[0-9]*" value="50" />
+          </label>
+          <input class="bet-slider" id="betSlider" type="range" min="1" max="10000" step="1" value="50" />
+          <button type="button" class="bet-confirm" id="confirmBetButton">Подтвердить<br /><span>50</span></button>
+          <button data-poker-action="bet">Bet</button>
+          <button data-poker-action="raise">Raise</button>
+        </div>
+        <div class="sitout-popover" id="sitOutPopover" hidden>
+          <button type="button" id="confirmSitOutButton">Отошёл</button>
+          <button type="button" class="sitout-info-button" id="sitOutInfoButton" aria-label="Информация">!</button>
+          <p id="sitOutInfoText" hidden>Вы перейдёте в sit-out. Если раздача активна, режим включится после фолда или завершения руки.</p>
+        </div>
+        <div class="pre-actions" id="preActions" hidden>
+          <button type="button" data-pre-action="check-fold">Чек/Фолд</button>
+          <button type="button" data-pre-action="check">Чек</button>
+          <button type="button" data-pre-action="call-any">Чек/Колл любой</button>
+        </div>
+        <div class="dev-floating">
+          <button id="addTestPlayerButton" class="secondary">Dev: игрок</button>
+          <button id="autoActButton" class="secondary">Dev: автоход</button>
+        </div>
+        <div class="bot-actions" id="botActions" hidden>
+          <span id="botActionLabel">Ход dev-игрока</span>
+          <button id="botFoldButton" class="danger">Dev fold</button>
+          <button id="botCallButton">Dev call</button>
+        </div>
+      </section>
+
+      <section class="buyin-overlay" id="buyInOverlay" hidden>
+        <div class="buyin-sheet">
+          <button type="button" class="buyin-close" id="closeBuyInOverlay" aria-label="Закрыть">×</button>
+          <header class="buyin-head">
+            <p class="buyin-kicker">QWZ Poker</p>
+            <h2 class="buyin-title">Вход за стол</h2>
+            <span id="buyInGameType">БЛ Холдем 25/50</span>
+          </header>
+          <div class="buyin-summary">
+            <div class="buyin-row">
+              <span>Доступный баланс</span>
+              <strong id="buyInBalance">0</strong>
+            </div>
+            <div class="buyin-row">
+              <span>Списать на стол</span>
+              <strong id="buyInDebit">10 000</strong>
+            </div>
+          </div>
+          <div class="buyin-amount-grid">
+            <button type="button" id="buyInMinButton">Мин.<br /><span>10 000</span></button>
+            <label>
+              Сумма
+              <input id="buyInAmount" inputmode="numeric" pattern="[0-9]*" value="10000" />
+            </label>
+            <button type="button" id="buyInMaxButton">Макс.<br /><span>40 000</span></button>
+          </div>
+          <input id="buyInSlider" class="buyin-slider" type="range" min="10000" max="40000" step="500" value="10000" />
+          <button type="button" class="buyin-auto" disabled>Авто Бай-ин и Авто Ребай</button>
+          <section class="buyin-info-card">
+            <div>
+              <span>Стек за столом</span>
+              <strong id="buyInStackPreview">10 000</strong>
+            </div>
+            <div>
+              <span>Режим</span>
+              <strong>QWZ chips</strong>
+            </div>
+            <div>
+              <span>После выхода</span>
+              <strong>Стек сохранится</strong>
+          </section>
+          <button type="button" class="buyin-submit" id="confirmBuyInButton">OK</button>
+        </div>
+      </section>
+
+      <section class="lobby-shell" id="lobby">
+        <section class="lobby-view active" data-lobby-view="home">
+        <section class="wallet-card home-card">
+          <div class="home-head">
+            <div class="lobby-avatar" id="lobbyAvatar">P</div>
+            <div class="home-player">
+              <span>QWZ Poker</span>
+              <strong id="lobbyName">Игрок</strong>
+              <small id="lobbyUsername">Telegram profile</small>
+            </div>
+          </div>
+          <div class="wallet-label">QWZ chips</div>
+          <div class="wallet-balance" id="lobbyBalance">0</div>
+          <div class="home-metrics">
+            <div>
+              <span>В игре</span>
+              <strong id="lobbyTableStack">0</strong>
+            </div>
+            <div>
+              <span>Столов</span>
+              <strong id="lobbyActiveTables">0</strong>
+            </div>
+          </div>
+          <div class="wallet-actions">
+            <button id="quickPlayButton" type="button">Быстрый вход</button>
+            <button type="button" class="secondary-pill" data-lobby-tab="tables">Все столы</button>
+          </div>
+        </section>
+
+        <section class="lobby-card continue-card" id="continueCard" hidden>
+          <div>
+            <p class="eyebrow">В игре</p>
+            <h2>Вернуться за стол</h2>
+            <span id="continueMeta">Стол открыт</span>
+          </div>
+          <button id="continueGameButton" type="button">Вернуться</button>
+        </section>
+
+        <section class="lobby-card home-mode-card">
+          <div>
+            <p class="eyebrow">Режим</p>
+            <h2>Texas Hold’em cash</h2>
+            <span>2-6 игроков · без реальных денег</span>
+          </div>
+          <button type="button" data-lobby-tab="tables">Столы</button>
+        </section>
+
+        <section class="lobby-card limit-card">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Выбор лимита</p>
+              <h2>Блайнды</h2>
+            </div>
+            <span id="onlineStatus">0 свободно</span>
+          </div>
+          <div class="limit-pills" id="limitPills">
+            <button type="button" class="active" data-small-blind="25">25/50</button>
+            <button type="button" data-small-blind="50">50/100</button>
+            <button type="button" data-small-blind="100">100/200</button>
+          </div>
+        </section>
+
+        <section class="lobby-card home-action-card">
+          <div>
+            <p class="eyebrow">Сессия</p>
+            <h2>Мои столы</h2>
+            <span id="homeActivityText">Выберите стол и начните игру.</span>
+          </div>
+          <button type="button" data-lobby-tab="tables">Открыть</button>
+        </section>
+
+        <section class="lobby-card home-action-card">
+          <div>
+            <p class="eyebrow">Приватный стол</p>
+            <h2>Игра с друзьями</h2>
+            <span>Создать стол и отправить ссылку</span>
+          </div>
+          <button type="button" id="quickPrivateButton">Создать</button>
+        </section>
+
+        </section>
+
+        <section class="lobby-view" data-lobby-view="tables">
+        <section class="lobby-card tables-filter-card">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Выбор игры</p>
+              <h2>Столы</h2>
+            </div>
+            <span id="tablesFilterStatus">25/50</span>
+          </div>
+          <div class="limit-pills table-limit-pills" id="tableLimitPills">
+            <button type="button" class="active" data-small-blind="25">25/50</button>
+            <button type="button" data-small-blind="50">50/100</button>
+            <button type="button" data-small-blind="100">100/200</button>
+          </div>
+        </section>
+        <section class="lobby-card">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Общие столы</p>
+              <h2>Cash games</h2>
+            </div>
+            <span id="publicTablesStatus">live</span>
+          </div>
+          <div class="table-list" id="publicTableList"></div>
+        </section>
+        <section class="lobby-card">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Приватные столы</p>
+              <h2>Игры с друзьями</h2>
+            </div>
+            <span id="privateTablesStatus">private</span>
+          </div>
+          <div class="table-list" id="privateTableList"></div>
+        </section>
+        <form class="lobby-card create-card" id="createTableForm">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Приватный стол</p>
+              <h2>Создать игру</h2>
+            </div>
+            <span>Texas NL</span>
+          </div>
+          <input type="hidden" name="smallBlind" value="25" />
+          <label>
+            Название
+            <input name="name" maxlength="40" value="QWZ private table" />
+          </label>
+          <div class="create-grid">
+            <label>
+              Игроков
+              <select name="maxPlayers">
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6" selected>6</option>
+              </select>
+            </label>
+            <button type="submit">Создать</button>
+          </div>
+        </form>
+        </section>
+
+        <section class="lobby-view" data-lobby-view="cashier">
+          <section class="wallet-card cashier-card">
+            <div class="miniapp-title">
+              <span>Касса</span>
+              <small>QWZ chips</small>
+            </div>
+            <div class="wallet-label">Доступно</div>
+            <div class="wallet-balance" id="cashierBalance">0</div>
+            <div class="wallet-actions">
+              <button type="button" id="cashierPrimaryButton">Пополнить</button>
+              <button type="button" class="secondary-pill" disabled>Вывести</button>
+            </div>
+            <div class="cashier-breakdown">
+              <div>
+                <span>За столами</span>
+                <strong id="cashierTableStack">0</strong>
+              </div>
+              <div>
+                <span>Общий банкролл</span>
+                <strong id="cashierTotalBankroll">0</strong>
+              </div>
+            </div>
+          </section>
+          <section class="lobby-card cashier-topup-card">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Пополнение</p>
+                <h2>Пакеты фишек</h2>
+              </div>
+              <span>Telegram Stars</span>
+            </div>
+            <p class="cashier-note">Выберите пакет, оплатите его Telegram Stars, и QWZ chips будут зачислены на игровой баланс.</p>
+            <div class="cashier-packages" id="cashierPackages"></div>
+            <div class="cashier-status" id="cashierStatus" role="status"></div>
+          </section>
+          <section class="lobby-card">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Операции</p>
+                <h2>История</h2>
+              </div>
+              <span>chips</span>
+            </div>
+            <div class="cashier-history" id="cashierHistory"></div>
+          </section>
+        </section>
+
+        <section class="lobby-view" data-lobby-view="profile">
+          <section class="profile-hero">
+            <div class="profile-avatar" id="profileAvatar">P</div>
+            <div class="profile-main">
+              <p class="eyebrow">Профиль</p>
+              <h2 id="profileName">Игрок</h2>
+              <span id="profileUsername">@player</span>
+            </div>
+            <button type="button" id="profileRefreshButton" class="round-control" aria-label="Обновить профиль">↻</button>
+          </section>
+          <section class="lobby-card">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Банкролл</p>
+                <h2 id="profileBalance">0 chips</h2>
+              </div>
+              <span>chips</span>
+            </div>
+            <div class="stats-cards">
+              <div><span>За столами</span><strong id="profileTableStack">0</strong></div>
+              <div><span>Сохранённый стек</span><strong id="profileSavedStack">0</strong></div>
+              <div><span>Баланс</span><strong id="profileChips">0</strong></div>
+            </div>
+          </section>
+          <section class="lobby-card">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Игра</p>
+                <h2>Активность</h2>
+              </div>
+              <span>cash</span>
+            </div>
+            <div class="stats-cards">
+              <div><span>Раздач</span><strong id="profileHands">0</strong></div>
+              <div><span>Столов</span><strong id="profileTables">0</strong></div>
+              <div><span>Статус</span><strong id="profileStatus">В лобби</strong></div>
+            </div>
+          </section>
+          <section class="lobby-card">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Текущий стол</p>
+                <h2>Сессия</h2>
+              </div>
+              <span id="profileSessionBadge">нет</span>
+            </div>
+            <div class="settings-list" id="profileSessionList">
+              <div class="settings-row"><span>Активных столов нет</span><strong>Лобби</strong></div>
+            </div>
+          </section>
+          <section class="lobby-card">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Настройки</p>
+                <h2>Игрок</h2>
+              </div>
+              <span>app</span>
+            </div>
+            <div class="settings-list">
+              <button type="button" class="settings-action" data-lobby-tab="cashier">Касса</button>
+              <button type="button" class="settings-action" data-lobby-tab="tables">Мои столы</button>
+            </div>
+          </section>
+        </section>
+
+        <nav class="bottom-nav" aria-label="Главное меню">
+          <button type="button" class="active" data-lobby-tab="home">⌂<span>Главная</span></button>
+          <button type="button" data-lobby-tab="tables">♠<span>Столы</span></button>
+          <button type="button" data-lobby-tab="cashier">◈<span>Касса</span></button>
+          <button type="button" data-lobby-tab="profile">◉<span>Профиль</span></button>
+        </nav>
+      </section>
+    </main>
+
+    <aside class="side-menu" id="sideMenu" hidden>
+      <button class="close-button" id="closeMenuButton" aria-label="Закрыть меню">×</button>
+      <button id="standButton">Встать</button>
+      <button id="sitOutButton">Отойти</button>
+      <button id="buyInButton">Добавить средства на стол</button>
+      <button id="inviteButton">Пригласить</button>
+      <button id="backToLobbyButton">Назад в лобби</button>
+    </aside>
+
+    <aside class="info-drawer" id="infoDrawer" hidden>
+      <div class="drawer-tabs">
+        <button data-drawer-tab="log" aria-label="История">♠ <span>История</span></button>
+        <button data-drawer-tab="info" aria-label="Инфо">i <span>Инфо</span></button>
+        <button data-drawer-tab="stats" aria-label="Статистика">◔ <span>Статистика</span></button>
+        <button data-drawer-tab="waitlist" aria-label="Лист ожидания">☷ <span>Лист ожидания</span></button>
+        <button class="close-button" id="closeDrawerButton" aria-label="Закрыть панель">×</button>
+      </div>
+      <section class="drawer-page" id="drawerLog">
+        <div class="log-list drawer-log" id="actionLog"></div>
+      </section>
+      <section class="drawer-page" id="drawerInfo" hidden>
+        <div class="info-list" id="tableInfo"></div>
+      </section>
+      <section class="drawer-page" id="drawerStats" hidden>
+        <div class="stats-table" id="statsTable"></div>
+      </section>
+      <section class="drawer-page empty-state" id="drawerWaitlist" hidden>
+        <div class="empty-icon">✦</div>
+        <p>В листе ожидания нет игроков.</p>
+      </section>
+    </aside>
+
+    <template id="tableItemTemplate">
+      <article class="table-item">
+        <div class="table-avatar" data-field="avatar">♠</div>
+        <div class="table-summary">
+          <div class="table-row">
+            <strong data-field="name"></strong>
+            <small data-field="status"></small>
+          </div>
+          <span data-field="meta"></span>
+        </div>
+        <button data-action="join">Войти</button>
+      </article>
+    </template>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
