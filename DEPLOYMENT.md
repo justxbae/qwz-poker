@@ -40,7 +40,7 @@ Required environment variables:
 ```text
 NODE_ENV=production
 HOST=0.0.0.0
-BOT_USERNAME=poker74bot
+BOT_USERNAME=qwzpokerbot
 BOT_TOKEN=<token from BotFather>
 APP_NAME=QWZ Poker
 ```

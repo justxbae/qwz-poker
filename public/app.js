@@ -1,5 +1,5 @@
 const tg = window.Telegram?.WebApp;
-const BOT_USERNAME = "poker74bot";
+const BOT_USERNAME = "qwzpokerbot";
 const params = new URLSearchParams(window.location.search);
 const DEV_MODE = params.has("dev1")
   || params.get("dev") === "1"

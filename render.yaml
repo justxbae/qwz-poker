@@ -12,6 +12,6 @@ services:
       - key: APP_NAME
         value: QWZ Poker
       - key: BOT_USERNAME
-        value: poker74bot
+        value: qwzpokerbot
       - key: BOT_TOKEN
         sync: false

@@ -29,7 +29,7 @@ loadEnv(path.join(rootDir, ".env"));
 
 const PORT = Number(process.env.PORT || 3000);
 const BOT_TOKEN = process.env.BOT_TOKEN || "";
-const BOT_USERNAME = normalizeBotUsername(process.env.BOT_USERNAME || "poker74bot");
+const BOT_USERNAME = normalizeBotUsername(process.env.BOT_USERNAME || "qwzpokerbot");
 const APP_NAME = process.env.APP_NAME || "QWZ Poker";
 const isProduction = process.env.NODE_ENV === "production";
 const HOST = process.env.HOST || (isProduction ? "0.0.0.0" : "127.0.0.1");
