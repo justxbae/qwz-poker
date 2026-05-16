@@ -43,6 +43,8 @@ HOST=0.0.0.0
 BOT_USERNAME=qwzpokerbot
 BOT_TOKEN=<token from BotFather>
 ADMIN_CHAT_ID=<your Telegram numeric user id for private admin logs>
+ADMIN_USER_IDS=<comma-separated Telegram user ids allowed to use admin commands>
+ADMIN_GRANT_MAX_CHIPS=500000
 APP_NAME=QWZ Poker
 ```
 
@@ -58,6 +60,24 @@ Stars payments require:
 - Mini App opened inside Telegram.
 
 The app creates invoices with `currency: XTR`. Successful payments are processed from Telegram `successful_payment` webhook updates.
+
+## Admin wallet commands
+
+Add your Telegram numeric user id to `ADMIN_USER_IDS` on Render. Then you can send commands to the bot:
+
+```text
+/balance <telegram_id>
+/grant <telegram_id> <chips> <reason>
+/deduct <telegram_id> <chips> <reason>
+```
+
+Example:
+
+```text
+/grant 123456789 50000 welcome_bonus
+```
+
+Each operation is written to the player's cashier history and sent to the admin log.
 
 ## Important
 

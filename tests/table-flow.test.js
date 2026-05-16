@@ -280,6 +280,61 @@ test("cashier returns deposit settings and records wallet operations", async () 
   }
 });
 
+test("admin telegram commands grant and deduct wallet chips", async () => {
+  const server = await startServer({ ADMIN_USER_IDS: "777" });
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+
+    await request("/api/telegram/webhook", {
+      method: "POST",
+      body: {
+        message: {
+          chat: { id: 777 },
+          from: { id: 123, first_name: "Nope" },
+          text: "/grant dev-user 15000 blocked"
+        }
+      }
+    });
+
+    let cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.balance, 0);
+
+    await request("/api/telegram/webhook", {
+      method: "POST",
+      body: {
+        message: {
+          chat: { id: 777 },
+          from: { id: 777, first_name: "Admin", username: "admin" },
+          text: "/grant dev-user 15000 test_bonus"
+        }
+      }
+    });
+
+    cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.balance, 15000);
+    assert.equal(cashier.transactions[0].title, "Ручное начисление");
+    assert.equal(cashier.transactions[0].amount, 15000);
+
+    await request("/api/telegram/webhook", {
+      method: "POST",
+      body: {
+        message: {
+          chat: { id: 777 },
+          from: { id: 777, first_name: "Admin", username: "admin" },
+          text: "/deduct dev-user 5000 correction"
+        }
+      }
+    });
+
+    cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.balance, 10000);
+    assert.equal(cashier.transactions[0].title, "Ручное списание");
+    assert.equal(cashier.transactions[0].amount, 5000);
+  } finally {
+    server.kill();
+  }
+});
+
 test("rebuy adds chips only between hands and spends wallet balance", async () => {
   const server = await startServer();
   try {
@@ -349,7 +404,7 @@ async function topUp(token, count = 1) {
   return cashier;
 }
 
-function startServer() {
+function startServer(extraEnv = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ["server/index.js"], {
       cwd: process.cwd(),
@@ -357,7 +412,8 @@ function startServer() {
         ...process.env,
         PORT: String(PORT),
         BOT_TOKEN: "test-token",
-        NODE_ENV: "test"
+        NODE_ENV: "test",
+        ...extraEnv
       },
       stdio: ["ignore", "pipe", "pipe"]
     });

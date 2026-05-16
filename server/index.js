@@ -33,11 +33,14 @@ const BOT_TOKEN = process.env.BOT_TOKEN || "";
 const BOT_USERNAME = normalizeBotUsername(process.env.BOT_USERNAME || "qwzpokerbot");
 const APP_NAME = process.env.APP_NAME || "QWZ Poker";
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || "";
+const ADMIN_USER_IDS = parseIdList(process.env.ADMIN_USER_IDS || ADMIN_CHAT_ID);
+const ADMIN_GRANT_MAX_CHIPS = Number(process.env.ADMIN_GRANT_MAX_CHIPS || 500000);
 const isProduction = process.env.NODE_ENV === "production";
 const HOST = process.env.HOST || (isProduction ? "0.0.0.0" : "127.0.0.1");
 
 const tables = new Map();
 const sessions = new Map();
+const userProfiles = new Map();
 const savedStacks = new Map();
 const wallets = new Map();
 const transactions = new Map();
@@ -143,8 +146,7 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     const quote = quoteDeposit(body);
 
-    user.balance += quote.chips;
-    wallets.set(user.id, user.balance);
+    user.balance = setWalletBalance(user.id, user.balance + quote.chips);
     recordTransaction(user, {
       type: "credit",
       title: "Пополнение баланса",
@@ -316,8 +318,7 @@ async function handleApi(req, res, url) {
       const beforeStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
       const afterStack = addBuyIn(table, user, amount);
       const actualAmount = afterStack - beforeStack;
-      user.balance -= actualAmount;
-      wallets.set(user.id, user.balance);
+      user.balance = setWalletBalance(user.id, user.balance - actualAmount);
       if (actualAmount > 0) {
         recordTransaction(user, {
           type: "debit",
@@ -423,13 +424,15 @@ function authenticateTelegram(initData) {
 
 function normalizeUser(user) {
   const id = String(user.id);
-  return {
+  const normalized = {
     id,
     name: user.first_name || user.username || "Player",
     username: user.username || "",
     photoUrl: user.photo_url || "",
     balance: getWallet(id)
   };
+  userProfiles.set(id, normalized);
+  return normalized;
 }
 
 function profileView(user) {
@@ -542,8 +545,7 @@ function prepareInitialStack(user, body = {}) {
   }
   const amount = clamp(requested, 1, user.balance);
   user.stack = amount;
-  user.balance -= amount;
-  wallets.set(user.id, user.balance);
+  user.balance = setWalletBalance(user.id, user.balance - amount);
   recordTransaction(user, {
     type: "debit",
     title: "Бай-ин за стол",
@@ -559,6 +561,20 @@ function saveStack(user, stack) {
 function getWallet(userId) {
   if (!wallets.has(userId)) wallets.set(userId, DEFAULT_WALLET);
   return wallets.get(userId);
+}
+
+function setWalletBalance(userId, balance) {
+  const id = String(userId);
+  const normalized = Math.max(0, Math.round(Number(balance) || 0));
+  wallets.set(id, normalized);
+
+  for (const sessionUser of sessions.values()) {
+    if (sessionUser.id === id) sessionUser.balance = normalized;
+  }
+
+  const profile = userProfiles.get(id);
+  if (profile) profile.balance = normalized;
+  return normalized;
 }
 
 function getTransactions(user) {
@@ -590,6 +606,33 @@ function recordTransaction(user, transaction) {
   transactions.set(user.id, history.slice(0, 30));
 }
 
+function isAdminUser(userId) {
+  return ADMIN_USER_IDS.has(String(userId));
+}
+
+function normalizeTargetUserId(value) {
+  const targetId = String(value || "").trim();
+  if (!targetId) throw new Error("Укажите Telegram ID игрока");
+  return targetId;
+}
+
+function parseChipAmount(value) {
+  const amount = Number(String(value || "").replace(/\s+/g, ""));
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("Укажите положительную сумму chips");
+  if (amount > ADMIN_GRANT_MAX_CHIPS) {
+    throw new Error(`Лимит одной операции: ${formatNumber(ADMIN_GRANT_MAX_CHIPS)} chips`);
+  }
+  return Math.round(amount);
+}
+
+function telegramMessageUser(user = {}) {
+  return {
+    id: String(user.id || ""),
+    name: user.first_name || user.username || "Admin",
+    username: user.username || ""
+  };
+}
+
 async function createStarsInvoiceLink({ title, description, payload, stars }) {
   const data = await callTelegram("createInvoiceLink", {
     title,
@@ -603,6 +646,11 @@ async function createStarsInvoiceLink({ title, description, payload, stars }) {
 }
 
 async function handleTelegramWebhook(update) {
+  if (update.message?.text) {
+    await handleAdminCommand(update.message);
+    return;
+  }
+
   if (update.pre_checkout_query) {
     await answerPreCheckout(update.pre_checkout_query);
     return;
@@ -611,6 +659,96 @@ async function handleTelegramWebhook(update) {
   const payment = update.message?.successful_payment;
   if (!payment) return;
   processSuccessfulStarPayment(payment);
+}
+
+async function handleAdminCommand(message) {
+  const text = String(message.text || "").trim();
+  if (!text.startsWith("/")) return;
+
+  const fromId = String(message.from?.id || "");
+  const [rawCommand, ...args] = text.split(/\s+/);
+  const command = rawCommand.toLowerCase().replace(`@${BOT_USERNAME.toLowerCase()}`, "");
+
+  if (!["/balance", "/grant", "/deduct"].includes(command)) return;
+
+  if (!isAdminUser(fromId)) {
+    await sendBotMessage(message.chat.id, "Недостаточно прав для админ-команд.");
+    notifyAdmin("admin_denied", "Отклонена админ-команда", {
+      user: telegramMessageUser(message.from),
+      lines: [`Команда: ${text}`]
+    });
+    return;
+  }
+
+  try {
+    if (command === "/balance") {
+      await handleAdminBalanceCommand(message, args);
+      return;
+    }
+
+    await handleAdminWalletCommand(message, command, args);
+  } catch (error) {
+    await sendBotMessage(message.chat.id, `Ошибка: ${error.message}`);
+  }
+}
+
+async function handleAdminBalanceCommand(message, args) {
+  const targetId = normalizeTargetUserId(args[0]);
+  const profile = userProfiles.get(targetId);
+  const balance = getWallet(targetId);
+  const tableStack = userActiveTables({ id: targetId }).reduce((sum, table) => sum + table.stack, 0);
+
+  await sendBotMessage(message.chat.id, [
+    "Баланс игрока",
+    `Игрок: ${formatUser(profile || { id: targetId })}`,
+    `Кошелек: ${formatNumber(balance)} chips`,
+    `За столами: ${formatNumber(tableStack)} chips`,
+    `Всего: ${formatNumber(balance + tableStack)} chips`
+  ].join("\n"));
+}
+
+async function handleAdminWalletCommand(message, command, args) {
+  const targetId = normalizeTargetUserId(args[0]);
+  const amount = parseChipAmount(args[1]);
+  const reason = args.slice(2).join(" ").trim() || "manual_adjustment";
+  const sign = command === "/grant" ? 1 : -1;
+  const before = getWallet(targetId);
+  const after = before + sign * amount;
+
+  if (after < 0) {
+    throw new Error(`Недостаточно chips. Баланс игрока: ${formatNumber(before)}`);
+  }
+
+  const balance = setWalletBalance(targetId, after);
+  const targetProfile = userProfiles.get(targetId) || { id: targetId };
+  const admin = telegramMessageUser(message.from);
+  const title = command === "/grant" ? "Ручное начисление" : "Ручное списание";
+
+  recordTransaction(targetProfile, {
+    type: command === "/grant" ? "credit" : "debit",
+    title,
+    amount,
+    meta: `${reason} · admin ${admin.id}`
+  });
+
+  notifyAdmin(command.slice(1), title, {
+    user: targetProfile,
+    lines: [
+      `Админ: ${formatUser(admin)}`,
+      `Сумма: ${formatNumber(amount)} chips`,
+      `До: ${formatNumber(before)} chips`,
+      `После: ${formatNumber(balance)} chips`,
+      `Причина: ${reason}`
+    ]
+  });
+
+  await sendBotMessage(message.chat.id, [
+    command === "/grant" ? "Начислено chips" : "Списано chips",
+    `Игрок: ${formatUser(targetProfile)}`,
+    `Сумма: ${formatNumber(amount)} chips`,
+    `Баланс: ${formatNumber(balance)} chips`,
+    `Причина: ${reason}`
+  ].join("\n"));
 }
 
 async function answerPreCheckout(query) {
@@ -635,8 +773,7 @@ function processSuccessfulStarPayment(payment) {
   if (!order || order.status === "paid") return;
   if (payment.currency !== "XTR" || Number(payment.total_amount) !== Number(order.stars)) return;
 
-  const balance = getWallet(order.userId) + order.chips;
-  wallets.set(order.userId, balance);
+  const balance = setWalletBalance(order.userId, getWallet(order.userId) + order.chips);
   order.status = "paid";
   order.paidAt = new Date().toISOString();
   order.telegramPaymentChargeId = payment.telegram_payment_charge_id || "";
@@ -679,6 +816,17 @@ async function callTelegram(method, payload) {
     throw error;
   }
   return data;
+}
+
+async function sendBotMessage(chatId, text) {
+  if (!chatId || !BOT_TOKEN || BOT_TOKEN.includes("replace_with") || BOT_TOKEN === "test-token") return;
+  await callTelegram("sendMessage", {
+    chat_id: chatId,
+    text,
+    disable_web_page_preview: true
+  }).catch((error) => {
+    console.error("Bot message failed:", error.message);
+  });
 }
 
 function notifyAdmin(type, title, { user, lines = [] } = {}) {
@@ -769,6 +917,15 @@ function randomId(prefix) {
 
 function normalizeBotUsername(username) {
   return username.replace(/^@/, "");
+}
+
+function parseIdList(value) {
+  return new Set(
+    String(value || "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter((item) => item && !item.startsWith("-"))
+  );
 }
 
 function loadEnv(filePath) {
