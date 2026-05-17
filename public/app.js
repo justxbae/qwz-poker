@@ -316,8 +316,9 @@ async function auth() {
 }
 
 function setupTelegramControls() {
-  tg?.setHeaderColor?.("#0e1621");
-  tg?.setBackgroundColor?.("#0e1621");
+  const themeBg = tg?.themeParams?.secondary_bg_color || tg?.themeParams?.bg_color || "#17212b";
+  tg?.setHeaderColor?.(themeBg);
+  tg?.setBackgroundColor?.(themeBg);
   tg?.BackButton?.onClick?.(() => {
     runAction(handleTelegramBack);
   });

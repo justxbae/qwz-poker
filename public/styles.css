@@ -9,7 +9,7 @@
   --accent: #28c76f;
   --accent-dark: #159455;
   --danger: #ff5f57;
-  --tg-bg: var(--tg-theme-bg-color, #0e1621);
+  --tg-bg: var(--tg-theme-secondary-bg-color, var(--tg-theme-bg-color, #17212b));
   --tg-secondary-bg: var(--tg-theme-secondary-bg-color, #17212b);
   --tg-surface: #242f3d;
   --tg-surface-soft: rgba(36, 47, 61, 0.72);
@@ -321,9 +321,7 @@ h2 {
 .lobby-card {
   border: 1px solid var(--tg-line);
   border-radius: 16px;
-  background:
-    linear-gradient(145deg, rgba(36, 47, 61, 0.92), rgba(23, 33, 43, 0.96)),
-    var(--tg-secondary-bg);
+  background: var(--tg-secondary-bg);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 14px 32px rgba(0, 0, 0, 0.26);
@@ -334,24 +332,11 @@ h2 {
   position: relative;
   min-height: 0;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 92% 8%, rgba(42, 171, 238, 0.24), transparent 25%),
-    radial-gradient(circle at 12% 100%, rgba(47, 191, 113, 0.16), transparent 32%),
-    linear-gradient(150deg, #1a2c3a 0%, var(--tg-secondary-bg) 54%, #0b1520 100%);
+  background: var(--tg-secondary-bg);
 }
 
 .wallet-card::after {
-  content: "";
-  position: absolute;
-  right: -60px;
-  bottom: -84px;
-  width: 230px;
-  aspect-ratio: 1;
-  height: auto;
-  border: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.035);
-  pointer-events: none;
+  display: none;
 }
 
 .home-card {
@@ -377,8 +362,7 @@ h2 {
   border: 1px solid rgba(244, 245, 247, 0.18);
   border-radius: 50%;
   background:
-    radial-gradient(circle at 35% 24%, rgba(255, 255, 255, 0.16), transparent 26%),
-    linear-gradient(145deg, #56645f, #171c1e 72%);
+    #242f3d;
   background-position: center;
   background-size: cover;
   color: #fff;
@@ -825,9 +809,7 @@ h2 {
   position: sticky;
   top: 0;
   z-index: 4;
-  background:
-    radial-gradient(circle at 92% 12%, rgba(42, 171, 238, 0.16), transparent 26%),
-    linear-gradient(145deg, rgba(36, 47, 61, 0.98), rgba(16, 27, 39, 0.98));
+  background: var(--tg-secondary-bg);
 }
 
 .table-limit-pills {
@@ -837,9 +819,7 @@ h2 {
 .cashier-card {
   min-height: 0;
   padding: 16px;
-  background:
-    radial-gradient(circle at 92% 10%, rgba(42, 171, 238, 0.16), transparent 24%),
-    linear-gradient(150deg, rgba(32, 46, 60, 0.98), rgba(16, 27, 39, 0.98));
+  background: var(--tg-secondary-bg);
 }
 
 .cashier-card .miniapp-title {
@@ -1266,7 +1246,7 @@ h2 {
   width: 62px;
   aspect-ratio: 1;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 25%, #53645e, #1b1f22 70%);
+  background: #242f3d;
   background-position: center;
   background-size: cover;
   color: #fff;
@@ -1291,9 +1271,7 @@ h2 {
   min-height: 108px;
   border: 1px solid var(--tg-line);
   border-radius: 18px;
-  background:
-    radial-gradient(circle at 88% 14%, rgba(42, 171, 238, 0.14), transparent 26%),
-    linear-gradient(145deg, rgba(36, 47, 61, 0.96), rgba(23, 33, 43, 0.96));
+  background: var(--tg-secondary-bg);
   padding: 16px;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
@@ -1360,9 +1338,7 @@ h2 {
 
 body:not(.in-game) .bottom-nav {
   border: 0;
-  background:
-    linear-gradient(180deg, rgba(43, 49, 55, 0.96), rgba(31, 36, 41, 0.96)),
-    var(--tg-secondary-bg);
+  background: rgba(31, 36, 41, 0.96);
   box-shadow:
     0 -18px 50px rgba(0, 0, 0, 0.36),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -1551,9 +1527,7 @@ body:not(.in-game) .stats-cards span {
   height: 54px;
   border: 3px solid rgba(57, 65, 72, 0.92);
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 35% 24%, rgba(255, 255, 255, 0.16), transparent 26%),
-    linear-gradient(145deg, #56645f, #171c1e 72%);
+  background: #242f3d;
   background-position: center;
   background-size: cover;
   color: #fff;
@@ -3969,9 +3943,7 @@ body.in-game .seat-count-6.seat-3 .bet-spot {
   z-index: 40;
   display: grid;
   place-items: stretch;
-  background:
-    radial-gradient(circle at 50% -8%, rgba(42, 171, 238, 0.16), transparent 34%),
-    var(--tg-bg);
+  background: var(--tg-bg);
 }
 
 .buyin-sheet {
@@ -3983,9 +3955,7 @@ body.in-game .seat-count-6.seat-3 .bet-spot {
   width: min(430px, 100%);
   min-height: 100dvh;
   margin: 0 auto;
-  background:
-    radial-gradient(circle at 92% 4%, rgba(42, 171, 238, 0.12), transparent 30%),
-    linear-gradient(180deg, #0e1621 0%, #0b121a 100%);
+  background: var(--tg-bg);
   padding: max(22px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
 }
 
