@@ -1487,6 +1487,24 @@ body:not(.in-game) .stats-cards span {
   background: rgba(23, 33, 43, 0.94);
 }
 
+.nav-trophy::before {
+  content: "";
+  width: 16px;
+  height: 13px;
+  border: 2px solid currentColor;
+  border-radius: 4px 4px 7px 7px;
+}
+
+.nav-trophy::after {
+  content: "";
+  position: absolute;
+  bottom: 1px;
+  width: 14px;
+  height: 7px;
+  border-bottom: 2px solid currentColor;
+  border-radius: 0 0 5px 5px;
+}
+
 .nav-admin::before {
   content: "";
   width: 18px;
