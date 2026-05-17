@@ -33,6 +33,7 @@ const lobbyTableStack = document.querySelector("#lobbyTableStack");
 const lobbyActiveTables = document.querySelector("#lobbyActiveTables");
 const homeActivityText = document.querySelector("#homeActivityText");
 const homeSessionPill = document.querySelector("#homeSessionPill");
+const homeOfferMeta = document.querySelector("#homeOfferMeta");
 const quickPlayHint = document.querySelector("#quickPlayHint");
 const cashierBalance = document.querySelector("#cashierBalance");
 const cashierPrimaryButton = document.querySelector("#cashierPrimaryButton");
@@ -791,11 +792,13 @@ function renderHomeCta() {
 
   if (balance <= 0) {
     quickPlayButton.textContent = "Пополнить баланс";
+    if (homeOfferMeta) homeOfferMeta.textContent = `${smallBlind}/${bigBlind} · вход от ${formatChips(minBuyIn)} chips`;
     quickPlayHint.textContent = `Для старта ${smallBlind}/${bigBlind} нужен бай-ин от ${formatChips(minBuyIn)} chips`;
     return;
   }
 
   quickPlayButton.textContent = `Начать игру ${smallBlind}/${bigBlind}`;
+  if (homeOfferMeta) homeOfferMeta.textContent = `${smallBlind}/${bigBlind} · баланс ${formatChips(balance)} chips`;
   quickPlayHint.textContent = balance < minBuyIn
     ? `Баланс ниже рекомендуемого бай-ина ${formatChips(minBuyIn)} chips`
     : "Подберём свободный стол автоматически";
