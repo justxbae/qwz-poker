@@ -1361,17 +1361,21 @@ h2 {
 }
 
 body:not(.in-game) .bottom-nav {
-  border: 1px solid var(--tg-line);
-  background: rgba(23, 33, 43, 0.88);
-  box-shadow: 0 -18px 50px rgba(0, 0, 0, 0.36);
+  border: 1px solid rgba(122, 162, 194, 0.18);
+  background:
+    linear-gradient(180deg, rgba(31, 42, 54, 0.94), rgba(22, 31, 42, 0.94)),
+    var(--tg-secondary-bg);
+  box-shadow:
+    0 -18px 50px rgba(0, 0, 0, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 body:not(.in-game) .bottom-nav button {
-  color: rgba(244, 247, 251, 0.5);
+  color: var(--tg-hint);
 }
 
 body:not(.in-game) .bottom-nav button.active {
-  background: rgba(42, 171, 238, 0.18);
+  background: rgba(42, 171, 238, 0.16);
   color: #fff;
 }
 
@@ -1403,47 +1407,231 @@ body:not(.in-game) .stats-cards span {
 
 .bottom-nav {
   position: fixed;
-  right: 18px;
-  bottom: max(14px, env(safe-area-inset-bottom));
-  left: 18px;
+  right: 14px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: 14px;
   z-index: 12;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 2px;
-  width: min(394px, calc(100vw - 36px));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: min(394px, calc(100vw - 28px));
   margin: 0 auto;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
+  border-radius: 24px;
   background: rgba(25, 28, 30, 0.78);
-  padding: 8px;
+  padding: 6px;
   box-shadow: 0 -18px 50px rgba(0, 0, 0, 0.42);
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(18px);
 }
 
 .admin-mode .bottom-nav {
-  grid-template-columns: repeat(5, 1fr);
+  width: min(430px, calc(100vw - 18px));
 }
 
 .bottom-nav button {
+  position: relative;
+  flex: 1 1 0;
   display: grid;
   place-items: center;
-  gap: 3px;
+  gap: 2px;
+  min-width: 0;
   min-height: 48px;
-  border-radius: 999px;
+  border-radius: 18px;
   background: transparent;
-  color: rgba(244, 245, 247, 0.5);
+  color: var(--tg-hint);
   font-size: 18px;
-  padding: 0 6px;
+  padding: 5px 8px 6px;
+  overflow: hidden;
+  transition:
+    background 180ms ease,
+    color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
 }
 
-.bottom-nav span {
+.bottom-nav button::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  z-index: -1;
+  border-radius: 16px;
+  background: rgba(42, 171, 238, 0);
+  transform: scale(0.72);
+  opacity: 0;
+  transition: transform 220ms cubic-bezier(0.2, 0.86, 0.2, 1), opacity 180ms ease, background 180ms ease;
+}
+
+.bottom-nav .nav-label {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 650;
+  line-height: 1.1;
+  letter-spacing: 0;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.nav-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  color: currentColor;
+  transition: transform 220ms cubic-bezier(0.2, 0.86, 0.2, 1), color 180ms ease;
+}
+
+.nav-home::before {
+  content: "";
+  width: 16px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top: 0;
+  border-radius: 3px;
+  transform: translateY(3px);
+}
+
+.nav-home::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  width: 12px;
+  height: 12px;
+  border-left: 2px solid currentColor;
+  border-top: 2px solid currentColor;
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.nav-spade {
+  font-size: 23px;
+  line-height: 1;
+}
+
+.nav-wallet::before {
+  content: "";
+  width: 18px;
+  height: 15px;
+  border: 2px solid currentColor;
+  border-radius: 5px;
+}
+
+.nav-wallet::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  width: 7px;
+  height: 7px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  background: rgba(23, 33, 43, 0.94);
+}
+
+.nav-admin::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+
+.nav-admin::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .bottom-nav button.active {
-  background: rgba(255, 255, 255, 0.08);
+  background: transparent;
   color: #fff;
+}
+
+.bottom-nav button.active::before {
+  background: rgba(42, 171, 238, 0.16);
+  opacity: 1;
+  transform: scale(1);
+}
+
+.bottom-nav button.active .nav-icon {
+  color: #eaf7ff;
+  transform: translateY(-1px) scale(1.08);
+}
+
+.bottom-nav button.nav-pressed .nav-icon,
+.bottom-nav button.nav-pressed .nav-profile-avatar {
+  animation: navIconPop 340ms cubic-bezier(0.18, 0.9, 0.2, 1);
+}
+
+.bottom-nav button.profile-nav-button {
+  flex: 0 0 56px;
+  width: 56px;
+  isolation: isolate;
+}
+
+.bottom-nav button.profile-nav-button .nav-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.bottom-nav button.profile-nav-button::after {
+  content: "";
+  position: absolute;
+  left: -4px;
+  width: 1px;
+  height: 30px;
+  border-radius: 999px;
+  background: rgba(122, 162, 194, 0.18);
+}
+
+.nav-profile-avatar {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 2px solid rgba(122, 162, 194, 0.18);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 24%, rgba(255, 255, 255, 0.16), transparent 26%),
+    linear-gradient(145deg, #56645f, #171c1e 72%);
+  background-position: center;
+  background-size: cover;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 750;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.24);
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 220ms cubic-bezier(0.2, 0.86, 0.2, 1);
+}
+
+.nav-profile-avatar.has-photo {
+  background-color: #171c1e;
+}
+
+.bottom-nav button.profile-nav-button.active::before {
+  background: rgba(42, 171, 238, 0.12);
+  border-radius: 999px;
+}
+
+.bottom-nav button.profile-nav-button.active .nav-profile-avatar {
+  border-color: rgba(42, 171, 238, 0.82);
+  box-shadow: 0 0 0 3px rgba(42, 171, 238, 0.14), 0 10px 22px rgba(0, 0, 0, 0.3);
+  transform: scale(1.04);
+}
+
+@keyframes navIconPop {
+  0% {
+    transform: translateY(0) scale(0.94);
+  }
+  58% {
+    transform: translateY(-2px) scale(1.12);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
 }
 
 .panel {

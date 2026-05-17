@@ -534,11 +534,26 @@
         </section>
 
         <nav class="bottom-nav" aria-label="Главное меню">
-          <button type="button" class="active" data-lobby-tab="home">⌂<span>Главная</span></button>
-          <button type="button" data-lobby-tab="tables">♠<span>Столы</span></button>
-          <button type="button" data-lobby-tab="cashier">◈<span>Касса</span></button>
-          <button type="button" data-lobby-tab="profile">◉<span>Профиль</span></button>
-          <button type="button" class="admin-nav-button" data-lobby-tab="admin" hidden>⚙<span>Админ</span></button>
+          <button type="button" class="active" data-lobby-tab="home">
+            <span class="nav-icon nav-home" aria-hidden="true"></span>
+            <span class="nav-label">Главная</span>
+          </button>
+          <button type="button" data-lobby-tab="tables">
+            <span class="nav-icon nav-spade" aria-hidden="true">♠</span>
+            <span class="nav-label">Столы</span>
+          </button>
+          <button type="button" data-lobby-tab="cashier">
+            <span class="nav-icon nav-wallet" aria-hidden="true"></span>
+            <span class="nav-label">Касса</span>
+          </button>
+          <button type="button" class="profile-nav-button" data-lobby-tab="profile" aria-label="Профиль">
+            <span class="nav-profile-avatar" id="navProfileAvatar">P</span>
+            <span class="nav-label">Профиль</span>
+          </button>
+          <button type="button" class="admin-nav-button" data-lobby-tab="admin" hidden>
+            <span class="nav-icon nav-admin" aria-hidden="true"></span>
+            <span class="nav-label">Админ</span>
+          </button>
         </nav>
       </section>
     </main>

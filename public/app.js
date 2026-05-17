@@ -48,6 +48,7 @@ const cashierPayButton = document.querySelector("#cashierPayButton");
 const cashierHistory = document.querySelector("#cashierHistory");
 const cashierStatus = document.querySelector("#cashierStatus");
 const profileAvatar = document.querySelector("#profileAvatar");
+const navProfileAvatar = document.querySelector("#navProfileAvatar");
 const profileName = document.querySelector("#profileName");
 const profileUsername = document.querySelector("#profileUsername");
 const profileBalance = document.querySelector("#profileBalance");
@@ -306,6 +307,7 @@ async function auth() {
   cashierBalance.textContent = data.user.balance.toLocaleString("ru-RU");
   renderAvatar(lobbyAvatar, data.user);
   renderAvatar(profileAvatar, data.user);
+  renderAvatar(navProfileAvatar, data.user);
   profileName.textContent = data.user.name;
   profileUsername.textContent = data.user.username ? `@${data.user.username}` : `id ${data.user.id}`;
   profileBalance.textContent = `${data.user.balance.toLocaleString("ru-RU")} chips`;
@@ -585,6 +587,7 @@ function renderProfile(profileData) {
 
   renderAvatar(profileAvatar, user);
   renderAvatar(lobbyAvatar, user);
+  renderAvatar(navProfileAvatar, user);
 
   renderProfileSessions(profileData.activeTables || []);
 }
@@ -838,6 +841,12 @@ function selectLobbyTab(tab, options = {}) {
   haptic("light");
   document.querySelectorAll("[data-lobby-tab]").forEach((button) => {
     button.classList.toggle("active", button.dataset.lobbyTab === tab);
+    if (tabChanged && button.dataset.lobbyTab === tab) {
+      button.classList.remove("nav-pressed");
+      void button.offsetWidth;
+      button.classList.add("nav-pressed");
+      window.setTimeout(() => button.classList.remove("nav-pressed"), 360);
+    }
   });
   document.querySelectorAll("[data-lobby-view]").forEach((view) => {
     view.classList.toggle("active", view.dataset.lobbyView === tab);
