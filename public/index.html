@@ -144,110 +144,105 @@
 
       <section class="lobby-shell" id="lobby">
         <section class="lobby-view active" data-lobby-view="home">
-        <section class="wallet-card home-card">
-          <div class="home-head">
-            <div class="lobby-avatar" id="lobbyAvatar">P</div>
-            <div class="home-player">
+          <section class="tg-home-header">
+            <button type="button" class="tg-header-ghost" aria-label="QR"><span class="tg-qr-icon" aria-hidden="true"></span></button>
+            <div class="tg-header-profile" data-lobby-tab="profile">
+              <div class="lobby-avatar" id="lobbyAvatar">P</div>
+              <div>
+                <strong id="lobbyName">Игрок</strong>
+                <span id="lobbyUsername">Telegram profile</span>
+              </div>
+            </div>
+            <button type="button" class="tg-header-edit" data-lobby-tab="profile">Изм.</button>
+          </section>
+
+          <section class="tg-balance-hero">
+            <div>
               <span>QWZ Poker</span>
-              <strong id="lobbyName">Игрок</strong>
-              <small id="lobbyUsername">Telegram profile</small>
+              <strong>Texas Hold’em</strong>
+              <small id="homeOfferMeta">25/50 · вход от 2 500 chips</small>
             </div>
-            <button type="button" class="wallet-topup-button" id="walletTopupButton" aria-label="Пополнить баланс">+</button>
-          </div>
-          <div class="home-offer">
-            <p>Открытый стол</p>
-            <h2>Texas Hold’em</h2>
-            <span id="homeOfferMeta">25/50 · вход от 2 500 chips</span>
-          </div>
-          <div class="wallet-balance-row">
+            <button type="button" id="walletTopupButton" aria-label="Пополнить баланс">+</button>
+          </section>
+
+          <section class="tg-menu-group">
+            <button type="button" class="tg-menu-row" data-lobby-tab="profile">
+              <span class="tg-row-icon tg-row-red">●</span>
+              <span class="tg-row-main">Мой профиль</span>
+              <span class="tg-chevron">›</span>
+            </button>
+            <button type="button" class="tg-menu-row" data-lobby-tab="cashier">
+              <span class="tg-row-icon tg-row-blue">◉</span>
+              <span class="tg-row-main">Баланс</span>
+              <span class="tg-row-value"><b id="lobbyBalance">0</b> chips</span>
+              <span class="tg-chevron">›</span>
+            </button>
+          </section>
+
+          <section class="tg-menu-group">
+            <button type="button" class="tg-menu-row tg-menu-row-action" id="quickPlayButton">
+              <span class="tg-row-icon tg-row-green">♠</span>
+              <span class="tg-row-main">Начать игру</span>
+              <span class="tg-row-value" id="quickPlayHint">Минимальный вход на 25/50: 2 500 chips</span>
+              <span class="tg-chevron">›</span>
+            </button>
+            <button type="button" class="tg-menu-row" data-lobby-tab="tables">
+              <span class="tg-row-icon tg-row-cyan">▦</span>
+              <span class="tg-row-main">Все столы</span>
+              <span class="tg-row-value" id="onlineStatus">0 свободно</span>
+              <span class="tg-chevron">›</span>
+            </button>
+            <div class="tg-menu-row tg-menu-row-stack">
+              <span class="tg-row-icon tg-row-gold">½</span>
+              <span class="tg-row-main">Блайнды</span>
+              <div class="limit-pills" id="limitPills">
+                <button type="button" class="active" data-small-blind="25">25/50</button>
+                <button type="button" data-small-blind="50">50/100</button>
+                <button type="button" data-small-blind="100">100/200</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="lobby-card continue-card" id="continueCard" hidden>
             <div>
-              <div class="wallet-label">Ваш баланс</div>
-              <div class="wallet-balance" id="lobbyBalance">0</div>
+              <p class="eyebrow">В игре</p>
+              <h2>Вернуться за стол</h2>
+              <span id="continueMeta">Стол открыт</span>
             </div>
-          </div>
-          <div class="wallet-actions">
-            <button id="quickPlayButton" type="button">Пополнить баланс</button>
-            <button type="button" class="secondary-pill" data-lobby-tab="tables">Все столы</button>
-          </div>
-          <div class="home-cta-hint" id="quickPlayHint">Минимальный вход на 25/50: 2 500 chips</div>
-        </section>
+            <button id="continueGameButton" type="button">Вернуться</button>
+          </section>
 
-        <section class="lobby-card start-guide-card">
-          <div class="section-title">
+          <section class="tg-menu-group">
+            <button type="button" class="tg-menu-row" data-lobby-tab="tournaments">
+              <span class="tg-row-icon tg-row-purple">🏆</span>
+              <span class="tg-row-main">Турниры</span>
+              <span class="tg-row-value">скоро</span>
+              <span class="tg-chevron">›</span>
+            </button>
+            <button type="button" class="tg-menu-row" id="quickPrivateButton">
+              <span class="tg-row-icon tg-row-orange">🔒</span>
+              <span class="tg-row-main">Приватный стол</span>
+              <span class="tg-row-value">для друзей</span>
+              <span class="tg-chevron">›</span>
+            </button>
+            <div class="tg-menu-row">
+              <span class="tg-row-icon tg-row-gray">•</span>
+              <span class="tg-row-main">Сессия</span>
+              <span class="tg-row-value" id="homeActivityText">Выберите стол и начните игру.</span>
+              <span class="session-pill" id="homeSessionPill">нет активных</span>
+            </div>
+          </section>
+
+          <section class="home-metrics">
             <div>
-              <p class="eyebrow">Быстрый старт</p>
-              <h2>Как начать игру</h2>
+              <span>За столами</span>
+              <strong id="lobbyTableStack">0</strong>
             </div>
-            <span>3 шага</span>
-          </div>
-          <div class="start-guide-list">
-            <div><b>1</b><span>Пополните QWZ chips</span></div>
-            <div><b>2</b><span>Выберите блайнды</span></div>
-            <div><b>3</b><span>Нажмите “Начать игру”</span></div>
-          </div>
-        </section>
-
-        <section class="lobby-card continue-card" id="continueCard" hidden>
-          <div>
-            <p class="eyebrow">В игре</p>
-            <h2>Вернуться за стол</h2>
-            <span id="continueMeta">Стол открыт</span>
-          </div>
-          <button id="continueGameButton" type="button">Вернуться</button>
-        </section>
-
-        <section class="lobby-card home-mode-card telegram-list-card">
-          <div>
-            <p class="eyebrow">Открытые столы</p>
-            <h2>Cash game</h2>
-            <span>Свободные столы подберём автоматически</span>
-          </div>
-          <span class="session-pill" data-status="active">live</span>
-        </section>
-
-        <section class="lobby-card limit-card">
-          <div class="section-title">
             <div>
-              <p class="eyebrow">Выбор лимита</p>
-              <h2>Блайнды</h2>
+              <span>Активных столов</span>
+              <strong id="lobbyActiveTables">0</strong>
             </div>
-            <span id="onlineStatus">0 свободно</span>
-          </div>
-          <div class="limit-pills" id="limitPills">
-            <button type="button" class="active" data-small-blind="25">25/50</button>
-            <button type="button" data-small-blind="50">50/100</button>
-            <button type="button" data-small-blind="100">100/200</button>
-          </div>
-        </section>
-
-        <section class="lobby-card home-action-card">
-          <div>
-            <p class="eyebrow">Сессия</p>
-            <h2>Мои столы</h2>
-            <span id="homeActivityText">Выберите стол и начните игру.</span>
-          </div>
-          <span class="session-pill" id="homeSessionPill">нет активных</span>
-        </section>
-
-        <section class="home-metrics">
-          <div>
-            <span>За столами</span>
-            <strong id="lobbyTableStack">0</strong>
-          </div>
-          <div>
-            <span>Активных столов</span>
-            <strong id="lobbyActiveTables">0</strong>
-          </div>
-        </section>
-
-        <section class="lobby-card home-action-card telegram-list-card">
-          <div>
-            <p class="eyebrow">Дополнительно</p>
-            <h2>Приватный стол</h2>
-            <span>Создать закрытый стол по ссылке</span>
-          </div>
-          <button type="button" id="quickPrivateButton">Создать</button>
-        </section>
+          </section>
 
         </section>
 

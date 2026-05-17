@@ -318,12 +318,17 @@ async function auth() {
 }
 
 function setupTelegramControls() {
-  const themeBg = tg?.themeParams?.secondary_bg_color || tg?.themeParams?.bg_color || "#17212b";
-  tg?.setHeaderColor?.(themeBg);
-  tg?.setBackgroundColor?.(themeBg);
+  applyTelegramTheme();
+  tg?.onEvent?.("themeChanged", applyTelegramTheme);
   tg?.BackButton?.onClick?.(() => {
     runAction(handleTelegramBack);
   });
+}
+
+function applyTelegramTheme() {
+  const themeBg = tg?.themeParams?.secondary_bg_color || tg?.themeParams?.bg_color || "#17212b";
+  tg?.setHeaderColor?.(themeBg);
+  tg?.setBackgroundColor?.(themeBg);
 }
 
 function setupTapGuards() {
@@ -809,15 +814,18 @@ function renderHomeCta() {
   const bigBlind = smallBlind * 2;
   const minBuyIn = bigBlind * 50;
   const balance = Number(state.user?.balance || 0);
+  const quickPlayTitle = quickPlayButton.querySelector(".tg-row-main");
 
   if (balance <= 0) {
-    quickPlayButton.textContent = "Пополнить баланс";
+    if (quickPlayTitle) quickPlayTitle.textContent = "Пополнить баланс";
+    else quickPlayButton.textContent = "Пополнить баланс";
     if (homeOfferMeta) homeOfferMeta.textContent = `${smallBlind}/${bigBlind} · вход от ${formatChips(minBuyIn)} chips`;
     quickPlayHint.textContent = `Для старта ${smallBlind}/${bigBlind} нужен бай-ин от ${formatChips(minBuyIn)} chips`;
     return;
   }
 
-  quickPlayButton.textContent = `Начать игру ${smallBlind}/${bigBlind}`;
+  if (quickPlayTitle) quickPlayTitle.textContent = `Начать игру ${smallBlind}/${bigBlind}`;
+  else quickPlayButton.textContent = `Начать игру ${smallBlind}/${bigBlind}`;
   if (homeOfferMeta) homeOfferMeta.textContent = `${smallBlind}/${bigBlind} · баланс ${formatChips(balance)} chips`;
   quickPlayHint.textContent = balance < minBuyIn
     ? `Баланс ниже рекомендуемого бай-ина ${formatChips(minBuyIn)} chips`
