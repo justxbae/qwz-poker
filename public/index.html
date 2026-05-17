@@ -152,27 +152,38 @@
               <strong id="lobbyName">Игрок</strong>
               <small id="lobbyUsername">Telegram profile</small>
             </div>
+            <button type="button" class="wallet-topup-button" id="walletTopupButton" aria-label="Пополнить баланс">+</button>
+          </div>
+          <div class="home-offer">
+            <p>Первый покерный клуб в Telegram</p>
+            <h2>Texas Hold’em без приложений и регистрации</h2>
+            <span>Выберите лимит, пополните QWZ chips и садитесь за свободный стол прямо внутри Mini App.</span>
           </div>
           <div class="wallet-balance-row">
             <div>
-              <div class="wallet-label">QWZ chips</div>
+              <div class="wallet-label">Ваш баланс</div>
               <div class="wallet-balance" id="lobbyBalance">0</div>
-            </div>
-            <button type="button" class="wallet-topup-button" id="walletTopupButton" aria-label="Пополнить баланс">+</button>
-          </div>
-          <div class="home-metrics">
-            <div>
-              <span>В игре</span>
-              <strong id="lobbyTableStack">0</strong>
-            </div>
-            <div>
-              <span>Столов</span>
-              <strong id="lobbyActiveTables">0</strong>
             </div>
           </div>
           <div class="wallet-actions">
-            <button id="quickPlayButton" type="button">Играть сейчас</button>
-            <button type="button" class="secondary-pill" data-lobby-tab="cashier">Касса</button>
+            <button id="quickPlayButton" type="button">Пополнить баланс</button>
+            <button type="button" class="secondary-pill" data-lobby-tab="tables">Все столы</button>
+          </div>
+          <div class="home-cta-hint" id="quickPlayHint">Минимальный вход на 25/50: 2 500 chips</div>
+        </section>
+
+        <section class="lobby-card start-guide-card">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Быстрый старт</p>
+              <h2>Как начать игру</h2>
+            </div>
+            <span>3 шага</span>
+          </div>
+          <div class="start-guide-list">
+            <div><b>1</b><span>Пополните QWZ chips</span></div>
+            <div><b>2</b><span>Выберите блайнды</span></div>
+            <div><b>3</b><span>Нажмите “Начать игру”</span></div>
           </div>
         </section>
 
@@ -187,11 +198,11 @@
 
         <section class="lobby-card home-mode-card telegram-list-card">
           <div>
-            <p class="eyebrow">Открытый клуб</p>
-            <h2>Texas Hold’em cash</h2>
-            <span>Первый нативный покерный клуб в Telegram</span>
+            <p class="eyebrow">Открытые столы</p>
+            <h2>Cash game</h2>
+            <span>Свободные столы подберём автоматически</span>
           </div>
-          <button type="button" data-lobby-tab="tables">Столы</button>
+          <span class="session-pill" data-status="active">live</span>
         </section>
 
         <section class="lobby-card limit-card">
@@ -216,6 +227,17 @@
             <span id="homeActivityText">Выберите стол и начните игру.</span>
           </div>
           <span class="session-pill" id="homeSessionPill">нет активных</span>
+        </section>
+
+        <section class="home-metrics">
+          <div>
+            <span>За столами</span>
+            <strong id="lobbyTableStack">0</strong>
+          </div>
+          <div>
+            <span>Активных столов</span>
+            <strong id="lobbyActiveTables">0</strong>
+          </div>
         </section>
 
         <section class="lobby-card home-action-card telegram-list-card">

@@ -33,6 +33,7 @@ const lobbyTableStack = document.querySelector("#lobbyTableStack");
 const lobbyActiveTables = document.querySelector("#lobbyActiveTables");
 const homeActivityText = document.querySelector("#homeActivityText");
 const homeSessionPill = document.querySelector("#homeSessionPill");
+const quickPlayHint = document.querySelector("#quickPlayHint");
 const cashierBalance = document.querySelector("#cashierBalance");
 const cashierPrimaryButton = document.querySelector("#cashierPrimaryButton");
 const walletTopupButton = document.querySelector("#walletTopupButton");
@@ -309,6 +310,7 @@ async function auth() {
   profileUsername.textContent = data.user.username ? `@${data.user.username}` : `id ${data.user.id}`;
   profileBalance.textContent = `${data.user.balance.toLocaleString("ru-RU")} chips`;
   profileChips.textContent = data.user.balance.toLocaleString("ru-RU");
+  renderHomeCta();
 }
 
 function setupTelegramControls() {
@@ -753,6 +755,11 @@ async function onCreateTable(event) {
 }
 
 async function quickPlay() {
+  if (Number(state.user?.balance || 0) <= 0) {
+    openCashierTopup();
+    return;
+  }
+
   const table = state.tables.find((item) => (
     !item.isPrivate
       && Number(item.smallBlind) === state.selectedSmallBlind
@@ -769,6 +776,25 @@ async function quickPlay() {
     tableId: table.id,
     smallBlind: Number(table.smallBlind || state.selectedSmallBlind)
   });
+}
+
+function renderHomeCta() {
+  if (!quickPlayButton || !quickPlayHint) return;
+  const smallBlind = Number(state.selectedSmallBlind || 25);
+  const bigBlind = smallBlind * 2;
+  const minBuyIn = bigBlind * 50;
+  const balance = Number(state.user?.balance || 0);
+
+  if (balance <= 0) {
+    quickPlayButton.textContent = "Пополнить баланс";
+    quickPlayHint.textContent = `Для старта ${smallBlind}/${bigBlind} нужен бай-ин от ${formatChips(minBuyIn)} chips`;
+    return;
+  }
+
+  quickPlayButton.textContent = `Начать игру ${smallBlind}/${bigBlind}`;
+  quickPlayHint.textContent = balance < minBuyIn
+    ? `Баланс ниже рекомендуемого бай-ина ${formatChips(minBuyIn)} chips`
+    : "Подберём свободный стол автоматически";
 }
 
 async function quickCreatePrivateTable() {
@@ -803,6 +829,7 @@ function syncLimitSelection() {
   if (tablesFilterStatus) {
     tablesFilterStatus.textContent = `${state.selectedSmallBlind}/${state.selectedSmallBlind * 2}`;
   }
+  renderHomeCta();
 }
 
 function selectLobbyTab(tab, options = {}) {

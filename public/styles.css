@@ -366,9 +366,9 @@ h2 {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
+  grid-template-columns: 54px minmax(0, 1fr) 48px;
   gap: 12px;
-  align-items: start;
+  align-items: center;
 }
 
 .lobby-avatar {
@@ -485,11 +485,8 @@ h2 {
 .wallet-balance-row {
   position: relative;
   z-index: 1;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 48px;
-  gap: 12px;
-  align-items: end;
-  margin-top: 16px;
+  display: block;
+  margin-top: 14px;
 }
 
 .wallet-balance-row .wallet-label {
@@ -499,7 +496,7 @@ h2 {
 .wallet-balance {
   margin-top: 4px;
   color: #fff;
-  font-size: 44px;
+  font-size: 42px;
   font-weight: 800;
   line-height: 1;
 }
@@ -525,6 +522,38 @@ h2 {
   font-weight: 600;
   line-height: 1;
   box-shadow: 0 10px 22px rgba(42, 171, 238, 0.28);
+}
+
+.home-offer {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 7px;
+  margin-top: 18px;
+}
+
+.home-offer p {
+  color: var(--tg-link);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.home-offer h2 {
+  max-width: 330px;
+  color: #fff;
+  font-size: 25px;
+  font-weight: 750;
+  line-height: 1.08;
+}
+
+.home-offer span {
+  max-width: 340px;
+  color: rgba(244, 247, 251, 0.66);
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.35;
 }
 
 .home-metrics {
@@ -581,6 +610,59 @@ h2 {
   border: 1px solid var(--tg-line);
   background: var(--tg-surface-soft);
   color: var(--tg-text);
+}
+
+.home-cta-hint {
+  position: relative;
+  z-index: 1;
+  margin-top: 10px;
+  color: var(--tg-hint);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.start-guide-card {
+  display: grid;
+  gap: 14px;
+}
+
+.start-guide-list {
+  display: grid;
+  border: 1px solid var(--tg-line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.start-guide-list div {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 48px;
+  background: rgba(36, 47, 61, 0.46);
+  padding: 10px 13px;
+}
+
+.start-guide-list div + div {
+  border-top: 1px solid var(--tg-line);
+}
+
+.start-guide-list b {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(42, 171, 238, 0.18);
+  color: #eaf7ff;
+  font-size: 13px;
+}
+
+.start-guide-list span {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 650;
 }
 
 .section-title {
