@@ -4,11 +4,13 @@ const params = new URLSearchParams(window.location.search);
 const DEV_MODE = params.has("dev1")
   || params.get("dev") === "1"
   || window.localStorage.getItem("qwzDevMode") === "1";
+const ADMIN_MODE = params.get("admin") === "1";
 if ("scrollRestoration" in window.history) {
   window.history.scrollRestoration = "manual";
 }
 window.scrollTo({ top: 0, left: 0 });
 document.documentElement.classList.toggle("dev-mode", DEV_MODE);
+document.documentElement.classList.toggle("admin-mode", ADMIN_MODE);
 const state = {
   token: "",
   user: null,
@@ -57,6 +59,25 @@ const profileStatus = document.querySelector("#profileStatus");
 const profileSessionBadge = document.querySelector("#profileSessionBadge");
 const profileSessionList = document.querySelector("#profileSessionList");
 const profileRefreshButton = document.querySelector("#profileRefreshButton");
+const adminNavButton = document.querySelector(".admin-nav-button");
+const adminBankrollTotal = document.querySelector("#adminBankrollTotal");
+const adminSummary = document.querySelector("#adminSummary");
+const adminLookupForm = document.querySelector("#adminLookupForm");
+const adminUserId = document.querySelector("#adminUserId");
+const adminStatus = document.querySelector("#adminStatus");
+const adminPlayerCard = document.querySelector("#adminPlayerCard");
+const adminPlayerName = document.querySelector("#adminPlayerName");
+const adminPlayerId = document.querySelector("#adminPlayerId");
+const adminPlayerBalance = document.querySelector("#adminPlayerBalance");
+const adminPlayerTableStack = document.querySelector("#adminPlayerTableStack");
+const adminPlayerTotal = document.querySelector("#adminPlayerTotal");
+const adminAdjustForm = document.querySelector("#adminAdjustForm");
+const adminAdjustType = document.querySelector("#adminAdjustType");
+const adminAdjustAmount = document.querySelector("#adminAdjustAmount");
+const adminAdjustReason = document.querySelector("#adminAdjustReason");
+const adminPlayerTransactions = document.querySelector("#adminPlayerTransactions");
+const adminRecentPayments = document.querySelector("#adminRecentPayments");
+const adminRecentEvents = document.querySelector("#adminRecentEvents");
 const continueCard = document.querySelector("#continueCard");
 const continueMeta = document.querySelector("#continueMeta");
 const continueGameButton = document.querySelector("#continueGameButton");
@@ -189,6 +210,15 @@ async function boot() {
   quickPlayButton.addEventListener("click", () => runAction(quickPlay));
   quickPrivateButton.addEventListener("click", () => runAction(quickCreatePrivateTable));
   continueGameButton.addEventListener("click", continueGame);
+  if (adminNavButton) adminNavButton.hidden = !ADMIN_MODE;
+  adminLookupForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    runAction(() => loadAdminPlayer(adminUserId.value));
+  });
+  adminAdjustForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    runAction(adjustAdminPlayerWallet);
+  });
   limitPills.addEventListener("click", onLimitSelect);
   tableLimitPills.addEventListener("click", onLimitSelect);
   document.querySelectorAll("[data-lobby-tab]").forEach((button) => {
@@ -582,6 +612,135 @@ function renderProfileSessions(activeTables) {
   }
 }
 
+async function loadAdminDashboard() {
+  if (!ADMIN_MODE || !state.token) return;
+  const data = await api("/api/admin");
+  renderAdminDashboard(data.admin);
+}
+
+function renderAdminDashboard(admin) {
+  const stats = admin?.stats || {};
+  adminBankrollTotal.textContent = formatChips(stats.bankrollTotal || 0);
+  adminSummary.replaceChildren(...[
+    ["Игроков", stats.players || 0],
+    ["Активных столов", stats.activeTables || 0],
+    ["Столов всего", stats.openTables || 0],
+    ["Кошельки", formatChips(stats.walletTotal || 0)],
+    ["За столами", formatChips(stats.tableStackTotal || 0)],
+    ["Stars paid", stats.paidStars || 0],
+    ["Stars pending", stats.pendingStars || 0]
+  ].map(([label, value]) => {
+    const item = document.createElement("div");
+    item.innerHTML = "<span></span><strong></strong>";
+    item.querySelector("span").textContent = label;
+    item.querySelector("strong").textContent = String(value);
+    return item;
+  }));
+
+  renderAdminPayments(admin?.recentPayments || []);
+  renderAdminEvents(admin?.recentEvents || []);
+}
+
+async function loadAdminPlayer(telegramId) {
+  const id = String(telegramId || "").trim();
+  if (!id) {
+    adminStatus.textContent = "Введите Telegram ID игрока.";
+    return;
+  }
+  adminStatus.textContent = "Ищем игрока...";
+  const data = await api(`/api/admin/users/${encodeURIComponent(id)}`);
+  renderAdminPlayer(data.player);
+  adminStatus.textContent = "Игрок загружен.";
+}
+
+function renderAdminPlayer(player) {
+  const user = player.user || {};
+  adminPlayerCard.hidden = false;
+  adminPlayerName.textContent = user.username ? `@${user.username}` : user.name || "unknown";
+  adminPlayerId.textContent = `ID ${user.id}`;
+  adminPlayerBalance.textContent = formatChips(player.balance || 0);
+  adminPlayerTableStack.textContent = formatChips(player.tableStack || 0);
+  adminPlayerTotal.textContent = formatChips(player.totalBankroll || 0);
+  adminUserId.value = user.id || adminUserId.value;
+  renderAdminTransactions(player.transactions || []);
+}
+
+async function adjustAdminPlayerWallet() {
+  const telegramId = String(adminUserId.value || "").trim();
+  const amount = Number(String(adminAdjustAmount.value || "").replace(/\s+/g, ""));
+  if (!telegramId || !amount) {
+    adminStatus.textContent = "Укажите Telegram ID и сумму chips.";
+    return;
+  }
+  adminStatus.textContent = "Применяем операцию...";
+  const data = await api("/api/admin/wallet-adjust", {
+    method: "POST",
+    body: {
+      telegramId,
+      type: adminAdjustType.value,
+      amount,
+      reason: adminAdjustReason.value
+    }
+  });
+  renderAdminPlayer(data.player);
+  adminAdjustAmount.value = "";
+  adminStatus.textContent = "Баланс обновлён.";
+  await loadAdminDashboard();
+}
+
+function renderAdminTransactions(transactions) {
+  renderAdminRows(adminPlayerTransactions, transactions.map((transaction) => ({
+    title: transaction.title,
+    meta: formatTransactionMeta(transaction),
+    value: `${transaction.type === "credit" ? "+" : "-"}${formatChips(transaction.amount)}`,
+    positive: transaction.type === "credit"
+  })), "Операций нет");
+}
+
+function renderAdminPayments(payments) {
+  renderAdminRows(adminRecentPayments, payments.map((payment) => ({
+    title: `${formatChips(payment.chips)} chips`,
+    meta: `${payment.userName || payment.userId} · ${payment.rubAmount || 0} ₽ · ${payment.stars || 0} Stars`,
+    value: payment.status,
+    positive: payment.status === "paid"
+  })), "Платежей пока нет");
+}
+
+function renderAdminEvents(events) {
+  renderAdminRows(adminRecentEvents, events.map((event) => ({
+    title: event.title,
+    meta: `${event.type} · ${event.user?.id || "system"} · ${formatDateTime(event.createdAt)}`,
+    value: "log",
+    positive: false
+  })), "Событий пока нет");
+}
+
+function renderAdminRows(container, rows, emptyText) {
+  container.replaceChildren();
+  if (!rows.length) {
+    const empty = document.createElement("div");
+    empty.className = "cashier-empty";
+    empty.textContent = emptyText;
+    container.append(empty);
+    return;
+  }
+
+  for (const item of rows) {
+    const row = document.createElement("div");
+    row.className = `cashier-transaction ${item.positive ? "credit" : "debit"}`;
+    const main = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = item.title || "";
+    const meta = document.createElement("span");
+    meta.textContent = item.meta || "";
+    const value = document.createElement("b");
+    value.textContent = item.value || "";
+    main.append(title, meta);
+    row.append(main, value);
+    container.append(row);
+  }
+}
+
 async function onCreateTable(event) {
   event.preventDefault();
   const form = new FormData(createTableForm);
@@ -658,6 +817,7 @@ function selectLobbyTab(tab, options = {}) {
   });
   if (tab === "profile") runAction(loadProfile);
   if (tab === "cashier") runAction(loadCashier);
+  if (tab === "admin") runAction(loadAdminDashboard);
   if (tabChanged && !options.keepScroll) {
     window.requestAnimationFrame(resetScroll);
   }
@@ -1726,6 +1886,16 @@ function headerRow(labels) {
 
 function formatChips(value) {
   return Number(value).toLocaleString("ru-RU");
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  return new Date(value).toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 function plural(count, one, few, many) {

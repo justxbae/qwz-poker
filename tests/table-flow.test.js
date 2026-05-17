@@ -335,6 +335,52 @@ test("admin telegram commands grant and deduct wallet chips", async () => {
   }
 });
 
+test("admin api exposes dashboard and manual wallet adjustments", async () => {
+  const server = await startServer({ ADMIN_USER_IDS: "dev-user" });
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    let dashboard = (await request("/api/admin", { token: auth.token })).admin;
+    assert.equal(dashboard.stats.players, 1);
+    assert.equal(dashboard.stats.walletTotal, 0);
+
+    let data = await request("/api/admin/wallet-adjust", {
+      method: "POST",
+      token: auth.token,
+      body: {
+        telegramId: "dev-user",
+        type: "grant",
+        amount: 25000,
+        reason: "admin_panel_test"
+      }
+    });
+
+    assert.equal(data.player.balance, 25000);
+    assert.equal(data.player.transactions[0].title, "Ручное начисление");
+
+    data = await request("/api/admin/users/dev-user", { token: auth.token });
+    assert.equal(data.player.totalBankroll, 25000);
+
+    dashboard = (await request("/api/admin", { token: auth.token })).admin;
+    assert.equal(dashboard.stats.walletTotal, 25000);
+    assert.ok(dashboard.recentEvents.some((event) => event.type === "grant"));
+  } finally {
+    server.kill();
+  }
+});
+
+test("admin api rejects non-admin sessions", async () => {
+  const server = await startServer({ ADMIN_USER_IDS: "777" });
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await assert.rejects(
+      request("/api/admin", { token: auth.token }),
+      /Admin access denied/
+    );
+  } finally {
+    server.kill();
+  }
+});
+
 test("rebuy adds chips only between hands and spends wallet balance", async () => {
   const server = await startServer();
   try {

@@ -45,6 +45,7 @@ const savedStacks = new Map();
 const wallets = new Map();
 const transactions = new Map();
 const starOrders = new Map();
+const adminEvents = [];
 const loggedAppOpens = new Set();
 const DEFAULT_STACK = 0;
 const DEFAULT_WALLET = 0;
@@ -139,6 +140,15 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/cashier") {
     sendJson(res, 200, { cashier: cashierView(user) });
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/admin")) {
+    if (!isAdminUser(user.id)) {
+      sendJson(res, 403, { error: "Admin access denied" });
+      return;
+    }
+    await handleAdminApi(req, res, url, user);
     return;
   }
 
@@ -377,6 +387,84 @@ async function handleApi(req, res, url) {
   }
 
   sendJson(res, 404, { error: "Not found" });
+}
+
+async function handleAdminApi(req, res, url, adminUser) {
+  const userMatch = url.pathname.match(/^\/api\/admin\/users\/([^/]+)$/);
+
+  if (req.method === "GET" && url.pathname === "/api/admin") {
+    sendJson(res, 200, { admin: adminDashboardView() });
+    return;
+  }
+
+  if (req.method === "GET" && userMatch) {
+    sendJson(res, 200, { player: adminPlayerView(userMatch[1]) });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/admin/wallet-adjust") {
+    const body = await readJson(req);
+    const result = adjustWalletManually({
+      admin: adminUser,
+      targetId: body.telegramId,
+      type: body.type,
+      amount: body.amount,
+      reason: body.reason
+    });
+    sendJson(res, 200, { player: adminPlayerView(result.targetId), adjustment: result });
+    return;
+  }
+
+  sendJson(res, 404, { error: "Admin endpoint not found" });
+}
+
+function adminDashboardView() {
+  const players = [...new Set([...wallets.keys(), ...userProfiles.keys(), ...transactions.keys()])];
+  const walletTotal = [...wallets.values()].reduce((sum, value) => sum + Number(value || 0), 0);
+  const tableStackTotal = [...tables.values()].reduce((sum, table) => (
+    sum + table.seats.reduce((seatSum, seat) => seatSum + Number(seat.stack || 0), 0)
+  ), 0);
+  const paidStars = [...starOrders.values()].filter((order) => order.status === "paid");
+  const pendingStars = [...starOrders.values()].filter((order) => order.status === "pending");
+
+  return {
+    stats: {
+      players: players.length,
+      activeTables: [...tables.values()].filter((table) => table.seats.length > 0).length,
+      openTables: tables.size,
+      walletTotal,
+      tableStackTotal,
+      bankrollTotal: walletTotal + tableStackTotal,
+      paidStars: paidStars.length,
+      pendingStars: pendingStars.length
+    },
+    recentPayments: [...starOrders.values()]
+      .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+      .slice(0, 10),
+    recentEvents: adminEvents.slice(0, 20)
+  };
+}
+
+function adminPlayerView(userId) {
+  const id = normalizeTargetUserId(userId);
+  const profile = userProfiles.get(id) || { id, name: "unknown", username: "" };
+  const balance = getWallet(id);
+  const activeTables = userActiveTables({ id });
+  const tableStack = activeTables.reduce((sum, table) => sum + table.stack, 0);
+
+  return {
+    user: {
+      id,
+      name: profile.name || "unknown",
+      username: profile.username || "",
+      photoUrl: profile.photoUrl || ""
+    },
+    balance,
+    tableStack,
+    totalBankroll: balance + tableStack,
+    activeTables,
+    transactions: getTransactions({ id }).slice(0, 20)
+  };
 }
 
 function authenticateTelegram(initData) {
@@ -708,47 +796,69 @@ async function handleAdminBalanceCommand(message, args) {
 }
 
 async function handleAdminWalletCommand(message, command, args) {
-  const targetId = normalizeTargetUserId(args[0]);
-  const amount = parseChipAmount(args[1]);
-  const reason = args.slice(2).join(" ").trim() || "manual_adjustment";
-  const sign = command === "/grant" ? 1 : -1;
-  const before = getWallet(targetId);
-  const after = before + sign * amount;
+  const admin = telegramMessageUser(message.from);
+  const result = adjustWalletManually({
+    admin,
+    targetId: args[0],
+    type: command === "/grant" ? "grant" : "deduct",
+    amount: args[1],
+    reason: args.slice(2).join(" ").trim() || "manual_adjustment"
+  });
+
+  await sendBotMessage(message.chat.id, [
+    command === "/grant" ? "Начислено chips" : "Списано chips",
+    `Игрок: ${formatUser(result.targetProfile)}`,
+    `Сумма: ${formatNumber(result.amount)} chips`,
+    `Баланс: ${formatNumber(result.balance)} chips`,
+    `Причина: ${result.reason}`
+  ].join("\n"));
+}
+
+function adjustWalletManually({ admin, targetId, type, amount, reason }) {
+  const normalizedType = type === "deduct" ? "deduct" : "grant";
+  const normalizedTargetId = normalizeTargetUserId(targetId);
+  const normalizedAmount = parseChipAmount(amount);
+  const normalizedReason = String(reason || "").trim() || "manual_adjustment";
+  const sign = normalizedType === "grant" ? 1 : -1;
+  const before = getWallet(normalizedTargetId);
+  const after = before + sign * normalizedAmount;
 
   if (after < 0) {
     throw new Error(`Недостаточно chips. Баланс игрока: ${formatNumber(before)}`);
   }
 
-  const balance = setWalletBalance(targetId, after);
-  const targetProfile = userProfiles.get(targetId) || { id: targetId };
-  const admin = telegramMessageUser(message.from);
-  const title = command === "/grant" ? "Ручное начисление" : "Ручное списание";
+  const balance = setWalletBalance(normalizedTargetId, after);
+  const targetProfile = userProfiles.get(normalizedTargetId) || { id: normalizedTargetId };
+  const adminProfile = admin || { id: "system", name: "Admin", username: "" };
+  const title = normalizedType === "grant" ? "Ручное начисление" : "Ручное списание";
 
   recordTransaction(targetProfile, {
-    type: command === "/grant" ? "credit" : "debit",
+    type: normalizedType === "grant" ? "credit" : "debit",
     title,
-    amount,
-    meta: `${reason} · admin ${admin.id}`
+    amount: normalizedAmount,
+    meta: `${normalizedReason} · admin ${adminProfile.id}`
   });
 
-  notifyAdmin(command.slice(1), title, {
+  notifyAdmin(normalizedType, title, {
     user: targetProfile,
     lines: [
-      `Админ: ${formatUser(admin)}`,
-      `Сумма: ${formatNumber(amount)} chips`,
+      `Админ: ${formatUser(adminProfile)}`,
+      `Сумма: ${formatNumber(normalizedAmount)} chips`,
       `До: ${formatNumber(before)} chips`,
       `После: ${formatNumber(balance)} chips`,
-      `Причина: ${reason}`
+      `Причина: ${normalizedReason}`
     ]
   });
 
-  await sendBotMessage(message.chat.id, [
-    command === "/grant" ? "Начислено chips" : "Списано chips",
-    `Игрок: ${formatUser(targetProfile)}`,
-    `Сумма: ${formatNumber(amount)} chips`,
-    `Баланс: ${formatNumber(balance)} chips`,
-    `Причина: ${reason}`
-  ].join("\n"));
+  return {
+    targetId: normalizedTargetId,
+    targetProfile,
+    amount: normalizedAmount,
+    before,
+    balance,
+    reason: normalizedReason,
+    type: normalizedType
+  };
 }
 
 async function answerPreCheckout(query) {
@@ -830,6 +940,20 @@ async function sendBotMessage(chatId, text) {
 }
 
 function notifyAdmin(type, title, { user, lines = [] } = {}) {
+  adminEvents.unshift({
+    id: randomId("event"),
+    type,
+    title,
+    user: user ? {
+      id: user.id,
+      name: user.name || "",
+      username: user.username || ""
+    } : null,
+    lines,
+    createdAt: new Date().toISOString()
+  });
+  adminEvents.splice(50);
+
   if (!ADMIN_CHAT_ID || !BOT_TOKEN || BOT_TOKEN.includes("replace_with") || BOT_TOKEN === "test-token") return;
 
   const text = [

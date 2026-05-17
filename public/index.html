@@ -437,11 +437,86 @@
           </section>
         </section>
 
+        <section class="lobby-view admin-view" data-lobby-view="admin">
+          <section class="wallet-card admin-hero">
+            <div class="miniapp-title">
+              <span>Админ</span>
+              <small>QWZ control</small>
+            </div>
+            <div class="wallet-label">Банкролл в системе</div>
+            <div class="wallet-balance" id="adminBankrollTotal">0</div>
+            <div class="admin-grid" id="adminSummary"></div>
+          </section>
+
+          <section class="lobby-card">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Игрок</p>
+                <h2>Поиск по Telegram ID</h2>
+              </div>
+              <span>admin</span>
+            </div>
+            <form class="admin-form" id="adminLookupForm">
+              <input id="adminUserId" inputmode="numeric" placeholder="Telegram ID игрока" />
+              <button type="submit">Найти</button>
+            </form>
+            <div class="cashier-status" id="adminStatus" role="status"></div>
+          </section>
+
+          <section class="lobby-card admin-player-card" id="adminPlayerCard" hidden>
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Карточка игрока</p>
+                <h2 id="adminPlayerName">Игрок</h2>
+              </div>
+              <span id="adminPlayerId">ID</span>
+            </div>
+            <div class="stats-cards">
+              <div><span>Кошелек</span><strong id="adminPlayerBalance">0</strong></div>
+              <div><span>За столами</span><strong id="adminPlayerTableStack">0</strong></div>
+              <div><span>Всего</span><strong id="adminPlayerTotal">0</strong></div>
+            </div>
+            <form class="admin-form admin-adjust-form" id="adminAdjustForm">
+              <select id="adminAdjustType">
+                <option value="grant">Начислить</option>
+                <option value="deduct">Списать</option>
+              </select>
+              <input id="adminAdjustAmount" inputmode="numeric" placeholder="Сумма chips" />
+              <input id="adminAdjustReason" placeholder="Причина" value="manual_adjustment" />
+              <button type="submit">Применить</button>
+            </form>
+            <div class="cashier-history" id="adminPlayerTransactions"></div>
+          </section>
+
+          <section class="lobby-card">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Платежи</p>
+                <h2>Stars</h2>
+              </div>
+              <span>последние</span>
+            </div>
+            <div class="cashier-history" id="adminRecentPayments"></div>
+          </section>
+
+          <section class="lobby-card">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Логи</p>
+                <h2>События</h2>
+              </div>
+              <span>live</span>
+            </div>
+            <div class="cashier-history" id="adminRecentEvents"></div>
+          </section>
+        </section>
+
         <nav class="bottom-nav" aria-label="Главное меню">
           <button type="button" class="active" data-lobby-tab="home">⌂<span>Главная</span></button>
           <button type="button" data-lobby-tab="tables">♠<span>Столы</span></button>
           <button type="button" data-lobby-tab="cashier">◈<span>Касса</span></button>
           <button type="button" data-lobby-tab="profile">◉<span>Профиль</span></button>
+          <button type="button" class="admin-nav-button" data-lobby-tab="admin" hidden>⚙<span>Админ</span></button>
         </nav>
       </section>
     </main>

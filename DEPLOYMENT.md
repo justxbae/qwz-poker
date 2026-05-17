@@ -79,6 +79,8 @@ Example:
 
 Each operation is written to the player's cashier history and sent to the admin log.
 
+You can also open the Mini App with `?admin=1` to show the hidden admin tab. The server still checks `ADMIN_USER_IDS`, so the tab is only usable by allowed Telegram accounts.
+
 ## Important
 
 The current MVP stores wallets, tables, and transactions in memory. A server restart will reset runtime state. Before a real launch, move this data to a database.

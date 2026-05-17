@@ -1062,6 +1062,70 @@ h2 {
   color: var(--tg-poker-green);
 }
 
+.admin-view {
+  gap: 12px;
+}
+
+.admin-hero .wallet-balance {
+  font-size: 48px;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.admin-grid div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--tg-line);
+  border-radius: 14px;
+  background: rgba(14, 22, 33, 0.34);
+  padding: 12px;
+}
+
+.admin-grid span {
+  color: var(--tg-hint);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-grid strong {
+  color: #fff;
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.admin-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.admin-form input,
+.admin-form select {
+  border: 1px solid rgba(42, 171, 238, 0.22);
+  border-radius: 14px;
+  background: rgba(9, 16, 25, 0.72);
+}
+
+.admin-form button {
+  border-radius: 14px;
+  background: var(--tg-button);
+  color: var(--tg-button-text);
+}
+
+.admin-adjust-form {
+  grid-template-columns: 1fr 1fr;
+}
+
+.admin-adjust-form input:last-of-type,
+.admin-adjust-form button {
+  grid-column: 1 / -1;
+}
+
 .settings-list {
   display: grid;
   margin-top: 16px;
@@ -1272,6 +1336,10 @@ body:not(.in-game) .stats-cards span {
   padding: 8px;
   box-shadow: 0 -18px 50px rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(14px);
+}
+
+.admin-mode .bottom-nav {
+  grid-template-columns: repeat(5, 1fr);
 }
 
 .bottom-nav button {
