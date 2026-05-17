@@ -188,6 +188,7 @@ boot();
 
 async function boot() {
   resetScroll();
+  setupTapGuards();
   tg?.ready();
   tg?.expand();
   setupTelegramControls();
@@ -323,6 +324,25 @@ function setupTelegramControls() {
   tg?.BackButton?.onClick?.(() => {
     runAction(handleTelegramBack);
   });
+}
+
+function setupTapGuards() {
+  let lastTapAt = 0;
+  const editableSelector = "input, textarea, select, [contenteditable='true']";
+
+  document.addEventListener("dblclick", (event) => {
+    if (!event.target.closest(editableSelector)) event.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener("touchend", (event) => {
+    if (event.target.closest(editableSelector)) return;
+
+    const now = Date.now();
+    if (now - lastTapAt < 320) {
+      event.preventDefault();
+    }
+    lastTapAt = now;
+  }, { passive: false });
 }
 
 async function handleTelegramBack() {
