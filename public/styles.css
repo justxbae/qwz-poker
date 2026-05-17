@@ -44,9 +44,7 @@ body {
 
 body:not(.in-game) {
   overflow-x: hidden;
-  background:
-    radial-gradient(circle at 50% -10%, rgba(42, 171, 238, 0.18), transparent 36%),
-    linear-gradient(180deg, var(--tg-bg), #08111a 100%);
+  background: var(--tg-bg);
 }
 
 button,
