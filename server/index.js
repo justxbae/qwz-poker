@@ -6,6 +6,24 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { depositSettings, quoteDeposit } from "./economy.js";
 import {
+  addWalletEntry as dbAddWalletEntry,
+  createPaymentOrder as dbCreatePaymentOrder,
+  dashboardStats as dbDashboardStats,
+  databaseEnabled,
+  getPaymentOrder as dbGetPaymentOrder,
+  getSavedStack as dbGetSavedStack,
+  getWallet as dbGetWallet,
+  initDatabase,
+  listAdminEvents as dbListAdminEvents,
+  listLedger as dbListLedger,
+  listPaymentOrders as dbListPaymentOrders,
+  markPaymentOrderPaid as dbMarkPaymentOrderPaid,
+  recordAdminEvent as dbRecordAdminEvent,
+  setSavedStack as dbSetSavedStack,
+  setWallet as dbSetWallet,
+  upsertTelegramUser
+} from "./db.js";
+import {
   act,
   addBuyIn,
   autoAct,
@@ -68,13 +86,16 @@ const server = createServer(async (req, res) => {
   }
 });
 
+await initDatabase();
+
 server.listen(PORT, HOST, () => {
   const displayHost = HOST === "0.0.0.0" ? "127.0.0.1" : HOST;
   console.log(`${APP_NAME} running at http://${displayHost}:${PORT}`);
   notifyAdmin("server_start", "Admin logs online", {
     lines: [
       `Сервер: ${isProduction ? "production" : "development"}`,
-      `Bot: @${BOT_USERNAME}`
+      `Bot: @${BOT_USERNAME}`,
+      `Database: ${databaseEnabled() ? "PostgreSQL" : "memory"}`
     ]
   });
 });
@@ -107,7 +128,7 @@ async function handleApi(req, res, url) {
     }
 
     const token = randomId("session");
-    const user = normalizeUser(auth.user);
+    const user = await normalizeUser(auth.user);
     sessions.set(token, user);
     if (!loggedAppOpens.has(user.id)) {
       loggedAppOpens.add(user.id);
@@ -134,12 +155,12 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "GET" && url.pathname === "/api/profile") {
-    sendJson(res, 200, { profile: profileView(user) });
+    sendJson(res, 200, { profile: await profileView(user) });
     return;
   }
 
   if (req.method === "GET" && url.pathname === "/api/cashier") {
-    sendJson(res, 200, { cashier: cashierView(user) });
+    sendJson(res, 200, { cashier: await cashierView(user) });
     return;
   }
 
@@ -156,8 +177,7 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     const quote = quoteDeposit(body);
 
-    user.balance = setWalletBalance(user.id, user.balance + quote.chips);
-    recordTransaction(user, {
+    user.balance = await recordTransaction(user, {
       type: "credit",
       title: "Пополнение баланса",
       amount: quote.chips,
@@ -171,7 +191,7 @@ async function handleApi(req, res, url) {
         `Баланс: ${formatNumber(user.balance)} chips`
       ]
     });
-    sendJson(res, 200, { cashier: cashierView(user) });
+    sendJson(res, 200, { cashier: await cashierView(user) });
     return;
   }
 
@@ -197,6 +217,7 @@ async function handleApi(req, res, url) {
       createdAt: new Date().toISOString()
     };
     starOrders.set(orderId, order);
+    await dbCreatePaymentOrder(order);
 
     const invoiceLink = await createStarsInvoiceLink({
       title: `${formatNumber(quote.chips)} QWZ chips`,
@@ -214,14 +235,14 @@ async function handleApi(req, res, url) {
       ]
     });
 
-    sendJson(res, 200, { invoiceLink, orderId, cashier: cashierView(user) });
+    sendJson(res, 200, { invoiceLink, orderId, cashier: await cashierView(user) });
     return;
   }
 
   if (req.method === "POST" && url.pathname === "/api/tables") {
     const body = await readJson(req);
     body.visibility = "private";
-    prepareInitialStack(user, body);
+    await prepareInitialStack(user, body);
     const table = createTable(user, body);
     tables.set(table.id, table);
     notifyAdmin("table_create", "Создан приватный стол", {
@@ -254,7 +275,7 @@ async function handleApi(req, res, url) {
       const body = await readJson(req);
       const wasSeated = table.seats.some((seat) => seat.userId === user.id);
       if (!wasSeated) {
-        prepareInitialStack(user, body);
+        await prepareInitialStack(user, body);
       }
       joinTable(table, user);
       maybeStartHand(table);
@@ -275,7 +296,7 @@ async function handleApi(req, res, url) {
 
     if (req.method === "POST" && action === "leave") {
       const result = leaveTable(table, user);
-      saveStack(user, result.stack);
+      await saveStack(user, result.stack);
       if (result.tableEmpty && table.isPrivate) tables.delete(table.id);
       notifyAdmin("table_leave", "Игрок вышел из стола", {
         user,
@@ -291,7 +312,7 @@ async function handleApi(req, res, url) {
 
     if (req.method === "POST" && action === "stand") {
       const result = leaveTable(table, user);
-      saveStack(user, result.stack);
+      await saveStack(user, result.stack);
       if (result.tableEmpty && table.isPrivate) tables.delete(table.id);
       notifyAdmin("table_stand", "Игрок встал из-за стола", {
         user,
@@ -328,9 +349,8 @@ async function handleApi(req, res, url) {
       const beforeStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
       const afterStack = addBuyIn(table, user, amount);
       const actualAmount = afterStack - beforeStack;
-      user.balance = setWalletBalance(user.id, user.balance - actualAmount);
       if (actualAmount > 0) {
-        recordTransaction(user, {
+        user.balance = await recordTransaction(user, {
           type: "debit",
           title: "Докупка за столом",
           amount: actualAmount,
@@ -393,62 +413,65 @@ async function handleAdminApi(req, res, url, adminUser) {
   const userMatch = url.pathname.match(/^\/api\/admin\/users\/([^/]+)$/);
 
   if (req.method === "GET" && url.pathname === "/api/admin") {
-    sendJson(res, 200, { admin: adminDashboardView() });
+    sendJson(res, 200, { admin: await adminDashboardView() });
     return;
   }
 
   if (req.method === "GET" && userMatch) {
-    sendJson(res, 200, { player: adminPlayerView(userMatch[1]) });
+    sendJson(res, 200, { player: await adminPlayerView(userMatch[1]) });
     return;
   }
 
   if (req.method === "POST" && url.pathname === "/api/admin/wallet-adjust") {
     const body = await readJson(req);
-    const result = adjustWalletManually({
+    const result = await adjustWalletManually({
       admin: adminUser,
       targetId: body.telegramId,
       type: body.type,
       amount: body.amount,
       reason: body.reason
     });
-    sendJson(res, 200, { player: adminPlayerView(result.targetId), adjustment: result });
+    sendJson(res, 200, { player: await adminPlayerView(result.targetId), adjustment: result });
     return;
   }
 
   sendJson(res, 404, { error: "Admin endpoint not found" });
 }
 
-function adminDashboardView() {
+async function adminDashboardView() {
   const players = [...new Set([...wallets.keys(), ...userProfiles.keys(), ...transactions.keys()])];
-  const walletTotal = [...wallets.values()].reduce((sum, value) => sum + Number(value || 0), 0);
+  const dbStats = await dbDashboardStats();
+  const walletTotal = dbStats ? dbStats.walletTotal : [...wallets.values()].reduce((sum, value) => sum + Number(value || 0), 0);
   const tableStackTotal = [...tables.values()].reduce((sum, table) => (
     sum + table.seats.reduce((seatSum, seat) => seatSum + Number(seat.stack || 0), 0)
   ), 0);
   const paidStars = [...starOrders.values()].filter((order) => order.status === "paid");
   const pendingStars = [...starOrders.values()].filter((order) => order.status === "pending");
+  const recentPayments = await dbListPaymentOrders(10);
+  const recentEvents = await dbListAdminEvents(20);
 
   return {
     stats: {
-      players: players.length,
+      players: dbStats ? dbStats.players : players.length,
       activeTables: [...tables.values()].filter((table) => table.seats.length > 0).length,
       openTables: tables.size,
       walletTotal,
       tableStackTotal,
       bankrollTotal: walletTotal + tableStackTotal,
-      paidStars: paidStars.length,
-      pendingStars: pendingStars.length
+      paidStars: dbStats ? dbStats.paidStars : paidStars.length,
+      pendingStars: dbStats ? dbStats.pendingStars : pendingStars.length
     },
-    recentPayments: [...starOrders.values()]
+    recentPayments: recentPayments || [...starOrders.values()]
       .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
       .slice(0, 10),
-    recentEvents: adminEvents.slice(0, 20)
+    recentEvents: recentEvents || adminEvents.slice(0, 20)
   };
 }
 
-function adminPlayerView(userId) {
+async function adminPlayerView(userId) {
   const id = normalizeTargetUserId(userId);
   const profile = userProfiles.get(id) || { id, name: "unknown", username: "" };
-  const balance = getWallet(id);
+  const balance = await getWallet(id);
   const activeTables = userActiveTables({ id });
   const tableStack = activeTables.reduce((sum, table) => sum + table.stack, 0);
 
@@ -463,7 +486,7 @@ function adminPlayerView(userId) {
     tableStack,
     totalBankroll: balance + tableStack,
     activeTables,
-    transactions: getTransactions({ id }).slice(0, 20)
+    transactions: (await getTransactions({ id })).slice(0, 20)
   };
 }
 
@@ -510,20 +533,22 @@ function authenticateTelegram(initData) {
   return { ok: true, user };
 }
 
-function normalizeUser(user) {
+async function normalizeUser(user) {
   const id = String(user.id);
   const normalized = {
     id,
     name: user.first_name || user.username || "Player",
     username: user.username || "",
     photoUrl: user.photo_url || "",
-    balance: getWallet(id)
+    balance: 0
   };
+  await upsertTelegramUser(normalized);
+  normalized.balance = await getWallet(id);
   userProfiles.set(id, normalized);
   return normalized;
 }
 
-function profileView(user) {
+async function profileView(user) {
   const activeTables = [...tables.values()]
     .map((table) => {
       const seat = table.seats.find((candidate) => candidate.userId === user.id);
@@ -552,7 +577,7 @@ function profileView(user) {
       photoUrl: user.photoUrl || ""
     },
     balance: user.balance,
-    savedStack: getSavedStack(user),
+    savedStack: await getSavedStack(user),
     tableStack,
     activeTables,
     activeTableCount: activeTables.length,
@@ -560,7 +585,7 @@ function profileView(user) {
   };
 }
 
-function cashierView(user) {
+async function cashierView(user) {
   const activeTables = userActiveTables(user);
   const tableStack = activeTables.reduce((sum, table) => sum + table.stack, 0);
   return {
@@ -571,7 +596,7 @@ function cashierView(user) {
     currency: "chips",
     mode: "chips",
     deposit: depositSettings(),
-    transactions: getTransactions(user)
+    transactions: await getTransactions(user)
   };
 }
 
@@ -610,14 +635,19 @@ function seedPublicTables() {
   }
 }
 
-function getSavedStack(user) {
+async function getSavedStack(user) {
+  const dbStack = await dbGetSavedStack(user.id);
+  if (dbStack !== null) {
+    savedStacks.set(user.id, dbStack);
+    return dbStack;
+  }
   return savedStacks.get(user.id) || DEFAULT_STACK;
 }
 
-function prepareInitialStack(user, body = {}) {
+async function prepareInitialStack(user, body = {}) {
   const requested = Number(body.buyInAmount || 0);
   if (!requested) {
-    user.stack = getSavedStack(user);
+    user.stack = await getSavedStack(user);
     if (user.stack <= 0) {
       const error = new Error("Сначала пополните баланс и выберите бай-ин");
       error.status = 409;
@@ -633,8 +663,7 @@ function prepareInitialStack(user, body = {}) {
   }
   const amount = clamp(requested, 1, user.balance);
   user.stack = amount;
-  user.balance = setWalletBalance(user.id, user.balance - amount);
-  recordTransaction(user, {
+  user.balance = await recordTransaction(user, {
     type: "debit",
     title: "Бай-ин за стол",
     amount,
@@ -642,16 +671,24 @@ function prepareInitialStack(user, body = {}) {
   });
 }
 
-function saveStack(user, stack) {
+async function saveStack(user, stack) {
   savedStacks.set(user.id, stack);
+  await dbSetSavedStack(user.id, stack);
 }
 
-function getWallet(userId) {
+async function getWallet(userId) {
+  const dbBalance = await dbGetWallet(userId);
+  if (dbBalance !== null) return setWalletBalanceLocal(userId, dbBalance);
   if (!wallets.has(userId)) wallets.set(userId, DEFAULT_WALLET);
   return wallets.get(userId);
 }
 
-function setWalletBalance(userId, balance) {
+async function setWalletBalance(userId, balance) {
+  const dbBalance = await dbSetWallet(userId, balance);
+  return setWalletBalanceLocal(userId, dbBalance ?? balance);
+}
+
+function setWalletBalanceLocal(userId, balance) {
   const id = String(userId);
   const normalized = Math.max(0, Math.round(Number(balance) || 0));
   wallets.set(id, normalized);
@@ -665,7 +702,12 @@ function setWalletBalance(userId, balance) {
   return normalized;
 }
 
-function getTransactions(user) {
+async function getTransactions(user) {
+  const dbLedger = await dbListLedger(user.id, 30);
+  if (dbLedger) {
+    transactions.set(user.id, dbLedger);
+    return dbLedger;
+  }
   if (!transactions.has(user.id)) {
     transactions.set(user.id, DEFAULT_WALLET > 0 ? [
       {
@@ -681,8 +723,19 @@ function getTransactions(user) {
   return transactions.get(user.id);
 }
 
-function recordTransaction(user, transaction) {
-  const history = getTransactions(user);
+async function recordTransaction(user, transaction) {
+  const dbEntry = await dbAddWalletEntry(user.id, transaction);
+  if (dbEntry) {
+    setWalletBalanceLocal(user.id, dbEntry.balance);
+    await getTransactions(user);
+    return dbEntry.balance;
+  }
+
+  const nextBalance = setWalletBalanceLocal(
+    user.id,
+    getWalletLocal(user.id) + (transaction.type === "debit" ? -transaction.amount : transaction.amount)
+  );
+  const history = await getTransactions(user);
   history.unshift({
     id: randomId("tx"),
     type: transaction.type,
@@ -692,6 +745,12 @@ function recordTransaction(user, transaction) {
     createdAt: new Date().toISOString()
   });
   transactions.set(user.id, history.slice(0, 30));
+  return nextBalance;
+}
+
+function getWalletLocal(userId) {
+  if (!wallets.has(userId)) wallets.set(userId, DEFAULT_WALLET);
+  return wallets.get(userId);
 }
 
 function isAdminUser(userId) {
@@ -746,7 +805,7 @@ async function handleTelegramWebhook(update) {
 
   const payment = update.message?.successful_payment;
   if (!payment) return;
-  processSuccessfulStarPayment(payment);
+  await processSuccessfulStarPayment(payment);
 }
 
 async function handleAdminCommand(message) {
@@ -783,7 +842,7 @@ async function handleAdminCommand(message) {
 async function handleAdminBalanceCommand(message, args) {
   const targetId = normalizeTargetUserId(args[0]);
   const profile = userProfiles.get(targetId);
-  const balance = getWallet(targetId);
+  const balance = await getWallet(targetId);
   const tableStack = userActiveTables({ id: targetId }).reduce((sum, table) => sum + table.stack, 0);
 
   await sendBotMessage(message.chat.id, [
@@ -797,7 +856,7 @@ async function handleAdminBalanceCommand(message, args) {
 
 async function handleAdminWalletCommand(message, command, args) {
   const admin = telegramMessageUser(message.from);
-  const result = adjustWalletManually({
+  const result = await adjustWalletManually({
     admin,
     targetId: args[0],
     type: command === "/grant" ? "grant" : "deduct",
@@ -814,25 +873,24 @@ async function handleAdminWalletCommand(message, command, args) {
   ].join("\n"));
 }
 
-function adjustWalletManually({ admin, targetId, type, amount, reason }) {
+async function adjustWalletManually({ admin, targetId, type, amount, reason }) {
   const normalizedType = type === "deduct" ? "deduct" : "grant";
   const normalizedTargetId = normalizeTargetUserId(targetId);
   const normalizedAmount = parseChipAmount(amount);
   const normalizedReason = String(reason || "").trim() || "manual_adjustment";
   const sign = normalizedType === "grant" ? 1 : -1;
-  const before = getWallet(normalizedTargetId);
+  const before = await getWallet(normalizedTargetId);
   const after = before + sign * normalizedAmount;
 
   if (after < 0) {
     throw new Error(`Недостаточно chips. Баланс игрока: ${formatNumber(before)}`);
   }
 
-  const balance = setWalletBalance(normalizedTargetId, after);
   const targetProfile = userProfiles.get(normalizedTargetId) || { id: normalizedTargetId };
   const adminProfile = admin || { id: "system", name: "Admin", username: "" };
   const title = normalizedType === "grant" ? "Ручное начисление" : "Ручное списание";
 
-  recordTransaction(targetProfile, {
+  const balance = await recordTransaction(targetProfile, {
     type: normalizedType === "grant" ? "credit" : "debit",
     title,
     amount: normalizedAmount,
@@ -863,7 +921,7 @@ function adjustWalletManually({ admin, targetId, type, amount, reason }) {
 
 async function answerPreCheckout(query) {
   const payload = query.invoice_payload || "";
-  const order = orderFromPayload(payload);
+  const order = await orderFromPayload(payload);
   const ok = Boolean(
     order
       && order.status === "pending"
@@ -878,23 +936,22 @@ async function answerPreCheckout(query) {
   });
 }
 
-function processSuccessfulStarPayment(payment) {
-  const order = orderFromPayload(payment.invoice_payload || "");
+async function processSuccessfulStarPayment(payment) {
+  const order = await orderFromPayload(payment.invoice_payload || "");
   if (!order || order.status === "paid") return;
   if (payment.currency !== "XTR" || Number(payment.total_amount) !== Number(order.stars)) return;
 
-  const balance = setWalletBalance(order.userId, getWallet(order.userId) + order.chips);
-  order.status = "paid";
-  order.paidAt = new Date().toISOString();
-  order.telegramPaymentChargeId = payment.telegram_payment_charge_id || "";
-  starOrders.set(order.id, order);
-
-  recordTransaction({ id: order.userId }, {
+  const balance = await recordTransaction({ id: order.userId }, {
     type: "credit",
     title: "Пополнение Stars",
     amount: order.chips,
     meta: `${order.stars} Stars · QWZ chips`
   });
+  order.status = "paid";
+  order.paidAt = new Date().toISOString();
+  order.telegramPaymentChargeId = payment.telegram_payment_charge_id || "";
+  starOrders.set(order.id, order);
+  await dbMarkPaymentOrderPaid(order.id, payment);
   notifyAdmin("stars_paid", "Оплачено Stars-пополнение", {
     user: { id: order.userId, name: order.userName, username: order.username },
     lines: [
@@ -908,9 +965,10 @@ function processSuccessfulStarPayment(payment) {
   });
 }
 
-function orderFromPayload(payload) {
+async function orderFromPayload(payload) {
   const orderId = String(payload).startsWith("qwz:") ? payload.slice(4) : "";
-  return orderId ? starOrders.get(orderId) : null;
+  if (!orderId) return null;
+  return starOrders.get(orderId) || await dbGetPaymentOrder(orderId);
 }
 
 async function callTelegram(method, payload) {
@@ -953,6 +1011,9 @@ function notifyAdmin(type, title, { user, lines = [] } = {}) {
     createdAt: new Date().toISOString()
   });
   adminEvents.splice(50);
+  dbRecordAdminEvent(adminEvents[0]).catch((error) => {
+    console.error("Admin event persistence failed:", error.message);
+  });
 
   if (!ADMIN_CHAT_ID || !BOT_TOKEN || BOT_TOKEN.includes("replace_with") || BOT_TOKEN === "test-token") return;
 

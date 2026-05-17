@@ -8,6 +8,9 @@
     "start": "NODE_ENV=production node server/index.js",
     "test": "node --test tests/*.test.js"
   },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
   "engines": {
     "node": ">=20"
   }

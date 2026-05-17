@@ -3,7 +3,7 @@ services:
     name: qwz-poker
     runtime: node
     plan: free
-    buildCommand: ""
+    buildCommand: npm install
     startCommand: node server/index.js
     healthCheckPath: /api/config
     envVars:
@@ -16,4 +16,8 @@ services:
       - key: BOT_TOKEN
         sync: false
       - key: ADMIN_CHAT_ID
+        sync: false
+      - key: ADMIN_USER_IDS
+        sync: false
+      - key: DATABASE_URL
         sync: false

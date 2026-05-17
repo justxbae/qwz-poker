@@ -15,6 +15,7 @@ Steps:
 3. Render will read `render.yaml` and start the app with `node server/index.js`.
 4. Add the secret environment variable:
    - `BOT_TOKEN`
+   - `DATABASE_URL`
 5. Deploy.
 
 After deploy, copy the public Render URL, for example:
@@ -45,8 +46,15 @@ BOT_TOKEN=<token from BotFather>
 ADMIN_CHAT_ID=<your Telegram numeric user id for private admin logs>
 ADMIN_USER_IDS=<comma-separated Telegram user ids allowed to use admin commands>
 ADMIN_GRANT_MAX_CHIPS=500000
+DATABASE_URL=<Render PostgreSQL internal database URL>
 APP_NAME=QWZ Poker
 ```
+
+## PostgreSQL
+
+Create a PostgreSQL database on Render and copy its internal connection string into `DATABASE_URL` for the web service. On startup, the app automatically creates the required tables.
+
+If `DATABASE_URL` is missing, the app falls back to memory storage. That is acceptable only for local testing; production balances and payments require PostgreSQL.
 
 After deploy, set webhook exactly like above, replacing the domain with the Koyeb app URL.
 
