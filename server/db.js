@@ -144,6 +144,48 @@ export async function listLedger(providerUserId, limit = 30, provider = "telegra
   }));
 }
 
+export async function recordFundMovement(providerUserId, movement, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const amount = Math.max(0, Math.round(Number(movement.amount) || 0));
+  await query(`
+    insert into fund_movements (
+      id, app_user_id, provider, provider_user_id, category,
+      from_bucket, to_bucket, amount, context_id, meta
+    )
+    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+  `, [
+    movement.id || id("move"),
+    appUserId,
+    provider,
+    String(providerUserId),
+    normalizeLedgerCategory(movement.category),
+    normalizeLedgerCategory(movement.from || movement.fromBucket),
+    normalizeLedgerCategory(movement.to || movement.toBucket),
+    amount,
+    movement.contextId || "",
+    movement.meta || ""
+  ]);
+  return true;
+}
+
+export async function listFundMovements(providerUserId, limit = 30, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const result = await query(`
+    select id, category, from_bucket as "from", to_bucket as "to", amount,
+           context_id as "contextId", meta, created_at as "createdAt"
+    from fund_movements
+    where app_user_id = $1
+    order by created_at desc
+    limit $2
+  `, [appUserId, limit]);
+  return result.rows.map((row) => ({
+    ...row,
+    amount: Number(row.amount || 0)
+  }));
+}
+
 export async function getSavedStack(providerUserId, provider = "telegram") {
   if (!pool) return null;
   const appUserId = await ensureIdentity(provider, providerUserId);
@@ -362,6 +404,23 @@ async function migrate() {
     create index if not exists idx_ledger_entries_app_user_created on ledger_entries(app_user_id, created_at desc);
     alter table ledger_entries add column if not exists category text not null default 'other';
     create index if not exists idx_ledger_entries_category_created on ledger_entries(category, created_at desc);
+
+    create table if not exists fund_movements (
+      id text primary key,
+      app_user_id text not null references app_users(id) on delete cascade,
+      provider text not null,
+      provider_user_id text not null,
+      category text not null,
+      from_bucket text not null,
+      to_bucket text not null,
+      amount bigint not null check (amount >= 0),
+      context_id text not null default '',
+      meta text not null default '',
+      created_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_fund_movements_app_user_created on fund_movements(app_user_id, created_at desc);
+    create index if not exists idx_fund_movements_category_created on fund_movements(category, created_at desc);
 
     create table if not exists payment_orders (
       id text primary key,

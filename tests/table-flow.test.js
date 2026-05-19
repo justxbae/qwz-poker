@@ -222,7 +222,7 @@ test("standing keeps the table open as observer and allows sitting again", async
 });
 
 test("initial buy-in chooses table stack and spends wallet balance", async () => {
-  const server = await startServer();
+  const server = await startServer({ ADMIN_USER_IDS: "dev-user" });
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
     await topUp(auth.token, 4);
@@ -234,6 +234,14 @@ test("initial buy-in chooses table stack and spends wallet balance", async () =>
 
     assert.equal(table.viewer.balance, 0);
     assert.equal(table.seats.find((seat) => seat.userId === "dev-user").stack, 20000);
+
+    const dashboard = (await request("/api/admin", { token: auth.token })).admin;
+    assert.ok(dashboard.recentFundMovements.some((movement) => (
+      movement.category === "wallet_to_table"
+      && movement.from === "wallet"
+      && movement.to === "table"
+      && movement.amount === 20000
+    )));
   } finally {
     server.kill();
   }
@@ -437,7 +445,7 @@ test("tournament registration spends chips and cancellation refunds them", async
 });
 
 test("rebuy adds chips only between hands and spends wallet balance", async () => {
-  const server = await startServer();
+  const server = await startServer({ ADMIN_USER_IDS: "dev-user" });
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
     await topUp(auth.token, 4);
@@ -458,6 +466,11 @@ test("rebuy adds chips only between hands and spends wallet balance", async () =
     assert.equal(table.seats.find((seat) => seat.userId === "dev-user").stack, 15000);
     const cashier = (await request("/api/cashier", { token: auth.token })).cashier;
     assert.equal(cashier.transactions[0].category, "table_rebuy");
+    let dashboard = (await request("/api/admin", { token: auth.token })).admin;
+    assert.ok(dashboard.recentFundMovements.some((movement) => (
+      movement.category === "wallet_to_table_rebuy"
+      && movement.amount === 5000
+    )));
 
     table = (await request(`/api/tables/${table.id}/add-test-player`, {
       method: "POST",
@@ -476,6 +489,18 @@ test("rebuy adds chips only between hands and spends wallet balance", async () =
       }),
       /Докупить фишки можно только между раздачами/
     );
+
+    await request(`/api/tables/${table.id}/stand`, {
+      method: "POST",
+      token: auth.token
+    });
+    dashboard = (await request("/api/admin", { token: auth.token })).admin;
+    assert.ok(dashboard.recentFundMovements.some((movement) => (
+      movement.category === "table_to_saved_stack"
+      && movement.from === "table"
+      && movement.to === "saved_stack"
+      && movement.amount > 0
+    )));
   } finally {
     server.kill();
   }

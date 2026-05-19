@@ -82,6 +82,7 @@ const adminAdjustReason = document.querySelector("#adminAdjustReason");
 const adminPlayerTransactions = document.querySelector("#adminPlayerTransactions");
 const adminRecentPayments = document.querySelector("#adminRecentPayments");
 const adminRecentEvents = document.querySelector("#adminRecentEvents");
+const adminFundMovements = document.querySelector("#adminFundMovements");
 const tournamentList = document.querySelector("#tournamentList");
 const tournamentStatus = document.querySelector("#tournamentStatus");
 const continueCard = document.querySelector("#continueCard");
@@ -696,6 +697,7 @@ function renderAdminDashboard(admin) {
   }));
 
   renderAdminPayments(admin?.recentPayments || []);
+  renderAdminFundMovements(admin?.recentFundMovements || []);
   renderAdminEvents(admin?.recentEvents || []);
 }
 
@@ -762,6 +764,15 @@ function renderAdminPayments(payments) {
     value: payment.status,
     positive: payment.status === "paid"
   })), "Платежей пока нет");
+}
+
+function renderAdminFundMovements(movements) {
+  renderAdminRows(adminFundMovements, movements.map((movement) => ({
+    title: `${movement.from} → ${movement.to}`,
+    meta: `${movement.category} · ${movement.user?.name || movement.userId} · ${formatDateTime(movement.createdAt)}`,
+    value: formatChips(movement.amount),
+    positive: false
+  })), "Движений chips пока нет");
 }
 
 function renderAdminEvents(events) {

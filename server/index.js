@@ -19,6 +19,7 @@ import {
   listPaymentOrders as dbListPaymentOrders,
   markPaymentOrderPaid as dbMarkPaymentOrderPaid,
   recordAdminEvent as dbRecordAdminEvent,
+  recordFundMovement as dbRecordFundMovement,
   setSavedStack as dbSetSavedStack,
   setWallet as dbSetWallet,
   upsertTelegramUser
@@ -62,6 +63,7 @@ const userProfiles = new Map();
 const savedStacks = new Map();
 const wallets = new Map();
 const transactions = new Map();
+const fundMovements = new Map();
 const starOrders = new Map();
 const adminEvents = [];
 const loggedAppOpens = new Set();
@@ -387,6 +389,14 @@ async function handleApi(req, res, url) {
           amount: actualAmount,
           meta: `${table.smallBlind}/${table.bigBlind} · ${table.name}`
         });
+        await recordFundMovement(user, {
+          category: "wallet_to_table_rebuy",
+          from: "wallet",
+          to: "table",
+          amount: actualAmount,
+          contextId: table.id,
+          meta: `${table.smallBlind}/${table.bigBlind} · ${table.name}`
+        });
         notifyAdmin("rebuy", "Докупка за столом", {
           user,
           lines: [
@@ -526,6 +536,7 @@ async function adminDashboardView() {
         "ledgerNetTotal is informational until all transfers use categorized ledger entries"
       ]
     },
+    recentFundMovements: recentFundMovements(20),
     recentPayments: recentPayments || [...starOrders.values()]
       .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
       .slice(0, 10),
@@ -557,6 +568,17 @@ function memoryLedgerTotal(type) {
       .filter((entry) => entry.type === type)
       .reduce((entrySum, entry) => entrySum + Number(entry.amount || 0), 0)
   ), 0);
+}
+
+function recentFundMovements(limit = 20) {
+  return [...fundMovements.entries()]
+    .flatMap(([userId, movements]) => movements.map((movement) => ({
+      ...movement,
+      userId,
+      user: userProfiles.get(userId) || { id: userId }
+    })))
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+    .slice(0, limit);
 }
 
 async function adminPlayerView(userId) {
@@ -905,11 +927,30 @@ async function prepareInitialStack(user, body = {}) {
     amount,
     meta: "Texas NL"
   });
+  await recordFundMovement(user, {
+    category: "wallet_to_table",
+    from: "wallet",
+    to: "table",
+    amount,
+    meta: "Texas NL buy-in"
+  });
 }
 
 async function saveStack(user, stack) {
-  savedStacks.set(user.id, stack);
-  await dbSetSavedStack(user.id, stack);
+  const previous = await getSavedStack(user);
+  const normalized = Math.max(0, Math.round(Number(stack) || 0));
+  savedStacks.set(user.id, normalized);
+  await dbSetSavedStack(user.id, normalized);
+  const delta = normalized - previous;
+  if (delta !== 0) {
+    await recordFundMovement(user, {
+      category: delta > 0 ? "table_to_saved_stack" : "saved_stack_decrease",
+      from: delta > 0 ? "table" : "saved_stack",
+      to: delta > 0 ? "saved_stack" : "table_or_adjustment",
+      amount: Math.abs(delta),
+      meta: `saved stack ${formatNumber(previous)} -> ${formatNumber(normalized)}`
+    });
+  }
 }
 
 async function getWallet(userId) {
@@ -984,6 +1025,26 @@ async function recordTransaction(user, transaction) {
   });
   transactions.set(user.id, history.slice(0, 30));
   return nextBalance;
+}
+
+async function recordFundMovement(user, movement) {
+  const normalized = {
+    id: randomId("move"),
+    category: normalizeLedgerCategory(movement.category),
+    from: normalizeLedgerCategory(movement.from || movement.fromBucket),
+    to: normalizeLedgerCategory(movement.to || movement.toBucket),
+    amount: Math.max(0, Math.round(Number(movement.amount) || 0)),
+    contextId: movement.contextId || "",
+    meta: movement.meta || "",
+    createdAt: new Date().toISOString()
+  };
+  if (normalized.amount <= 0) return null;
+
+  const dbMovement = await dbRecordFundMovement(user.id, normalized);
+  const history = fundMovements.get(user.id) || [];
+  history.unshift(normalized);
+  fundMovements.set(user.id, history.slice(0, 100));
+  return dbMovement || normalized;
 }
 
 function getWalletLocal(userId) {
