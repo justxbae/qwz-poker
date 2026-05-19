@@ -427,6 +427,10 @@ test("tournament registration spends chips and cancellation refunds them", async
     assert.equal(dashboard.stats.tournamentPrizePoolTotal, tournament.buyIn);
     assert.equal(dashboard.stats.tournamentFeeReserveTotal, tournament.fee);
     assert.equal(dashboard.stats.playerFundsTotal, 10000);
+    assert.ok(dashboard.recentFundMovements.some((movement) => (
+      movement.category === "wallet_to_tournament_escrow"
+      && movement.amount === tournament.totalCost
+    )));
 
     data = await request(`/api/tournaments/${tournament.id}/cancel`, {
       method: "POST",
@@ -439,6 +443,11 @@ test("tournament registration spends chips and cancellation refunds them", async
     assert.equal(data.profile.balance, 10000);
     assert.equal(data.cashier.transactions[0].title, "Возврат турнирного бай-ина");
     assert.equal(data.cashier.transactions[0].category, "tournament_refund");
+    const afterCancelDashboard = (await request("/api/admin", { token: auth.token })).admin;
+    assert.ok(afterCancelDashboard.recentFundMovements.some((movement) => (
+      movement.category === "tournament_escrow_to_wallet"
+      && movement.amount === tournament.totalCost
+    )));
   } finally {
     server.kill();
   }

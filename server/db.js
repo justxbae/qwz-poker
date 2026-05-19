@@ -186,6 +186,167 @@ export async function listFundMovements(providerUserId, limit = 30, provider = "
   }));
 }
 
+export async function listTournamentRegistrations(tournamentIds = []) {
+  if (!pool) return null;
+  if (!tournamentIds.length) return [];
+  const result = await query(`
+    select tr.tournament_id as "tournamentId",
+           tr.provider_user_id as "userId",
+           tr.buy_in as "buyIn",
+           tr.fee,
+           tr.registered_at as "registeredAt",
+           au.display_name as name,
+           au.username
+    from tournament_registrations tr
+    left join app_users au on au.id = tr.app_user_id
+    where tr.status = 'active'
+      and tr.tournament_id = any($1::text[])
+    order by tr.registered_at asc
+  `, [tournamentIds]);
+  return result.rows.map((row) => ({
+    ...row,
+    buyIn: Number(row.buyIn || 0),
+    fee: Number(row.fee || 0)
+  }));
+}
+
+export async function registerTournament(providerUserId, tournament, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const buyIn = Math.max(0, Math.round(Number(tournament.buyIn) || 0));
+  const fee = Math.max(0, Math.round(Number(tournament.fee) || 0));
+  const totalCost = buyIn + fee;
+  const client = await pool.connect();
+
+  try {
+    await client.query("begin");
+    await client.query("select pg_advisory_xact_lock(hashtext($1))", [String(tournament.id)]);
+    await client.query("insert into wallets (app_user_id, balance) values ($1, 0) on conflict do nothing", [appUserId]);
+
+    const existing = await client.query(`
+      select status
+      from tournament_registrations
+      where tournament_id = $1 and app_user_id = $2
+      for update
+    `, [tournament.id, appUserId]);
+    if (existing.rows[0]?.status === "active") {
+      const wallet = await client.query("select balance from wallets where app_user_id = $1", [appUserId]);
+      await client.query("commit");
+      return { balance: Number(wallet.rows[0]?.balance || 0), alreadyRegistered: true };
+    }
+
+    const count = await client.query(`
+      select count(*)::int as count
+      from tournament_registrations
+      where tournament_id = $1 and status = 'active'
+    `, [tournament.id]);
+    if (Number(count.rows[0]?.count || 0) >= Number(tournament.maxPlayers || 0)) {
+      const error = new Error("Турнир уже заполнен");
+      error.status = 409;
+      throw error;
+    }
+
+    const current = await client.query("select balance from wallets where app_user_id = $1 for update", [appUserId]);
+    const before = Number(current.rows[0]?.balance || 0);
+    const after = before - totalCost;
+    if (after < 0) {
+      const error = new Error(`Недостаточно chips для регистрации. Нужно ${totalCost.toLocaleString("ru-RU")} chips`);
+      error.status = 409;
+      throw error;
+    }
+
+    await client.query("update wallets set balance = $2, updated_at = now() where app_user_id = $1", [appUserId, after]);
+    await client.query(`
+      insert into ledger_entries (
+        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after
+      )
+      values ($1, $2, $3, $4, 'debit', 'tournament_buyin', 'Вход в турнир', $5, $6, $7)
+    `, [
+      id("ledger"),
+      appUserId,
+      provider,
+      String(providerUserId),
+      totalCost,
+      `${tournament.title} · бай-ин ${buyIn.toLocaleString("ru-RU")} + fee ${fee.toLocaleString("ru-RU")}`,
+      after
+    ]);
+    await client.query(`
+      insert into tournament_registrations (
+        tournament_id, app_user_id, provider, provider_user_id, buy_in, fee, status, registered_at, cancelled_at
+      )
+      values ($1, $2, $3, $4, $5, $6, 'active', now(), null)
+      on conflict (tournament_id, app_user_id) do update
+      set buy_in = excluded.buy_in,
+          fee = excluded.fee,
+          status = 'active',
+          registered_at = now(),
+          cancelled_at = null
+    `, [tournament.id, appUserId, provider, String(providerUserId), buyIn, fee]);
+    await client.query("commit");
+    return { balance: after, alreadyRegistered: false };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function cancelTournamentRegistration(providerUserId, tournament, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const client = await pool.connect();
+
+  try {
+    await client.query("begin");
+    await client.query("select pg_advisory_xact_lock(hashtext($1))", [String(tournament.id)]);
+    const registration = await client.query(`
+      select buy_in, fee
+      from tournament_registrations
+      where tournament_id = $1 and app_user_id = $2 and status = 'active'
+      for update
+    `, [tournament.id, appUserId]);
+    if (!registration.rowCount) {
+      const wallet = await client.query("select balance from wallets where app_user_id = $1", [appUserId]);
+      await client.query("commit");
+      return { balance: Number(wallet.rows[0]?.balance || 0), cancelled: false };
+    }
+
+    const refund = Number(registration.rows[0].buy_in || 0) + Number(registration.rows[0].fee || 0);
+    await client.query("insert into wallets (app_user_id, balance) values ($1, 0) on conflict do nothing", [appUserId]);
+    const current = await client.query("select balance from wallets where app_user_id = $1 for update", [appUserId]);
+    const after = Number(current.rows[0]?.balance || 0) + refund;
+
+    await client.query("update wallets set balance = $2, updated_at = now() where app_user_id = $1", [appUserId, after]);
+    await client.query(`
+      update tournament_registrations
+      set status = 'cancelled', cancelled_at = now()
+      where tournament_id = $1 and app_user_id = $2
+    `, [tournament.id, appUserId]);
+    await client.query(`
+      insert into ledger_entries (
+        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after
+      )
+      values ($1, $2, $3, $4, 'credit', 'tournament_refund', 'Возврат турнирного бай-ина', $5, $6, $7)
+    `, [
+      id("ledger"),
+      appUserId,
+      provider,
+      String(providerUserId),
+      refund,
+      tournament.title,
+      after
+    ]);
+    await client.query("commit");
+    return { balance: after, cancelled: true };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function getSavedStack(providerUserId, provider = "telegram") {
   if (!pool) return null;
   const appUserId = await ensureIdentity(provider, providerUserId);
@@ -421,6 +582,22 @@ async function migrate() {
 
     create index if not exists idx_fund_movements_app_user_created on fund_movements(app_user_id, created_at desc);
     create index if not exists idx_fund_movements_category_created on fund_movements(category, created_at desc);
+
+    create table if not exists tournament_registrations (
+      tournament_id text not null,
+      app_user_id text not null references app_users(id) on delete cascade,
+      provider text not null,
+      provider_user_id text not null,
+      buy_in bigint not null default 0 check (buy_in >= 0),
+      fee bigint not null default 0 check (fee >= 0),
+      status text not null default 'active' check (status in ('active', 'cancelled', 'seated', 'finished')),
+      registered_at timestamptz not null default now(),
+      cancelled_at timestamptz,
+      primary key (tournament_id, app_user_id)
+    );
+
+    create index if not exists idx_tournament_registrations_status on tournament_registrations(tournament_id, status);
+    create index if not exists idx_tournament_registrations_user on tournament_registrations(app_user_id, registered_at desc);
 
     create table if not exists payment_orders (
       id text primary key,

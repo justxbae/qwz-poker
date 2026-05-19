@@ -16,10 +16,13 @@ import {
   initDatabase,
   listAdminEvents as dbListAdminEvents,
   listLedger as dbListLedger,
+  listTournamentRegistrations as dbListTournamentRegistrations,
   listPaymentOrders as dbListPaymentOrders,
   markPaymentOrderPaid as dbMarkPaymentOrderPaid,
   recordAdminEvent as dbRecordAdminEvent,
   recordFundMovement as dbRecordFundMovement,
+  registerTournament as dbRegisterTournament,
+  cancelTournamentRegistration as dbCancelTournamentRegistration,
   setSavedStack as dbSetSavedStack,
   setWallet as dbSetWallet,
   upsertTelegramUser
@@ -90,6 +93,7 @@ const server = createServer(async (req, res) => {
 });
 
 await initDatabase();
+await hydrateTournamentRegistrations();
 
 server.listen(PORT, HOST, () => {
   const displayHost = HOST === "0.0.0.0" ? "127.0.0.1" : HOST;
@@ -799,6 +803,25 @@ function tournamentListView(user) {
   return [...tournaments.values()].map((tournament) => tournamentView(tournament, user));
 }
 
+async function hydrateTournamentRegistrations() {
+  const rows = await dbListTournamentRegistrations([...tournaments.keys()]);
+  if (!rows) return;
+
+  for (const tournament of tournaments.values()) {
+    tournament.registrations.clear();
+  }
+  for (const row of rows) {
+    const tournament = tournaments.get(row.tournamentId);
+    if (!tournament) continue;
+    tournament.registrations.set(row.userId, {
+      userId: row.userId,
+      name: row.name || "Player",
+      username: row.username || "",
+      registeredAt: row.registeredAt
+    });
+  }
+}
+
 function tournamentView(tournament, user) {
   const participants = tournament.registrations.size;
   const totalCost = tournament.buyIn + tournament.fee;
@@ -841,18 +864,33 @@ async function registerTournament(tournament, user) {
     throw error;
   }
 
-  user.balance = await recordTransaction(user, {
-    type: "debit",
-    category: "tournament_buyin",
-    title: "Вход в турнир",
-    amount: totalCost,
-    meta: `${tournament.title} · бай-ин ${formatNumber(tournament.buyIn)} + fee ${formatNumber(tournament.fee)}`
-  });
+  const registeredAt = new Date().toISOString();
+  const dbResult = await dbRegisterTournament(user.id, tournament);
+  if (dbResult) {
+    user.balance = setWalletBalanceLocal(user.id, dbResult.balance);
+  } else {
+    user.balance = await recordTransaction(user, {
+      type: "debit",
+      category: "tournament_buyin",
+      title: "Вход в турнир",
+      amount: totalCost,
+      meta: `${tournament.title} · бай-ин ${formatNumber(tournament.buyIn)} + fee ${formatNumber(tournament.fee)}`
+    });
+  }
+
   tournament.registrations.set(user.id, {
     userId: user.id,
     name: user.name,
     username: user.username,
-    registeredAt: new Date().toISOString()
+    registeredAt
+  });
+  await recordFundMovement(user, {
+    category: "wallet_to_tournament_escrow",
+    from: "wallet",
+    to: "tournament_escrow",
+    amount: totalCost,
+    contextId: tournament.id,
+    meta: tournament.title
   });
   notifyAdmin("tournament_register", "Регистрация в турнир", {
     user,
@@ -873,13 +911,26 @@ async function cancelTournamentRegistration(tournament, user) {
     throw error;
   }
 
-  tournament.registrations.delete(user.id);
   const totalCost = tournament.buyIn + tournament.fee;
-  user.balance = await recordTransaction(user, {
-    type: "credit",
-    category: "tournament_refund",
-    title: "Возврат турнирного бай-ина",
+  const dbResult = await dbCancelTournamentRegistration(user.id, tournament);
+  if (dbResult) {
+    user.balance = setWalletBalanceLocal(user.id, dbResult.balance);
+  } else {
+    user.balance = await recordTransaction(user, {
+      type: "credit",
+      category: "tournament_refund",
+      title: "Возврат турнирного бай-ина",
+      amount: totalCost,
+      meta: tournament.title
+    });
+  }
+  tournament.registrations.delete(user.id);
+  await recordFundMovement(user, {
+    category: "tournament_escrow_to_wallet",
+    from: "tournament_escrow",
+    to: "wallet",
     amount: totalCost,
+    contextId: tournament.id,
     meta: tournament.title
   });
   notifyAdmin("tournament_cancel", "Отмена регистрации в турнир", {
