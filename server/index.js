@@ -17,10 +17,12 @@ import {
   listAdminEvents as dbListAdminEvents,
   listLedger as dbListLedger,
   listTournamentRegistrations as dbListTournamentRegistrations,
+  listHandHistories as dbListHandHistories,
   listPaymentOrders as dbListPaymentOrders,
   markPaymentOrderPaid as dbMarkPaymentOrderPaid,
   recordAdminEvent as dbRecordAdminEvent,
   recordFundMovement as dbRecordFundMovement,
+  recordHandHistory as dbRecordHandHistory,
   registerTournament as dbRegisterTournament,
   cancelTournamentRegistration as dbCancelTournamentRegistration,
   setSavedStack as dbSetSavedStack,
@@ -70,6 +72,8 @@ const fundMovements = new Map();
 const starOrders = new Map();
 const adminEvents = [];
 const loggedAppOpens = new Set();
+const persistedHandIds = new Set();
+const recentHandHistories = [];
 const DEFAULT_STACK = 0;
 const DEFAULT_WALLET = 0;
 
@@ -107,7 +111,14 @@ server.listen(PORT, HOST, () => {
   });
 });
 
-setInterval(() => tickTables(tables), 1000);
+setInterval(async () => {
+  try {
+    tickTables(tables);
+    await persistAllCompletedHands();
+  } catch (error) {
+    console.error("Table tick failed:", error);
+  }
+}, 1000);
 
 async function handleApi(req, res, url) {
   if (req.method === "POST" && url.pathname === "/api/telegram/webhook") {
@@ -332,6 +343,7 @@ async function handleApi(req, res, url) {
 
     if (req.method === "POST" && action === "leave") {
       const result = leaveTable(table, user);
+      await persistCompletedHands(table);
       await saveStack(user, result.stack);
       if (result.tableEmpty && table.isPrivate) tables.delete(table.id);
       notifyAdmin("table_leave", "Игрок вышел из стола", {
@@ -348,6 +360,7 @@ async function handleApi(req, res, url) {
 
     if (req.method === "POST" && action === "stand") {
       const result = leaveTable(table, user);
+      await persistCompletedHands(table);
       await saveStack(user, result.stack);
       if (result.tableEmpty && table.isPrivate) tables.delete(table.id);
       notifyAdmin("table_stand", "Игрок встал из-за стола", {
@@ -425,6 +438,7 @@ async function handleApi(req, res, url) {
     if (req.method === "POST" && action === "act") {
       const body = await readJson(req);
       act(table, user, body);
+      await persistCompletedHands(table);
       sendJson(res, 200, { table: tableView(table, user) });
       return;
     }
@@ -439,6 +453,7 @@ async function handleApi(req, res, url) {
 
     if (req.method === "POST" && action === "auto-act") {
       autoAct(table, user);
+      await persistCompletedHands(table);
       sendJson(res, 200, { table: tableView(table, user) });
       return;
     }
@@ -446,6 +461,7 @@ async function handleApi(req, res, url) {
     if (req.method === "POST" && action === "test-bot-act") {
       const body = await readJson(req);
       testBotAct(table, user, body);
+      await persistCompletedHands(table);
       sendJson(res, 200, { table: tableView(table, user) });
       return;
     }
@@ -502,6 +518,9 @@ async function adminDashboardView() {
   const pendingStars = [...starOrders.values()].filter((order) => order.status === "pending");
   const recentPayments = await dbListPaymentOrders(10);
   const recentEvents = await dbListAdminEvents(20);
+  const recentHands = await dbListHandHistories(20);
+  const memoryHandHistoryCount = recentHandHistories.length;
+  const memoryHandHistoryRakeTotal = recentHandHistories.reduce((sum, hand) => sum + Number(hand.rake || 0), 0);
 
   return {
     stats: {
@@ -519,6 +538,8 @@ async function adminDashboardView() {
       ledgerCreditTotal,
       ledgerDebitTotal,
       ledgerNetTotal: ledgerCreditTotal - ledgerDebitTotal,
+      handHistoryCount: dbStats ? dbStats.handHistoryCount : memoryHandHistoryCount,
+      handHistoryRakeTotal: dbStats ? dbStats.handHistoryRakeTotal : memoryHandHistoryRakeTotal,
       bankrollTotal: playerFundsTotal,
       paidStars: dbStats ? dbStats.paidStars : paidStars.length,
       pendingStars: dbStats ? dbStats.pendingStars : pendingStars.length
@@ -541,6 +562,7 @@ async function adminDashboardView() {
       ]
     },
     recentFundMovements: recentFundMovements(20),
+    recentHands: recentHands || recentHandHistories.slice(0, 20),
     recentPayments: recentPayments || [...starOrders.values()]
       .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
       .slice(0, 10),
@@ -583,6 +605,43 @@ function recentFundMovements(limit = 20) {
     })))
     .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
     .slice(0, limit);
+}
+
+async function persistAllCompletedHands() {
+  for (const table of tables.values()) {
+    await persistCompletedHands(table);
+  }
+}
+
+async function persistCompletedHands(table) {
+  for (const hand of table.handHistory || []) {
+    const key = `${table.id}:${hand.id}`;
+    if (persistedHandIds.has(key)) continue;
+    persistedHandIds.add(key);
+
+    const record = {
+      id: hand.id,
+      tableId: table.id,
+      tableName: table.name,
+      handNumber: hand.handNumber,
+      smallBlind: table.smallBlind,
+      bigBlind: table.bigBlind,
+      board: hand.board || [],
+      pots: hand.pots || [],
+      seats: hand.seats || [],
+      rake: hand.rake || 0,
+      at: hand.at || Date.now(),
+      finishedAt: new Date(hand.at || Date.now()).toISOString()
+    };
+    recentHandHistories.unshift(record);
+    recentHandHistories.splice(50);
+
+    try {
+      await dbRecordHandHistory(table, hand);
+    } catch (error) {
+      console.error("Hand history persist failed:", error.message);
+    }
+  }
 }
 
 async function adminPlayerView(userId) {

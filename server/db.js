@@ -186,6 +186,51 @@ export async function listFundMovements(providerUserId, limit = 30, provider = "
   }));
 }
 
+export async function recordHandHistory(table, hand) {
+  if (!pool) return null;
+  await query(`
+    insert into hand_histories (
+      id, table_id, table_name, hand_number, small_blind, big_blind,
+      board, pots, seats, rake, raw, finished_at
+    )
+    values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::jsonb, $10, $11::jsonb, to_timestamp($12 / 1000.0))
+    on conflict (id) do nothing
+  `, [
+    hand.id,
+    table.id,
+    table.name || "",
+    hand.handNumber || 0,
+    table.smallBlind || 0,
+    table.bigBlind || 0,
+    JSON.stringify(hand.board || []),
+    JSON.stringify(hand.pots || []),
+    JSON.stringify(hand.seats || []),
+    hand.rake || 0,
+    JSON.stringify(hand),
+    Number(hand.at || Date.now())
+  ]);
+  return true;
+}
+
+export async function listHandHistories(limit = 20) {
+  if (!pool) return null;
+  const result = await query(`
+    select id, table_id as "tableId", table_name as "tableName", hand_number as "handNumber",
+           small_blind as "smallBlind", big_blind as "bigBlind", board, pots, seats, rake,
+           finished_at as "finishedAt"
+    from hand_histories
+    order by finished_at desc
+    limit $1
+  `, [limit]);
+  return result.rows.map((row) => ({
+    ...row,
+    handNumber: Number(row.handNumber || 0),
+    smallBlind: Number(row.smallBlind || 0),
+    bigBlind: Number(row.bigBlind || 0),
+    rake: Number(row.rake || 0)
+  }));
+}
+
 export async function listTournamentRegistrations(tournamentIds = []) {
   if (!pool) return null;
   if (!tournamentIds.length) return [];
@@ -477,6 +522,8 @@ export async function dashboardStats() {
       (select coalesce(sum(stack), 0)::bigint from saved_stacks) as saved_stack_total,
       (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'credit') as ledger_credit_total,
       (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'debit') as ledger_debit_total,
+      (select count(*)::int from hand_histories) as hand_history_count,
+      (select coalesce(sum(rake), 0)::bigint from hand_histories) as hand_history_rake_total,
       (select count(*)::int from payment_orders where status = 'paid') as paid_stars,
       (select count(*)::int from payment_orders where status = 'pending') as pending_stars
   `);
@@ -486,6 +533,8 @@ export async function dashboardStats() {
     savedStackTotal: Number(result.rows[0].saved_stack_total || 0),
     ledgerCreditTotal: Number(result.rows[0].ledger_credit_total || 0),
     ledgerDebitTotal: Number(result.rows[0].ledger_debit_total || 0),
+    handHistoryCount: Number(result.rows[0].hand_history_count || 0),
+    handHistoryRakeTotal: Number(result.rows[0].hand_history_rake_total || 0),
     paidStars: Number(result.rows[0].paid_stars || 0),
     pendingStars: Number(result.rows[0].pending_stars || 0)
   };
@@ -598,6 +647,25 @@ async function migrate() {
 
     create index if not exists idx_tournament_registrations_status on tournament_registrations(tournament_id, status);
     create index if not exists idx_tournament_registrations_user on tournament_registrations(app_user_id, registered_at desc);
+
+    create table if not exists hand_histories (
+      id text primary key,
+      table_id text not null,
+      table_name text not null default '',
+      hand_number integer not null default 0,
+      small_blind integer not null default 0,
+      big_blind integer not null default 0,
+      board jsonb not null default '[]'::jsonb,
+      pots jsonb not null default '[]'::jsonb,
+      seats jsonb not null default '[]'::jsonb,
+      rake bigint not null default 0 check (rake >= 0),
+      raw jsonb not null default '{}'::jsonb,
+      finished_at timestamptz not null default now(),
+      created_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_hand_histories_finished on hand_histories(finished_at desc);
+    create index if not exists idx_hand_histories_table_hand on hand_histories(table_id, hand_number desc);
 
     create table if not exists payment_orders (
       id text primary key,

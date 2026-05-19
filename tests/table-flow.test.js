@@ -6,7 +6,7 @@ const PORT = 3901;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 test("table auto-starts, accepts custom raise, and pays the pot at showdown", async () => {
-  const server = await startServer();
+  const server = await startServer({ ADMIN_USER_IDS: "dev-user" });
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
     await topUp(auth.token, 2);
@@ -62,6 +62,10 @@ test("table auto-starts, accepts custom raise, and pays the pot at showdown", as
     assert.equal(table.pot, 0);
     assert.equal(table.seats.reduce((sum, seat) => sum + seat.stack, 0), 19975);
     assert.match(table.message, /забирает банк/);
+
+    const dashboard = (await request("/api/admin", { token: auth.token })).admin;
+    assert.equal(dashboard.stats.handHistoryCount, 1);
+    assert.ok(dashboard.recentHands.some((hand) => hand.handNumber === table.handNumber));
   } finally {
     server.kill();
   }

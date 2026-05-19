@@ -83,6 +83,7 @@ const adminPlayerTransactions = document.querySelector("#adminPlayerTransactions
 const adminRecentPayments = document.querySelector("#adminRecentPayments");
 const adminRecentEvents = document.querySelector("#adminRecentEvents");
 const adminFundMovements = document.querySelector("#adminFundMovements");
+const adminRecentHands = document.querySelector("#adminRecentHands");
 const tournamentList = document.querySelector("#tournamentList");
 const tournamentStatus = document.querySelector("#tournamentStatus");
 const continueCard = document.querySelector("#continueCard");
@@ -684,6 +685,8 @@ function renderAdminDashboard(admin) {
     ["Prize pool", formatChips(stats.tournamentPrizePoolTotal || 0)],
     ["Fee reserve", formatChips(stats.tournamentFeeReserveTotal || 0)],
     ["Рейк", formatChips(stats.rakeCollectedTotal || 0)],
+    ["История рук", stats.handHistoryCount || 0],
+    ["Рейк history", formatChips(stats.handHistoryRakeTotal || 0)],
     ["Ledger +", formatChips(stats.ledgerCreditTotal || 0)],
     ["Ledger -", formatChips(stats.ledgerDebitTotal || 0)],
     ["Stars paid", stats.paidStars || 0],
@@ -698,6 +701,7 @@ function renderAdminDashboard(admin) {
 
   renderAdminPayments(admin?.recentPayments || []);
   renderAdminFundMovements(admin?.recentFundMovements || []);
+  renderAdminHands(admin?.recentHands || []);
   renderAdminEvents(admin?.recentEvents || []);
 }
 
@@ -773,6 +777,15 @@ function renderAdminFundMovements(movements) {
     value: formatChips(movement.amount),
     positive: false
   })), "Движений chips пока нет");
+}
+
+function renderAdminHands(hands) {
+  renderAdminRows(adminRecentHands, hands.map((hand) => ({
+    title: `${hand.tableName || hand.tableId} · #${hand.handNumber}`,
+    meta: `${(hand.board || []).join(" ")} · rake ${formatChips(hand.rake || 0)} · ${formatDateTime(hand.finishedAt || hand.at)}`,
+    value: `${hand.smallBlind || 0}/${hand.bigBlind || 0}`,
+    positive: false
+  })), "Истории раздач пока нет");
 }
 
 function renderAdminEvents(events) {
