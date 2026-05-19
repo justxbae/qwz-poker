@@ -270,12 +270,18 @@ export async function dashboardStats() {
     select
       (select count(*)::int from user_identities where provider = 'telegram') as players,
       (select coalesce(sum(balance), 0)::bigint from wallets) as wallet_total,
+      (select coalesce(sum(stack), 0)::bigint from saved_stacks) as saved_stack_total,
+      (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'credit') as ledger_credit_total,
+      (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'debit') as ledger_debit_total,
       (select count(*)::int from payment_orders where status = 'paid') as paid_stars,
       (select count(*)::int from payment_orders where status = 'pending') as pending_stars
   `);
   return {
     players: Number(result.rows[0].players || 0),
     walletTotal: Number(result.rows[0].wallet_total || 0),
+    savedStackTotal: Number(result.rows[0].saved_stack_total || 0),
+    ledgerCreditTotal: Number(result.rows[0].ledger_credit_total || 0),
+    ledgerDebitTotal: Number(result.rows[0].ledger_debit_total || 0),
     paidStars: Number(result.rows[0].paid_stars || 0),
     pendingStars: Number(result.rows[0].pending_stars || 0)
   };

@@ -362,6 +362,10 @@ test("admin api exposes dashboard and manual wallet adjustments", async () => {
 
     dashboard = (await request("/api/admin", { token: auth.token })).admin;
     assert.equal(dashboard.stats.walletTotal, 25000);
+    assert.equal(dashboard.stats.playerFundsTotal, 25000);
+    assert.equal(dashboard.audit.walletTotal, 25000);
+    assert.equal(dashboard.audit.playerFundsTotal, 25000);
+    assert.equal(dashboard.audit.ledgerCreditTotal, 25000);
     assert.ok(dashboard.recentEvents.some((event) => event.type === "grant"));
   } finally {
     server.kill();
@@ -382,7 +386,7 @@ test("admin api rejects non-admin sessions", async () => {
 });
 
 test("tournament registration spends chips and cancellation refunds them", async () => {
-  const server = await startServer();
+  const server = await startServer({ ADMIN_USER_IDS: "dev-user" });
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
     await topUp(auth.token, 2);
@@ -402,6 +406,13 @@ test("tournament registration spends chips and cancellation refunds them", async
     assert.equal(registered.participants, tournament.participants + 1);
     assert.equal(data.profile.balance, 10000 - tournament.totalCost);
     assert.equal(data.cashier.transactions[0].title, "Вход в турнир");
+
+    const dashboard = (await request("/api/admin", { token: auth.token })).admin;
+    assert.equal(dashboard.stats.walletTotal, 10000 - tournament.totalCost);
+    assert.equal(dashboard.stats.tournamentEscrowTotal, tournament.totalCost);
+    assert.equal(dashboard.stats.tournamentPrizePoolTotal, tournament.buyIn);
+    assert.equal(dashboard.stats.tournamentFeeReserveTotal, tournament.fee);
+    assert.equal(dashboard.stats.playerFundsTotal, 10000);
 
     data = await request(`/api/tournaments/${tournament.id}/cancel`, {
       method: "POST",

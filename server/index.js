@@ -474,6 +474,14 @@ async function adminDashboardView() {
   const tableStackTotal = [...tables.values()].reduce((sum, table) => (
     sum + table.seats.reduce((seatSum, seat) => seatSum + Number(seat.stack || 0), 0)
   ), 0);
+  const savedStackTotal = dbStats ? dbStats.savedStackTotal : [...savedStacks.values()].reduce((sum, value) => sum + Number(value || 0), 0);
+  const tournamentEscrowTotal = tournamentEscrow();
+  const tournamentPrizePoolTotal = tournamentPrizePool();
+  const tournamentFeeReserveTotal = tournamentFeeReserve();
+  const rakeCollectedTotal = [...tables.values()].reduce((sum, table) => sum + Number(table.rakeCollected || 0), 0);
+  const ledgerCreditTotal = dbStats ? dbStats.ledgerCreditTotal : memoryLedgerTotal("credit");
+  const ledgerDebitTotal = dbStats ? dbStats.ledgerDebitTotal : memoryLedgerTotal("debit");
+  const playerFundsTotal = walletTotal + tableStackTotal + savedStackTotal + tournamentEscrowTotal;
   const paidStars = [...starOrders.values()].filter((order) => order.status === "paid");
   const pendingStars = [...starOrders.values()].filter((order) => order.status === "pending");
   const recentPayments = await dbListPaymentOrders(10);
@@ -486,15 +494,67 @@ async function adminDashboardView() {
       openTables: tables.size,
       walletTotal,
       tableStackTotal,
-      bankrollTotal: walletTotal + tableStackTotal,
+      savedStackTotal,
+      tournamentEscrowTotal,
+      tournamentPrizePoolTotal,
+      tournamentFeeReserveTotal,
+      rakeCollectedTotal,
+      playerFundsTotal,
+      ledgerCreditTotal,
+      ledgerDebitTotal,
+      ledgerNetTotal: ledgerCreditTotal - ledgerDebitTotal,
+      bankrollTotal: playerFundsTotal,
       paidStars: dbStats ? dbStats.paidStars : paidStars.length,
       pendingStars: dbStats ? dbStats.pendingStars : pendingStars.length
+    },
+    audit: {
+      playerFundsTotal,
+      walletTotal,
+      tableStackTotal,
+      savedStackTotal,
+      tournamentEscrowTotal,
+      tournamentPrizePoolTotal,
+      tournamentFeeReserveTotal,
+      rakeCollectedTotal,
+      ledgerCreditTotal,
+      ledgerDebitTotal,
+      ledgerNetTotal: ledgerCreditTotal - ledgerDebitTotal,
+      notes: [
+        "playerFundsTotal = wallets + active table stacks + saved stacks + tournament escrow",
+        "ledgerNetTotal is informational until all transfers use categorized ledger entries"
+      ]
     },
     recentPayments: recentPayments || [...starOrders.values()]
       .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
       .slice(0, 10),
     recentEvents: recentEvents || adminEvents.slice(0, 20)
   };
+}
+
+function tournamentEscrow() {
+  return [...tournaments.values()].reduce((sum, tournament) => (
+    sum + tournament.registrations.size * (Number(tournament.buyIn || 0) + Number(tournament.fee || 0))
+  ), 0);
+}
+
+function tournamentPrizePool() {
+  return [...tournaments.values()].reduce((sum, tournament) => (
+    sum + tournament.registrations.size * Number(tournament.buyIn || 0)
+  ), 0);
+}
+
+function tournamentFeeReserve() {
+  return [...tournaments.values()].reduce((sum, tournament) => (
+    sum + tournament.registrations.size * Number(tournament.fee || 0)
+  ), 0);
+}
+
+function memoryLedgerTotal(type) {
+  return [...transactions.values()].reduce((sum, history) => (
+    sum + history
+      .filter((entry) => entry.type === type)
+      .reduce((entrySum, entry) => entrySum + Number(entry.amount || 0), 0)
+  ), 0);
 }
 
 async function adminPlayerView(userId) {

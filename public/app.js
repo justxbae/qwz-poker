@@ -677,6 +677,13 @@ function renderAdminDashboard(admin) {
     ["Столов всего", stats.openTables || 0],
     ["Кошельки", formatChips(stats.walletTotal || 0)],
     ["За столами", formatChips(stats.tableStackTotal || 0)],
+    ["Сохранено", formatChips(stats.savedStackTotal || 0)],
+    ["Турнир escrow", formatChips(stats.tournamentEscrowTotal || 0)],
+    ["Prize pool", formatChips(stats.tournamentPrizePoolTotal || 0)],
+    ["Fee reserve", formatChips(stats.tournamentFeeReserveTotal || 0)],
+    ["Рейк", formatChips(stats.rakeCollectedTotal || 0)],
+    ["Ledger +", formatChips(stats.ledgerCreditTotal || 0)],
+    ["Ledger -", formatChips(stats.ledgerDebitTotal || 0)],
     ["Stars paid", stats.paidStars || 0],
     ["Stars pending", stats.pendingStars || 0]
   ].map(([label, value]) => {
