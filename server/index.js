@@ -76,6 +76,7 @@ const adminEvents = [];
 const loggedAppOpens = new Set();
 const persistedHandIds = new Set();
 const recentHandHistories = [];
+const idempotencyResults = new Map();
 const DEFAULT_STACK = 0;
 const DEFAULT_WALLET = 0;
 
@@ -498,7 +499,8 @@ async function handleAdminApi(req, res, url, adminUser) {
       targetId: body.telegramId,
       type: body.type,
       amount: body.amount,
-      reason: body.reason
+      reason: body.reason,
+      requestId: body.requestId || req.headers["x-idempotency-key"] || ""
     });
     sendJson(res, 200, { player: await adminPlayerView(result.targetId), adjustment: result });
     return;
@@ -1237,6 +1239,14 @@ function normalizeLedgerCategory(category) {
   return String(category || "other").trim().toLowerCase().replace(/[^a-z0-9_:-]/g, "_").slice(0, 64) || "other";
 }
 
+function normalizeIdempotencyKey({ scope, actorId, targetId, requestId }) {
+  const normalizedRequestId = String(requestId || "").trim();
+  if (!normalizedRequestId) return "";
+  return [scope, actorId || "system", targetId || "", normalizedRequestId]
+    .map((part) => String(part).trim().replace(/\s+/g, "_").slice(0, 120))
+    .join(":");
+}
+
 function parseChipAmount(value) {
   const amount = Number(String(value || "").replace(/\s+/g, ""));
   if (!Number.isFinite(amount) || amount <= 0) throw new Error("Укажите положительную сумму chips");
@@ -1335,7 +1345,8 @@ async function handleAdminWalletCommand(message, command, args) {
     targetId: args[0],
     type: command === "/grant" ? "grant" : "deduct",
     amount: args[1],
-    reason: args.slice(2).join(" ").trim() || "manual_adjustment"
+    reason: args.slice(2).join(" ").trim() || "manual_adjustment",
+    requestId: message.message_id ? `telegram:${message.chat?.id || ""}:${message.message_id}` : ""
   });
 
   await sendBotMessage(message.chat.id, [
@@ -1347,11 +1358,25 @@ async function handleAdminWalletCommand(message, command, args) {
   ].join("\n"));
 }
 
-async function adjustWalletManually({ admin, targetId, type, amount, reason }) {
+async function adjustWalletManually({ admin, targetId, type, amount, reason, requestId = "" }) {
   const normalizedType = type === "deduct" ? "deduct" : "grant";
   const normalizedTargetId = normalizeTargetUserId(targetId);
   const normalizedAmount = parseChipAmount(amount);
   const normalizedReason = String(reason || "").trim() || "manual_adjustment";
+  const adminProfile = admin || { id: "system", name: "Admin", username: "" };
+  const idempotencyKey = normalizeIdempotencyKey({
+    scope: "admin_wallet_adjust",
+    actorId: adminProfile.id,
+    targetId: normalizedTargetId,
+    requestId
+  });
+  if (idempotencyKey && idempotencyResults.has(idempotencyKey)) {
+    return {
+      ...idempotencyResults.get(idempotencyKey),
+      idempotentReplay: true
+    };
+  }
+
   const sign = normalizedType === "grant" ? 1 : -1;
   const before = await getWallet(normalizedTargetId);
   const after = before + sign * normalizedAmount;
@@ -1361,7 +1386,6 @@ async function adjustWalletManually({ admin, targetId, type, amount, reason }) {
   }
 
   const targetProfile = userProfiles.get(normalizedTargetId) || { id: normalizedTargetId };
-  const adminProfile = admin || { id: "system", name: "Admin", username: "" };
   const title = normalizedType === "grant" ? "Ручное начисление" : "Ручное списание";
 
   const balance = await recordTransaction(targetProfile, {
@@ -1383,15 +1407,18 @@ async function adjustWalletManually({ admin, targetId, type, amount, reason }) {
     ]
   });
 
-  return {
+  const result = {
     targetId: normalizedTargetId,
     targetProfile,
     amount: normalizedAmount,
     before,
     balance,
     reason: normalizedReason,
-    type: normalizedType
+    type: normalizedType,
+    requestId: requestId || ""
   };
+  if (idempotencyKey) idempotencyResults.set(idempotencyKey, result);
+  return result;
 }
 
 async function answerPreCheckout(query) {

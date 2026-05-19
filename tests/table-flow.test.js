@@ -387,13 +387,29 @@ test("admin api exposes dashboard and manual wallet adjustments", async () => {
         telegramId: "dev-user",
         type: "grant",
         amount: 25000,
-        reason: "admin_panel_test"
+        reason: "admin_panel_test",
+        requestId: "adjust-once"
       }
     });
 
     assert.equal(data.player.balance, 25000);
     assert.equal(data.player.transactions[0].title, "Ручное начисление");
     assert.equal(data.player.transactions[0].category, "admin_grant");
+
+    data = await request("/api/admin/wallet-adjust", {
+      method: "POST",
+      token: auth.token,
+      body: {
+        telegramId: "dev-user",
+        type: "grant",
+        amount: 25000,
+        reason: "admin_panel_test",
+        requestId: "adjust-once"
+      }
+    });
+
+    assert.equal(data.player.balance, 25000);
+    assert.equal(data.adjustment.idempotentReplay, true);
 
     data = await request("/api/admin/users/dev-user", { token: auth.token });
     assert.equal(data.player.totalBankroll, 25000);

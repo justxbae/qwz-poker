@@ -750,7 +750,8 @@ async function adjustAdminPlayerWallet() {
       telegramId,
       type: adminAdjustType.value,
       amount,
-      reason: adminAdjustReason.value
+      reason: adminAdjustReason.value,
+      requestId: `admin-${Date.now()}-${Math.random().toString(16).slice(2)}`
     }
   });
   renderAdminPlayer(data.player);
