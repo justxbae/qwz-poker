@@ -6,6 +6,35 @@ export function databaseEnabled() {
   return Boolean(pool);
 }
 
+export async function databaseHealth() {
+  if (!pool) {
+    return {
+      enabled: false,
+      ok: true,
+      mode: "memory"
+    };
+  }
+
+  const started = Date.now();
+  try {
+    await query("select 1");
+    return {
+      enabled: true,
+      ok: true,
+      mode: "postgres",
+      latencyMs: Date.now() - started
+    };
+  } catch (error) {
+    return {
+      enabled: true,
+      ok: false,
+      mode: "postgres",
+      latencyMs: Date.now() - started,
+      error: error.message
+    };
+  }
+}
+
 export async function initDatabase() {
   const connectionString = process.env.DATABASE_URL || "";
   if (!connectionString) return false;

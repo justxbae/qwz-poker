@@ -673,8 +673,15 @@ async function loadAdminDashboard() {
 
 function renderAdminDashboard(admin) {
   const stats = admin?.stats || {};
+  const diagnostics = admin?.diagnostics || {};
+  const database = diagnostics.database || {};
+  const memory = diagnostics.memory || {};
   adminBankrollTotal.textContent = formatChips(stats.bankrollTotal || 0);
   adminSummary.replaceChildren(...[
+    ["Health", diagnostics.ok ? "ok" : "fail"],
+    ["DB", database.enabled ? `${database.ok ? "ok" : "fail"} · ${database.mode}` : "memory"],
+    ["Uptime", formatDuration(diagnostics.uptimeSeconds || 0)],
+    ["Heap", memory.heapUsedMb ? `${memory.heapUsedMb}/${memory.heapTotalMb} MB` : "n/a"],
     ["Игроков", stats.players || 0],
     ["Активных столов", stats.activeTables || 0],
     ["Столов всего", stats.openTables || 0],
@@ -2078,6 +2085,16 @@ function headerRow(labels) {
 
 function formatChips(value) {
   return Number(value).toLocaleString("ru-RU");
+}
+
+function formatDuration(seconds) {
+  const safeSeconds = Math.max(0, Math.round(Number(seconds) || 0));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const rest = safeSeconds % 60;
+  if (hours) return `${hours}ч ${minutes}м`;
+  if (minutes) return `${minutes}м ${rest}с`;
+  return `${rest}с`;
 }
 
 function statusLabel(status) {

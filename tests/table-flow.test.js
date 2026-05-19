@@ -104,6 +104,27 @@ test("public lobby tables are seeded and stay available when empty", async () =>
   }
 });
 
+test("health endpoint is public and admin dashboard exposes diagnostics", async () => {
+  const server = await startServer({ ADMIN_USER_IDS: "dev-user" });
+  try {
+    const health = (await request("/api/health")).health;
+    assert.equal(health.ok, true);
+    assert.equal(health.database.mode, "memory");
+    assert.equal(typeof health.uptimeSeconds, "number");
+    assert.equal(health.sessions, undefined);
+    assert.equal(health.memory, undefined);
+
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    const dashboard = (await request("/api/admin", { token: auth.token })).admin;
+    assert.equal(dashboard.diagnostics.ok, true);
+    assert.equal(dashboard.diagnostics.database.mode, "memory");
+    assert.equal(typeof dashboard.diagnostics.sessions, "number");
+    assert.equal(typeof dashboard.diagnostics.memory.heapUsedMb, "number");
+  } finally {
+    server.kill();
+  }
+});
+
 test("seated player can control test bots at public system tables", async () => {
   const server = await startServer();
   try {

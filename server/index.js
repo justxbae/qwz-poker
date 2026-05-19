@@ -9,6 +9,7 @@ import {
   addWalletEntry as dbAddWalletEntry,
   createPaymentOrder as dbCreatePaymentOrder,
   dashboardStats as dbDashboardStats,
+  databaseHealth as dbDatabaseHealth,
   databaseEnabled,
   getPaymentOrder as dbGetPaymentOrder,
   getSavedStack as dbGetSavedStack,
@@ -61,6 +62,7 @@ const ADMIN_USER_IDS = parseIdList(process.env.ADMIN_USER_IDS || ADMIN_CHAT_ID);
 const ADMIN_GRANT_MAX_CHIPS = Number(process.env.ADMIN_GRANT_MAX_CHIPS || 500000);
 const isProduction = process.env.NODE_ENV === "production";
 const HOST = process.env.HOST || (isProduction ? "0.0.0.0" : "127.0.0.1");
+const startedAt = Date.now();
 
 const tables = new Map();
 const sessions = new Map();
@@ -121,6 +123,12 @@ setInterval(async () => {
 }, 1000);
 
 async function handleApi(req, res, url) {
+  if (req.method === "GET" && url.pathname === "/api/health") {
+    const health = await healthSnapshot({ publicView: true });
+    sendJson(res, health.ok ? 200 : 503, { health });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/telegram/webhook") {
     const update = await readJson(req);
     await handleTelegramWebhook(update);
@@ -500,6 +508,7 @@ async function handleAdminApi(req, res, url, adminUser) {
 }
 
 async function adminDashboardView() {
+  const diagnostics = await healthSnapshot();
   const players = [...new Set([...wallets.keys(), ...userProfiles.keys(), ...transactions.keys()])];
   const dbStats = await dbDashboardStats();
   const walletTotal = dbStats ? dbStats.walletTotal : [...wallets.values()].reduce((sum, value) => sum + Number(value || 0), 0);
@@ -544,6 +553,7 @@ async function adminDashboardView() {
       paidStars: dbStats ? dbStats.paidStars : paidStars.length,
       pendingStars: dbStats ? dbStats.pendingStars : pendingStars.length
     },
+    diagnostics,
     audit: {
       playerFundsTotal,
       walletTotal,
@@ -605,6 +615,57 @@ function recentFundMovements(limit = 20) {
     })))
     .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
     .slice(0, limit);
+}
+
+async function healthSnapshot({ publicView = false } = {}) {
+  const database = await dbDatabaseHealth();
+  const tableStatuses = [...tables.values()].reduce((result, table) => {
+    result[table.status] = (result[table.status] || 0) + 1;
+    return result;
+  }, {});
+  const activeTables = [...tables.values()].filter((table) => table.seats.length > 0).length;
+  const tournamentRegistrations = [...tournaments.values()].reduce((sum, tournament) => sum + tournament.registrations.size, 0);
+  const memory = process.memoryUsage();
+  const uptimeSeconds = Math.round((Date.now() - startedAt) / 1000);
+
+  const health = {
+    ok: Boolean(database.ok),
+    appName: APP_NAME,
+    environment: isProduction ? "production" : "development",
+    uptimeSeconds,
+    startedAt: new Date(startedAt).toISOString(),
+    now: new Date().toISOString(),
+    database,
+    tables: {
+      open: tables.size,
+      active: activeTables,
+      statuses: tableStatuses
+    },
+    tournaments: {
+      count: tournaments.size,
+      registrations: tournamentRegistrations
+    }
+  };
+
+  if (!publicView) {
+    health.sessions = sessions.size;
+    health.payments = {
+      pendingStars: [...starOrders.values()].filter((order) => order.status === "pending").length,
+      paidStars: [...starOrders.values()].filter((order) => order.status === "paid").length
+    };
+    health.memory = {
+      rssMb: Math.round(memory.rss / 1024 / 1024),
+      heapUsedMb: Math.round(memory.heapUsed / 1024 / 1024),
+      heapTotalMb: Math.round(memory.heapTotal / 1024 / 1024)
+    };
+    health.audit = {
+      cachedHandHistories: recentHandHistories.length,
+      persistedHandKeys: persistedHandIds.size,
+      fundMovementUsers: fundMovements.size
+    };
+  }
+
+  return health;
 }
 
 async function persistAllCompletedHands() {
