@@ -69,6 +69,7 @@ const DEFAULT_STACK = 0;
 const DEFAULT_WALLET = 0;
 
 seedPublicTables();
+const tournaments = seedTournaments();
 
 const server = createServer(async (req, res) => {
   try {
@@ -161,6 +162,34 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/cashier") {
     sendJson(res, 200, { cashier: await cashierView(user) });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/tournaments") {
+    sendJson(res, 200, { tournaments: tournamentListView(user) });
+    return;
+  }
+
+  const tournamentMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)\/(register|cancel)$/);
+  if (req.method === "POST" && tournamentMatch) {
+    const [, tournamentId, action] = tournamentMatch;
+    const tournament = tournaments.get(tournamentId);
+    if (!tournament) {
+      sendJson(res, 404, { error: "Tournament not found" });
+      return;
+    }
+
+    if (action === "register") {
+      await registerTournament(tournament, user);
+    } else {
+      await cancelTournamentRegistration(tournament, user);
+    }
+
+    sendJson(res, 200, {
+      tournaments: tournamentListView(user),
+      profile: await profileView(user),
+      cashier: await cashierView(user)
+    });
     return;
   }
 
@@ -633,6 +662,148 @@ function seedPublicTables() {
       tables.set(table.id, table);
     }
   }
+}
+
+function seedTournaments() {
+  const now = Date.now();
+  const entries = [
+    {
+      id: "sng-25-evening",
+      title: "QWZ Sit&Go 25/50",
+      type: "Sit&Go",
+      status: "registering",
+      buyIn: 5000,
+      fee: 250,
+      maxPlayers: 6,
+      startsAt: new Date(now + 30 * 60 * 1000).toISOString(),
+      prizePoolMode: "buyins"
+    },
+    {
+      id: "freezeout-daily",
+      title: "Daily Freezeout",
+      type: "Freezeout",
+      status: "registering",
+      buyIn: 10000,
+      fee: 500,
+      maxPlayers: 36,
+      startsAt: new Date(now + 3 * 60 * 60 * 1000).toISOString(),
+      prizePoolMode: "buyins"
+    },
+    {
+      id: "rebuy-weekly",
+      title: "Weekly Rebuy",
+      type: "Rebuy",
+      status: "planned",
+      buyIn: 25000,
+      fee: 1250,
+      maxPlayers: 72,
+      startsAt: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
+      prizePoolMode: "buyins"
+    }
+  ];
+
+  return new Map(entries.map((tournament) => [
+    tournament.id,
+    {
+      ...tournament,
+      registrations: new Map()
+    }
+  ]));
+}
+
+function tournamentListView(user) {
+  return [...tournaments.values()].map((tournament) => tournamentView(tournament, user));
+}
+
+function tournamentView(tournament, user) {
+  const participants = tournament.registrations.size;
+  const totalCost = tournament.buyIn + tournament.fee;
+  const prizePool = tournament.buyIn * participants;
+  return {
+    id: tournament.id,
+    title: tournament.title,
+    type: tournament.type,
+    status: tournament.status,
+    buyIn: tournament.buyIn,
+    fee: tournament.fee,
+    totalCost,
+    maxPlayers: tournament.maxPlayers,
+    participants,
+    prizePool,
+    startsAt: tournament.startsAt,
+    registered: tournament.registrations.has(user.id),
+    canRegister: tournament.status === "registering" && participants < tournament.maxPlayers && !tournament.registrations.has(user.id),
+    canCancel: tournament.status === "registering" && tournament.registrations.has(user.id)
+  };
+}
+
+async function registerTournament(tournament, user) {
+  if (tournament.status !== "registering") {
+    const error = new Error("Регистрация на турнир пока закрыта");
+    error.status = 409;
+    throw error;
+  }
+  if (tournament.registrations.has(user.id)) return;
+  if (tournament.registrations.size >= tournament.maxPlayers) {
+    const error = new Error("Турнир уже заполнен");
+    error.status = 409;
+    throw error;
+  }
+
+  const totalCost = tournament.buyIn + tournament.fee;
+  if (user.balance < totalCost) {
+    const error = new Error(`Недостаточно chips для регистрации. Нужно ${formatNumber(totalCost)} chips`);
+    error.status = 409;
+    throw error;
+  }
+
+  user.balance = await recordTransaction(user, {
+    type: "debit",
+    title: "Вход в турнир",
+    amount: totalCost,
+    meta: `${tournament.title} · бай-ин ${formatNumber(tournament.buyIn)} + fee ${formatNumber(tournament.fee)}`
+  });
+  tournament.registrations.set(user.id, {
+    userId: user.id,
+    name: user.name,
+    username: user.username,
+    registeredAt: new Date().toISOString()
+  });
+  notifyAdmin("tournament_register", "Регистрация в турнир", {
+    user,
+    lines: [
+      `Турнир: ${tournament.title}`,
+      `Стоимость: ${formatNumber(totalCost)} chips`,
+      `Участников: ${tournament.registrations.size}/${tournament.maxPlayers}`,
+      `Баланс: ${formatNumber(user.balance)} chips`
+    ]
+  });
+}
+
+async function cancelTournamentRegistration(tournament, user) {
+  if (!tournament.registrations.has(user.id)) return;
+  if (tournament.status !== "registering") {
+    const error = new Error("Отменить регистрацию уже нельзя");
+    error.status = 409;
+    throw error;
+  }
+
+  tournament.registrations.delete(user.id);
+  const totalCost = tournament.buyIn + tournament.fee;
+  user.balance = await recordTransaction(user, {
+    type: "credit",
+    title: "Возврат турнирного бай-ина",
+    amount: totalCost,
+    meta: tournament.title
+  });
+  notifyAdmin("tournament_cancel", "Отмена регистрации в турнир", {
+    user,
+    lines: [
+      `Турнир: ${tournament.title}`,
+      `Возврат: ${formatNumber(totalCost)} chips`,
+      `Баланс: ${formatNumber(user.balance)} chips`
+    ]
+  });
 }
 
 async function getSavedStack(user) {

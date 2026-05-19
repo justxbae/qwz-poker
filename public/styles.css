@@ -9,10 +9,10 @@
   --accent: #28c76f;
   --accent-dark: #159455;
   --danger: #ff5f57;
-  --tg-bg: var(--tg-theme-secondary-bg-color, var(--tg-theme-bg-color, #17212b));
+  --tg-bg: var(--tg-theme-bg-color, #17212b);
   --tg-secondary-bg: var(--tg-theme-secondary-bg-color, #17212b);
-  --tg-surface: #242f3d;
-  --tg-surface-soft: rgba(36, 47, 61, 0.72);
+  --tg-surface: var(--tg-theme-secondary-bg-color, #202b36);
+  --tg-surface-soft: rgba(32, 43, 54, 0.92);
   --tg-text: var(--tg-theme-text-color, #f4f7fb);
   --tg-hint: var(--tg-theme-hint-color, #7d8b99);
   --tg-link: var(--tg-theme-link-color, #2aabee);
@@ -327,10 +327,8 @@ h2 {
 .lobby-card {
   border: 1px solid var(--tg-line);
   border-radius: 16px;
-  background: var(--tg-secondary-bg);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 14px 32px rgba(0, 0, 0, 0.26);
+  background: var(--tg-surface);
+  box-shadow: none;
   padding: 14px;
 }
 
@@ -338,7 +336,7 @@ h2 {
   position: relative;
   min-height: 0;
   overflow: hidden;
-  background: var(--tg-secondary-bg);
+  background: var(--tg-surface);
 }
 
 .wallet-card::after {
@@ -541,9 +539,9 @@ h2 {
   align-items: center;
   border: 1px solid var(--tg-line);
   border-radius: 20px;
-  background: var(--tg-secondary-bg);
+  background: var(--tg-surface);
   padding: 16px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: none;
 }
 
 .tg-balance-hero div {
@@ -593,8 +591,8 @@ h2 {
 .tg-menu-group {
   overflow: hidden;
   border-radius: 20px;
-  background: var(--tg-secondary-bg);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
+  background: var(--tg-surface);
+  box-shadow: none;
 }
 
 .tg-menu-row {
@@ -1523,6 +1521,99 @@ h2 {
   font-size: 13px;
 }
 
+.tournament-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.tournament-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--tg-line);
+  border-radius: 16px;
+  background: rgba(14, 22, 33, 0.34);
+  padding: 12px;
+}
+
+.tournament-main {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tournament-main div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tournament-main span {
+  color: var(--tg-link);
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.tournament-main strong {
+  overflow: hidden;
+  color: var(--tg-text);
+  font-size: 17px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tournament-main small,
+.tournament-meta span {
+  color: var(--tg-hint);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tournament-main b {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgba(42, 171, 238, 0.14);
+  color: var(--tg-link);
+  padding: 7px 9px;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.tournament-meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.tournament-meta span {
+  display: grid;
+  gap: 3px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 8px;
+}
+
+.tournament-meta strong {
+  color: var(--tg-text);
+  font-size: 13px;
+}
+
+.tournament-card button {
+  min-height: 44px;
+  border-radius: 14px;
+  background: var(--tg-button);
+  color: var(--tg-button-text);
+}
+
+.tournament-card button:disabled {
+  background: rgba(139, 152, 166, 0.18);
+  color: var(--tg-hint);
+  cursor: default;
+}
+
 .profile-avatar {
   display: grid;
   place-items: center;
@@ -1620,11 +1711,9 @@ h2 {
 }
 
 body:not(.in-game) .bottom-nav {
-  border: 0;
-  background: rgba(31, 36, 41, 0.96);
-  box-shadow:
-    0 -18px 50px rgba(0, 0, 0, 0.36),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--tg-line);
+  background: var(--tg-surface);
+  box-shadow: none;
 }
 
 body:not(.in-game) .bottom-nav button {
@@ -1632,7 +1721,7 @@ body:not(.in-game) .bottom-nav button {
 }
 
 body:not(.in-game) .bottom-nav button.active {
-  background: rgba(86, 96, 105, 0.72);
+  background: rgba(122, 162, 194, 0.18);
   color: #fff;
 }
 
@@ -1666,26 +1755,26 @@ body:not(.in-game) .stats-cards span {
   position: fixed;
   right: auto;
   bottom: max(12px, env(safe-area-inset-bottom));
-  left: max(10px, calc(50vw - 188px));
+  left: max(12px, calc(50vw - 204px));
   z-index: 12;
   display: flex;
   align-items: center;
-  gap: 4px;
-  width: min(286px, calc(100vw - 92px));
+  gap: 6px;
+  width: min(322px, calc(100vw - 112px));
   margin: 0;
-  border: 0;
-  border-radius: 30px;
-  background: rgba(25, 28, 30, 0.78);
-  padding: 6px;
-  box-shadow: 0 -14px 38px rgba(0, 0, 0, 0.36);
-  backdrop-filter: blur(18px);
+  border: 1px solid var(--tg-line);
+  border-radius: 34px;
+  background: var(--tg-surface);
+  padding: 7px;
+  box-shadow: none;
+  backdrop-filter: none;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
 
 .admin-mode .bottom-nav {
-  width: min(286px, calc(100vw - 92px));
+  width: min(322px, calc(100vw - 112px));
 }
 
 .bottom-nav button {
@@ -1695,8 +1784,8 @@ body:not(.in-game) .stats-cards span {
   place-items: center;
   gap: 2px;
   min-width: 0;
-  min-height: 52px;
-  border-radius: 24px;
+  min-height: 54px;
+  border-radius: 27px;
   background: transparent;
   color: var(--tg-hint);
   font-size: 18px;
@@ -1813,9 +1902,9 @@ body:not(.in-game) .stats-cards span {
 }
 
 .bottom-nav button.active {
-  background: rgba(86, 96, 105, 0.72);
+  background: rgba(122, 162, 194, 0.18);
   color: #fff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: none;
 }
 
 .bottom-nav button.active .nav-icon {
@@ -1831,8 +1920,8 @@ body:not(.in-game) .stats-cards span {
 .nav-profile-avatar {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   border: 0;
   border-radius: 50%;
   background: #242f3d;
@@ -1854,20 +1943,19 @@ body:not(.in-game) .stats-cards span {
 
 .profile-nav-fab {
   position: fixed;
-  right: max(10px, calc(50vw - 188px));
+  right: max(12px, calc(50vw - 204px));
   bottom: max(12px, env(safe-area-inset-bottom));
   z-index: 13;
   display: grid;
   place-items: center;
-  width: 58px;
-  min-height: 58px;
+  width: 68px;
+  min-height: 68px;
   border-radius: 50%;
-  background: rgba(31, 36, 41, 0.96);
-  padding: 5px;
-  box-shadow:
-    0 -12px 34px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(18px);
+  border: 1px solid var(--tg-line);
+  background: var(--tg-surface);
+  padding: 6px;
+  box-shadow: none;
+  backdrop-filter: none;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
@@ -1875,7 +1963,7 @@ body:not(.in-game) .stats-cards span {
 }
 
 .profile-nav-fab.active {
-  background: rgba(31, 36, 41, 0.96);
+  background: var(--tg-surface);
 }
 
 .profile-nav-fab.active .nav-profile-avatar {

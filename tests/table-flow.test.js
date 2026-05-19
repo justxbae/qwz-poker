@@ -381,6 +381,43 @@ test("admin api rejects non-admin sessions", async () => {
   }
 });
 
+test("tournament registration spends chips and cancellation refunds them", async () => {
+  const server = await startServer();
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await topUp(auth.token, 2);
+
+    let data = await request("/api/tournaments", { token: auth.token });
+    const tournament = data.tournaments.find((item) => item.status === "registering");
+    assert.ok(tournament);
+    assert.equal(tournament.registered, false);
+
+    data = await request(`/api/tournaments/${tournament.id}/register`, {
+      method: "POST",
+      token: auth.token
+    });
+
+    let registered = data.tournaments.find((item) => item.id === tournament.id);
+    assert.equal(registered.registered, true);
+    assert.equal(registered.participants, tournament.participants + 1);
+    assert.equal(data.profile.balance, 10000 - tournament.totalCost);
+    assert.equal(data.cashier.transactions[0].title, "Вход в турнир");
+
+    data = await request(`/api/tournaments/${tournament.id}/cancel`, {
+      method: "POST",
+      token: auth.token
+    });
+
+    registered = data.tournaments.find((item) => item.id === tournament.id);
+    assert.equal(registered.registered, false);
+    assert.equal(registered.participants, tournament.participants);
+    assert.equal(data.profile.balance, 10000);
+    assert.equal(data.cashier.transactions[0].title, "Возврат турнирного бай-ина");
+  } finally {
+    server.kill();
+  }
+});
+
 test("rebuy adds chips only between hands and spends wallet balance", async () => {
   const server = await startServer();
   try {

@@ -17,7 +17,8 @@ const state = {
   currentTableId: "",
   currentTable: null,
   selectedSmallBlind: 25,
-  tables: []
+  tables: [],
+  tournaments: []
 };
 const cashierState = {
   deposit: null,
@@ -81,6 +82,8 @@ const adminAdjustReason = document.querySelector("#adminAdjustReason");
 const adminPlayerTransactions = document.querySelector("#adminPlayerTransactions");
 const adminRecentPayments = document.querySelector("#adminRecentPayments");
 const adminRecentEvents = document.querySelector("#adminRecentEvents");
+const tournamentList = document.querySelector("#tournamentList");
+const tournamentStatus = document.querySelector("#tournamentStatus");
 const continueCard = document.querySelector("#continueCard");
 const continueMeta = document.querySelector("#continueMeta");
 const continueGameButton = document.querySelector("#continueGameButton");
@@ -211,6 +214,7 @@ async function boot() {
   cashierPresets?.addEventListener("click", onCashierPresetClick);
   cashierMethods?.addEventListener("click", onCashierMethodClick);
   cashierPayButton?.addEventListener("click", () => runAction(payCashierAmount));
+  tournamentList?.addEventListener("click", onTournamentAction);
   quickPlayButton.addEventListener("click", () => runAction(quickPlay));
   quickPrivateButton.addEventListener("click", () => runAction(quickCreatePrivateTable));
   continueGameButton.addEventListener("click", continueGame);
@@ -326,7 +330,21 @@ function setupTelegramControls() {
 }
 
 function applyTelegramTheme() {
-  const themeBg = tg?.themeParams?.secondary_bg_color || tg?.themeParams?.bg_color || "#17212b";
+  const themeBg = tg?.themeParams?.bg_color || tg?.themeParams?.secondary_bg_color || "#17212b";
+  const secondaryBg = tg?.themeParams?.secondary_bg_color || themeBg;
+  const textColor = tg?.themeParams?.text_color || "#f4f7fb";
+  const hintColor = tg?.themeParams?.hint_color || "#7d8b99";
+  const linkColor = tg?.themeParams?.link_color || "#2aabee";
+  const buttonColor = tg?.themeParams?.button_color || linkColor;
+  const buttonTextColor = tg?.themeParams?.button_text_color || "#ffffff";
+  document.documentElement.style.setProperty("--tg-bg", themeBg);
+  document.documentElement.style.setProperty("--tg-secondary-bg", secondaryBg);
+  document.documentElement.style.setProperty("--tg-surface", secondaryBg);
+  document.documentElement.style.setProperty("--tg-text", textColor);
+  document.documentElement.style.setProperty("--tg-hint", hintColor);
+  document.documentElement.style.setProperty("--tg-link", linkColor);
+  document.documentElement.style.setProperty("--tg-button", buttonColor);
+  document.documentElement.style.setProperty("--tg-button-text", buttonTextColor);
   tg?.setHeaderColor?.(themeBg);
   tg?.setBackgroundColor?.(themeBg);
 }
@@ -885,6 +903,7 @@ function selectLobbyTab(tab, options = {}) {
   });
   if (tab === "profile") runAction(loadProfile);
   if (tab === "cashier") runAction(loadCashier);
+  if (tab === "tournaments") runAction(loadTournaments);
   if (tab === "admin") runAction(loadAdminDashboard);
   if (tabChanged && !options.keepScroll) {
     window.requestAnimationFrame(resetScroll);
@@ -904,6 +923,79 @@ async function loadTables() {
   const data = await api("/api/tables");
   state.tables = data.tables;
   renderTables();
+}
+
+async function loadTournaments() {
+  if (!tournamentList) return;
+  const data = await api("/api/tournaments");
+  state.tournaments = data.tournaments || [];
+  renderTournaments();
+}
+
+function renderTournaments() {
+  if (!tournamentList) return;
+  tournamentList.replaceChildren();
+
+  if (!state.tournaments.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = "Турниров пока нет.";
+    tournamentList.append(empty);
+    return;
+  }
+
+  for (const tournament of state.tournaments) {
+    const node = document.createElement("article");
+    node.className = "tournament-card";
+    node.dataset.status = tournament.status;
+
+    const startsAt = new Date(tournament.startsAt);
+    const time = Number.isNaN(startsAt.getTime())
+      ? "время уточняется"
+      : startsAt.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    const action = tournament.registered ? "cancel" : "register";
+    const actionText = tournament.registered ? "Отменить" : tournament.canRegister ? "Участвовать" : "Скоро";
+
+    node.innerHTML = `
+      <div class="tournament-main">
+        <div>
+          <span>${escapeHtml(tournament.type)}</span>
+          <strong>${escapeHtml(tournament.title)}</strong>
+          <small>${time} · ${tournament.participants}/${tournament.maxPlayers} игроков</small>
+        </div>
+        <b>${tournament.registered ? "Вы в игре" : statusLabel(tournament.status)}</b>
+      </div>
+      <div class="tournament-meta">
+        <span>Бай-ин <strong>${formatChips(tournament.buyIn)}</strong></span>
+        <span>Fee <strong>${formatChips(tournament.fee)}</strong></span>
+        <span>Призовой фонд <strong>${formatChips(tournament.prizePool)}</strong></span>
+      </div>
+      <button type="button" data-tournament-action="${action}" data-tournament-id="${tournament.id}" ${(!tournament.canRegister && !tournament.canCancel) ? "disabled" : ""}>${actionText}</button>
+    `;
+    tournamentList.append(node);
+  }
+}
+
+async function onTournamentAction(event) {
+  const button = event.target.closest("[data-tournament-action]");
+  if (!button) return;
+  const id = button.dataset.tournamentId;
+  const action = button.dataset.tournamentAction;
+  const endpoint = action === "cancel" ? "cancel" : "register";
+  const data = await api(`/api/tournaments/${id}/${endpoint}`, { method: "POST" });
+  state.tournaments = data.tournaments || [];
+  if (data.profile) {
+    state.user.balance = data.profile.balance;
+    lobbyBalance.textContent = formatChips(data.profile.balance);
+    renderProfile(data.profile);
+    renderHomeCta();
+  }
+  if (data.cashier) renderCashier(data.cashier);
+  renderTournaments();
+  if (tournamentStatus) {
+    tournamentStatus.textContent = action === "cancel" ? "Регистрация отменена, chips возвращены." : "Вы зарегистрированы в турнире.";
+  }
+  haptic("success");
 }
 
 function renderTables() {
@@ -1954,6 +2046,25 @@ function headerRow(labels) {
 
 function formatChips(value) {
   return Number(value).toLocaleString("ru-RU");
+}
+
+function statusLabel(status) {
+  const labels = {
+    registering: "регистрация",
+    planned: "скоро",
+    running: "идёт",
+    finished: "завершён"
+  };
+  return labels[status] || status || "";
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function formatDateTime(value) {
