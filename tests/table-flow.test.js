@@ -262,6 +262,7 @@ test("cashier returns deposit settings and records wallet operations", async () 
     assert.equal(cashier.balance, 5000);
     assert.equal(cashier.transactions[0].title, "Пополнение баланса");
     assert.equal(cashier.transactions[0].amount, 5000);
+    assert.equal(cashier.transactions[0].category, "deposit_demo");
 
     cashier = await topUp(auth.token, 3);
 
@@ -275,6 +276,7 @@ test("cashier returns deposit settings and records wallet operations", async () 
     assert.equal(cashier.balance, 0);
     assert.equal(cashier.transactions[0].title, "Бай-ин за стол");
     assert.equal(cashier.transactions[0].amount, 20000);
+    assert.equal(cashier.transactions[0].category, "table_buyin");
   } finally {
     server.kill();
   }
@@ -314,6 +316,7 @@ test("admin telegram commands grant and deduct wallet chips", async () => {
     assert.equal(cashier.balance, 15000);
     assert.equal(cashier.transactions[0].title, "Ручное начисление");
     assert.equal(cashier.transactions[0].amount, 15000);
+    assert.equal(cashier.transactions[0].category, "admin_grant");
 
     await request("/api/telegram/webhook", {
       method: "POST",
@@ -330,6 +333,7 @@ test("admin telegram commands grant and deduct wallet chips", async () => {
     assert.equal(cashier.balance, 10000);
     assert.equal(cashier.transactions[0].title, "Ручное списание");
     assert.equal(cashier.transactions[0].amount, 5000);
+    assert.equal(cashier.transactions[0].category, "admin_deduct");
   } finally {
     server.kill();
   }
@@ -356,6 +360,7 @@ test("admin api exposes dashboard and manual wallet adjustments", async () => {
 
     assert.equal(data.player.balance, 25000);
     assert.equal(data.player.transactions[0].title, "Ручное начисление");
+    assert.equal(data.player.transactions[0].category, "admin_grant");
 
     data = await request("/api/admin/users/dev-user", { token: auth.token });
     assert.equal(data.player.totalBankroll, 25000);
@@ -406,6 +411,7 @@ test("tournament registration spends chips and cancellation refunds them", async
     assert.equal(registered.participants, tournament.participants + 1);
     assert.equal(data.profile.balance, 10000 - tournament.totalCost);
     assert.equal(data.cashier.transactions[0].title, "Вход в турнир");
+    assert.equal(data.cashier.transactions[0].category, "tournament_buyin");
 
     const dashboard = (await request("/api/admin", { token: auth.token })).admin;
     assert.equal(dashboard.stats.walletTotal, 10000 - tournament.totalCost);
@@ -424,6 +430,7 @@ test("tournament registration spends chips and cancellation refunds them", async
     assert.equal(registered.participants, tournament.participants);
     assert.equal(data.profile.balance, 10000);
     assert.equal(data.cashier.transactions[0].title, "Возврат турнирного бай-ина");
+    assert.equal(data.cashier.transactions[0].category, "tournament_refund");
   } finally {
     server.kill();
   }
@@ -449,6 +456,8 @@ test("rebuy adds chips only between hands and spends wallet balance", async () =
     table = rebuy.table;
     assert.equal(table.viewer.balance, 5000);
     assert.equal(table.seats.find((seat) => seat.userId === "dev-user").stack, 15000);
+    const cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.transactions[0].category, "table_rebuy");
 
     table = (await request(`/api/tables/${table.id}/add-test-player`, {
       method: "POST",

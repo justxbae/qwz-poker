@@ -537,6 +537,7 @@ function renderCashierHistory(transactions) {
 
 function formatTransactionMeta(transaction) {
   const parts = [];
+  if (transaction.category) parts.push(transaction.category);
   if (transaction.meta) parts.push(transaction.meta);
   if (transaction.createdAt) {
     parts.push(new Date(transaction.createdAt).toLocaleString("ru-RU", {

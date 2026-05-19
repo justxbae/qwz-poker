@@ -103,15 +103,16 @@ export async function addWalletEntry(providerUserId, entry, provider = "telegram
     );
     await client.query(`
       insert into ledger_entries (
-        id, app_user_id, provider, provider_user_id, type, title, amount, meta, balance_after
+        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after
       )
-      values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     `, [
       entry.id || id("ledger"),
       appUserId,
       provider,
       String(providerUserId),
       entry.type,
+      normalizeLedgerCategory(entry.category),
       entry.title,
       amount,
       entry.meta || "",
@@ -131,7 +132,7 @@ export async function listLedger(providerUserId, limit = 30, provider = "telegra
   if (!pool) return null;
   const appUserId = await ensureIdentity(provider, providerUserId);
   const result = await query(`
-    select id, type, title, amount, meta, created_at as "createdAt"
+    select id, type, category, title, amount, meta, created_at as "createdAt"
     from ledger_entries
     where app_user_id = $1
     order by created_at desc
@@ -350,6 +351,7 @@ async function migrate() {
       provider text not null,
       provider_user_id text not null,
       type text not null check (type in ('credit', 'debit')),
+      category text not null default 'other',
       title text not null,
       amount bigint not null check (amount >= 0),
       meta text not null default '',
@@ -358,6 +360,8 @@ async function migrate() {
     );
 
     create index if not exists idx_ledger_entries_app_user_created on ledger_entries(app_user_id, created_at desc);
+    alter table ledger_entries add column if not exists category text not null default 'other';
+    create index if not exists idx_ledger_entries_category_created on ledger_entries(category, created_at desc);
 
     create table if not exists payment_orders (
       id text primary key,
@@ -412,6 +416,10 @@ function paymentRow(row) {
 
 function query(sql, params = []) {
   return pool.query(sql, params);
+}
+
+function normalizeLedgerCategory(category) {
+  return String(category || "other").trim().toLowerCase().replace(/[^a-z0-9_:-]/g, "_").slice(0, 64) || "other";
 }
 
 function id(prefix) {

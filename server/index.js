@@ -208,6 +208,7 @@ async function handleApi(req, res, url) {
 
     user.balance = await recordTransaction(user, {
       type: "credit",
+      category: "deposit_demo",
       title: "Пополнение баланса",
       amount: quote.chips,
       meta: `${quote.rubAmount} ₽ · ${quote.stars} Stars`
@@ -381,6 +382,7 @@ async function handleApi(req, res, url) {
       if (actualAmount > 0) {
         user.balance = await recordTransaction(user, {
           type: "debit",
+          category: "table_rebuy",
           title: "Докупка за столом",
           amount: actualAmount,
           meta: `${table.smallBlind}/${table.bigBlind} · ${table.name}`
@@ -819,6 +821,7 @@ async function registerTournament(tournament, user) {
 
   user.balance = await recordTransaction(user, {
     type: "debit",
+    category: "tournament_buyin",
     title: "Вход в турнир",
     amount: totalCost,
     meta: `${tournament.title} · бай-ин ${formatNumber(tournament.buyIn)} + fee ${formatNumber(tournament.fee)}`
@@ -852,6 +855,7 @@ async function cancelTournamentRegistration(tournament, user) {
   const totalCost = tournament.buyIn + tournament.fee;
   user.balance = await recordTransaction(user, {
     type: "credit",
+    category: "tournament_refund",
     title: "Возврат турнирного бай-ина",
     amount: totalCost,
     meta: tournament.title
@@ -896,6 +900,7 @@ async function prepareInitialStack(user, body = {}) {
   user.stack = amount;
   user.balance = await recordTransaction(user, {
     type: "debit",
+    category: "table_buyin",
     title: "Бай-ин за стол",
     amount,
     meta: "Texas NL"
@@ -944,6 +949,7 @@ async function getTransactions(user) {
       {
         id: randomId("tx"),
         type: "credit",
+        category: "starting_balance",
         title: "Стартовый баланс",
         amount: DEFAULT_WALLET,
         meta: "QWZ chips",
@@ -970,6 +976,7 @@ async function recordTransaction(user, transaction) {
   history.unshift({
     id: randomId("tx"),
     type: transaction.type,
+    category: normalizeLedgerCategory(transaction.category),
     title: transaction.title,
     amount: transaction.amount,
     meta: transaction.meta || "",
@@ -992,6 +999,10 @@ function normalizeTargetUserId(value) {
   const targetId = String(value || "").trim();
   if (!targetId) throw new Error("Укажите Telegram ID игрока");
   return targetId;
+}
+
+function normalizeLedgerCategory(category) {
+  return String(category || "other").trim().toLowerCase().replace(/[^a-z0-9_:-]/g, "_").slice(0, 64) || "other";
 }
 
 function parseChipAmount(value) {
@@ -1123,6 +1134,7 @@ async function adjustWalletManually({ admin, targetId, type, amount, reason }) {
 
   const balance = await recordTransaction(targetProfile, {
     type: normalizedType === "grant" ? "credit" : "debit",
+    category: normalizedType === "grant" ? "admin_grant" : "admin_deduct",
     title,
     amount: normalizedAmount,
     meta: `${normalizedReason} · admin ${adminProfile.id}`
@@ -1174,6 +1186,7 @@ async function processSuccessfulStarPayment(payment) {
 
   const balance = await recordTransaction({ id: order.userId }, {
     type: "credit",
+    category: "deposit_stars",
     title: "Пополнение Stars",
     amount: order.chips,
     meta: `${order.stars} Stars · QWZ chips`
