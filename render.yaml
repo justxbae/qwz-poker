@@ -3,9 +3,9 @@ services:
     name: qwz-poker
     runtime: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm ci
     startCommand: node server/index.js
-    healthCheckPath: /api/config
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
@@ -15,9 +15,15 @@ services:
         value: qwzpokerbot
       - key: BOT_TOKEN
         sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
       - key: ADMIN_CHAT_ID
         sync: false
       - key: ADMIN_USER_IDS
         sync: false
       - key: DATABASE_URL
         sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        value: "0.1"

@@ -24,13 +24,15 @@ After deploy, copy the public Render URL, for example:
 https://qwz-poker.onrender.com
 ```
 
-Set Telegram webhook:
+Set Telegram webhook (with a secret_token, see ниже):
 
 ```bash
-curl "https://api.telegram.org/bot$BOT_TOKEN/setWebhook?url=https://qwz-poker.onrender.com/api/telegram/webhook"
+SECRET=$(openssl rand -hex 32)
+curl "https://api.telegram.org/bot$BOT_TOKEN/setWebhook?url=https://qwz-poker.onrender.com/api/telegram/webhook&secret_token=$SECRET"
+# затем добавить $SECRET в TELEGRAM_WEBHOOK_SECRET на Render
 ```
 
-In `@BotFather`, set the Mini App / menu button URL to the same public URL.
+В `@BotFather` поставь Mini App / menu button URL на тот же публичный URL.
 
 ### Koyeb
 
@@ -43,11 +45,14 @@ NODE_ENV=production
 HOST=0.0.0.0
 BOT_USERNAME=qwzpokerbot
 BOT_TOKEN=<token from BotFather>
+TELEGRAM_WEBHOOK_SECRET=<random hex, см. setWebhook ниже>
 ADMIN_CHAT_ID=<your Telegram numeric user id for private admin logs>
 ADMIN_USER_IDS=<comma-separated Telegram user ids allowed to use admin commands>
 ADMIN_GRANT_MAX_CHIPS=500000
 DATABASE_URL=<Render PostgreSQL internal database URL>
 APP_NAME=QWZ Poker
+SENTRY_DSN=<optional, Sentry/GlitchTip DSN>
+SENTRY_TRACES_SAMPLE_RATE=0.1
 ```
 
 ## PostgreSQL

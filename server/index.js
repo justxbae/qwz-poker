@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import * as Sentry from "@sentry/node";
 import { depositSettings, quoteDeposit } from "./economy.js";
 import {
   addWalletEntry as dbAddWalletEntry,
@@ -60,9 +61,14 @@ const APP_NAME = process.env.APP_NAME || "QWZ Poker";
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || "";
 const ADMIN_USER_IDS = parseIdList(process.env.ADMIN_USER_IDS || ADMIN_CHAT_ID);
 const ADMIN_GRANT_MAX_CHIPS = Number(process.env.ADMIN_GRANT_MAX_CHIPS || 500000);
+const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
 const isProduction = process.env.NODE_ENV === "production";
 const HOST = process.env.HOST || (isProduction ? "0.0.0.0" : "127.0.0.1");
 const startedAt = Date.now();
+
+validateEnvironment();
+initSentry();
+registerProcessHandlers();
 
 const tables = new Map();
 const sessions = new Map();
@@ -94,7 +100,7 @@ const server = createServer(async (req, res) => {
 
     await serveStatic(req, res, url);
   } catch (error) {
-    console.error(error);
+    reportError(error, { url: req.url, method: req.method });
     sendJson(res, error.status || 500, { error: error.status ? error.message : "Internal server error" });
   }
 });
@@ -131,6 +137,10 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/telegram/webhook") {
+    if (!verifyTelegramWebhook(req)) {
+      sendJson(res, 403, { error: "Invalid webhook secret" });
+      return;
+    }
     const update = await readJson(req);
     await handleTelegramWebhook(update);
     sendJson(res, 200, { ok: true });
@@ -1614,6 +1624,74 @@ function parseIdList(value) {
       .map((item) => item.trim())
       .filter((item) => item && !item.startsWith("-"))
   );
+}
+
+function validateEnvironment() {
+  if (!isProduction) return;
+  const problems = [];
+  if (!BOT_TOKEN || BOT_TOKEN.includes("replace_with") || BOT_TOKEN === "test-token") {
+    problems.push("BOT_TOKEN is required in production");
+  }
+  if (!process.env.DATABASE_URL) {
+    problems.push("DATABASE_URL is required in production (memory mode is dev only)");
+  }
+  if (!TELEGRAM_WEBHOOK_SECRET) {
+    console.warn("[warn] TELEGRAM_WEBHOOK_SECRET is empty — webhook endpoint is unprotected.");
+  }
+  if (problems.length) {
+    for (const message of problems) console.error(`[fatal] ${message}`);
+    process.exit(1);
+  }
+}
+
+function initSentry() {
+  const dsn = process.env.SENTRY_DSN || "";
+  if (!dsn) return;
+  try {
+    Sentry.init({
+      dsn,
+      environment: isProduction ? "production" : (process.env.NODE_ENV || "development"),
+      tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE || 0.1),
+      release: process.env.SENTRY_RELEASE || undefined
+    });
+  } catch (error) {
+    console.error("Sentry init failed:", error.message);
+  }
+}
+
+function registerProcessHandlers() {
+  process.on("uncaughtException", (error) => {
+    console.error("uncaughtException:", error);
+    reportError(error, { kind: "uncaughtException" });
+  });
+  process.on("unhandledRejection", (reason) => {
+    const error = reason instanceof Error ? reason : new Error(String(reason));
+    console.error("unhandledRejection:", error);
+    reportError(error, { kind: "unhandledRejection" });
+  });
+}
+
+function reportError(error, context = {}) {
+  if (!error) return;
+  try {
+    if (process.env.SENTRY_DSN) {
+      Sentry.withScope((scope) => {
+        for (const [key, value] of Object.entries(context)) {
+          scope.setTag(key, String(value).slice(0, 200));
+        }
+        Sentry.captureException(error);
+      });
+    }
+  } catch (sentryError) {
+    console.error("Sentry capture failed:", sentryError.message);
+  }
+  if (!process.env.SENTRY_DSN) console.error(error);
+}
+
+function verifyTelegramWebhook(req) {
+  if (!TELEGRAM_WEBHOOK_SECRET) return true;
+  const provided = req.headers["x-telegram-bot-api-secret-token"] || "";
+  return provided === TELEGRAM_WEBHOOK_SECRET;
 }
 
 function loadEnv(filePath) {

@@ -594,7 +594,15 @@ async function ensureIdentity(provider, providerUserId) {
 }
 
 async function migrate() {
-  await query(`
+  // Concurrent instances (Render scaleup, blue-green deploy) могут запускать
+  // миграцию одновременно. Advisory lock сериализует их без блокировок
+  // на пользовательских транзакциях.
+  const MIGRATION_LOCK_KEY = 7421983457;
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await client.query("select pg_advisory_xact_lock($1)", [MIGRATION_LOCK_KEY]);
+    await client.query(`
     create table if not exists app_users (
       id text primary key,
       display_name text not null default 'Player',
@@ -727,7 +735,14 @@ async function migrate() {
     );
 
     create index if not exists idx_admin_events_created on admin_events(created_at desc);
-  `);
+    `);
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 function paymentRow(row) {
