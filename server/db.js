@@ -712,6 +712,21 @@ export async function listPaymentOrders(limit = 10) {
   return result.rows.map(paymentRow);
 }
 
+export async function listPendingCryptoPaymentOrders(limit = 50) {
+  if (!pool) return null;
+  const result = await query(`
+    select po.*, au.display_name as "userName", au.username
+    from payment_orders po
+    left join app_users au on au.id = po.app_user_id
+    where po.status = 'pending'
+      and po.method in ('ton', 'usdt_trc20')
+      and (po.expires_at is null or po.expires_at > now())
+    order by po.created_at asc
+    limit $1
+  `, [limit]);
+  return result.rows.map(paymentRow);
+}
+
 export async function getIdempotencyResult(key) {
   if (!pool) return null;
   const normalized = normalizeIdempotencyKey(key);
@@ -1087,6 +1102,8 @@ function paymentRow(row) {
     network: row.network || "",
     cryptoAmount: row.crypto_amount === null || row.crypto_amount === undefined ? null : Number(row.crypto_amount),
     externalId: row.external_id || "",
+    receiverAddress: row.raw?.receiverAddress || "",
+    confirmationsRequired: Number(row.raw?.confirmationsRequired || 0),
     status: row.status,
     payload: row.payload || "",
     telegramPaymentChargeId: row.telegram_payment_charge_id || "",

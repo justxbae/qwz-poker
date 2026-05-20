@@ -23,20 +23,29 @@ Flow:
 
 ## TON deposit
 
-Prepared method.
+Prepared method for the project wallet:
+
+```text
+UQB5ZtlMthiWet8Cy0K8LFOJc-5aG55uQc7DCnHA18XiYn9T
+```
 
 Recommended production route:
 
 1. Add `TON_PAYMENTS_ENABLED=true`.
-2. Add `TON_RECEIVER_ADDRESS`.
-3. Keep `/tonconnect-manifest.json` public and accurate.
-4. Create order through `/api/cashier/crypto-order` with `method='ton'`.
-5. Client sends TON transfer through TON Connect with:
+2. Add/confirm `TON_RECEIVER_ADDRESS`.
+3. Add `TON_POLLING_ENABLED=true`.
+4. Add `TONCENTER_API_KEY` for stable polling limits.
+5. Keep `/tonconnect-manifest.json` public and accurate.
+6. Create order through `/api/cashier/crypto-order` with `method='ton'`.
+7. Client sends TON transfer through TON Connect with:
    - receiver address;
    - amount in nanotons;
    - unique comment/reference `qwz:{orderId}`.
-6. Backend confirms transaction through provider/indexer reconciliation, not through client success alone.
-7. Only confirmed order calls `completePaymentOrder`.
+8. Backend polls TON Center v3 for incoming transactions to the receiver address.
+9. Backend matches amount and comment/reference.
+10. Only matched on-chain payment calls `completePaymentOrder`.
+
+Do not enable TON payments in production without PostgreSQL. Pending orders must survive server restarts.
 
 Official references:
 

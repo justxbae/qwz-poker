@@ -25,6 +25,7 @@ import {
   listTournamentRegistrations as dbListTournamentRegistrations,
   listHandHistories as dbListHandHistories,
   listPaymentOrders as dbListPaymentOrders,
+  listPendingCryptoPaymentOrders as dbListPendingCryptoPaymentOrders,
   markPaymentOrderPaid as dbMarkPaymentOrderPaid,
   recordAdminEvent as dbRecordAdminEvent,
   recordFundMovement as dbRecordFundMovement,
@@ -75,6 +76,11 @@ const ADMIN_USER_IDS = parseIdList(process.env.ADMIN_USER_IDS || ADMIN_CHAT_ID);
 const ADMIN_GRANT_MAX_CHIPS = Number(process.env.ADMIN_GRANT_MAX_CHIPS || 500000);
 const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
 const CRYPTO_WEBHOOK_SECRET = process.env.CRYPTO_WEBHOOK_SECRET || "";
+const TON_RECEIVER_ADDRESS = process.env.TON_RECEIVER_ADDRESS || "";
+const TON_POLLING_ENABLED = process.env.TON_POLLING_ENABLED === "true";
+const TONCENTER_API_BASE = (process.env.TONCENTER_API_BASE || "https://toncenter.com/api/v3").replace(/\/$/, "");
+const TONCENTER_API_KEY = process.env.TONCENTER_API_KEY || "";
+const TON_POLLING_INTERVAL_MS = Number(process.env.TON_POLLING_INTERVAL_MS || 60 * 1000);
 const isProduction = process.env.NODE_ENV === "production";
 const HOST = process.env.HOST || (isProduction ? "0.0.0.0" : "127.0.0.1");
 const startedAt = Date.now();
@@ -164,6 +170,14 @@ setInterval(async () => {
     console.error("Reconciliation check failed:", error.message);
   }
 }, RECONCILIATION_INTERVAL_MS);
+
+setInterval(async () => {
+  try {
+    await pollTonDeposits();
+  } catch (error) {
+    console.error("TON polling failed:", error.message);
+  }
+}, TON_POLLING_INTERVAL_MS);
 
 async function handleApi(req, res, url) {
   if (req.method === "GET" && url.pathname === "/api/health") {
@@ -1845,11 +1859,27 @@ async function handleCryptoWebhook(event) {
     telegram_payment_charge_id: txHash || externalId,
     provider_event: event
   });
-  if (!completed || completed.alreadyPaid || completed.ignored) return;
+  if (completed?.alreadyPaid || completed?.ignored) return;
+  let balance = completed?.balance;
+  if (!completed) {
+    const paymentKey = `payment:${order.id}`;
+    if (idempotencyResults.has(paymentKey)) return;
+    balance = await recordTransaction({ id: order.userId }, {
+      type: "credit",
+      category: `deposit_${normalizeLedgerCategory(order.method)}`,
+      title: "Пополнение баланса",
+      amount: order.chips,
+      meta: `${paidAmount || order.cryptoAmount} ${order.asset} ${order.network} · ${txHash || externalId || order.id}`,
+      idempotencyKey: paymentKey
+    });
+    idempotencyResults.set(paymentKey, { balance });
+    order.status = "paid";
+    order.paidAt = new Date().toISOString();
+  }
 
   const paidOrder = { ...order, status: "paid", externalId, txHash, paidAt: new Date().toISOString() };
   cryptoOrders.set(order.id, paidOrder);
-  setWalletBalanceLocal(order.userId, completed.balance);
+  setWalletBalanceLocal(order.userId, balance);
   notifyAdmin("crypto_paid", "Оплачено crypto-пополнение", {
     user: { id: order.userId, name: order.userName, username: order.username },
     lines: [
@@ -1859,9 +1889,104 @@ async function handleCryptoWebhook(event) {
       `Chips: ${formatNumber(order.chips)}`,
       `Order: ${order.id}`,
       `TX: ${txHash || externalId || "n/a"}`,
-      `Баланс: ${formatNumber(completed.balance)} chips`
+      `Баланс: ${formatNumber(balance)} chips`
     ]
   });
+}
+
+async function pollTonDeposits() {
+  if (!TON_POLLING_ENABLED || process.env.TON_PAYMENTS_ENABLED !== "true" || !TON_RECEIVER_ADDRESS) return;
+  const pendingOrders = await pendingTonPaymentOrders();
+  if (!pendingOrders.length) return;
+
+  const transactions = await fetchTonTransactions(TON_RECEIVER_ADDRESS);
+  for (const order of pendingOrders) {
+    if (order.status !== "pending") continue;
+    const match = findTonPaymentForOrder(order, transactions);
+    if (!match) continue;
+    await handleCryptoWebhook({
+      orderId: order.id,
+      status: "confirmed",
+      paidAmount: match.tonAmount,
+      txHash: match.hash,
+      externalId: match.lt || match.hash,
+      source: match.source,
+      detectedBy: "toncenter_polling"
+    });
+  }
+}
+
+async function pendingTonPaymentOrders() {
+  const dbOrders = await dbListPendingCryptoPaymentOrders(50);
+  const orders = dbOrders || [...cryptoOrders.values()]
+    .filter((order) => order.status === "pending" && order.method === "ton");
+  const now = Date.now();
+  return orders.filter((order) => (
+    order.method === "ton"
+      && (!order.expiresAt || new Date(order.expiresAt).getTime() > now)
+  ));
+}
+
+async function fetchTonTransactions(address) {
+  const url = new URL(`${TONCENTER_API_BASE}/transactions`);
+  url.searchParams.set("account", address);
+  url.searchParams.set("limit", "50");
+  url.searchParams.set("sort", "desc");
+  const headers = {};
+  if (TONCENTER_API_KEY) headers["X-API-Key"] = TONCENTER_API_KEY;
+  const response = await fetch(url, { headers });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || data.message || "TON transactions request failed");
+  }
+  return Array.isArray(data.transactions) ? data.transactions : Array.isArray(data) ? data : [];
+}
+
+function findTonPaymentForOrder(order, transactions) {
+  const expectedNano = Math.round(Number(order.cryptoAmount || 0) * 1_000_000_000);
+  const expectedComment = order.payload || `qwz:${order.id}`;
+
+  for (const tx of transactions) {
+    const transfer = extractTonInboundTransfer(tx);
+    if (!transfer) continue;
+    if (transfer.valueNano < expectedNano) continue;
+    if (!transfer.comment.includes(expectedComment)) continue;
+    return transfer;
+  }
+  return null;
+}
+
+function extractTonInboundTransfer(tx) {
+  const message = tx.in_msg || tx.inMessage || tx.inMessageDescr || tx.in_message;
+  if (!message) return null;
+  const valueNano = Number(message.value || message.amount || message.value_extra_currencies || 0);
+  if (!Number.isFinite(valueNano) || valueNano <= 0) return null;
+  return {
+    hash: tx.hash || tx.transaction_hash || tx.tx_hash || "",
+    lt: String(tx.lt || tx.logical_time || tx.transaction_id?.lt || ""),
+    source: message.source || message.src || "",
+    destination: message.destination || message.dst || message.dest || "",
+    valueNano,
+    tonAmount: valueNano / 1_000_000_000,
+    comment: tonMessageComment(message)
+  };
+}
+
+function tonMessageComment(message) {
+  const candidates = [
+    message.message,
+    message.comment,
+    message.decoded_body?.text,
+    message.decoded_body?.comment,
+    message.message_content?.decoded?.comment,
+    message.message_content?.decoded?.text,
+    message.message_content?.body,
+    message.msg_data?.text,
+    message.msg_data?.body
+  ];
+  return candidates
+    .filter((value) => typeof value === "string" && value.trim())
+    .join("\n");
 }
 
 function normalizeCryptoPaymentStatus(status) {

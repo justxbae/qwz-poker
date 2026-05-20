@@ -400,6 +400,20 @@ test("crypto deposit order can be created but does not credit chips before confi
 
     const after = (await request("/api/cashier", { token: auth.token })).cashier;
     assert.equal(after.balance, 0);
+
+    await request("/api/payments/crypto/webhook", {
+      method: "POST",
+      body: {
+        orderId: data.order.id,
+        status: "confirmed",
+        paidAmount: 1,
+        txHash: "ton-test-hash"
+      }
+    });
+
+    const paid = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(paid.balance, 12500);
+    assert.equal(paid.transactions[0].category, "deposit_ton");
   } finally {
     server.kill();
   }

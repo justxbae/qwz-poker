@@ -22,6 +22,10 @@ services:
       - key: TON_PAYMENTS_ENABLED
         value: "false"
       - key: TON_RECEIVER_ADDRESS
+        value: UQB5ZtlMthiWet8Cy0K8LFOJc-5aG55uQc7DCnHA18XiYn9T
+      - key: TON_POLLING_ENABLED
+        value: "false"
+      - key: TONCENTER_API_KEY
         sync: false
       - key: TON_RUB_RATE
         sync: false
