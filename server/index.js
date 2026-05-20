@@ -8,12 +8,14 @@ import * as Sentry from "@sentry/node";
 import { depositSettings, quoteDeposit } from "./economy.js";
 import {
   addWalletEntry as dbAddWalletEntry,
+  completePaymentOrder as dbCompletePaymentOrder,
   createPaymentOrder as dbCreatePaymentOrder,
   dashboardStats as dbDashboardStats,
   databaseHealth as dbDatabaseHealth,
   databaseEnabled,
   deleteActiveTableSnapshot as dbDeleteActiveTableSnapshot,
   getPaymentOrder as dbGetPaymentOrder,
+  getIdempotencyResult as dbGetIdempotencyResult,
   getSavedStack as dbGetSavedStack,
   getWallet as dbGetWallet,
   initDatabase,
@@ -27,7 +29,9 @@ import {
   recordAdminEvent as dbRecordAdminEvent,
   recordFundMovement as dbRecordFundMovement,
   recordHandHistory as dbRecordHandHistory,
+  recordPlatformLedgerEntry as dbRecordPlatformLedgerEntry,
   registerTournament as dbRegisterTournament,
+  saveIdempotencyResult as dbSaveIdempotencyResult,
   cancelTournamentRegistration as dbCancelTournamentRegistration,
   setSavedStack as dbSetSavedStack,
   setWallet as dbSetWallet,
@@ -90,8 +94,13 @@ const loggedAppOpens = new Set();
 const persistedHandIds = new Set();
 const recentHandHistories = [];
 const idempotencyResults = new Map();
+const apiIdempotencyResults = new Map();
+const pendingIdempotencyResults = new Map();
 const DEFAULT_STACK = 0;
 const DEFAULT_WALLET = 0;
+const RECONCILIATION_INTERVAL_MS = Number(process.env.RECONCILIATION_INTERVAL_MS || 15 * 60 * 1000);
+const RECONCILIATION_DRIFT_ALERT_CHIPS = Number(process.env.RECONCILIATION_DRIFT_ALERT_CHIPS || 1);
+let lastReconciliationAlertKey = "";
 
 seedPublicTables();
 const tournaments = seedTournaments();
@@ -144,6 +153,14 @@ setInterval(async () => {
     console.error("Active table snapshot flush failed:", error);
   }
 }, 5000);
+
+setInterval(async () => {
+  try {
+    await runReconciliationCheck("interval");
+  } catch (error) {
+    console.error("Reconciliation check failed:", error.message);
+  }
+}, RECONCILIATION_INTERVAL_MS);
 
 async function handleApi(req, res, url) {
   if (req.method === "GET" && url.pathname === "/api/health") {
@@ -231,16 +248,18 @@ async function handleApi(req, res, url) {
       return;
     }
 
-    if (action === "register") {
-      await registerTournament(tournament, user);
-    } else {
-      await cancelTournamentRegistration(tournament, user);
-    }
+    await sendIdempotentJson(req, res, user, `tournament_${action}:${tournamentId}`, async () => {
+      if (action === "register") {
+        await registerTournament(tournament, user);
+      } else {
+        await cancelTournamentRegistration(tournament, user);
+      }
 
-    sendJson(res, 200, {
-      tournaments: tournamentListView(user),
-      profile: await profileView(user),
-      cashier: await cashierView(user)
+      return {
+        tournaments: tournamentListView(user),
+        profile: await profileView(user),
+        cashier: await cashierView(user)
+      };
     });
     return;
   }
@@ -255,88 +274,96 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/cashier/demo-topup") {
-    const body = await readJson(req);
-    const quote = quoteDeposit(body);
+    await sendIdempotentJson(req, res, user, "cashier_demo_topup", async (idempotencyKey) => {
+      const body = await readJson(req);
+      const quote = quoteDeposit(body);
 
-    user.balance = await recordTransaction(user, {
-      type: "credit",
-      category: "deposit_demo",
-      title: "Пополнение баланса",
-      amount: quote.chips,
-      meta: `${quote.rubAmount} ₽ · ${quote.stars} Stars`
+      user.balance = await recordTransaction(user, {
+        type: "credit",
+        category: "deposit_demo",
+        title: "Пополнение баланса",
+        amount: quote.chips,
+        meta: `${quote.rubAmount} ₽ · ${quote.stars} Stars`,
+        idempotencyKey
+      });
+      notifyAdmin("demo_topup", "Demo-пополнение", {
+        user,
+        lines: [
+          `Сумма: ${formatNumber(quote.rubAmount)} ₽`,
+          `Пакет: ${formatNumber(quote.chips)} chips`,
+          `Баланс: ${formatNumber(user.balance)} chips`
+        ]
+      });
+      return { cashier: await cashierView(user) };
     });
-    notifyAdmin("demo_topup", "Demo-пополнение", {
-      user,
-      lines: [
-        `Сумма: ${formatNumber(quote.rubAmount)} ₽`,
-        `Пакет: ${formatNumber(quote.chips)} chips`,
-        `Баланс: ${formatNumber(user.balance)} chips`
-      ]
-    });
-    sendJson(res, 200, { cashier: await cashierView(user) });
     return;
   }
 
   if (req.method === "POST" && url.pathname === "/api/cashier/stars-invoice") {
-    const body = await readJson(req);
-    const quote = quoteDeposit(body);
-    if (!BOT_TOKEN || BOT_TOKEN.includes("replace_with") || BOT_TOKEN === "test-token") {
-      sendJson(res, 409, { error: "BOT_TOKEN не настроен для Telegram Stars" });
-      return;
-    }
+    await sendIdempotentJson(req, res, user, "cashier_stars_invoice", async () => {
+      const body = await readJson(req);
+      const quote = quoteDeposit(body);
+      if (!BOT_TOKEN || BOT_TOKEN.includes("replace_with") || BOT_TOKEN === "test-token") {
+        const error = new Error("BOT_TOKEN не настроен для Telegram Stars");
+        error.status = 409;
+        throw error;
+      }
 
-    const orderId = randomId("stars");
-    const payload = `qwz:${orderId}`;
-    const order = {
-      id: orderId,
-      userId: user.id,
-      userName: user.name,
-      username: user.username,
-      rubAmount: quote.rubAmount,
-      chips: quote.chips,
-      stars: quote.stars,
-      status: "pending",
-      createdAt: new Date().toISOString()
-    };
-    starOrders.set(orderId, order);
-    await dbCreatePaymentOrder(order);
+      const orderId = randomId("stars");
+      const payload = `qwz:${orderId}`;
+      const order = {
+        id: orderId,
+        userId: user.id,
+        userName: user.name,
+        username: user.username,
+        rubAmount: quote.rubAmount,
+        chips: quote.chips,
+        stars: quote.stars,
+        status: "pending",
+        createdAt: new Date().toISOString()
+      };
+      starOrders.set(orderId, order);
+      await dbCreatePaymentOrder(order);
 
-    const invoiceLink = await createStarsInvoiceLink({
-      title: `${formatNumber(quote.chips)} QWZ chips`,
-      description: `Пополнение игрового баланса QWZ Poker на ${formatNumber(quote.chips)} chips`,
-      payload,
-      stars: quote.stars
+      const invoiceLink = await createStarsInvoiceLink({
+        title: `${formatNumber(quote.chips)} QWZ chips`,
+        description: `Пополнение игрового баланса QWZ Poker на ${formatNumber(quote.chips)} chips`,
+        payload,
+        stars: quote.stars
+      });
+      notifyAdmin("stars_invoice", "Создан счет Stars", {
+        user,
+        lines: [
+          `Сумма: ${formatNumber(quote.rubAmount)} ₽`,
+          `Пакет: ${formatNumber(quote.chips)} chips`,
+          `Стоимость: ${formatNumber(quote.stars)} Stars`,
+          `Order: ${order.id}`
+        ]
+      });
+
+      return { invoiceLink, orderId, cashier: await cashierView(user) };
     });
-    notifyAdmin("stars_invoice", "Создан счет Stars", {
-      user,
-      lines: [
-        `Сумма: ${formatNumber(quote.rubAmount)} ₽`,
-        `Пакет: ${formatNumber(quote.chips)} chips`,
-        `Стоимость: ${formatNumber(quote.stars)} Stars`,
-        `Order: ${order.id}`
-      ]
-    });
-
-    sendJson(res, 200, { invoiceLink, orderId, cashier: await cashierView(user) });
     return;
   }
 
   if (req.method === "POST" && url.pathname === "/api/tables") {
-    const body = await readJson(req);
-    body.visibility = "private";
-    await prepareInitialStack(user, body);
-    const table = createTable(user, body);
-    tables.set(table.id, table);
-    await persistActiveTableSnapshot(table);
-    notifyAdmin("table_create", "Создан приватный стол", {
-      user,
-      lines: [
-        `Стол: ${table.name}`,
-        `Блайнды: ${table.smallBlind}/${table.bigBlind}`,
-        `Бай-ин: ${formatNumber(table.seats[0]?.stack || 0)} chips`
-      ]
+    await sendIdempotentJson(req, res, user, "table_create", async (idempotencyKey) => {
+      const body = await readJson(req);
+      body.visibility = "private";
+      await prepareInitialStack(user, body, idempotencyKey);
+      const table = createTable(user, body);
+      tables.set(table.id, table);
+      await persistActiveTableSnapshot(table);
+      notifyAdmin("table_create", "Создан приватный стол", {
+        user,
+        lines: [
+          `Стол: ${table.name}`,
+          `Блайнды: ${table.smallBlind}/${table.bigBlind}`,
+          `Бай-ин: ${formatNumber(table.seats[0]?.stack || 0)} chips`
+        ]
+      });
+      return { status: 201, body: { table: tableView(table, user) } };
     });
-    sendJson(res, 201, { table: tableView(table, user) });
     return;
   }
 
@@ -355,26 +382,28 @@ async function handleApi(req, res, url) {
     }
 
     if (req.method === "POST" && action === "join") {
-      const body = await readJson(req);
-      const wasSeated = table.seats.some((seat) => seat.userId === user.id);
-      if (!wasSeated) {
-        await prepareInitialStack(user, body);
-      }
-      joinTable(table, user);
-      maybeStartHand(table);
-      await persistActiveTableSnapshot(table);
-      if (!wasSeated) {
-        notifyAdmin("table_join", "Игрок сел за стол", {
-          user,
-          lines: [
-            `Стол: ${table.name}`,
-            `Блайнды: ${table.smallBlind}/${table.bigBlind}`,
-            `Стек: ${formatNumber(table.seats.find((seat) => seat.userId === user.id)?.stack || 0)} chips`,
-            `Игроков: ${table.seats.length}/${table.maxPlayers}`
-          ]
-        });
-      }
-      sendJson(res, 200, { table: tableView(table, user) });
+      await sendIdempotentJson(req, res, user, `table_join:${table.id}`, async (idempotencyKey) => {
+        const body = await readJson(req);
+        const wasSeated = table.seats.some((seat) => seat.userId === user.id);
+        if (!wasSeated) {
+          await prepareInitialStack(user, body, idempotencyKey);
+        }
+        joinTable(table, user);
+        maybeStartHand(table);
+        await persistActiveTableSnapshot(table);
+        if (!wasSeated) {
+          notifyAdmin("table_join", "Игрок сел за стол", {
+            user,
+            lines: [
+              `Стол: ${table.name}`,
+              `Блайнды: ${table.smallBlind}/${table.bigBlind}`,
+              `Стек: ${formatNumber(table.seats.find((seat) => seat.userId === user.id)?.stack || 0)} chips`,
+              `Игроков: ${table.seats.length}/${table.maxPlayers}`
+            ]
+          });
+        }
+        return { table: tableView(table, user) };
+      });
       return;
     }
 
@@ -437,45 +466,49 @@ async function handleApi(req, res, url) {
     }
 
     if (req.method === "POST" && action === "rebuy") {
-      const body = await readJson(req);
-      if (user.balance <= 0) {
-        sendJson(res, 409, { error: "На общем балансе нет средств для докупки" });
-        return;
-      }
+      await sendIdempotentJson(req, res, user, `table_rebuy:${table.id}`, async (idempotencyKey) => {
+        const body = await readJson(req);
+        if (user.balance <= 0) {
+          const error = new Error("На общем балансе нет средств для докупки");
+          error.status = 409;
+          throw error;
+        }
 
-      const amount = clamp(Number(body.amount || DEFAULT_STACK), 1, user.balance);
-      const beforeStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
-      const afterStack = addBuyIn(table, user, amount);
-      const actualAmount = afterStack - beforeStack;
-      if (actualAmount > 0) {
-        user.balance = await recordTransaction(user, {
-          type: "debit",
-          category: "table_rebuy",
-          title: "Докупка за столом",
-          amount: actualAmount,
-          meta: `${table.smallBlind}/${table.bigBlind} · ${table.name}`
-        });
-        await recordFundMovement(user, {
-          category: "wallet_to_table_rebuy",
-          from: "wallet",
-          to: "table",
-          amount: actualAmount,
-          contextId: table.id,
-          meta: `${table.smallBlind}/${table.bigBlind} · ${table.name}`
-        });
-        notifyAdmin("rebuy", "Докупка за столом", {
-          user,
-          lines: [
-            `Стол: ${table.name}`,
-            `Сумма: ${formatNumber(actualAmount)} chips`,
-            `Стек: ${formatNumber(afterStack)} chips`,
-            `Баланс: ${formatNumber(user.balance)} chips`
-          ]
-        });
-      }
-      maybeStartHand(table);
-      await persistActiveTableSnapshot(table);
-      sendJson(res, 200, { table: tableView(table, user), balance: user.balance });
+        const amount = clamp(Number(body.amount || DEFAULT_STACK), 1, user.balance);
+        const beforeStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
+        const afterStack = addBuyIn(table, user, amount);
+        const actualAmount = afterStack - beforeStack;
+        if (actualAmount > 0) {
+          user.balance = await recordTransaction(user, {
+            type: "debit",
+            category: "table_rebuy",
+            title: "Докупка за столом",
+            amount: actualAmount,
+            meta: `${table.smallBlind}/${table.bigBlind} · ${table.name}`,
+            idempotencyKey
+          });
+          await recordFundMovement(user, {
+            category: "wallet_to_table_rebuy",
+            from: "wallet",
+            to: "table",
+            amount: actualAmount,
+            contextId: table.id,
+            meta: `${table.smallBlind}/${table.bigBlind} · ${table.name}`
+          });
+          notifyAdmin("rebuy", "Докупка за столом", {
+            user,
+            lines: [
+              `Стол: ${table.name}`,
+              `Сумма: ${formatNumber(actualAmount)} chips`,
+              `Стек: ${formatNumber(afterStack)} chips`,
+              `Баланс: ${formatNumber(user.balance)} chips`
+            ]
+          });
+        }
+        maybeStartHand(table);
+        await persistActiveTableSnapshot(table);
+        return { table: tableView(table, user), balance: user.balance };
+      });
       return;
     }
 
@@ -570,7 +603,18 @@ async function adminDashboardView() {
   const rakeCollectedTotal = [...tables.values()].reduce((sum, table) => sum + Number(table.rakeCollected || 0), 0);
   const ledgerCreditTotal = dbStats ? dbStats.ledgerCreditTotal : memoryLedgerTotal("credit");
   const ledgerDebitTotal = dbStats ? dbStats.ledgerDebitTotal : memoryLedgerTotal("debit");
+  const paidStarsChipsTotal = dbStats ? dbStats.paidStarsChipsTotal : [...starOrders.values()]
+    .filter((order) => order.status === "paid")
+    .reduce((sum, order) => sum + Number(order.chips || 0), 0);
+  const depositStarsLedgerTotal = dbStats ? dbStats.depositStarsLedgerTotal : memoryLedgerCategoryTotal("credit", "deposit_stars");
   const playerFundsTotal = walletTotal + tableStackTotal + savedStackTotal + tournamentEscrowTotal;
+  const reconciliation = buildReconciliationAudit({
+    walletTotal,
+    ledgerCreditTotal,
+    ledgerDebitTotal,
+    paidStarsChipsTotal,
+    depositStarsLedgerTotal
+  });
   const paidStars = [...starOrders.values()].filter((order) => order.status === "paid");
   const pendingStars = [...starOrders.values()].filter((order) => order.status === "pending");
   const recentPayments = await dbListPaymentOrders(10);
@@ -595,6 +639,12 @@ async function adminDashboardView() {
       ledgerCreditTotal,
       ledgerDebitTotal,
       ledgerNetTotal: ledgerCreditTotal - ledgerDebitTotal,
+      platformLedgerCreditTotal: dbStats ? dbStats.platformLedgerCreditTotal : 0,
+      platformLedgerDebitTotal: dbStats ? dbStats.platformLedgerDebitTotal : 0,
+      platformLedgerNetTotal: dbStats ? dbStats.platformLedgerCreditTotal - dbStats.platformLedgerDebitTotal : 0,
+      paidStarsChipsTotal,
+      depositStarsLedgerTotal,
+      idempotencyKeyCount: dbStats ? dbStats.idempotencyKeyCount : apiIdempotencyResults.size,
       handHistoryCount: dbStats ? dbStats.handHistoryCount : memoryHandHistoryCount,
       handHistoryRakeTotal: dbStats ? dbStats.handHistoryRakeTotal : memoryHandHistoryRakeTotal,
       activeTableSnapshotCount: dbStats ? dbStats.activeTableSnapshotCount : 0,
@@ -615,9 +665,11 @@ async function adminDashboardView() {
       ledgerCreditTotal,
       ledgerDebitTotal,
       ledgerNetTotal: ledgerCreditTotal - ledgerDebitTotal,
+      reconciliation,
       notes: [
         "playerFundsTotal = wallets + active table stacks + saved stacks + tournament escrow",
-        "ledgerNetTotal is informational until all transfers use categorized ledger entries"
+        "walletLedgerDrift must stay at 0: walletTotal should match ledger credits minus debits",
+        "starsDepositDrift must stay at 0: paid Stars orders should match deposit_stars ledger credits"
       ]
     },
     recentFundMovements: recentFundMovements(20),
@@ -653,6 +705,63 @@ function memoryLedgerTotal(type) {
       .filter((entry) => entry.type === type)
       .reduce((entrySum, entry) => entrySum + Number(entry.amount || 0), 0)
   ), 0);
+}
+
+function memoryLedgerCategoryTotal(type, category) {
+  return [...transactions.values()].reduce((sum, history) => (
+    sum + history
+      .filter((entry) => entry.type === type && entry.category === category)
+      .reduce((entrySum, entry) => entrySum + Number(entry.amount || 0), 0)
+  ), 0);
+}
+
+function buildReconciliationAudit({
+  walletTotal,
+  ledgerCreditTotal,
+  ledgerDebitTotal,
+  paidStarsChipsTotal,
+  depositStarsLedgerTotal
+}) {
+  const ledgerNetTotal = Number(ledgerCreditTotal || 0) - Number(ledgerDebitTotal || 0);
+  const walletLedgerDrift = Number(walletTotal || 0) - ledgerNetTotal;
+  const starsDepositDrift = Number(paidStarsChipsTotal || 0) - Number(depositStarsLedgerTotal || 0);
+  const maxDrift = Math.max(Math.abs(walletLedgerDrift), Math.abs(starsDepositDrift));
+  return {
+    ok: maxDrift < RECONCILIATION_DRIFT_ALERT_CHIPS,
+    walletLedgerDrift,
+    starsDepositDrift,
+    maxDrift,
+    checkedAt: new Date().toISOString()
+  };
+}
+
+async function runReconciliationCheck(reason = "manual") {
+  const dashboard = await adminDashboardView();
+  const reconciliation = dashboard.audit.reconciliation;
+  if (!reconciliation || reconciliation.ok) {
+    if (lastReconciliationAlertKey && reconciliation?.ok) lastReconciliationAlertKey = "";
+    return reconciliation;
+  }
+
+  const alertKey = [
+    reconciliation.walletLedgerDrift,
+    reconciliation.starsDepositDrift
+  ].join(":");
+  if (alertKey === lastReconciliationAlertKey) return reconciliation;
+  lastReconciliationAlertKey = alertKey;
+
+  notifyAdmin("reconciliation_alert", "Ошибка сверки балансов", {
+    lines: [
+      `Причина проверки: ${reason}`,
+      `Wallet/Ledger drift: ${formatNumber(reconciliation.walletLedgerDrift)} chips`,
+      `Stars paid/Ledger drift: ${formatNumber(reconciliation.starsDepositDrift)} chips`,
+      `Wallet total: ${formatNumber(dashboard.stats.walletTotal)} chips`,
+      `Ledger net: ${formatNumber(dashboard.stats.ledgerNetTotal)} chips`,
+      `Paid Stars chips: ${formatNumber(dashboard.stats.paidStarsChipsTotal)} chips`,
+      `Ledger deposit_stars: ${formatNumber(dashboard.stats.depositStarsLedgerTotal)} chips`
+    ]
+  });
+  return reconciliation;
 }
 
 function recentFundMovements(limit = 20) {
@@ -748,6 +857,17 @@ async function persistCompletedHands(table) {
 
     try {
       await dbRecordHandHistory(table, hand);
+      if (Number(hand.rake || 0) > 0) {
+        await dbRecordPlatformLedgerEntry({
+          type: "credit",
+          category: "rake_cash",
+          title: "Cash game rake",
+          amount: hand.rake,
+          contextId: hand.id,
+          meta: `${table.name} · ${table.smallBlind}/${table.bigBlind} · hand #${hand.handNumber}`,
+          idempotencyKey: `rake:${hand.id}`
+        });
+      }
     } catch (error) {
       console.error("Hand history persist failed:", error.message);
     }
@@ -1202,7 +1322,7 @@ async function getSavedStack(user) {
   return savedStacks.get(user.id) || DEFAULT_STACK;
 }
 
-async function prepareInitialStack(user, body = {}) {
+async function prepareInitialStack(user, body = {}, idempotencyKey = "") {
   const requested = Number(body.buyInAmount || 0);
   if (!requested) {
     user.stack = await getSavedStack(user);
@@ -1226,7 +1346,8 @@ async function prepareInitialStack(user, body = {}) {
     category: "table_buyin",
     title: "Бай-ин за стол",
     amount,
-    meta: "Texas NL"
+    meta: "Texas NL",
+    idempotencyKey
   });
   await recordFundMovement(user, {
     category: "wallet_to_table",
@@ -1571,18 +1692,30 @@ async function processSuccessfulStarPayment(payment) {
   if (!order || order.status === "paid") return;
   if (payment.currency !== "XTR" || Number(payment.total_amount) !== Number(order.stars)) return;
 
-  const balance = await recordTransaction({ id: order.userId }, {
-    type: "credit",
-    category: "deposit_stars",
-    title: "Пополнение Stars",
-    amount: order.chips,
-    meta: `${order.stars} Stars · QWZ chips`
-  });
+  const completed = await dbCompletePaymentOrder(order.id, payment);
+  let balance = completed?.balance;
+  if (completed) {
+    if (completed.alreadyPaid || completed.ignored) return;
+  } else {
+    const paymentKey = `payment:${order.id}`;
+    if (idempotencyResults.has(paymentKey)) return;
+    balance = await recordTransaction({ id: order.userId }, {
+      type: "credit",
+      category: "deposit_stars",
+      title: "Пополнение Stars",
+      amount: order.chips,
+      meta: `${order.stars} Stars · QWZ chips`,
+      idempotencyKey: paymentKey
+    });
+    idempotencyResults.set(paymentKey, { balance });
+    await dbMarkPaymentOrderPaid(order.id, payment);
+  }
+
   order.status = "paid";
   order.paidAt = new Date().toISOString();
   order.telegramPaymentChargeId = payment.telegram_payment_charge_id || "";
   starOrders.set(order.id, order);
-  await dbMarkPaymentOrderPaid(order.id, payment);
+  setWalletBalanceLocal(order.userId, balance);
   notifyAdmin("stars_paid", "Оплачено Stars-пополнение", {
     user: { id: order.userId, name: order.userName, username: order.username },
     lines: [
@@ -1725,6 +1858,104 @@ async function readJson(req) {
 function sendJson(res, status, payload) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
+}
+
+async function sendIdempotentJson(req, res, user, scope, handler) {
+  const rawKey = requestIdempotencyKey(req);
+  const key = rawKey ? normalizeIdempotencyKey({
+    scope,
+    actorId: user?.id || "anonymous",
+    targetId: "",
+    requestId: rawKey
+  }) : "";
+
+  if (!key) {
+    const result = await handler("");
+    const normalized = normalizeRouteResult(result);
+    sendJson(res, normalized.status, normalized.body);
+    return;
+  }
+
+  const cached = await getApiIdempotencyResult(key);
+  if (cached) {
+    sendJson(res, Number(cached.status || 200), cached.body || {});
+    return;
+  }
+
+  if (pendingIdempotencyResults.has(key)) {
+    const replay = await pendingIdempotencyResults.get(key);
+    sendJson(res, replay.status, replay.body);
+    return;
+  }
+
+  const promise = (async () => {
+    const result = normalizeRouteResult(await handler(key));
+    await saveApiIdempotencyResult({
+      key,
+      scope,
+      userId: user?.id || "",
+      status: result.status,
+      body: result.body
+    });
+    return result;
+  })();
+
+  pendingIdempotencyResults.set(key, promise);
+  try {
+    const result = await promise;
+    sendJson(res, result.status, result.body);
+  } finally {
+    pendingIdempotencyResults.delete(key);
+  }
+}
+
+function requestIdempotencyKey(req) {
+  const value = req.headers["x-idempotency-key"];
+  if (Array.isArray(value)) return value[0] || "";
+  return value || "";
+}
+
+async function getApiIdempotencyResult(key) {
+  const dbResult = await dbGetIdempotencyResult(key);
+  if (dbResult) return dbResult;
+  const memoryResult = apiIdempotencyResults.get(key);
+  if (!memoryResult) return null;
+  if (memoryResult.expiresAt <= Date.now()) {
+    apiIdempotencyResults.delete(key);
+    return null;
+  }
+  return memoryResult;
+}
+
+async function saveApiIdempotencyResult(record) {
+  await dbSaveIdempotencyResult(record);
+  apiIdempotencyResults.set(record.key, {
+    status: record.status,
+    body: record.body,
+    createdAt: new Date().toISOString(),
+    expiresAt: Date.now() + 24 * 60 * 60 * 1000
+  });
+  if (apiIdempotencyResults.size > 1000) {
+    const expiredAt = Date.now();
+    for (const [key, value] of apiIdempotencyResults.entries()) {
+      if (value.expiresAt <= expiredAt || apiIdempotencyResults.size > 800) {
+        apiIdempotencyResults.delete(key);
+      }
+    }
+  }
+}
+
+function normalizeRouteResult(result) {
+  if (result && typeof result === "object" && "body" in result) {
+    return {
+      status: Number(result.status || 200),
+      body: result.body || {}
+    };
+  }
+  return {
+    status: 200,
+    body: result || {}
+  };
 }
 
 function randomId(prefix) {

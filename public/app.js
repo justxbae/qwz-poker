@@ -565,6 +565,7 @@ async function payCashierAmount() {
     const quote = cashierQuote();
     const data = await api("/api/cashier/stars-invoice", {
       method: "POST",
+      idempotencyKey: requestKey("stars-invoice"),
       body: { rubAmount: quote.rubAmount }
     });
     await openStarsInvoice(data.invoiceLink);
@@ -696,6 +697,10 @@ function renderAdminDashboard(admin) {
     ["Рейк history", formatChips(stats.handHistoryRakeTotal || 0)],
     ["Ledger +", formatChips(stats.ledgerCreditTotal || 0)],
     ["Ledger -", formatChips(stats.ledgerDebitTotal || 0)],
+    ["Platform ledger", formatChips(stats.platformLedgerNetTotal || 0)],
+    ["Wallet drift", formatChips(admin?.audit?.reconciliation?.walletLedgerDrift || 0)],
+    ["Stars drift", formatChips(admin?.audit?.reconciliation?.starsDepositDrift || 0)],
+    ["Idempotency", stats.idempotencyKeyCount || 0],
     ["Stars paid", stats.paidStars || 0],
     ["Stars pending", stats.pendingStars || 0]
   ].map(([label, value]) => {
@@ -1022,7 +1027,10 @@ async function onTournamentAction(event) {
   const id = button.dataset.tournamentId;
   const action = button.dataset.tournamentAction;
   const endpoint = action === "cancel" ? "cancel" : "register";
-  const data = await api(`/api/tournaments/${id}/${endpoint}`, { method: "POST" });
+  const data = await api(`/api/tournaments/${id}/${endpoint}`, {
+    method: "POST",
+    idempotencyKey: requestKey(`tournament-${endpoint}-${id}`)
+  });
   state.tournaments = data.tournaments || [];
   if (data.profile) {
     state.user.balance = data.profile.balance;
@@ -1126,6 +1134,7 @@ async function joinTable(tableId, buyInAmount = 0) {
   await runAction(async () => {
     const data = await api(`/api/tables/${tableId}/join`, {
       method: "POST",
+      idempotencyKey: requestKey(`table-join-${tableId}`),
       body: { buyInAmount }
     });
     state.currentTableId = data.table.id;
@@ -1215,6 +1224,7 @@ async function confirmBuyIn() {
   if (intent.mode === "create") {
     const data = await api("/api/tables", {
       method: "POST",
+      idempotencyKey: requestKey("table-create"),
       body: { ...intent.body, buyInAmount }
     });
     state.currentTableId = data.table.id;
@@ -1238,6 +1248,7 @@ async function confirmBuyIn() {
   if (intent.mode === "rebuy") {
     const data = await api(`/api/tables/${intent.tableId}/rebuy`, {
       method: "POST",
+      idempotencyKey: requestKey(`table-rebuy-${intent.tableId}`),
       body: { amount: buyInAmount }
     });
     closeMenu();
@@ -2355,6 +2366,9 @@ async function api(path, options = {}) {
   if (options.auth !== false && state.token) {
     headers.authorization = `Bearer ${state.token}`;
   }
+  if (options.idempotencyKey) {
+    headers["x-idempotency-key"] = options.idempotencyKey;
+  }
 
   const response = await fetch(path, {
     method: options.method || "GET",
@@ -2365,4 +2379,9 @@ async function api(path, options = {}) {
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "Request failed");
   return data;
+}
+
+function requestKey(prefix) {
+  if (window.crypto?.randomUUID) return `${prefix}:${window.crypto.randomUUID()}`;
+  return `${prefix}:${Date.now()}:${Math.random().toString(16).slice(2)}`;
 }

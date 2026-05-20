@@ -104,6 +104,22 @@ export async function addWalletEntry(providerUserId, entry, provider = "telegram
   if (!pool) return null;
   const appUserId = await ensureIdentity(provider, providerUserId);
   const amount = Math.max(0, Math.round(Number(entry.amount) || 0));
+  const idempotencyKey = normalizeIdempotencyKey(entry.idempotencyKey);
+  if (idempotencyKey) {
+    const existing = await query(`
+      select balance_after
+      from ledger_entries
+      where idempotency_key = $1
+      limit 1
+    `, [idempotencyKey]);
+    if (existing.rowCount) {
+      return {
+        balance: Number(existing.rows[0].balance_after || 0),
+        before: Number(existing.rows[0].balance_after || 0),
+        idempotentReplay: true
+      };
+    }
+  }
   const sign = entry.type === "debit" ? -1 : 1;
   const delta = sign * amount;
   const client = await pool.connect();
@@ -132,9 +148,9 @@ export async function addWalletEntry(providerUserId, entry, provider = "telegram
     );
     await client.query(`
       insert into ledger_entries (
-        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after
+        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after, idempotency_key
       )
-      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     `, [
       entry.id || id("ledger"),
       appUserId,
@@ -145,7 +161,8 @@ export async function addWalletEntry(providerUserId, entry, provider = "telegram
       entry.title,
       amount,
       entry.meta || "",
-      after
+      after,
+      idempotencyKey || null
     ]);
     await client.query("commit");
     return { balance: after, before };
@@ -239,6 +256,35 @@ export async function recordHandHistory(table, hand) {
     Number(hand.at || Date.now())
   ]);
   return true;
+}
+
+export async function recordPlatformLedgerEntry(entry) {
+  if (!pool) return null;
+  const amount = Math.max(0, Math.round(Number(entry.amount) || 0));
+  if (amount <= 0) return null;
+  const idempotencyKey = normalizeIdempotencyKey(entry.idempotencyKey);
+  if (idempotencyKey) {
+    const existing = await query("select id from platform_ledger_entries where idempotency_key = $1 limit 1", [idempotencyKey]);
+    if (existing.rowCount) return { id: existing.rows[0].id, idempotentReplay: true };
+  }
+  const result = await query(`
+    insert into platform_ledger_entries (
+      id, type, category, title, amount, context_id, meta, idempotency_key
+    )
+    values ($1, $2, $3, $4, $5, $6, $7, $8)
+    on conflict do nothing
+    returning id
+  `, [
+    entry.id || id("platform"),
+    entry.type === "debit" ? "debit" : "credit",
+    normalizeLedgerCategory(entry.category),
+    entry.title || "Platform ledger entry",
+    amount,
+    entry.contextId || "",
+    entry.meta || "",
+    idempotencyKey || null
+  ]);
+  return { id: result.rows[0]?.id || null };
 }
 
 export async function listHandHistories(limit = 20) {
@@ -542,6 +588,94 @@ export async function markPaymentOrderPaid(orderId, payment) {
   return getPaymentOrder(orderId);
 }
 
+export async function completePaymentOrder(orderId, payment) {
+  if (!pool) return null;
+  const client = await pool.connect();
+
+  try {
+    await client.query("begin");
+    const currentOrder = await client.query(`
+      select po.*, au.display_name as "userName", au.username
+      from payment_orders po
+      left join app_users au on au.id = po.app_user_id
+      where po.id = $1
+      for update
+    `, [orderId]);
+    if (!currentOrder.rowCount) {
+      await client.query("commit");
+      return null;
+    }
+
+    const order = paymentRow(currentOrder.rows[0]);
+    if (order.status === "paid") {
+      const wallet = await client.query("select balance from wallets where app_user_id = $1", [currentOrder.rows[0].app_user_id]);
+      await client.query("commit");
+      return { order, balance: Number(wallet.rows[0]?.balance || 0), alreadyPaid: true };
+    }
+    if (order.status !== "pending") {
+      await client.query("commit");
+      return { order, balance: null, ignored: true };
+    }
+
+    const appUserId = currentOrder.rows[0].app_user_id;
+    await client.query("insert into wallets (app_user_id, balance) values ($1, 0) on conflict do nothing", [appUserId]);
+    const wallet = await client.query("select balance from wallets where app_user_id = $1 for update", [appUserId]);
+    const before = Number(wallet.rows[0]?.balance || 0);
+    const amount = Math.max(0, Math.round(Number(order.chips) || 0));
+    const after = before + amount;
+    const method = normalizeLedgerCategory(order.method || "stars");
+    const ledgerKey = `payment:${order.id}`;
+
+    await client.query("update wallets set balance = $2, updated_at = now() where app_user_id = $1", [appUserId, after]);
+    await client.query(`
+      insert into ledger_entries (
+        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after, idempotency_key
+      )
+      values ($1, $2, $3, $4, 'credit', $5, $6, $7, $8, $9, $10)
+      on conflict do nothing
+    `, [
+      id("ledger"),
+      appUserId,
+      order.provider || "telegram",
+      String(order.userId),
+      `deposit_${method}`,
+      method === "stars" ? "Пополнение Stars" : "Пополнение баланса",
+      amount,
+      `${order.stars || 0} Stars · order ${order.id}`,
+      after,
+      ledgerKey
+    ]);
+    await client.query(`
+      update payment_orders
+      set status = 'paid',
+          paid_at = now(),
+          telegram_payment_charge_id = $2,
+          raw = coalesce(raw, '{}'::jsonb) || $3::jsonb
+      where id = $1
+    `, [
+      order.id,
+      payment.telegram_payment_charge_id || "",
+      JSON.stringify({ successfulPayment: payment })
+    ]);
+    await client.query("commit");
+    return {
+      order: {
+        ...order,
+        status: "paid",
+        paidAt: new Date().toISOString(),
+        telegramPaymentChargeId: payment.telegram_payment_charge_id || ""
+      },
+      balance: after,
+      alreadyPaid: false
+    };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function listPaymentOrders(limit = 10) {
   if (!pool) return null;
   const result = await query(`
@@ -552,6 +686,46 @@ export async function listPaymentOrders(limit = 10) {
     limit $1
   `, [limit]);
   return result.rows.map(paymentRow);
+}
+
+export async function getIdempotencyResult(key) {
+  if (!pool) return null;
+  const normalized = normalizeIdempotencyKey(key);
+  if (!normalized) return null;
+  const result = await query(`
+    select response_status as "status", response_body as "body", created_at as "createdAt"
+    from idempotency_keys
+    where key = $1 and expires_at > now()
+  `, [normalized]);
+  return result.rowCount ? result.rows[0] : null;
+}
+
+export async function saveIdempotencyResult(record) {
+  if (!pool) return null;
+  const key = normalizeIdempotencyKey(record.key);
+  if (!key) return null;
+  const appUserId = record.userId ? await ensureIdentity(record.provider || "telegram", record.userId) : null;
+  await query(`
+    insert into idempotency_keys (
+      key, scope, app_user_id, provider, provider_user_id, request_hash, response_status, response_body, expires_at
+    )
+    values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, now() + ($9::text)::interval)
+    on conflict (key) do update
+    set response_status = excluded.response_status,
+        response_body = excluded.response_body,
+        expires_at = excluded.expires_at
+  `, [
+    key,
+    normalizeLedgerCategory(record.scope || "api"),
+    appUserId,
+    record.provider || "telegram",
+    record.userId ? String(record.userId) : "",
+    record.requestHash || "",
+    Number(record.status || 200),
+    JSON.stringify(record.body || {}),
+    record.ttl || "24 hours"
+  ]);
+  return true;
 }
 
 export async function recordAdminEvent(event) {
@@ -603,10 +777,15 @@ export async function dashboardStats() {
       (select coalesce(sum(stack), 0)::bigint from saved_stacks) as saved_stack_total,
       (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'credit') as ledger_credit_total,
       (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'debit') as ledger_debit_total,
+      (select coalesce(sum(amount), 0)::bigint from platform_ledger_entries where type = 'credit') as platform_ledger_credit_total,
+      (select coalesce(sum(amount), 0)::bigint from platform_ledger_entries where type = 'debit') as platform_ledger_debit_total,
       (select count(*)::int from hand_histories) as hand_history_count,
       (select coalesce(sum(rake), 0)::bigint from hand_histories) as hand_history_rake_total,
       (select count(*)::int from payment_orders where status = 'paid') as paid_stars,
       (select count(*)::int from payment_orders where status = 'pending') as pending_stars,
+      (select coalesce(sum(chips), 0)::bigint from payment_orders where status = 'paid' and method = 'stars') as paid_stars_chips_total,
+      (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'credit' and category = 'deposit_stars') as deposit_stars_ledger_total,
+      (select count(*)::int from idempotency_keys where expires_at > now()) as idempotency_key_count,
       (select count(*)::int from active_table_snapshots) as active_table_snapshot_count
   `);
   return {
@@ -615,10 +794,15 @@ export async function dashboardStats() {
     savedStackTotal: Number(result.rows[0].saved_stack_total || 0),
     ledgerCreditTotal: Number(result.rows[0].ledger_credit_total || 0),
     ledgerDebitTotal: Number(result.rows[0].ledger_debit_total || 0),
+    platformLedgerCreditTotal: Number(result.rows[0].platform_ledger_credit_total || 0),
+    platformLedgerDebitTotal: Number(result.rows[0].platform_ledger_debit_total || 0),
     handHistoryCount: Number(result.rows[0].hand_history_count || 0),
     handHistoryRakeTotal: Number(result.rows[0].hand_history_rake_total || 0),
     paidStars: Number(result.rows[0].paid_stars || 0),
     pendingStars: Number(result.rows[0].pending_stars || 0),
+    paidStarsChipsTotal: Number(result.rows[0].paid_stars_chips_total || 0),
+    depositStarsLedgerTotal: Number(result.rows[0].deposit_stars_ledger_total || 0),
+    idempotencyKeyCount: Number(result.rows[0].idempotency_key_count || 0),
     activeTableSnapshotCount: Number(result.rows[0].active_table_snapshot_count || 0)
   };
 }
@@ -699,12 +883,17 @@ async function migrate() {
       amount bigint not null check (amount >= 0),
       meta text not null default '',
       balance_after bigint,
+      idempotency_key text,
+      reversal_of text references ledger_entries(id) on delete set null,
       created_at timestamptz not null default now()
     );
 
     create index if not exists idx_ledger_entries_app_user_created on ledger_entries(app_user_id, created_at desc);
     alter table ledger_entries add column if not exists category text not null default 'other';
+    alter table ledger_entries add column if not exists idempotency_key text;
+    alter table ledger_entries add column if not exists reversal_of text references ledger_entries(id) on delete set null;
     create index if not exists idx_ledger_entries_category_created on ledger_entries(category, created_at desc);
+    create unique index if not exists idx_ledger_entries_idempotency_key on ledger_entries(idempotency_key) where idempotency_key is not null;
 
     create table if not exists fund_movements (
       id text primary key,
@@ -758,6 +947,23 @@ async function migrate() {
     create index if not exists idx_hand_histories_finished on hand_histories(finished_at desc);
     create index if not exists idx_hand_histories_table_hand on hand_histories(table_id, hand_number desc);
 
+    create table if not exists platform_ledger_entries (
+      id text primary key,
+      type text not null check (type in ('credit', 'debit')),
+      category text not null,
+      title text not null,
+      amount bigint not null check (amount >= 0),
+      context_id text not null default '',
+      meta text not null default '',
+      idempotency_key text,
+      reversal_of text references platform_ledger_entries(id) on delete set null,
+      created_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_platform_ledger_entries_category_created on platform_ledger_entries(category, created_at desc);
+    create index if not exists idx_platform_ledger_entries_context on platform_ledger_entries(context_id);
+    create unique index if not exists idx_platform_ledger_entries_idempotency_key on platform_ledger_entries(idempotency_key) where idempotency_key is not null;
+
     create table if not exists payment_orders (
       id text primary key,
       app_user_id text not null references app_users(id) on delete cascade,
@@ -777,6 +983,22 @@ async function migrate() {
 
     create index if not exists idx_payment_orders_app_user_created on payment_orders(app_user_id, created_at desc);
     create index if not exists idx_payment_orders_status_created on payment_orders(status, created_at desc);
+
+    create table if not exists idempotency_keys (
+      key text primary key,
+      scope text not null,
+      app_user_id text references app_users(id) on delete set null,
+      provider text not null default 'telegram',
+      provider_user_id text not null default '',
+      request_hash text not null default '',
+      response_status integer not null default 200,
+      response_body jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now(),
+      expires_at timestamptz not null
+    );
+
+    create index if not exists idx_idempotency_keys_expires on idempotency_keys(expires_at);
+    create index if not exists idx_idempotency_keys_user_created on idempotency_keys(provider, provider_user_id, created_at desc);
 
     create table if not exists active_table_snapshots (
       id text primary key,
@@ -819,6 +1041,8 @@ function paymentRow(row) {
   return {
     id: row.id,
     userId: row.provider_user_id,
+    provider: row.provider || "telegram",
+    method: row.method || "stars",
     userName: row.userName || row.display_name || "",
     username: row.username || "",
     rubAmount: Number(row.rub_amount || 0),
@@ -838,6 +1062,10 @@ function query(sql, params = []) {
 
 function normalizeLedgerCategory(category) {
   return String(category || "other").trim().toLowerCase().replace(/[^a-z0-9_:-]/g, "_").slice(0, 64) || "other";
+}
+
+function normalizeIdempotencyKey(key) {
+  return String(key || "").trim().replace(/\s+/g, "_").slice(0, 240);
 }
 
 function id(prefix) {

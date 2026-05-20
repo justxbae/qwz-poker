@@ -315,6 +315,55 @@ test("cashier returns deposit settings and records wallet operations", async () 
   }
 });
 
+test("idempotency key prevents duplicated wallet money operations", async () => {
+  const server = await startServer({ ADMIN_USER_IDS: "dev-user" });
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+
+    let cashier = (await request("/api/cashier/demo-topup", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "same-demo-topup",
+      body: { rubAmount: 100 }
+    })).cashier;
+    assert.equal(cashier.balance, 5000);
+
+    cashier = (await request("/api/cashier/demo-topup", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "same-demo-topup",
+      body: { rubAmount: 100 }
+    })).cashier;
+    assert.equal(cashier.balance, 5000);
+    assert.equal(cashier.transactions.filter((entry) => entry.category === "deposit_demo").length, 1);
+
+    const firstTable = (await request("/api/tables", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "same-table-create",
+      body: { name: "Idem", maxPlayers: 2, smallBlind: 25, buyInAmount: 2500 }
+    })).table;
+
+    const replayTable = (await request("/api/tables", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "same-table-create",
+      body: { name: "Idem", maxPlayers: 2, smallBlind: 25, buyInAmount: 2500 }
+    })).table;
+
+    assert.equal(replayTable.id, firstTable.id);
+    cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.balance, 2500);
+    assert.equal(cashier.transactions.filter((entry) => entry.category === "table_buyin").length, 1);
+
+    const dashboard = (await request("/api/admin", { token: auth.token })).admin;
+    assert.equal(dashboard.audit.reconciliation.walletLedgerDrift, 0);
+    assert.equal(dashboard.audit.reconciliation.starsDepositDrift, 0);
+  } finally {
+    server.kill();
+  }
+});
+
 test("admin telegram commands grant and deduct wallet chips", async () => {
   const server = await startServer({ ADMIN_USER_IDS: "777" });
   try {
@@ -561,7 +610,9 @@ async function request(path, options = {}) {
     method: options.method || "GET",
     headers: {
       "content-type": "application/json",
-      ...(options.token ? { authorization: `Bearer ${options.token}` } : {})
+      ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
+      ...(options.idempotencyKey ? { "x-idempotency-key": options.idempotencyKey } : {}),
+      ...(options.headers || {})
     },
     body: options.body ? JSON.stringify(options.body) : undefined
   });
