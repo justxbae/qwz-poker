@@ -260,6 +260,58 @@ export async function listHandHistories(limit = 20) {
   }));
 }
 
+export async function upsertActiveTableSnapshot(table) {
+  if (!pool) return null;
+  await query(`
+    insert into active_table_snapshots (
+      id, table_name, is_private, is_system, small_blind, big_blind,
+      status, hand_number, raw, updated_at
+    )
+    values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, now())
+    on conflict (id) do update
+    set table_name = excluded.table_name,
+        is_private = excluded.is_private,
+        is_system = excluded.is_system,
+        small_blind = excluded.small_blind,
+        big_blind = excluded.big_blind,
+        status = excluded.status,
+        hand_number = excluded.hand_number,
+        raw = excluded.raw,
+        updated_at = now()
+  `, [
+    table.id,
+    table.name || "",
+    Boolean(table.isPrivate),
+    Boolean(table.isSystem),
+    Number(table.smallBlind || 0),
+    Number(table.bigBlind || 0),
+    table.status || "waiting",
+    Number(table.handNumber || 0),
+    JSON.stringify(table)
+  ]);
+  return true;
+}
+
+export async function deleteActiveTableSnapshot(tableId) {
+  if (!pool) return null;
+  await query("delete from active_table_snapshots where id = $1", [tableId]);
+  return true;
+}
+
+export async function listActiveTableSnapshots() {
+  if (!pool) return null;
+  const result = await query(`
+    select id, raw, updated_at as "updatedAt"
+    from active_table_snapshots
+    order by is_system desc, small_blind asc, table_name asc
+  `);
+  return result.rows.map((row) => ({
+    id: row.id,
+    raw: row.raw,
+    updatedAt: row.updatedAt
+  }));
+}
+
 export async function listTournamentRegistrations(tournamentIds = []) {
   if (!pool) return null;
   if (!tournamentIds.length) return [];
@@ -554,7 +606,8 @@ export async function dashboardStats() {
       (select count(*)::int from hand_histories) as hand_history_count,
       (select coalesce(sum(rake), 0)::bigint from hand_histories) as hand_history_rake_total,
       (select count(*)::int from payment_orders where status = 'paid') as paid_stars,
-      (select count(*)::int from payment_orders where status = 'pending') as pending_stars
+      (select count(*)::int from payment_orders where status = 'pending') as pending_stars,
+      (select count(*)::int from active_table_snapshots) as active_table_snapshot_count
   `);
   return {
     players: Number(result.rows[0].players || 0),
@@ -565,7 +618,8 @@ export async function dashboardStats() {
     handHistoryCount: Number(result.rows[0].hand_history_count || 0),
     handHistoryRakeTotal: Number(result.rows[0].hand_history_rake_total || 0),
     paidStars: Number(result.rows[0].paid_stars || 0),
-    pendingStars: Number(result.rows[0].pending_stars || 0)
+    pendingStars: Number(result.rows[0].pending_stars || 0),
+    activeTableSnapshotCount: Number(result.rows[0].active_table_snapshot_count || 0)
   };
 }
 
@@ -723,6 +777,22 @@ async function migrate() {
 
     create index if not exists idx_payment_orders_app_user_created on payment_orders(app_user_id, created_at desc);
     create index if not exists idx_payment_orders_status_created on payment_orders(status, created_at desc);
+
+    create table if not exists active_table_snapshots (
+      id text primary key,
+      table_name text not null default '',
+      is_private boolean not null default false,
+      is_system boolean not null default false,
+      small_blind integer not null default 0,
+      big_blind integer not null default 0,
+      status text not null default 'waiting',
+      hand_number integer not null default 0,
+      raw jsonb not null default '{}'::jsonb,
+      updated_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_active_table_snapshots_updated on active_table_snapshots(updated_at desc);
+    create index if not exists idx_active_table_snapshots_status on active_table_snapshots(status, updated_at desc);
 
     create table if not exists admin_events (
       id text primary key,

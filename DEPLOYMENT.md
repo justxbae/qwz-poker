@@ -15,7 +15,8 @@ Steps:
 3. Render will read `render.yaml` and start the app with `node server/index.js`.
 4. Add the secret environment variable:
    - `BOT_TOKEN`
-   - `DATABASE_URL`
+   - `DATABASE_URL` (strongly recommended before public testing)
+   - `TELEGRAM_WEBHOOK_SECRET` (if setWebhook uses `secret_token`)
 5. Deploy.
 
 After deploy, copy the public Render URL, for example:
@@ -96,4 +97,4 @@ You can also open the Mini App with `?admin=1` to show the hidden admin tab. The
 
 ## Important
 
-The current MVP stores wallets, tables, and transactions in memory. A server restart will reset runtime state. Before a real launch, move this data to a database.
+With `DATABASE_URL`, wallets, ledger, payments, saved stacks, tournaments, hand histories, and active table snapshots are persisted in PostgreSQL. Without `DATABASE_URL`, the app still deploys in memory mode for emergency/demo use, but balances and runtime state can reset after a server restart. Do not run public paid traffic without PostgreSQL connected.

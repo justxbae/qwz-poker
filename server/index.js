@@ -12,10 +12,12 @@ import {
   dashboardStats as dbDashboardStats,
   databaseHealth as dbDatabaseHealth,
   databaseEnabled,
+  deleteActiveTableSnapshot as dbDeleteActiveTableSnapshot,
   getPaymentOrder as dbGetPaymentOrder,
   getSavedStack as dbGetSavedStack,
   getWallet as dbGetWallet,
   initDatabase,
+  listActiveTableSnapshots as dbListActiveTableSnapshots,
   listAdminEvents as dbListAdminEvents,
   listLedger as dbListLedger,
   listTournamentRegistrations as dbListTournamentRegistrations,
@@ -29,9 +31,14 @@ import {
   cancelTournamentRegistration as dbCancelTournamentRegistration,
   setSavedStack as dbSetSavedStack,
   setWallet as dbSetWallet,
+  upsertActiveTableSnapshot as dbUpsertActiveTableSnapshot,
   upsertTelegramUser
 } from "./db.js";
 import {
+  ACTION_TIMEOUT_MS,
+  NEXT_HAND_DELAY_MS,
+  RUNOUT_CARD_DELAY_MS,
+  START_INTRO_MS,
   act,
   addBuyIn,
   autoAct,
@@ -106,6 +113,7 @@ const server = createServer(async (req, res) => {
 });
 
 await initDatabase();
+await hydrateActiveTables();
 await hydrateTournamentRegistrations();
 
 server.listen(PORT, HOST, () => {
@@ -128,6 +136,14 @@ setInterval(async () => {
     console.error("Table tick failed:", error);
   }
 }, 1000);
+
+setInterval(async () => {
+  try {
+    await persistActiveTableSnapshots();
+  } catch (error) {
+    console.error("Active table snapshot flush failed:", error);
+  }
+}, 5000);
 
 async function handleApi(req, res, url) {
   if (req.method === "GET" && url.pathname === "/api/health") {
@@ -311,6 +327,7 @@ async function handleApi(req, res, url) {
     await prepareInitialStack(user, body);
     const table = createTable(user, body);
     tables.set(table.id, table);
+    await persistActiveTableSnapshot(table);
     notifyAdmin("table_create", "Создан приватный стол", {
       user,
       lines: [
@@ -345,6 +362,7 @@ async function handleApi(req, res, url) {
       }
       joinTable(table, user);
       maybeStartHand(table);
+      await persistActiveTableSnapshot(table);
       if (!wasSeated) {
         notifyAdmin("table_join", "Игрок сел за стол", {
           user,
@@ -364,7 +382,12 @@ async function handleApi(req, res, url) {
       const result = leaveTable(table, user);
       await persistCompletedHands(table);
       await saveStack(user, result.stack);
-      if (result.tableEmpty && table.isPrivate) tables.delete(table.id);
+      if (result.tableEmpty && table.isPrivate) {
+        tables.delete(table.id);
+        await deleteActiveTableSnapshot(table.id);
+      } else {
+        await persistActiveTableSnapshot(table);
+      }
       notifyAdmin("table_leave", "Игрок вышел из стола", {
         user,
         lines: [
@@ -381,7 +404,12 @@ async function handleApi(req, res, url) {
       const result = leaveTable(table, user);
       await persistCompletedHands(table);
       await saveStack(user, result.stack);
-      if (result.tableEmpty && table.isPrivate) tables.delete(table.id);
+      if (result.tableEmpty && table.isPrivate) {
+        tables.delete(table.id);
+        await deleteActiveTableSnapshot(table.id);
+      } else {
+        await persistActiveTableSnapshot(table);
+      }
       notifyAdmin("table_stand", "Игрок встал из-за стола", {
         user,
         lines: [
@@ -396,12 +424,14 @@ async function handleApi(req, res, url) {
 
     if (req.method === "POST" && action === "sit-out") {
       sitOut(table, user);
+      await persistActiveTableSnapshot(table);
       sendJson(res, 200, { table: tableView(table, user), balance: user.balance });
       return;
     }
 
     if (req.method === "POST" && action === "sit-in") {
       sitIn(table, user);
+      await persistActiveTableSnapshot(table);
       sendJson(res, 200, { table: tableView(table, user), balance: user.balance });
       return;
     }
@@ -444,12 +474,14 @@ async function handleApi(req, res, url) {
         });
       }
       maybeStartHand(table);
+      await persistActiveTableSnapshot(table);
       sendJson(res, 200, { table: tableView(table, user), balance: user.balance });
       return;
     }
 
     if (req.method === "POST" && action === "start-hand") {
       startHand(table, user);
+      await persistActiveTableSnapshot(table);
       sendJson(res, 200, { table: tableView(table, user) });
       return;
     }
@@ -458,6 +490,7 @@ async function handleApi(req, res, url) {
       const body = await readJson(req);
       act(table, user, body);
       await persistCompletedHands(table);
+      await persistActiveTableSnapshot(table);
       sendJson(res, 200, { table: tableView(table, user) });
       return;
     }
@@ -466,6 +499,7 @@ async function handleApi(req, res, url) {
       const testUser = createTestUser(table.seats.length + 1);
       joinTable(table, testUser);
       maybeStartHand(table);
+      await persistActiveTableSnapshot(table);
       sendJson(res, 200, { table: tableView(table, user) });
       return;
     }
@@ -473,6 +507,7 @@ async function handleApi(req, res, url) {
     if (req.method === "POST" && action === "auto-act") {
       autoAct(table, user);
       await persistCompletedHands(table);
+      await persistActiveTableSnapshot(table);
       sendJson(res, 200, { table: tableView(table, user) });
       return;
     }
@@ -481,6 +516,7 @@ async function handleApi(req, res, url) {
       const body = await readJson(req);
       testBotAct(table, user, body);
       await persistCompletedHands(table);
+      await persistActiveTableSnapshot(table);
       sendJson(res, 200, { table: tableView(table, user) });
       return;
     }
@@ -561,6 +597,7 @@ async function adminDashboardView() {
       ledgerNetTotal: ledgerCreditTotal - ledgerDebitTotal,
       handHistoryCount: dbStats ? dbStats.handHistoryCount : memoryHandHistoryCount,
       handHistoryRakeTotal: dbStats ? dbStats.handHistoryRakeTotal : memoryHandHistoryRakeTotal,
+      activeTableSnapshotCount: dbStats ? dbStats.activeTableSnapshotCount : 0,
       bankrollTotal: playerFundsTotal,
       paidStars: dbStats ? dbStats.paidStars : paidStars.length,
       pendingStars: dbStats ? dbStats.pendingStars : pendingStars.length
@@ -714,6 +751,87 @@ async function persistCompletedHands(table) {
     } catch (error) {
       console.error("Hand history persist failed:", error.message);
     }
+  }
+}
+
+async function hydrateActiveTables() {
+  const snapshots = await dbListActiveTableSnapshots();
+  if (!snapshots || snapshots.length === 0) return;
+
+  tables.clear();
+  const now = Date.now();
+  for (const snapshot of snapshots) {
+    const table = normalizeHydratedTable(snapshot.raw, now);
+    if (!table?.id || !Array.isArray(table.seats)) continue;
+    tables.set(table.id, table);
+  }
+
+  if (tables.size === 0) {
+    seedPublicTables();
+    return;
+  }
+
+  console.log(`Restored ${tables.size} table snapshot${tables.size === 1 ? "" : "s"} from database`);
+}
+
+function normalizeHydratedTable(table, now = Date.now()) {
+  if (!table || typeof table !== "object") return null;
+
+  table.seats = Array.isArray(table.seats) ? table.seats : [];
+  table.communityCards = Array.isArray(table.communityCards) ? table.communityCards : [];
+  table.actionLog = Array.isArray(table.actionLog) ? table.actionLog : [];
+  table.handHistory = Array.isArray(table.handHistory) ? table.handHistory : [];
+  table.runoutQueue = Array.isArray(table.runoutQueue) ? table.runoutQueue : [];
+  table.deck = Array.isArray(table.deck) ? table.deck : [];
+  table.status = table.status || "waiting";
+  table.startIntroUntil = 0;
+  table.runoutNextAt = 0;
+  table.actionDeadline = 0;
+
+  if (table.status === "starting") {
+    table.startIntroUntil = now + START_INTRO_MS;
+  } else if (table.status === "showdown") {
+    table.handFinishedAt = now - NEXT_HAND_DELAY_MS;
+  } else if (table.status === "runout") {
+    table.runoutNextAt = now + RUNOUT_CARD_DELAY_MS;
+  } else if (table.activeSeatIndex >= 0) {
+    table.actionDeadline = now + ACTION_TIMEOUT_MS;
+  }
+
+  for (const seat of table.seats) {
+    seat.cards = Array.isArray(seat.cards) ? seat.cards : [];
+    seat.stack = Math.max(0, Math.round(Number(seat.stack) || 0));
+    seat.bet = Math.max(0, Math.round(Number(seat.bet) || 0));
+    seat.totalBet = Math.max(0, Math.round(Number(seat.totalBet) || 0));
+    seat.handStartStack = Math.max(0, Math.round(Number(seat.handStartStack) || seat.stack || 0));
+    seat.sittingOutUntil = Number(seat.sittingOutUntil || 0);
+  }
+
+  return table;
+}
+
+async function persistActiveTableSnapshots() {
+  if (!databaseEnabled()) return;
+
+  for (const table of tables.values()) {
+    await persistActiveTableSnapshot(table);
+  }
+}
+
+async function persistActiveTableSnapshot(table) {
+  if (!databaseEnabled()) return;
+  try {
+    await dbUpsertActiveTableSnapshot(table);
+  } catch (error) {
+    console.error("Active table snapshot persist failed:", error.message);
+  }
+}
+
+async function deleteActiveTableSnapshot(tableId) {
+  try {
+    await dbDeleteActiveTableSnapshot(tableId);
+  } catch (error) {
+    console.error("Active table snapshot delete failed:", error.message);
   }
 }
 
@@ -1633,7 +1751,7 @@ function validateEnvironment() {
     problems.push("BOT_TOKEN is required in production");
   }
   if (!process.env.DATABASE_URL) {
-    problems.push("DATABASE_URL is required in production (memory mode is dev only)");
+    console.warn("[warn] DATABASE_URL is empty — production will run in memory mode until PostgreSQL is configured.");
   }
   if (!TELEGRAM_WEBHOOK_SECRET) {
     console.warn("[warn] TELEGRAM_WEBHOOK_SECRET is empty — webhook endpoint is unprotected.");
