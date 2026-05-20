@@ -553,16 +553,26 @@ function formatTransactionMeta(transaction) {
 }
 
 async function payCashierAmount() {
-  if (cashierState.selectedMethod !== "stars") {
-    cashierStatus.textContent = "Этот способ оплаты скоро появится.";
-    return;
-  }
-
   if (cashierPayButton) cashierPayButton.disabled = true;
-  cashierStatus.textContent = "Открываем оплату Telegram Stars...";
+  cashierStatus.textContent = cashierState.selectedMethod === "stars"
+    ? "Открываем оплату Telegram Stars..."
+    : "Создаём crypto-счёт...";
 
   try {
     const quote = cashierQuote();
+    if (cashierState.selectedMethod !== "stars") {
+      const data = await api("/api/cashier/crypto-order", {
+        method: "POST",
+        idempotencyKey: requestKey(`crypto-order-${cashierState.selectedMethod}`),
+        body: {
+          method: cashierState.selectedMethod,
+          rubAmount: quote.rubAmount
+        }
+      });
+      renderCryptoPaymentInstructions(data.order);
+      return;
+    }
+
     const data = await api("/api/cashier/stars-invoice", {
       method: "POST",
       idempotencyKey: requestKey("stars-invoice"),
@@ -572,6 +582,22 @@ async function payCashierAmount() {
   } finally {
     if (cashierPayButton) cashierPayButton.disabled = false;
   }
+}
+
+function renderCryptoPaymentInstructions(order) {
+  if (!order) {
+    cashierStatus.textContent = "Не удалось создать crypto-счёт.";
+    return;
+  }
+
+  const address = order.receiverAddress ? `\nАдрес: ${order.receiverAddress}` : "";
+  const comment = order.payload ? `\nКомментарий: ${order.payload}` : "";
+  cashierStatus.textContent = [
+    `Счёт создан: ${order.cryptoAmount} ${order.asset} ${order.network}.`,
+    `Chips будут начислены только после подтверждения платежа.`,
+    address,
+    comment
+  ].join("").trim();
 }
 
 async function openStarsInvoice(invoiceLink) {

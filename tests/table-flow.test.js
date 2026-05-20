@@ -284,7 +284,17 @@ test("cashier returns deposit settings and records wallet operations", async () 
     assert.equal(cashier.deposit.chipsPerRub, 50);
     assert.equal(cashier.deposit.methods.find((method) => method.id === "stars").enabled, true);
     assert.equal(cashier.deposit.methods.find((method) => method.id === "ton").enabled, false);
+    assert.equal(cashier.deposit.methods.find((method) => method.id === "usdt_trc20").enabled, false);
     assert.equal(cashier.transactions.length, 0);
+
+    await assert.rejects(
+      request("/api/cashier/crypto-order", {
+        method: "POST",
+        token: auth.token,
+        body: { method: "ton", rubAmount: 100 }
+      }),
+      /crypto-метод еще не подключен/
+    );
 
     cashier = (await request("/api/cashier/demo-topup", {
       method: "POST",
@@ -359,6 +369,37 @@ test("idempotency key prevents duplicated wallet money operations", async () => 
     const dashboard = (await request("/api/admin", { token: auth.token })).admin;
     assert.equal(dashboard.audit.reconciliation.walletLedgerDrift, 0);
     assert.equal(dashboard.audit.reconciliation.starsDepositDrift, 0);
+  } finally {
+    server.kill();
+  }
+});
+
+test("crypto deposit order can be created but does not credit chips before confirmation", async () => {
+  const server = await startServer({
+    TON_PAYMENTS_ENABLED: "true",
+    TON_RECEIVER_ADDRESS: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+    TON_RUB_RATE: "250"
+  });
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    const cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.deposit.methods.find((method) => method.id === "ton").enabled, true);
+
+    const data = await request("/api/cashier/crypto-order", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "ton-order-once",
+      body: { method: "ton", rubAmount: 250 }
+    });
+
+    assert.equal(data.order.method, "ton");
+    assert.equal(data.order.asset, "TON");
+    assert.equal(data.order.cryptoAmount, 1);
+    assert.equal(data.order.chips, 12500);
+    assert.equal(data.order.tonConnect.comment, data.order.payload);
+
+    const after = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(after.balance, 0);
   } finally {
     server.kill();
   }

@@ -542,9 +542,9 @@ export async function createPaymentOrder(order, provider = "telegram") {
   await query(`
     insert into payment_orders (
       id, app_user_id, provider, provider_user_id, method, status,
-      rub_amount, chips, stars, payload, raw
+      rub_amount, chips, stars, asset, network, crypto_amount, external_id, payload, raw, expires_at
     )
-    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
   `, [
     order.id,
     appUserId,
@@ -555,9 +555,31 @@ export async function createPaymentOrder(order, provider = "telegram") {
     order.rubAmount || 0,
     order.chips || 0,
     order.stars || 0,
+    order.asset || "",
+    order.network || "",
+    order.cryptoAmount ?? null,
+    order.externalId || "",
     order.payload || "",
-    JSON.stringify(order)
+    JSON.stringify(order),
+    order.expiresAt ? new Date(order.expiresAt) : null
   ]);
+}
+
+export async function updatePaymentOrderStatus(orderId, patch = {}) {
+  if (!pool) return null;
+  await query(`
+    update payment_orders
+    set status = $2,
+        external_id = coalesce($3, external_id),
+        raw = coalesce(raw, '{}'::jsonb) || $4::jsonb
+    where id = $1
+  `, [
+    orderId,
+    patch.status,
+    patch.externalId || null,
+    JSON.stringify(patch.raw || {})
+  ]);
+  return getPaymentOrder(orderId);
 }
 
 export async function getPaymentOrder(orderId) {
@@ -624,6 +646,8 @@ export async function completePaymentOrder(orderId, payment) {
     const amount = Math.max(0, Math.round(Number(order.chips) || 0));
     const after = before + amount;
     const method = normalizeLedgerCategory(order.method || "stars");
+    const asset = order.asset || (method === "stars" ? "Stars" : method.toUpperCase());
+    const network = order.network || "";
     const ledgerKey = `payment:${order.id}`;
 
     await client.query("update wallets set balance = $2, updated_at = now() where app_user_id = $1", [appUserId, after]);
@@ -641,7 +665,7 @@ export async function completePaymentOrder(orderId, payment) {
       `deposit_${method}`,
       method === "stars" ? "Пополнение Stars" : "Пополнение баланса",
       amount,
-      `${order.stars || 0} Stars · order ${order.id}`,
+      `${order.cryptoAmount || order.stars || 0} ${asset}${network ? ` ${network}` : ""} · order ${order.id}`,
       after,
       ledgerKey
     ]);
@@ -781,8 +805,8 @@ export async function dashboardStats() {
       (select coalesce(sum(amount), 0)::bigint from platform_ledger_entries where type = 'debit') as platform_ledger_debit_total,
       (select count(*)::int from hand_histories) as hand_history_count,
       (select coalesce(sum(rake), 0)::bigint from hand_histories) as hand_history_rake_total,
-      (select count(*)::int from payment_orders where status = 'paid') as paid_stars,
-      (select count(*)::int from payment_orders where status = 'pending') as pending_stars,
+      (select count(*)::int from payment_orders where status = 'paid' and method = 'stars') as paid_stars,
+      (select count(*)::int from payment_orders where status = 'pending' and method = 'stars') as pending_stars,
       (select coalesce(sum(chips), 0)::bigint from payment_orders where status = 'paid' and method = 'stars') as paid_stars_chips_total,
       (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'credit' and category = 'deposit_stars') as deposit_stars_ledger_total,
       (select count(*)::int from idempotency_keys where expires_at > now()) as idempotency_key_count,
@@ -974,15 +998,26 @@ async function migrate() {
       rub_amount integer not null default 0,
       chips bigint not null default 0,
       stars integer not null default 0,
+      asset text not null default '',
+      network text not null default '',
+      crypto_amount numeric(24, 8),
+      external_id text not null default '',
       payload text not null default '',
       telegram_payment_charge_id text not null default '',
       raw jsonb not null default '{}'::jsonb,
       created_at timestamptz not null default now(),
+      expires_at timestamptz,
       paid_at timestamptz
     );
 
+    alter table payment_orders add column if not exists asset text not null default '';
+    alter table payment_orders add column if not exists network text not null default '';
+    alter table payment_orders add column if not exists crypto_amount numeric(24, 8);
+    alter table payment_orders add column if not exists external_id text not null default '';
+    alter table payment_orders add column if not exists expires_at timestamptz;
     create index if not exists idx_payment_orders_app_user_created on payment_orders(app_user_id, created_at desc);
     create index if not exists idx_payment_orders_status_created on payment_orders(status, created_at desc);
+    create index if not exists idx_payment_orders_external_id on payment_orders(external_id) where external_id <> '';
 
     create table if not exists idempotency_keys (
       key text primary key,
@@ -1048,10 +1083,15 @@ function paymentRow(row) {
     rubAmount: Number(row.rub_amount || 0),
     chips: Number(row.chips || 0),
     stars: Number(row.stars || 0),
+    asset: row.asset || "",
+    network: row.network || "",
+    cryptoAmount: row.crypto_amount === null || row.crypto_amount === undefined ? null : Number(row.crypto_amount),
+    externalId: row.external_id || "",
     status: row.status,
     payload: row.payload || "",
     telegramPaymentChargeId: row.telegram_payment_charge_id || "",
     createdAt: row.created_at,
+    expiresAt: row.expires_at,
     paidAt: row.paid_at
   };
 }

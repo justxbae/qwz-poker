@@ -13,6 +13,7 @@ Persisted in PostgreSQL:
 - `platform_ledger_entries` - immutable project-side ledger for rake, future tournament fees, withdrawals, bonuses, reversals, and manual review adjustments.
 - `saved_stacks` - saved stack after leaving a table.
 - `payment_orders` - Stars orders and payment statuses.
+- `payment_orders` also stores prepared TON/USDT order metadata: method, asset, network, expected crypto amount, external provider id, expiration.
 - `idempotency_keys` - dedupe cache for money endpoints, so retries/double taps return the same response instead of charging twice.
 - `fund_movements` - movement of chips between wallet, table, saved stack, tournament escrow, and reserves.
 - `tournament_registrations` - active/cancelled tournament registrations.

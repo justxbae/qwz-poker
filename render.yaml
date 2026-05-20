@@ -17,6 +17,22 @@ services:
         sync: false
       - key: TELEGRAM_WEBHOOK_SECRET
         sync: false
+      - key: CRYPTO_WEBHOOK_SECRET
+        sync: false
+      - key: TON_PAYMENTS_ENABLED
+        value: "false"
+      - key: TON_RECEIVER_ADDRESS
+        sync: false
+      - key: TON_RUB_RATE
+        sync: false
+      - key: USDT_TRC20_PAYMENTS_ENABLED
+        value: "false"
+      - key: USDT_TRC20_RECEIVER_ADDRESS
+        sync: false
+      - key: USDT_RUB_RATE
+        sync: false
+      - key: CRYPTO_PROVIDER_API_KEY
+        sync: false
       - key: ADMIN_CHAT_ID
         sync: false
       - key: ADMIN_USER_IDS

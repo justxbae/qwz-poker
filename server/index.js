@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as Sentry from "@sentry/node";
-import { depositSettings, quoteDeposit } from "./economy.js";
+import { depositSettings, quoteCryptoDeposit, quoteDeposit } from "./economy.js";
 import {
   addWalletEntry as dbAddWalletEntry,
   completePaymentOrder as dbCompletePaymentOrder,
@@ -35,6 +35,7 @@ import {
   cancelTournamentRegistration as dbCancelTournamentRegistration,
   setSavedStack as dbSetSavedStack,
   setWallet as dbSetWallet,
+  updatePaymentOrderStatus as dbUpdatePaymentOrderStatus,
   upsertActiveTableSnapshot as dbUpsertActiveTableSnapshot,
   upsertTelegramUser
 } from "./db.js";
@@ -73,6 +74,7 @@ const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || "";
 const ADMIN_USER_IDS = parseIdList(process.env.ADMIN_USER_IDS || ADMIN_CHAT_ID);
 const ADMIN_GRANT_MAX_CHIPS = Number(process.env.ADMIN_GRANT_MAX_CHIPS || 500000);
 const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
+const CRYPTO_WEBHOOK_SECRET = process.env.CRYPTO_WEBHOOK_SECRET || "";
 const isProduction = process.env.NODE_ENV === "production";
 const HOST = process.env.HOST || (isProduction ? "0.0.0.0" : "127.0.0.1");
 const startedAt = Date.now();
@@ -89,6 +91,7 @@ const wallets = new Map();
 const transactions = new Map();
 const fundMovements = new Map();
 const starOrders = new Map();
+const cryptoOrders = new Map();
 const adminEvents = [];
 const loggedAppOpens = new Set();
 const persistedHandIds = new Set();
@@ -176,6 +179,17 @@ async function handleApi(req, res, url) {
     }
     const update = await readJson(req);
     await handleTelegramWebhook(update);
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/payments/crypto/webhook") {
+    if (!verifyCryptoWebhook(req)) {
+      sendJson(res, 403, { error: "Invalid crypto webhook secret" });
+      return;
+    }
+    const event = await readJson(req);
+    await handleCryptoWebhook(event);
     sendJson(res, 200, { ok: true });
     return;
   }
@@ -342,6 +356,50 @@ async function handleApi(req, res, url) {
       });
 
       return { invoiceLink, orderId, cashier: await cashierView(user) };
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/cashier/crypto-order") {
+    await sendIdempotentJson(req, res, user, "cashier_crypto_order", async () => {
+      const body = await readJson(req);
+      const quote = quoteCryptoDeposit(body);
+      ensureCryptoPaymentMethodEnabled(quote.method);
+
+      const orderId = randomId(quote.method === "ton" ? "ton" : "usdt");
+      const expiresAt = new Date(Date.now() + 20 * 60 * 1000).toISOString();
+      const payload = `qwz:${orderId}`;
+      const order = {
+        id: orderId,
+        userId: user.id,
+        userName: user.name,
+        username: user.username,
+        method: quote.method,
+        asset: quote.asset,
+        network: quote.network,
+        rubAmount: quote.rubAmount,
+        chips: quote.chips,
+        cryptoAmount: quote.cryptoAmount,
+        receiverAddress: quote.receiverAddress,
+        confirmationsRequired: quote.confirmationsRequired,
+        payload,
+        status: "pending",
+        expiresAt,
+        createdAt: new Date().toISOString()
+      };
+      cryptoOrders.set(orderId, order);
+      await dbCreatePaymentOrder(order);
+      notifyAdmin("crypto_order", "Создан crypto-счет", {
+        user,
+        lines: [
+          `Метод: ${quote.asset} ${quote.network}`,
+          `Сумма: ${formatNumber(quote.rubAmount)} ₽`,
+          `К оплате: ${quote.cryptoAmount} ${quote.asset}`,
+          `Chips: ${formatNumber(quote.chips)}`,
+          `Order: ${order.id}`
+        ]
+      });
+      return { order: cryptoOrderView(order), cashier: await cashierView(user) };
     });
     return;
   }
@@ -1729,6 +1787,95 @@ async function processSuccessfulStarPayment(payment) {
   });
 }
 
+async function handleCryptoWebhook(event) {
+  const orderId = String(event.orderId || event.order_id || event.merchantOrderId || "").trim();
+  if (!orderId) {
+    notifyAdmin("crypto_webhook_error", "Crypto webhook без orderId", {
+      lines: [`Payload: ${JSON.stringify(event).slice(0, 500)}`]
+    });
+    return;
+  }
+
+  const order = await cryptoOrderFromId(orderId);
+  if (!order) {
+    notifyAdmin("crypto_webhook_error", "Crypto webhook для неизвестного order", {
+      lines: [`Order: ${orderId}`, `Payload: ${JSON.stringify(event).slice(0, 500)}`]
+    });
+    return;
+  }
+
+  const status = normalizeCryptoPaymentStatus(event.status || event.paymentStatus || event.state);
+  const paidAmount = Number(event.paidAmount ?? event.amount ?? event.cryptoAmount ?? 0);
+  const txHash = String(event.txHash || event.tx_hash || event.transactionHash || "");
+  const externalId = String(event.externalId || event.paymentId || event.invoiceId || "");
+  const expectedAmount = Number(order.cryptoAmount || 0);
+  const underpaid = paidAmount > 0 && expectedAmount > 0 && paidAmount + 0.00000001 < expectedAmount;
+
+  if (underpaid) {
+    await dbUpdatePaymentOrderStatus(order.id, {
+      status: "manual_review",
+      externalId,
+      raw: { cryptoWebhook: event, reason: "underpaid" }
+    });
+    notifyAdmin("crypto_manual_review", "Crypto-платеж требует проверки", {
+      user: { id: order.userId, name: order.userName, username: order.username },
+      lines: [
+        `Order: ${order.id}`,
+        `Метод: ${order.asset} ${order.network}`,
+        `Ожидали: ${order.cryptoAmount} ${order.asset}`,
+        `Пришло: ${paidAmount} ${order.asset}`,
+        `TX: ${txHash || "n/a"}`
+      ]
+    });
+    return;
+  }
+
+  if (status !== "paid") {
+    const mappedStatus = status === "expired" ? "expired" : status === "failed" ? "failed" : "pending";
+    await dbUpdatePaymentOrderStatus(order.id, {
+      status: mappedStatus,
+      externalId,
+      raw: { cryptoWebhook: event }
+    });
+    return;
+  }
+
+  const completed = await dbCompletePaymentOrder(order.id, {
+    crypto_payment: true,
+    telegram_payment_charge_id: txHash || externalId,
+    provider_event: event
+  });
+  if (!completed || completed.alreadyPaid || completed.ignored) return;
+
+  const paidOrder = { ...order, status: "paid", externalId, txHash, paidAt: new Date().toISOString() };
+  cryptoOrders.set(order.id, paidOrder);
+  setWalletBalanceLocal(order.userId, completed.balance);
+  notifyAdmin("crypto_paid", "Оплачено crypto-пополнение", {
+    user: { id: order.userId, name: order.userName, username: order.username },
+    lines: [
+      `Метод: ${order.asset} ${order.network}`,
+      `Сумма: ${formatNumber(order.rubAmount)} ₽`,
+      `Оплата: ${paidAmount || order.cryptoAmount} ${order.asset}`,
+      `Chips: ${formatNumber(order.chips)}`,
+      `Order: ${order.id}`,
+      `TX: ${txHash || externalId || "n/a"}`,
+      `Баланс: ${formatNumber(completed.balance)} chips`
+    ]
+  });
+}
+
+function normalizeCryptoPaymentStatus(status) {
+  const value = String(status || "").toLowerCase();
+  if (["paid", "confirmed", "confirming", "finished", "success", "completed"].includes(value)) return "paid";
+  if (["expired", "timeout", "cancelled", "canceled"].includes(value)) return "expired";
+  if (["failed", "error", "rejected"].includes(value)) return "failed";
+  return "pending";
+}
+
+async function cryptoOrderFromId(orderId) {
+  return cryptoOrders.get(orderId) || await dbGetPaymentOrder(orderId);
+}
+
 async function orderFromPayload(payload) {
   const orderId = String(payload).startsWith("qwz:") ? payload.slice(4) : "";
   if (!orderId) return null;
@@ -1840,6 +1987,7 @@ async function serveStatic(req, res, url) {
     ".css": "text/css; charset=utf-8",
     ".js": "text/javascript; charset=utf-8",
     ".json": "application/json; charset=utf-8",
+    ".svg": "image/svg+xml; charset=utf-8",
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg"
   };
@@ -1987,6 +2135,9 @@ function validateEnvironment() {
   if (!TELEGRAM_WEBHOOK_SECRET) {
     console.warn("[warn] TELEGRAM_WEBHOOK_SECRET is empty — webhook endpoint is unprotected.");
   }
+  if ((process.env.TON_PAYMENTS_ENABLED === "true" || process.env.USDT_TRC20_PAYMENTS_ENABLED === "true") && !CRYPTO_WEBHOOK_SECRET) {
+    console.warn("[warn] CRYPTO_WEBHOOK_SECRET is empty — crypto confirmations will be rejected in production.");
+  }
   if (problems.length) {
     for (const message of problems) console.error(`[fatal] ${message}`);
     process.exit(1);
@@ -2041,6 +2192,44 @@ function verifyTelegramWebhook(req) {
   if (!TELEGRAM_WEBHOOK_SECRET) return true;
   const provided = req.headers["x-telegram-bot-api-secret-token"] || "";
   return provided === TELEGRAM_WEBHOOK_SECRET;
+}
+
+function verifyCryptoWebhook(req) {
+  if (!CRYPTO_WEBHOOK_SECRET) return !isProduction;
+  const provided = req.headers["x-qwz-crypto-secret"] || req.headers["x-webhook-secret"] || "";
+  return provided === CRYPTO_WEBHOOK_SECRET;
+}
+
+function ensureCryptoPaymentMethodEnabled(method) {
+  const settings = depositSettings();
+  const item = settings.methods.find((candidate) => candidate.id === method);
+  if (!item?.enabled) {
+    const error = new Error("Этот crypto-метод еще не подключен");
+    error.status = 409;
+    throw error;
+  }
+}
+
+function cryptoOrderView(order) {
+  return {
+    id: order.id,
+    method: order.method,
+    asset: order.asset,
+    network: order.network,
+    rubAmount: order.rubAmount,
+    chips: order.chips,
+    cryptoAmount: order.cryptoAmount,
+    receiverAddress: order.receiverAddress || "",
+    payload: order.payload || "",
+    status: order.status,
+    expiresAt: order.expiresAt,
+    tonConnect: order.method === "ton" ? {
+      address: order.receiverAddress || "",
+      amountNano: String(Math.round(Number(order.cryptoAmount || 0) * 1_000_000_000)),
+      comment: order.payload || order.id,
+      validUntil: Math.floor(new Date(order.expiresAt || Date.now() + 20 * 60 * 1000).getTime() / 1000)
+    } : null
+  };
 }
 
 function loadEnv(filePath) {
