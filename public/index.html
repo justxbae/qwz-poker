@@ -523,9 +523,18 @@
             <div class="section-title">
               <div>
                 <p class="eyebrow">Платежи</p>
-                <h2>Stars</h2>
+                <h2>Orders</h2>
               </div>
-              <span>последние</span>
+              <span>admin</span>
+            </div>
+            <div class="admin-payment-tools">
+              <select id="adminPaymentFilter" aria-label="Фильтр платежей">
+                <option value="all">Все платежи</option>
+                <option value="pending">Pending</option>
+                <option value="manual_review">Manual review</option>
+                <option value="paid">Paid</option>
+                <option value="failed">Failed / expired</option>
+              </select>
             </div>
             <div class="cashier-history" id="adminRecentPayments"></div>
           </section>

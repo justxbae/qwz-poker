@@ -1467,6 +1467,49 @@ h2 {
   grid-column: 1 / -1;
 }
 
+.admin-payment-tools {
+  display: grid;
+  margin-top: 12px;
+}
+
+.admin-payment-tools select {
+  width: 100%;
+  border: 1px solid rgba(42, 171, 238, 0.22);
+  border-radius: 14px;
+  background: rgba(9, 16, 25, 0.72);
+  color: var(--tg-text);
+  padding: 12px;
+}
+
+.admin-payment-row {
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.admin-payment-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.admin-payment-actions button {
+  min-height: 38px;
+  border-radius: 12px;
+  background: var(--tg-surface-2);
+  color: var(--tg-text);
+  font-size: 14px;
+}
+
+.admin-payment-actions button[data-payment-action="approve"] {
+  background: rgba(47, 126, 82, 0.95);
+}
+
+.admin-payment-actions button[data-payment-action="reject"] {
+  background: rgba(142, 54, 62, 0.95);
+}
+
 .settings-list {
   display: grid;
   margin-top: 16px;

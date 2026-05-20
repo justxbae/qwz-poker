@@ -632,6 +632,7 @@ async function handleApi(req, res, url) {
 
 async function handleAdminApi(req, res, url, adminUser) {
   const userMatch = url.pathname.match(/^\/api\/admin\/users\/([^/]+)$/);
+  const paymentActionMatch = url.pathname.match(/^\/api\/admin\/payments\/([^/]+)\/(approve|reject)$/);
 
   if (req.method === "GET" && url.pathname === "/api/admin") {
     sendJson(res, 200, { admin: await adminDashboardView() });
@@ -654,6 +655,21 @@ async function handleAdminApi(req, res, url, adminUser) {
       requestId: body.requestId || req.headers["x-idempotency-key"] || ""
     });
     sendJson(res, 200, { player: await adminPlayerView(result.targetId), adjustment: result });
+    return;
+  }
+
+  if (req.method === "POST" && paymentActionMatch) {
+    const [, paymentId, action] = paymentActionMatch;
+    await sendIdempotentJson(req, res, adminUser, `admin_payment_${action}:${paymentId}`, async () => {
+      const body = await readJson(req);
+      const result = await handleAdminPaymentAction({
+        admin: adminUser,
+        paymentId,
+        action,
+        reason: body.reason || ""
+      });
+      return { payment: result, admin: await adminDashboardView() };
+    });
     return;
   }
 
@@ -689,7 +705,7 @@ async function adminDashboardView() {
   });
   const paidStars = [...starOrders.values()].filter((order) => order.status === "paid");
   const pendingStars = [...starOrders.values()].filter((order) => order.status === "pending");
-  const recentPayments = await dbListPaymentOrders(10);
+  const recentPayments = await dbListPaymentOrders(30);
   const recentEvents = await dbListAdminEvents(20);
   const recentHands = await dbListHandHistories(20);
   const memoryHandHistoryCount = recentHandHistories.length;
@@ -746,9 +762,9 @@ async function adminDashboardView() {
     },
     recentFundMovements: recentFundMovements(20),
     recentHands: recentHands || recentHandHistories.slice(0, 20),
-    recentPayments: recentPayments || [...starOrders.values()]
+    recentPayments: recentPayments || [...starOrders.values(), ...cryptoOrders.values()]
       .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
-      .slice(0, 10),
+      .slice(0, 30),
     recentEvents: recentEvents || adminEvents.slice(0, 20)
   };
 }
@@ -1742,6 +1758,95 @@ async function adjustWalletManually({ admin, targetId, type, amount, reason, req
   return result;
 }
 
+async function handleAdminPaymentAction({ admin, paymentId, action, reason = "" }) {
+  const order = await paymentOrderFromId(paymentId);
+  if (!order) {
+    const error = new Error("Платеж не найден");
+    error.status = 404;
+    throw error;
+  }
+  if (order.method === "stars") {
+    const error = new Error("Stars платежи нельзя подтверждать вручную");
+    error.status = 409;
+    throw error;
+  }
+  if (!["pending", "manual_review"].includes(order.status)) {
+    const error = new Error(`Платеж уже в статусе ${order.status}`);
+    error.status = 409;
+    throw error;
+  }
+
+  const adminProfile = admin || { id: "system", name: "Admin", username: "" };
+  const normalizedReason = String(reason || "").trim() || `manual_${action}`;
+
+  if (action === "reject") {
+    await dbUpdatePaymentOrderStatus(order.id, {
+      status: "failed",
+      externalId: order.externalId || `admin:${adminProfile.id}`,
+      raw: { adminAction: "reject", reason: normalizedReason, adminId: adminProfile.id }
+    });
+    order.status = "failed";
+    cryptoOrders.set(order.id, order);
+    notifyAdmin("payment_rejected", "Админ отклонил платеж", {
+      user: { id: order.userId, name: order.userName, username: order.username },
+      lines: [
+        `Админ: ${formatUser(adminProfile)}`,
+        `Order: ${order.id}`,
+        `Метод: ${order.method}`,
+        `Сумма: ${formatNumber(order.chips)} chips`,
+        `Причина: ${normalizedReason}`
+      ]
+    });
+    return order;
+  }
+
+  const completed = await dbCompletePaymentOrder(order.id, {
+    crypto_payment: true,
+    telegram_payment_charge_id: `manual:${adminProfile.id}:${Date.now()}`,
+    provider_event: { adminAction: "approve", reason: normalizedReason, adminId: adminProfile.id }
+  });
+  let balance = completed?.balance;
+  if (completed?.alreadyPaid || completed?.ignored) {
+    return { ...order, status: completed.order?.status || order.status };
+  }
+  if (!completed) {
+    const paymentKey = `payment:${order.id}`;
+    if (idempotencyResults.has(paymentKey)) {
+      return { ...order, status: "paid" };
+    }
+    balance = await recordTransaction({ id: order.userId }, {
+      type: "credit",
+      category: `deposit_${normalizeLedgerCategory(order.method)}`,
+      title: "Пополнение баланса",
+      amount: order.chips,
+      meta: `manual approval · ${order.cryptoAmount || 0} ${order.asset || order.method} · admin ${adminProfile.id}`,
+      idempotencyKey: paymentKey
+    });
+    idempotencyResults.set(paymentKey, { balance });
+  }
+
+  const paidOrder = {
+    ...order,
+    status: "paid",
+    externalId: order.externalId || `manual:${adminProfile.id}`,
+    paidAt: new Date().toISOString()
+  };
+  cryptoOrders.set(order.id, paidOrder);
+  setWalletBalanceLocal(order.userId, balance);
+  notifyAdmin("payment_approved", "Админ подтвердил платеж", {
+    user: { id: order.userId, name: order.userName, username: order.username },
+    lines: [
+      `Админ: ${formatUser(adminProfile)}`,
+      `Order: ${order.id}`,
+      `Метод: ${order.method}`,
+      `Сумма: ${formatNumber(order.chips)} chips`,
+      `Баланс: ${formatNumber(balance)} chips`,
+      `Причина: ${normalizedReason}`
+    ]
+  });
+  return paidOrder;
+}
+
 async function answerPreCheckout(query) {
   const payload = query.invoice_payload || "";
   const order = await orderFromPayload(payload);
@@ -1999,6 +2104,10 @@ function normalizeCryptoPaymentStatus(status) {
 
 async function cryptoOrderFromId(orderId) {
   return cryptoOrders.get(orderId) || await dbGetPaymentOrder(orderId);
+}
+
+async function paymentOrderFromId(orderId) {
+  return starOrders.get(orderId) || cryptoOrders.get(orderId) || await dbGetPaymentOrder(orderId);
 }
 
 async function orderFromPayload(payload) {

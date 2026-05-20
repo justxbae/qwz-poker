@@ -81,6 +81,7 @@ const adminAdjustAmount = document.querySelector("#adminAdjustAmount");
 const adminAdjustReason = document.querySelector("#adminAdjustReason");
 const adminPlayerTransactions = document.querySelector("#adminPlayerTransactions");
 const adminRecentPayments = document.querySelector("#adminRecentPayments");
+const adminPaymentFilter = document.querySelector("#adminPaymentFilter");
 const adminRecentEvents = document.querySelector("#adminRecentEvents");
 const adminFundMovements = document.querySelector("#adminFundMovements");
 const adminRecentHands = document.querySelector("#adminRecentHands");
@@ -229,6 +230,8 @@ async function boot() {
     event.preventDefault();
     runAction(adjustAdminPlayerWallet);
   });
+  adminRecentPayments?.addEventListener("click", onAdminPaymentAction);
+  adminPaymentFilter?.addEventListener("change", () => runAction(loadAdminDashboard));
   limitPills.addEventListener("click", onLimitSelect);
   tableLimitPills.addEventListener("click", onLimitSelect);
   document.querySelectorAll("[data-lobby-tab]").forEach((button) => {
@@ -801,12 +804,87 @@ function renderAdminTransactions(transactions) {
 }
 
 function renderAdminPayments(payments) {
-  renderAdminRows(adminRecentPayments, payments.map((payment) => ({
-    title: `${formatChips(payment.chips)} chips`,
-    meta: `${payment.userName || payment.userId} · ${payment.rubAmount || 0} ₽ · ${payment.stars || 0} Stars`,
-    value: payment.status,
-    positive: payment.status === "paid"
-  })), "Платежей пока нет");
+  const filter = adminPaymentFilter?.value || "all";
+  const filtered = payments.filter((payment) => {
+    if (filter === "all") return true;
+    if (filter === "failed") return ["failed", "expired"].includes(payment.status);
+    return payment.status === filter;
+  });
+
+  adminRecentPayments.replaceChildren();
+  if (!filtered.length) {
+    const empty = document.createElement("div");
+    empty.className = "cashier-empty";
+    empty.textContent = "Платежей по фильтру нет";
+    adminRecentPayments.append(empty);
+    return;
+  }
+
+  for (const payment of filtered) {
+    const row = document.createElement("div");
+    row.className = `cashier-transaction admin-payment-row ${payment.status === "paid" ? "credit" : "debit"}`;
+    const main = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = `${paymentMethodTitle(payment)} · ${formatChips(payment.chips)} chips`;
+    const meta = document.createElement("span");
+    meta.textContent = adminPaymentMeta(payment);
+    main.append(title, meta);
+
+    const status = document.createElement("b");
+    status.textContent = payment.status;
+    row.append(main, status);
+
+    const canAdminAct = payment.method !== "stars" && ["pending", "manual_review"].includes(payment.status);
+    if (canAdminAct) {
+      const actions = document.createElement("div");
+      actions.className = "admin-payment-actions";
+      actions.innerHTML = `
+        <button type="button" data-payment-action="approve" data-payment-id="${payment.id}">Подтвердить</button>
+        <button type="button" data-payment-action="reject" data-payment-id="${payment.id}">Отклонить</button>
+      `;
+      row.append(actions);
+    }
+
+    adminRecentPayments.append(row);
+  }
+}
+
+function paymentMethodTitle(payment) {
+  if (payment.method === "stars") return "Stars";
+  if (payment.method === "ton") return "TON";
+  if (payment.method === "usdt_trc20") return "USDT TRC20";
+  return payment.method || "payment";
+}
+
+function adminPaymentMeta(payment) {
+  const money = payment.method === "stars"
+    ? `${formatChips(payment.stars || 0)} Stars`
+    : `${payment.cryptoAmount || 0} ${payment.asset || ""} ${payment.network || ""}`.trim();
+  return [
+    payment.userName || payment.userId,
+    `${payment.rubAmount || 0} ₽`,
+    money,
+    payment.externalId ? `external ${payment.externalId}` : "",
+    payment.id
+  ].filter(Boolean).join(" · ");
+}
+
+async function onAdminPaymentAction(event) {
+  const button = event.target.closest("[data-payment-action]");
+  if (!button) return;
+  const paymentId = button.dataset.paymentId;
+  const action = button.dataset.paymentAction;
+  if (!paymentId || !action) return;
+  adminStatus.textContent = action === "approve" ? "Подтверждаем платеж..." : "Отклоняем платеж...";
+  await api(`/api/admin/payments/${encodeURIComponent(paymentId)}/${action}`, {
+    method: "POST",
+    idempotencyKey: requestKey(`admin-payment-${action}-${paymentId}`),
+    body: {
+      reason: action === "approve" ? "manual_admin_approval" : "manual_admin_reject"
+    }
+  });
+  adminStatus.textContent = action === "approve" ? "Платеж подтвержден." : "Платеж отклонен.";
+  await loadAdminDashboard();
 }
 
 function renderAdminFundMovements(movements) {

@@ -419,6 +419,65 @@ test("crypto deposit order can be created but does not credit chips before confi
   }
 });
 
+test("admin can manually approve and reject crypto payment orders", async () => {
+  const server = await startServer({
+    ADMIN_USER_IDS: "dev-user",
+    TON_PAYMENTS_ENABLED: "true",
+    TON_RECEIVER_ADDRESS: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+    TON_RUB_RATE: "250"
+  });
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+
+    const approveOrder = (await request("/api/cashier/crypto-order", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "admin-approve-ton-order",
+      body: { method: "ton", rubAmount: 250 }
+    })).order;
+
+    let data = await request(`/api/admin/payments/${approveOrder.id}/approve`, {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "approve-once",
+      body: { reason: "manual_test" }
+    });
+
+    assert.equal(data.payment.status, "paid");
+    let cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.balance, 12500);
+
+    data = await request(`/api/admin/payments/${approveOrder.id}/approve`, {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "approve-once",
+      body: { reason: "manual_test" }
+    });
+    assert.equal(data.payment.status, "paid");
+    cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.balance, 12500);
+
+    const rejectOrder = (await request("/api/cashier/crypto-order", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "admin-reject-ton-order",
+      body: { method: "ton", rubAmount: 250 }
+    })).order;
+
+    data = await request(`/api/admin/payments/${rejectOrder.id}/reject`, {
+      method: "POST",
+      token: auth.token,
+      body: { reason: "manual_reject_test" }
+    });
+
+    assert.equal(data.payment.status, "failed");
+    cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.balance, 12500);
+  } finally {
+    server.kill();
+  }
+});
+
 test("admin telegram commands grant and deduct wallet chips", async () => {
   const server = await startServer({ ADMIN_USER_IDS: "777" });
   try {
