@@ -4,6 +4,7 @@ import {
   act,
   addBuyIn,
   createTable,
+  createProvablyFairDeck,
   joinTable,
   leaveTable,
   maybeStartHand,
@@ -12,7 +13,8 @@ import {
   sitOut,
   startHand,
   testBotAct,
-  tickTables
+  tickTables,
+  verifyProvablyFairDeck
 } from "../server/poker-engine.js";
 
 const owner = { id: "owner", name: "Owner", username: "" };
@@ -27,6 +29,31 @@ test("table seats expose Telegram profile photos", () => {
 
   assert.equal(view.seats[0].photoUrl, "https://example.com/owner.jpg");
   assert.equal(view.seats[1].photoUrl, "https://example.com/player-2.jpg");
+});
+
+test("provably fair deck is deterministic and verifiable", () => {
+  const seed = "a".repeat(64);
+  const first = createProvablyFairDeck({
+    tableId: "table_1",
+    handNumber: 7,
+    playerIds: ["p2", "owner"],
+    serverSeed: seed
+  });
+  const second = createProvablyFairDeck({
+    tableId: "table_1",
+    handNumber: 7,
+    playerIds: ["owner", "p2"],
+    serverSeed: seed
+  });
+
+  assert.deepEqual(first.deck, second.deck);
+  assert.equal(first.deck.length, 52);
+  assert.equal(new Set(first.deck).size, 52);
+  assert.equal(first.proof.serverSeed, seed);
+  assert.equal(first.proof.serverSeedHash.length, 64);
+  assert.equal(first.proof.deckHash.length, 64);
+  assert.equal(verifyProvablyFairDeck(first.deck, first.proof), true);
+  assert.equal(verifyProvablyFairDeck([...first.deck].reverse(), first.proof), false);
 });
 
 test("first hand shows a starting intro before cards are dealt", () => {
@@ -92,6 +119,9 @@ test("folding to a raise awards the pot immediately", () => {
   assert.equal(table.pot, 0);
   assert.equal(table.seats[0].stack + table.seats[1].stack, 20000);
   assert.match(table.message, /Owner забирает банк/);
+  assert.equal(table.handHistory[0].fairnessProof.serverSeedHash.length, 64);
+  assert.equal(table.handHistory[0].fairnessProof.deckHash.length, 64);
+  assert.equal(table.handHistory[0].fairnessProof.algorithm, "qwz-sha256-fisher-yates-v1");
 });
 
 test("first voluntary chip action on a checked street is bet, not raise", () => {

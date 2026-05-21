@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { calculateRake } from "./economy.js";
 import { resolveShowdown } from "./poker-evaluator.js";
 
@@ -44,6 +44,7 @@ export function createTable(owner, body = {}) {
     message: "Ожидание игроков",
     actionLog: [],
     handHistory: [],
+    fairnessProof: null,
     rakeCollected: 0,
     seats: [],
     deck: []
@@ -235,7 +236,13 @@ export function startHand(table, user) {
 
   table.handNumber += 1;
   table.actionLog = [];
-  table.deck = shuffle(createDeck());
+  const fairness = createProvablyFairDeck({
+    tableId: table.id,
+    handNumber: table.handNumber,
+    playerIds: playableSeats(table).map((seat) => seat.userId)
+  });
+  table.deck = fairness.deck;
+  table.fairnessProof = fairness.proof;
   table.communityCards = [];
   table.pot = 0;
   table.currentBet = 0;
@@ -261,6 +268,7 @@ export function startHand(table, user) {
   postBlind(table, table.smallBlindIndex, table.smallBlind);
   postBlind(table, table.bigBlindIndex, table.bigBlind);
   addLog(table, `Раздача #${table.handNumber}`);
+  addLog(table, `Fair hash ${table.fairnessProof.serverSeedHash}`);
   addLog(table, `${table.seats[table.smallBlindIndex].name} SB ${table.smallBlind}`);
   addLog(table, `${table.seats[table.bigBlindIndex].name} BB ${table.bigBlind}`);
 
@@ -680,6 +688,7 @@ function recordHandHistory(table, { pots, rake = 0 }) {
     at: Date.now(),
     board: [...table.communityCards],
     rake,
+    fairnessProof: revealFairnessProof(table.fairnessProof),
     pots,
     seats: table.seats
       .filter((seat) => seat.cards.length > 0)
@@ -693,6 +702,38 @@ function recordHandHistory(table, { pots, rake = 0 }) {
   };
   table.handHistory.unshift(record);
   table.handHistory = table.handHistory.slice(0, 20);
+}
+
+export function createProvablyFairDeck({
+  tableId = "table",
+  handNumber = 0,
+  playerIds = [],
+  serverSeed = randomBytes(32).toString("hex")
+} = {}) {
+  const normalizedPlayerIds = [...playerIds].map(String).sort();
+  const proofBase = {
+    algorithm: "qwz-sha256-fisher-yates-v1",
+    tableId: String(tableId),
+    handNumber: Number(handNumber || 0),
+    nonce: Number(handNumber || 0),
+    playerIds: normalizedPlayerIds,
+    clientSeed: normalizedPlayerIds.length ? normalizedPlayerIds.join("|") : String(tableId),
+    serverSeed,
+    serverSeedHash: sha256Hex(serverSeed)
+  };
+  const deck = shuffleWithProof(createDeck(), proofBase);
+  const proof = {
+    ...proofBase,
+    deckHash: sha256Hex(deck.join(","))
+  };
+  return { deck, proof };
+}
+
+export function verifyProvablyFairDeck(deck, proof) {
+  if (!Array.isArray(deck) || !proof?.serverSeed || !proof?.serverSeedHash) return false;
+  if (sha256Hex(proof.serverSeed) !== proof.serverSeedHash) return false;
+  const rebuilt = shuffleWithProof(createDeck(), proof);
+  return rebuilt.join(",") === deck.join(",") && sha256Hex(deck.join(",")) === proof.deckHash;
 }
 
 function applyPendingSitOuts(table) {
@@ -926,13 +967,67 @@ function createDeck() {
   return suits.flatMap((suit) => ranks.map((rank) => `${rank}${suit}`));
 }
 
-function shuffle(cards) {
+function shuffleWithProof(cards, proof) {
   const result = [...cards];
+  let cursor = 0;
   for (let i = result.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const { value, nextCursor } = unbiasedRandomInt(i + 1, proof, cursor);
+    cursor = nextCursor;
+    const j = value;
     [result[i], result[j]] = [result[j], result[i]];
   }
   return result;
+}
+
+function unbiasedRandomInt(range, proof, cursor) {
+  if (range <= 0 || range > 0x100000000) throw new Error("Invalid shuffle range");
+  const limit = Math.floor(0x100000000 / range) * range;
+  let localCursor = cursor;
+
+  while (true) {
+    const digest = createHash("sha256")
+      .update([
+        proof.algorithm,
+        proof.serverSeed,
+        proof.clientSeed,
+        proof.nonce,
+        proof.tableId,
+        localCursor
+      ].join(":"))
+      .digest();
+
+    for (let offset = 0; offset <= digest.length - 4; offset += 4) {
+      const value = digest.readUInt32BE(offset);
+      if (value < limit) {
+        return {
+          value: value % range,
+          nextCursor: localCursor + 1
+        };
+      }
+    }
+
+    localCursor += 1;
+  }
+}
+
+function revealFairnessProof(proof) {
+  if (!proof) return null;
+  return {
+    algorithm: proof.algorithm,
+    tableId: proof.tableId,
+    handNumber: proof.handNumber,
+    nonce: proof.nonce,
+    playerIds: proof.playerIds,
+    clientSeed: proof.clientSeed,
+    serverSeedHash: proof.serverSeedHash,
+    serverSeed: proof.serverSeed,
+    deckHash: proof.deckHash,
+    revealedAt: Date.now()
+  };
+}
+
+function sha256Hex(value) {
+  return createHash("sha256").update(String(value)).digest("hex");
 }
 
 function throwHttp(status, message) {

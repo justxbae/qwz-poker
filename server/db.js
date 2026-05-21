@@ -237,9 +237,9 @@ export async function recordHandHistory(table, hand) {
   await query(`
     insert into hand_histories (
       id, table_id, table_name, hand_number, small_blind, big_blind,
-      board, pots, seats, rake, raw, finished_at
+      board, pots, seats, rake, fairness_proof, raw, finished_at
     )
-    values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::jsonb, $10, $11::jsonb, to_timestamp($12 / 1000.0))
+    values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::jsonb, $10, $11::jsonb, $12::jsonb, to_timestamp($13 / 1000.0))
     on conflict (id) do nothing
   `, [
     hand.id,
@@ -252,6 +252,7 @@ export async function recordHandHistory(table, hand) {
     JSON.stringify(hand.pots || []),
     JSON.stringify(hand.seats || []),
     hand.rake || 0,
+    JSON.stringify(hand.fairnessProof || {}),
     JSON.stringify(hand),
     Number(hand.at || Date.now())
   ]);
@@ -292,7 +293,7 @@ export async function listHandHistories(limit = 20) {
   const result = await query(`
     select id, table_id as "tableId", table_name as "tableName", hand_number as "handNumber",
            small_blind as "smallBlind", big_blind as "bigBlind", board, pots, seats, rake,
-           finished_at as "finishedAt"
+           fairness_proof as "fairnessProof", finished_at as "finishedAt"
     from hand_histories
     order by finished_at desc
     limit $1
@@ -978,11 +979,13 @@ async function migrate() {
       pots jsonb not null default '[]'::jsonb,
       seats jsonb not null default '[]'::jsonb,
       rake bigint not null default 0 check (rake >= 0),
+      fairness_proof jsonb not null default '{}'::jsonb,
       raw jsonb not null default '{}'::jsonb,
       finished_at timestamptz not null default now(),
       created_at timestamptz not null default now()
     );
 
+    alter table hand_histories add column if not exists fairness_proof jsonb not null default '{}'::jsonb;
     create index if not exists idx_hand_histories_finished on hand_histories(finished_at desc);
     create index if not exists idx_hand_histories_table_hand on hand_histories(table_id, hand_number desc);
 
