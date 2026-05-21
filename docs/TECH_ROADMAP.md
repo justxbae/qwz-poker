@@ -207,24 +207,33 @@ paid    → reversed         (chargeback / возврат)
 
 ### 2.2. Withdrawal flow
 
-**Сейчас:** `economy.withdrawals.enabled = false`. UI «скоро». Бэка нет.
+**Статус:** базовый backend и admin queue сделаны. Public UI пока оставлен закрытым, а создание заявок защищено `WITHDRAWALS_ENABLED=true`.
 
-**План:**
+**Сейчас работает:**
 
-1. **`POST /api/cashier/withdraw`** — создаёт `withdrawal_orders` запись:
-   - status: `pending_kyc` если игрок не верифицирован
-   - status: `pending_review` если сумма > авто-лимит
-   - status: `queued` для авто-выводов
-2. **Worker process** забирает `queued` ордера, шлёт транзакции:
+1. **`POST /api/cashier/withdraw`** создает `withdrawal_orders` со статусом `pending`.
+2. Chips сразу уходят в hold: wallet debit `withdrawal_hold`.
+3. Admin queue показывает заявки в `/admin`.
+4. **Approve** переводит заявку в `approved` без повторного списания.
+5. **Reject** переводит заявку в `rejected` и возвращает chips через ledger credit `withdrawal_refund`.
+6. Операции идемпотентны через `x-idempotency-key`.
+
+**Осталось до полноценного вывода:**
+
+1. **Worker process** забирает approved/queued ордера, шлёт транзакции:
    - TON: подпись из hot wallet, broadcast в TON network
    - USDT: API провайдера (NowPayments тоже умеет выплачивать)
    - RUB: через тот же gateway, что и приём (часто двусторонне)
-3. **Manual approval queue** в админке:
+2. **Risk/KYC статусы**:
+   - status: `pending_kyc` если игрок не верифицирован
+   - status: `pending_review` если сумма > авто-лимит
+   - status: `queued` для авто-выводов
+3. **Manual approval rules**:
    - сумма > X chips → ручное одобрение
    - игрок с risk score > 60 → manual
    - первый вывод > 5 000 chips → KYC + manual
 
-**Файлы:** новый `server/withdrawals.js`, новая таблица `withdrawal_orders`, расширение admin UI.
+**Файлы:** `server/db.js`, `server/index.js`, `public/app.js`, `public/index.html`, таблица `withdrawal_orders`.
 
 ---
 

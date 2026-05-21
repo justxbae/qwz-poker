@@ -81,6 +81,7 @@ const adminAdjustAmount = document.querySelector("#adminAdjustAmount");
 const adminAdjustReason = document.querySelector("#adminAdjustReason");
 const adminPlayerTransactions = document.querySelector("#adminPlayerTransactions");
 const adminRecentPayments = document.querySelector("#adminRecentPayments");
+const adminRecentWithdrawals = document.querySelector("#adminRecentWithdrawals");
 const adminPaymentFilter = document.querySelector("#adminPaymentFilter");
 const adminRecentEvents = document.querySelector("#adminRecentEvents");
 const adminFundMovements = document.querySelector("#adminFundMovements");
@@ -236,6 +237,7 @@ async function boot() {
     runAction(adjustAdminPlayerWallet);
   });
   adminRecentPayments?.addEventListener("click", onAdminPaymentAction);
+  adminRecentWithdrawals?.addEventListener("click", onAdminWithdrawalAction);
   adminPaymentFilter?.addEventListener("change", () => runAction(loadAdminDashboard));
   limitPills.addEventListener("click", onLimitSelect);
   tableLimitPills.addEventListener("click", onLimitSelect);
@@ -736,7 +738,9 @@ function renderAdminDashboard(admin) {
     ["Stars drift", formatChips(admin?.audit?.reconciliation?.starsDepositDrift || 0)],
     ["Idempotency", stats.idempotencyKeyCount || 0],
     ["Stars paid", stats.paidStars || 0],
-    ["Stars pending", stats.pendingStars || 0]
+    ["Stars pending", stats.pendingStars || 0],
+    ["Withdrawals", stats.pendingWithdrawals || 0],
+    ["Withdrawal hold", formatChips(stats.pendingWithdrawalChipsTotal || 0)]
   ].map(([label, value]) => {
     const item = document.createElement("div");
     item.innerHTML = "<span></span><strong></strong>";
@@ -746,6 +750,7 @@ function renderAdminDashboard(admin) {
   }));
 
   renderAdminPayments(admin?.recentPayments || []);
+  renderAdminWithdrawals(admin?.recentWithdrawals || []);
   renderAdminFundMovements(admin?.recentFundMovements || []);
   renderAdminHands(admin?.recentHands || []);
   renderAdminEvents(admin?.recentEvents || []);
@@ -872,6 +877,66 @@ function adminPaymentMeta(payment) {
     payment.externalId ? `external ${payment.externalId}` : "",
     payment.id
   ].filter(Boolean).join(" · ");
+}
+
+function renderAdminWithdrawals(withdrawals) {
+  adminRecentWithdrawals?.replaceChildren();
+  if (!withdrawals.length) {
+    const empty = document.createElement("div");
+    empty.className = "cashier-empty";
+    empty.textContent = "Заявок на вывод нет";
+    adminRecentWithdrawals?.append(empty);
+    return;
+  }
+
+  for (const withdrawal of withdrawals) {
+    const row = document.createElement("div");
+    row.className = `cashier-transaction admin-payment-row ${withdrawal.status === "approved" ? "credit" : "debit"}`;
+    const main = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = `${withdrawal.method?.toUpperCase?.() || withdrawal.method} · ${formatChips(withdrawal.chips)} chips`;
+    const meta = document.createElement("span");
+    meta.textContent = [
+      withdrawal.userName || withdrawal.username || withdrawal.userId,
+      `fee ${formatChips(withdrawal.feeChips || 0)}`,
+      `payout ${formatChips(withdrawal.payoutChips || 0)}`,
+      formatDateTime(withdrawal.createdAt)
+    ].filter(Boolean).join(" · ");
+    main.append(title, meta);
+
+    const status = document.createElement("b");
+    status.textContent = withdrawal.status;
+    row.append(main, status);
+
+    if (["pending", "manual_review"].includes(withdrawal.status)) {
+      const actions = document.createElement("div");
+      actions.className = "admin-payment-actions";
+      actions.innerHTML = `
+        <button type="button" data-withdrawal-action="approve" data-withdrawal-id="${withdrawal.id}">Approve</button>
+        <button type="button" data-withdrawal-action="reject" data-withdrawal-id="${withdrawal.id}">Reject</button>
+      `;
+      row.append(actions);
+    }
+
+    adminRecentWithdrawals?.append(row);
+  }
+}
+
+async function onAdminWithdrawalAction(event) {
+  const button = event.target.closest("button[data-withdrawal-action]");
+  if (!button) return;
+  const withdrawalId = button.dataset.withdrawalId;
+  const action = button.dataset.withdrawalAction;
+  adminStatus.textContent = action === "approve" ? "Подтверждаем вывод..." : "Отклоняем вывод...";
+  await api(`/api/admin/withdrawals/${encodeURIComponent(withdrawalId)}/${action}`, {
+    method: "POST",
+    idempotencyKey: requestKey(`admin-withdrawal-${action}-${withdrawalId}`),
+    body: {
+      reason: action === "approve" ? "manual_withdrawal_approval" : "manual_withdrawal_reject"
+    }
+  });
+  adminStatus.textContent = action === "approve" ? "Вывод подтвержден." : "Вывод отклонен.";
+  await loadAdminDashboard();
 }
 
 async function onAdminPaymentAction(event) {

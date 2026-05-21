@@ -5,11 +5,12 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as Sentry from "@sentry/node";
-import { depositSettings, quoteCryptoDeposit, quoteDeposit } from "./economy.js";
+import { ECONOMY, depositSettings, quoteCryptoDeposit, quoteDeposit } from "./economy.js";
 import {
   addWalletEntry as dbAddWalletEntry,
   completePaymentOrder as dbCompletePaymentOrder,
   createPaymentOrder as dbCreatePaymentOrder,
+  createWithdrawalOrder as dbCreateWithdrawalOrder,
   dashboardStats as dbDashboardStats,
   databaseHealth as dbDatabaseHealth,
   databaseEnabled,
@@ -17,6 +18,7 @@ import {
   getPaymentOrder as dbGetPaymentOrder,
   getIdempotencyResult as dbGetIdempotencyResult,
   getSavedStack as dbGetSavedStack,
+  getWithdrawalOrder as dbGetWithdrawalOrder,
   getWallet as dbGetWallet,
   initDatabase,
   listActiveTableSnapshots as dbListActiveTableSnapshots,
@@ -26,11 +28,13 @@ import {
   listHandHistories as dbListHandHistories,
   listPaymentOrders as dbListPaymentOrders,
   listPendingCryptoPaymentOrders as dbListPendingCryptoPaymentOrders,
+  listWithdrawalOrders as dbListWithdrawalOrders,
   markPaymentOrderPaid as dbMarkPaymentOrderPaid,
   recordAdminEvent as dbRecordAdminEvent,
   recordFundMovement as dbRecordFundMovement,
   recordHandHistory as dbRecordHandHistory,
   recordPlatformLedgerEntry as dbRecordPlatformLedgerEntry,
+  reviewWithdrawalOrder as dbReviewWithdrawalOrder,
   registerTournament as dbRegisterTournament,
   saveIdempotencyResult as dbSaveIdempotencyResult,
   cancelTournamentRegistration as dbCancelTournamentRegistration,
@@ -74,6 +78,10 @@ const BOT_USERNAME = normalizeBotUsername(process.env.BOT_USERNAME || "qwzpokerb
 const APP_NAME = process.env.APP_NAME || "QWZ Poker";
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || "";
 const ADMIN_USER_IDS = parseIdList(process.env.ADMIN_USER_IDS || ADMIN_CHAT_ID);
+const ADMIN_OWNER_IDS = parseIdList(process.env.ADMIN_OWNER_IDS || process.env.ADMIN_USER_IDS || ADMIN_CHAT_ID);
+const ADMIN_FINANCE_IDS = parseIdList(process.env.ADMIN_FINANCE_IDS || "");
+const ADMIN_SUPPORT_IDS = parseIdList(process.env.ADMIN_SUPPORT_IDS || "");
+const ADMIN_RISK_IDS = parseIdList(process.env.ADMIN_RISK_IDS || "");
 const ADMIN_GRANT_MAX_CHIPS = Number(process.env.ADMIN_GRANT_MAX_CHIPS || 500000);
 const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
 const CRYPTO_WEBHOOK_SECRET = process.env.CRYPTO_WEBHOOK_SECRET || "";
@@ -99,6 +107,7 @@ const transactions = new Map();
 const fundMovements = new Map();
 const starOrders = new Map();
 const cryptoOrders = new Map();
+const withdrawalOrders = new Map();
 const adminEvents = [];
 const loggedAppOpens = new Set();
 const persistedHandIds = new Set();
@@ -419,6 +428,15 @@ async function handleApi(req, res, url) {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/cashier/withdraw") {
+    await sendIdempotentJson(req, res, user, "cashier_withdraw", async (idempotencyKey) => {
+      const body = await readJson(req);
+      const result = await createWithdrawalRequest(user, body, idempotencyKey);
+      return { withdrawal: result.order, cashier: await cashierView(user) };
+    });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/tables") {
     await sendIdempotentJson(req, res, user, "table_create", async (idempotencyKey) => {
       const body = await readJson(req);
@@ -642,6 +660,7 @@ async function handleApi(req, res, url) {
 async function handleAdminApi(req, res, url, adminUser) {
   const userMatch = url.pathname.match(/^\/api\/admin\/users\/([^/]+)$/);
   const paymentActionMatch = url.pathname.match(/^\/api\/admin\/payments\/([^/]+)\/(approve|reject)$/);
+  const withdrawalActionMatch = url.pathname.match(/^\/api\/admin\/withdrawals\/([^/]+)\/(approve|reject)$/);
 
   if (req.method === "GET" && url.pathname === "/api/admin") {
     sendJson(res, 200, { admin: await adminDashboardView() });
@@ -654,6 +673,7 @@ async function handleAdminApi(req, res, url, adminUser) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/admin/wallet-adjust") {
+    requireAdminRole(adminUser.id, "finance");
     const body = await readJson(req);
     const result = await adjustWalletManually({
       admin: adminUser,
@@ -668,6 +688,7 @@ async function handleAdminApi(req, res, url, adminUser) {
   }
 
   if (req.method === "POST" && paymentActionMatch) {
+    requireAdminRole(adminUser.id, "finance");
     const [, paymentId, action] = paymentActionMatch;
     await sendIdempotentJson(req, res, adminUser, `admin_payment_${action}:${paymentId}`, async () => {
       const body = await readJson(req);
@@ -678,6 +699,22 @@ async function handleAdminApi(req, res, url, adminUser) {
         reason: body.reason || ""
       });
       return { payment: result, admin: await adminDashboardView() };
+    });
+    return;
+  }
+
+  if (req.method === "POST" && withdrawalActionMatch) {
+    requireAdminRole(adminUser.id, "finance");
+    const [, withdrawalId, action] = withdrawalActionMatch;
+    await sendIdempotentJson(req, res, adminUser, `admin_withdrawal_${action}:${withdrawalId}`, async () => {
+      const body = await readJson(req);
+      const result = await handleAdminWithdrawalAction({
+        admin: adminUser,
+        withdrawalId,
+        action,
+        reason: body.reason || ""
+      });
+      return { withdrawal: result.order || result, admin: await adminDashboardView() };
     });
     return;
   }
@@ -715,6 +752,7 @@ async function adminDashboardView() {
   const paidStars = [...starOrders.values()].filter((order) => order.status === "paid");
   const pendingStars = [...starOrders.values()].filter((order) => order.status === "pending");
   const recentPayments = await dbListPaymentOrders(30);
+  const recentWithdrawals = await dbListWithdrawalOrders(30);
   const recentEvents = await dbListAdminEvents(20);
   const recentHands = await dbListHandHistories(20);
   const memoryHandHistoryCount = recentHandHistories.length;
@@ -747,8 +785,13 @@ async function adminDashboardView() {
       activeTableSnapshotCount: dbStats ? dbStats.activeTableSnapshotCount : 0,
       bankrollTotal: playerFundsTotal,
       paidStars: dbStats ? dbStats.paidStars : paidStars.length,
-      pendingStars: dbStats ? dbStats.pendingStars : pendingStars.length
+      pendingStars: dbStats ? dbStats.pendingStars : pendingStars.length,
+      pendingWithdrawals: dbStats ? dbStats.pendingWithdrawals : [...withdrawalOrders.values()].filter((order) => ["pending", "manual_review"].includes(order.status)).length,
+      pendingWithdrawalChipsTotal: dbStats ? dbStats.pendingWithdrawalChipsTotal : [...withdrawalOrders.values()]
+        .filter((order) => ["pending", "manual_review"].includes(order.status))
+        .reduce((sum, order) => sum + Number(order.chips || 0), 0)
     },
+    adminRoles: adminRoleSummary(),
     diagnostics,
     audit: {
       playerFundsTotal,
@@ -772,6 +815,9 @@ async function adminDashboardView() {
     recentFundMovements: recentFundMovements(20),
     recentHands: recentHands || recentHandHistories.slice(0, 20),
     recentPayments: recentPayments || [...starOrders.values(), ...cryptoOrders.values()]
+      .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+      .slice(0, 30),
+    recentWithdrawals: recentWithdrawals || [...withdrawalOrders.values()]
       .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
       .slice(0, 30),
     recentEvents: recentEvents || adminEvents.slice(0, 20)
@@ -1181,6 +1227,7 @@ async function cashierView(user) {
     currency: "chips",
     mode: "chips",
     deposit: depositSettings(),
+    withdrawals: withdrawalSettings(),
     transactions: await getTransactions(user)
   };
 }
@@ -1573,7 +1620,40 @@ function getWalletLocal(userId) {
 }
 
 function isAdminUser(userId) {
-  return ADMIN_USER_IDS.has(String(userId));
+  return adminRolesFor(userId).length > 0;
+}
+
+function requireAdminRole(userId, role) {
+  if (hasAdminRole(userId, role)) return;
+  const error = new Error(`Admin role required: ${role}`);
+  error.status = 403;
+  throw error;
+}
+
+function hasAdminRole(userId, role) {
+  const roles = new Set(adminRolesFor(userId));
+  if (roles.has("owner")) return true;
+  return roles.has(role);
+}
+
+function adminRolesFor(userId) {
+  const id = String(userId || "");
+  const roles = [];
+  if (ADMIN_OWNER_IDS.has(id)) roles.push("owner");
+  if (ADMIN_USER_IDS.has(id) && !roles.includes("owner")) roles.push("owner");
+  if (ADMIN_FINANCE_IDS.has(id)) roles.push("finance");
+  if (ADMIN_SUPPORT_IDS.has(id)) roles.push("support");
+  if (ADMIN_RISK_IDS.has(id)) roles.push("risk");
+  return roles;
+}
+
+function adminRoleSummary() {
+  return {
+    owner: ADMIN_OWNER_IDS.size || ADMIN_USER_IDS.size,
+    finance: ADMIN_FINANCE_IDS.size,
+    support: ADMIN_SUPPORT_IDS.size,
+    risk: ADMIN_RISK_IDS.size
+  };
 }
 
 function normalizeTargetUserId(value) {
@@ -1600,6 +1680,12 @@ function parseChipAmount(value) {
   if (amount > ADMIN_GRANT_MAX_CHIPS) {
     throw new Error(`Лимит одной операции: ${formatNumber(ADMIN_GRANT_MAX_CHIPS)} chips`);
   }
+  return Math.round(amount);
+}
+
+function parsePositiveChips(value) {
+  const amount = Number(String(value || "").replace(/\s+/g, ""));
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("Укажите положительную сумму chips");
   return Math.round(amount);
 }
 
@@ -1766,6 +1852,202 @@ async function adjustWalletManually({ admin, targetId, type, amount, reason, req
   };
   if (idempotencyKey) idempotencyResults.set(idempotencyKey, result);
   return result;
+}
+
+async function createWithdrawalRequest(user, body = {}, idempotencyKey = "") {
+  if (process.env.WITHDRAWALS_ENABLED !== "true") {
+    const error = new Error("Вывод временно закрыт");
+    error.status = 409;
+    throw error;
+  }
+  const quote = quoteWithdrawal(body);
+  const order = {
+    id: randomId("wd"),
+    userId: user.id,
+    userName: user.name,
+    username: user.username,
+    method: quote.method,
+    chips: quote.chips,
+    feeChips: quote.feeChips,
+    payoutChips: quote.payoutChips,
+    destination: quote.destination,
+    status: "pending",
+    idempotencyKey,
+    createdAt: new Date().toISOString()
+  };
+
+  const dbResult = await dbCreateWithdrawalOrder(order);
+  if (dbResult?.order) {
+    setWalletBalanceLocal(user.id, dbResult.balance ?? user.balance);
+    withdrawalOrders.set(dbResult.order.id, dbResult.order);
+    notifyWithdrawalCreated(user, dbResult.order, dbResult.balance ?? user.balance);
+    return { order: dbResult.order, balance: dbResult.balance };
+  }
+
+  if (idempotencyKey && idempotencyResults.has(idempotencyKey)) {
+    return {
+      order: idempotencyResults.get(idempotencyKey),
+      balance: getWalletLocal(user.id),
+      idempotentReplay: true
+    };
+  }
+
+  const before = await getWallet(user.id);
+  if (before < quote.chips) {
+    const error = new Error(`Недостаточно chips. Баланс игрока: ${formatNumber(before)}`);
+    error.status = 409;
+    throw error;
+  }
+  const balance = await recordTransaction(user, {
+    type: "debit",
+    category: "withdrawal_hold",
+    title: "Заявка на вывод",
+    amount: quote.chips,
+    meta: `${quote.method} · payout ${quote.payoutChips} · fee ${quote.feeChips} · ${quote.destination}`,
+    idempotencyKey: `withdrawal:${order.id}:hold`
+  });
+  withdrawalOrders.set(order.id, order);
+  if (idempotencyKey) idempotencyResults.set(idempotencyKey, order);
+  notifyWithdrawalCreated(user, order, balance);
+  return { order, balance };
+}
+
+async function handleAdminWithdrawalAction({ admin, withdrawalId, action, reason = "" }) {
+  const order = await withdrawalOrderFromId(withdrawalId);
+  if (!order) {
+    const error = new Error("Заявка на вывод не найдена");
+    error.status = 404;
+    throw error;
+  }
+  if (!["pending", "manual_review"].includes(order.status)) {
+    const error = new Error(`Заявка уже в статусе ${order.status}`);
+    error.status = 409;
+    throw error;
+  }
+
+  const adminProfile = admin || { id: "system", name: "Admin", username: "" };
+  const normalizedReason = String(reason || "").trim() || `manual_${action}`;
+  const dbResult = await dbReviewWithdrawalOrder(order.id, {
+    action,
+    reason: normalizedReason,
+    adminId: adminProfile.id
+  });
+  if (dbResult?.order) {
+    withdrawalOrders.set(dbResult.order.id, dbResult.order);
+    if (dbResult.balance !== null && dbResult.balance !== undefined) {
+      setWalletBalanceLocal(dbResult.order.userId, dbResult.balance);
+    }
+    notifyWithdrawalReviewed(adminProfile, dbResult.order, normalizedReason);
+    return dbResult;
+  }
+
+  const nextStatus = action === "approve" ? "approved" : "rejected";
+  const reviewed = {
+    ...order,
+    status: nextStatus,
+    adminReason: normalizedReason,
+    reviewedBy: adminProfile.id,
+    reviewedAt: new Date().toISOString()
+  };
+  withdrawalOrders.set(order.id, reviewed);
+  let balance = null;
+  if (action === "reject") {
+    balance = await recordTransaction({ id: order.userId }, {
+      type: "credit",
+      category: "withdrawal_refund",
+      title: "Возврат заявки на вывод",
+      amount: order.chips,
+      meta: `${normalizedReason} · order ${order.id}`,
+      idempotencyKey: `withdrawal:${order.id}:refund`
+    });
+  }
+  notifyWithdrawalReviewed(adminProfile, reviewed, normalizedReason);
+  return { order: reviewed, balance };
+}
+
+async function withdrawalOrderFromId(orderId) {
+  return withdrawalOrders.get(orderId) || await dbGetWithdrawalOrder(orderId);
+}
+
+function quoteWithdrawal(body = {}) {
+  const chips = parsePositiveChips(body.chips || body.amount);
+  const method = normalizeWithdrawalMethod(body.method || "ton");
+  const settings = ECONOMY.withdrawals;
+  if (chips < settings.minimumChips) {
+    const error = new Error(`Минимальный вывод: ${formatNumber(settings.minimumChips)} chips`);
+    error.status = 400;
+    throw error;
+  }
+  const methodSettings = settings.methods.find((item) => item.id === method);
+  const feeChips = Math.ceil(chips * Number(methodSettings?.feePercent || 0));
+  const destination = String(body.destination || "").trim();
+  if (destination.length < 4) {
+    const error = new Error("Укажите реквизиты/адрес для вывода");
+    error.status = 400;
+    throw error;
+  }
+  if (destination.length > 240) {
+    const error = new Error("Реквизиты вывода слишком длинные");
+    error.status = 400;
+    throw error;
+  }
+  return {
+    method,
+    chips,
+    feeChips,
+    payoutChips: Math.max(0, chips - feeChips),
+    destination
+  };
+}
+
+function normalizeWithdrawalMethod(method) {
+  const normalized = normalizeLedgerCategory(method);
+  const methodIds = new Set(ECONOMY.withdrawals.methods.map((item) => item.id));
+  if (!methodIds.has(normalized)) {
+    const error = new Error("Метод вывода не поддерживается");
+    error.status = 400;
+    throw error;
+  }
+  return normalized;
+}
+
+function withdrawalSettings() {
+  return {
+    enabled: process.env.WITHDRAWALS_ENABLED === "true",
+    minimumChips: ECONOMY.withdrawals.minimumChips,
+    methods: ECONOMY.withdrawals.methods.map((method) => ({
+      ...method,
+      enabled: process.env.WITHDRAWALS_ENABLED === "true"
+    }))
+  };
+}
+
+function notifyWithdrawalCreated(user, order, balance) {
+  notifyAdmin("withdrawal_request", "Создана заявка на вывод", {
+    user,
+    lines: [
+      `Order: ${order.id}`,
+      `Метод: ${order.method}`,
+      `Hold: ${formatNumber(order.chips)} chips`,
+      `Комиссия: ${formatNumber(order.feeChips)} chips`,
+      `К выплате: ${formatNumber(order.payoutChips)} chips`,
+      `Баланс: ${formatNumber(balance)} chips`
+    ]
+  });
+}
+
+function notifyWithdrawalReviewed(admin, order, reason) {
+  notifyAdmin(`withdrawal_${order.status}`, order.status === "approved" ? "Вывод подтвержден" : "Вывод отклонен", {
+    user: { id: order.userId, name: order.userName, username: order.username },
+    lines: [
+      `Админ: ${formatUser(admin)}`,
+      `Order: ${order.id}`,
+      `Метод: ${order.method}`,
+      `Сумма: ${formatNumber(order.chips)} chips`,
+      `Статус: ${order.status}`,
+      `Причина: ${reason}`
+    ]
+  });
 }
 
 async function handleAdminPaymentAction({ admin, paymentId, action, reason = "" }) {

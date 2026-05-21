@@ -506,6 +506,54 @@ test("admin can manually approve and reject crypto payment orders", async () => 
   }
 });
 
+test("withdrawal request holds chips and admin can reject with refund", async () => {
+  const server = await startServer({
+    ADMIN_FINANCE_IDS: "dev-user",
+    WITHDRAWALS_ENABLED: "true"
+  });
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await topUp(auth.token, 10);
+
+    let cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.balance, 50000);
+
+    const created = await request("/api/cashier/withdraw", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "withdraw-ton-once",
+      body: { method: "ton", chips: 50000, destination: "UQB-test-wallet" }
+    });
+
+    assert.equal(created.withdrawal.status, "pending");
+    assert.equal(created.withdrawal.chips, 50000);
+    assert.equal(created.withdrawal.feeChips, 2500);
+    cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.balance, 0);
+    assert.equal(cashier.transactions[0].category, "withdrawal_hold");
+
+    let dashboard = (await request("/api/admin", { token: auth.token })).admin;
+    assert.equal(dashboard.stats.pendingWithdrawals, 1);
+    assert.ok(dashboard.recentWithdrawals.some((order) => order.id === created.withdrawal.id));
+
+    const reviewed = await request(`/api/admin/withdrawals/${created.withdrawal.id}/reject`, {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "withdraw-reject-once",
+      body: { reason: "test_refund" }
+    });
+
+    assert.equal(reviewed.withdrawal.status, "rejected");
+    cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.balance, 50000);
+    assert.equal(cashier.transactions[0].category, "withdrawal_refund");
+    dashboard = (await request("/api/admin", { token: auth.token })).admin;
+    assert.equal(dashboard.stats.pendingWithdrawals, 0);
+  } finally {
+    server.kill();
+  }
+});
+
 test("admin telegram commands grant and deduct wallet chips", async () => {
   const server = await startServer({ ADMIN_USER_IDS: "777" });
   try {

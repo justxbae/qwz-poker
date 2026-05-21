@@ -713,6 +713,189 @@ export async function listPaymentOrders(limit = 10) {
   return result.rows.map(paymentRow);
 }
 
+export async function createWithdrawalOrder(order, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, order.userId);
+  const idempotencyKey = normalizeIdempotencyKey(order.idempotencyKey);
+  if (idempotencyKey) {
+    const existing = await query(`
+      select wo.*, au.display_name as "userName", au.username
+      from withdrawal_orders wo
+      left join app_users au on au.id = wo.app_user_id
+      where wo.idempotency_key = $1
+      limit 1
+    `, [idempotencyKey]);
+    if (existing.rowCount) return { order: withdrawalRow(existing.rows[0]), idempotentReplay: true };
+  }
+
+  const chips = Math.max(0, Math.round(Number(order.chips) || 0));
+  const feeChips = Math.max(0, Math.round(Number(order.feeChips) || 0));
+  const payoutChips = Math.max(0, chips - feeChips);
+  const client = await pool.connect();
+
+  try {
+    await client.query("begin");
+    await client.query("insert into wallets (app_user_id, balance) values ($1, 0) on conflict do nothing", [appUserId]);
+    const wallet = await client.query("select balance from wallets where app_user_id = $1 for update", [appUserId]);
+    const before = Number(wallet.rows[0]?.balance || 0);
+    const after = before - chips;
+    if (after < 0) {
+      const error = new Error(`Недостаточно chips. Баланс игрока: ${before.toLocaleString("ru-RU")}`);
+      error.status = 409;
+      throw error;
+    }
+
+    await client.query("update wallets set balance = $2, updated_at = now() where app_user_id = $1", [appUserId, after]);
+    await client.query(`
+      insert into withdrawal_orders (
+        id, app_user_id, provider, provider_user_id, method, status,
+        chips, fee_chips, payout_chips, destination, idempotency_key, raw
+      )
+      values ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11::jsonb)
+    `, [
+      order.id,
+      appUserId,
+      provider,
+      String(order.userId),
+      normalizeLedgerCategory(order.method),
+      chips,
+      feeChips,
+      payoutChips,
+      order.destination || "",
+      idempotencyKey || null,
+      JSON.stringify(order)
+    ]);
+    await client.query(`
+      insert into ledger_entries (
+        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after, idempotency_key
+      )
+      values ($1, $2, $3, $4, 'debit', 'withdrawal_hold', 'Заявка на вывод', $5, $6, $7, $8)
+    `, [
+      id("ledger"),
+      appUserId,
+      provider,
+      String(order.userId),
+      chips,
+      `${order.method} · payout ${payoutChips} · fee ${feeChips} · order ${order.id}`,
+      after,
+      `withdrawal:${order.id}:hold`
+    ]);
+    await client.query("commit");
+    return {
+      order: await getWithdrawalOrder(order.id),
+      balance: after,
+      before
+    };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function reviewWithdrawalOrder(orderId, review) {
+  if (!pool) return null;
+  const client = await pool.connect();
+  const action = review.action === "approve" ? "approve" : "reject";
+  const reviewedStatus = action === "approve" ? "approved" : "rejected";
+
+  try {
+    await client.query("begin");
+    const current = await client.query(`
+      select wo.*, au.display_name as "userName", au.username
+      from withdrawal_orders wo
+      left join app_users au on au.id = wo.app_user_id
+      where wo.id = $1
+      for update
+    `, [orderId]);
+    if (!current.rowCount) {
+      await client.query("commit");
+      return null;
+    }
+    const row = current.rows[0];
+    const order = withdrawalRow(row);
+    if (order.status !== "pending" && order.status !== "manual_review") {
+      await client.query("commit");
+      return { order, ignored: true };
+    }
+
+    let balance = null;
+    if (action === "reject") {
+      await client.query("insert into wallets (app_user_id, balance) values ($1, 0) on conflict do nothing", [row.app_user_id]);
+      const wallet = await client.query("select balance from wallets where app_user_id = $1 for update", [row.app_user_id]);
+      const before = Number(wallet.rows[0]?.balance || 0);
+      balance = before + order.chips;
+      await client.query("update wallets set balance = $2, updated_at = now() where app_user_id = $1", [row.app_user_id, balance]);
+      await client.query(`
+        insert into ledger_entries (
+          id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after, idempotency_key
+        )
+        values ($1, $2, $3, $4, 'credit', 'withdrawal_refund', 'Возврат заявки на вывод', $5, $6, $7, $8)
+        on conflict do nothing
+      `, [
+        id("ledger"),
+        row.app_user_id,
+        row.provider,
+        row.provider_user_id,
+        order.chips,
+        `${review.reason || "manual_reject"} · order ${order.id}`,
+        balance,
+        `withdrawal:${order.id}:refund`
+      ]);
+    }
+
+    await client.query(`
+      update withdrawal_orders
+      set status = $2,
+          admin_reason = $3,
+          reviewed_by_provider_user_id = $4,
+          reviewed_at = now(),
+          raw = coalesce(raw, '{}'::jsonb) || $5::jsonb
+      where id = $1
+    `, [
+      order.id,
+      reviewedStatus,
+      review.reason || "",
+      String(review.adminId || ""),
+      JSON.stringify({ review })
+    ]);
+    await client.query("commit");
+    return {
+      order: await getWithdrawalOrder(order.id),
+      balance
+    };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function getWithdrawalOrder(orderId) {
+  if (!pool) return null;
+  const result = await query(`
+    select wo.*, au.display_name as "userName", au.username
+    from withdrawal_orders wo
+    left join app_users au on au.id = wo.app_user_id
+    where wo.id = $1
+  `, [orderId]);
+  return result.rowCount ? withdrawalRow(result.rows[0]) : null;
+}
+
+export async function listWithdrawalOrders(limit = 30) {
+  if (!pool) return null;
+  const result = await query(`
+    select wo.*, au.display_name as "userName", au.username
+    from withdrawal_orders wo
+    left join app_users au on au.id = wo.app_user_id
+    order by wo.created_at desc
+    limit $1
+  `, [limit]);
+  return result.rows.map(withdrawalRow);
+}
+
 export async function listPendingCryptoPaymentOrders(limit = 50) {
   if (!pool) return null;
   const result = await query(`
@@ -823,6 +1006,8 @@ export async function dashboardStats() {
       (select coalesce(sum(rake), 0)::bigint from hand_histories) as hand_history_rake_total,
       (select count(*)::int from payment_orders where status = 'paid' and method = 'stars') as paid_stars,
       (select count(*)::int from payment_orders where status = 'pending' and method = 'stars') as pending_stars,
+      (select count(*)::int from withdrawal_orders where status in ('pending', 'manual_review')) as pending_withdrawals,
+      (select coalesce(sum(chips), 0)::bigint from withdrawal_orders where status in ('pending', 'manual_review')) as pending_withdrawal_chips_total,
       (select coalesce(sum(chips), 0)::bigint from payment_orders where status = 'paid' and method = 'stars') as paid_stars_chips_total,
       (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'credit' and category = 'deposit_stars') as deposit_stars_ledger_total,
       (select count(*)::int from idempotency_keys where expires_at > now()) as idempotency_key_count,
@@ -840,6 +1025,8 @@ export async function dashboardStats() {
     handHistoryRakeTotal: Number(result.rows[0].hand_history_rake_total || 0),
     paidStars: Number(result.rows[0].paid_stars || 0),
     pendingStars: Number(result.rows[0].pending_stars || 0),
+    pendingWithdrawals: Number(result.rows[0].pending_withdrawals || 0),
+    pendingWithdrawalChipsTotal: Number(result.rows[0].pending_withdrawal_chips_total || 0),
     paidStarsChipsTotal: Number(result.rows[0].paid_stars_chips_total || 0),
     depositStarsLedgerTotal: Number(result.rows[0].deposit_stars_ledger_total || 0),
     idempotencyKeyCount: Number(result.rows[0].idempotency_key_count || 0),
@@ -1037,6 +1224,29 @@ async function migrate() {
     create index if not exists idx_payment_orders_status_created on payment_orders(status, created_at desc);
     create index if not exists idx_payment_orders_external_id on payment_orders(external_id) where external_id <> '';
 
+    create table if not exists withdrawal_orders (
+      id text primary key,
+      app_user_id text not null references app_users(id) on delete cascade,
+      provider text not null,
+      provider_user_id text not null,
+      method text not null,
+      status text not null check (status in ('pending', 'manual_review', 'approved', 'rejected', 'cancelled', 'failed')),
+      chips bigint not null check (chips > 0),
+      fee_chips bigint not null default 0 check (fee_chips >= 0),
+      payout_chips bigint not null default 0 check (payout_chips >= 0),
+      destination text not null default '',
+      admin_reason text not null default '',
+      reviewed_by_provider_user_id text not null default '',
+      idempotency_key text,
+      raw jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now(),
+      reviewed_at timestamptz
+    );
+
+    create index if not exists idx_withdrawal_orders_app_user_created on withdrawal_orders(app_user_id, created_at desc);
+    create index if not exists idx_withdrawal_orders_status_created on withdrawal_orders(status, created_at desc);
+    create unique index if not exists idx_withdrawal_orders_idempotency_key on withdrawal_orders(idempotency_key) where idempotency_key is not null;
+
     create table if not exists idempotency_keys (
       key text primary key,
       scope text not null,
@@ -1113,6 +1323,27 @@ function paymentRow(row) {
     createdAt: row.created_at,
     expiresAt: row.expires_at,
     paidAt: row.paid_at
+  };
+}
+
+function withdrawalRow(row) {
+  return {
+    id: row.id,
+    userId: row.provider_user_id,
+    provider: row.provider || "telegram",
+    method: row.method || "ton",
+    userName: row.userName || row.display_name || "",
+    username: row.username || "",
+    status: row.status,
+    chips: Number(row.chips || 0),
+    feeChips: Number(row.fee_chips || 0),
+    payoutChips: Number(row.payout_chips || 0),
+    destination: row.destination || "",
+    adminReason: row.admin_reason || "",
+    reviewedBy: row.reviewed_by_provider_user_id || "",
+    idempotencyKey: row.idempotency_key || "",
+    createdAt: row.created_at,
+    reviewedAt: row.reviewed_at
   };
 }
 
