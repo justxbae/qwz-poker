@@ -189,6 +189,8 @@ let queuedPreActionKey = "";
 let pendingBetAction = "";
 let pendingBuyIn = null;
 let currentLobbyTab = "home";
+let fairnessSeedSyncing = false;
+const fairnessSeedSyncedTables = new Set();
 
 boot();
 
@@ -788,7 +790,7 @@ async function adjustAdminPlayerWallet() {
       type: adminAdjustType.value,
       amount,
       reason: adminAdjustReason.value,
-      requestId: `admin-${Date.now()}-${Math.random().toString(16).slice(2)}`
+      requestId: `admin-${Date.now()}-${cryptoRandomHex(12)}`
     }
   });
   renderAdminPlayer(data.player);
@@ -1247,6 +1249,7 @@ async function joinTable(tableId, buyInAmount = 0) {
     state.currentTableId = data.table.id;
     enterGameMode();
     renderCurrentTable(data.table);
+    await ensurePlayerFairnessSeed(data.table);
     haptic("success");
   });
 }
@@ -1337,6 +1340,7 @@ async function confirmBuyIn() {
     state.currentTableId = data.table.id;
     enterGameMode();
     renderCurrentTable(data.table);
+    await ensurePlayerFairnessSeed(data.table);
     haptic("success");
     await auth();
     await loadCashier();
@@ -1392,6 +1396,43 @@ function setBuyInAmount(amount) {
 async function loadCurrentTable() {
   const data = await api(`/api/tables/${state.currentTableId}`);
   renderCurrentTable(data.table);
+  await ensurePlayerFairnessSeed(data.table);
+}
+
+async function ensurePlayerFairnessSeed(table) {
+  if (!table?.id || !state.user?.id || !table.viewer?.isSeated) return;
+  if (!["waiting", "starting", "showdown"].includes(table.status)) return;
+
+  const viewerSeat = (table.seats || []).find((seat) => seat.userId === state.user.id);
+  if (!viewerSeat || viewerSeat.fairnessSeedSource === "player") return;
+
+  const syncKey = `${table.id}:${viewerSeat.fairnessSeedHash || "missing"}`;
+  if (fairnessSeedSyncing || fairnessSeedSyncedTables.has(syncKey)) return;
+
+  fairnessSeedSyncing = true;
+  fairnessSeedSyncedTables.add(syncKey);
+  try {
+    const data = await api(`/api/tables/${table.id}/fairness-seed`, {
+      method: "POST",
+      body: { seed: getLocalFairnessSeed() }
+    });
+    if (data.table) renderCurrentTable(data.table);
+  } catch (error) {
+    console.warn("Fairness seed sync failed:", error.message);
+  } finally {
+    fairnessSeedSyncing = false;
+  }
+}
+
+function getLocalFairnessSeed() {
+  const userId = state.user?.id || "anonymous";
+  const storageKey = `qwzFairnessSeed:${userId}`;
+  const existing = window.localStorage.getItem(storageKey);
+  if (existing && existing.length >= 32) return existing;
+
+  const seed = `qwz:${userId}:${Date.now()}:${cryptoRandomHex(32)}`;
+  window.localStorage.setItem(storageKey, seed);
+  return seed;
 }
 
 async function onPokerAction(event) {
@@ -2490,5 +2531,17 @@ async function api(path, options = {}) {
 
 function requestKey(prefix) {
   if (window.crypto?.randomUUID) return `${prefix}:${window.crypto.randomUUID()}`;
-  return `${prefix}:${Date.now()}:${Math.random().toString(16).slice(2)}`;
+  return `${prefix}:${Date.now()}:${cryptoRandomHex(12)}`;
+}
+
+function cryptoRandomHex(bytes = 16) {
+  const array = new Uint8Array(bytes);
+  if (window.crypto?.getRandomValues) {
+    window.crypto.getRandomValues(array);
+  } else {
+    for (let index = 0; index < array.length; index += 1) {
+      array[index] = (Date.now() + index * 17) % 256;
+    }
+  }
+  return [...array].map((value) => value.toString(16).padStart(2, "0")).join("");
 }

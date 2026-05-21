@@ -125,6 +125,34 @@ test("health endpoint is public and admin dashboard exposes diagnostics", async 
   }
 });
 
+test("player can set fairness seed before the hand starts", async () => {
+  const server = await startServer();
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await topUp(auth.token, 1);
+    const table = (await request("/api/tables", {
+      method: "POST",
+      token: auth.token,
+      body: { name: "Fairness", maxPlayers: 2, smallBlind: 25, buyInAmount: 5000 }
+    })).table;
+
+    const seeded = await request(`/api/tables/${table.id}/fairness-seed`, {
+      method: "POST",
+      token: auth.token,
+      body: { seed: "client generated fairness seed" }
+    });
+
+    assert.equal(seeded.fairnessSeed.source, "player");
+    assert.equal(seeded.fairnessSeed.seedHash.length, 64);
+    assert.equal(
+      seeded.table.seats.find((seat) => seat.userId === auth.user.id).fairnessSeedSource,
+      "player"
+    );
+  } finally {
+    server.kill();
+  }
+});
+
 test("seated player can control test bots at public system tables", async () => {
   const server = await startServer();
   try {
