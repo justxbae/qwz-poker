@@ -55,19 +55,22 @@
 
 ---
 
-### 1.3. Provably-fair shuffle (commit-reveal)
+### 1.3. Provably-fair shuffle (commit-reveal) — базово сделано
 
-**Проблема:** `shuffle` в `poker-engine.js` использует `Math.random()`. Для **реально-денежного** покера это **неприемлемо** — невозможно доказать игроку, что раздача честная, и невозможно опровергнуть обвинение в подкрутке.
+**Статус:** `Math.random()` убран из раздачи. Сейчас используется SHA-256 + Fisher-Yates, `serverSeedHash` публикуется в начале руки, `serverSeed` раскрывается после завершения, proof пишется в `hand_histories.fairness_proof`.
 
-**Решение — стандартная схема commit-reveal:**
+**Текущая схема:**
 
 1. В начале каждой руки сервер генерирует `serverSeed` (32 байта csprng) и публикует `commit = sha256(serverSeed)`.
-2. Клиент при заходе на стол отправляет свой `clientSeed` (или используется агрегат всех клиентских seed’ов).
-3. Реальная колода тасуется детерминированно из `combinedSeed = hash(serverSeed || clientSeed || handNumber)`.
-4. По окончании руки сервер раскрывает `serverSeed` → игрок может локально воспроизвести тасовку и проверить.
-5. Всё это пишется в `hand_histories.raw.fairness`.
+2. Игрок может задать player seed через backend endpoint, иначе используется `server-fallback`.
+3. `clientSeed` собирается из player seeds активных игроков.
+4. Реальная колода тасуется детерминированно из `serverSeed`, `clientSeed`, `handNumber`, `tableId`.
+5. По окончании руки сервер раскрывает `serverSeed` → игрок может локально воспроизвести тасовку и проверить.
+6. Всё это пишется в `hand_histories.fairness_proof` и `hand_histories.raw`.
 
-**Файлы:** `server/poker-engine.js::createDeck/shuffle`, новая колонка `hand_histories.fairness_proof`.
+**Осталось до real-money уровня:** полноценный двухфазный player commit/reveal, где игрок сначала отправляет только `seedHash`, а seed раскрывается после фиксации server commit.
+
+**Файлы:** `server/poker-engine.js::createProvablyFairDeck`, `docs/FAIRNESS.md`, колонка `hand_histories.fairness_proof`.
 
 **Внешний эффект:** маркетинг — «provably fair», страница «проверь свою руку».
 

@@ -73,8 +73,24 @@ export function joinTable(table, user) {
     sitOutNextHand: false,
     sittingOutUntil: 0,
     sittingOutReason: "",
+    fairnessSeed: createPlayerFairnessSeed("server-fallback"),
     cards: []
   });
+}
+
+export function setPlayerFairnessSeed(table, user, seed) {
+  const seat = table.seats.find((candidate) => candidate.userId === user.id);
+  if (!seat) throwHttp(404, "Вы не сидите за этим столом");
+  if (!canBuyIn(table)) throwHttp(409, "Seed можно менять только между раздачами");
+
+  const normalizedSeed = String(seed || "").trim();
+  if (normalizedSeed.length < 16) throwHttp(400, "Seed должен быть не короче 16 символов");
+  if (normalizedSeed.length > 256) throwHttp(400, "Seed должен быть не длиннее 256 символов");
+
+  seat.fairnessSeed = createPlayerFairnessSeed("player", normalizedSeed);
+  table.message = `${seat.name} обновил fairness seed`;
+  addLog(table, table.message);
+  return publicPlayerFairnessSeed(seat);
 }
 
 export function leaveTable(table, user) {
@@ -236,10 +252,16 @@ export function startHand(table, user) {
 
   table.handNumber += 1;
   table.actionLog = [];
+  for (const seat of playableSeats(table)) {
+    if (!seat.fairnessSeed) {
+      seat.fairnessSeed = createPlayerFairnessSeed("server-fallback");
+    }
+  }
   const fairness = createProvablyFairDeck({
     tableId: table.id,
     handNumber: table.handNumber,
-    playerIds: playableSeats(table).map((seat) => seat.userId)
+    playerIds: playableSeats(table).map((seat) => seat.userId),
+    playerSeeds: buildCurrentHandPlayerSeeds(table)
   });
   table.deck = fairness.deck;
   table.fairnessProof = fairness.proof;
@@ -375,6 +397,7 @@ export function publicTable(table, viewerId = "") {
     message: table.message,
     actionLog: table.actionLog,
     handHistory: publicHandHistory(table.handHistory),
+    fairness: publicCurrentFairness(table),
     viewer: {
       isSeated: Boolean(viewerSeat),
       canAct,
@@ -408,6 +431,8 @@ export function publicTable(table, viewerId = "") {
       sitOutNextHand: seat.sitOutNextHand,
       sittingOutUntil: seat.sittingOutUntil,
       sittingOutReason: seat.sittingOutReason,
+      fairnessSeedHash: seat.fairnessSeed?.seedHash || "",
+      fairnessSeedSource: seat.fairnessSeed?.source || "server-fallback",
       sittingOutSecondsLeft: seat.sittingOutUntil ? Math.max(0, Math.ceil((seat.sittingOutUntil - Date.now()) / 1000)) : 0,
       isAllIn: isAllInSeat(table, seat),
       cards: seat.userId === viewerId || (!seat.folded && (table.status === "showdown" || table.status === "runout"))
@@ -423,6 +448,7 @@ function publicHandHistory(history) {
     handNumber: hand.handNumber,
     at: hand.at,
     board: hand.board,
+    fairnessProof: hand.fairnessProof ? publicFairnessProof(hand.fairnessProof) : null,
     pots: hand.pots.map((pot) => ({
       label: pot.label,
       amount: pot.amount,
@@ -708,16 +734,20 @@ export function createProvablyFairDeck({
   tableId = "table",
   handNumber = 0,
   playerIds = [],
+  playerSeeds = [],
   serverSeed = randomBytes(32).toString("hex")
 } = {}) {
   const normalizedPlayerIds = [...playerIds].map(String).sort();
+  const normalizedPlayerSeeds = normalizePlayerSeeds(playerSeeds, normalizedPlayerIds);
+  const clientSeed = buildClientSeed(tableId, normalizedPlayerIds, normalizedPlayerSeeds);
   const proofBase = {
     algorithm: "qwz-sha256-fisher-yates-v1",
     tableId: String(tableId),
     handNumber: Number(handNumber || 0),
     nonce: Number(handNumber || 0),
     playerIds: normalizedPlayerIds,
-    clientSeed: normalizedPlayerIds.length ? normalizedPlayerIds.join("|") : String(tableId),
+    playerSeeds: normalizedPlayerSeeds,
+    clientSeed,
     serverSeed,
     serverSeedHash: sha256Hex(serverSeed)
   };
@@ -732,6 +762,11 @@ export function createProvablyFairDeck({
 export function verifyProvablyFairDeck(deck, proof) {
   if (!Array.isArray(deck) || !proof?.serverSeed || !proof?.serverSeedHash) return false;
   if (sha256Hex(proof.serverSeed) !== proof.serverSeedHash) return false;
+  for (const playerSeed of proof.playerSeeds || []) {
+    if (sha256Hex(playerSeed.seed || "") !== playerSeed.seedHash) return false;
+  }
+  const rebuiltClientSeed = buildClientSeed(proof.tableId, proof.playerIds || [], proof.playerSeeds || []);
+  if (rebuiltClientSeed !== proof.clientSeed) return false;
   const rebuilt = shuffleWithProof(createDeck(), proof);
   return rebuilt.join(",") === deck.join(",") && sha256Hex(deck.join(",")) === proof.deckHash;
 }
@@ -967,6 +1002,47 @@ function createDeck() {
   return suits.flatMap((suit) => ranks.map((rank) => `${rank}${suit}`));
 }
 
+function createPlayerFairnessSeed(source, seed = randomBytes(32).toString("hex")) {
+  return {
+    source,
+    seed,
+    seedHash: sha256Hex(seed),
+    updatedAt: Date.now()
+  };
+}
+
+function buildCurrentHandPlayerSeeds(table) {
+  return playableSeats(table).map((seat) => ({
+    userId: seat.userId,
+    seed: seat.fairnessSeed?.seed || "",
+    seedHash: seat.fairnessSeed?.seedHash || "",
+    source: seat.fairnessSeed?.source || "server-fallback"
+  }));
+}
+
+function normalizePlayerSeeds(playerSeeds, playerIds) {
+  const byUserId = new Map((playerSeeds || []).map((item) => [String(item.userId || ""), item]));
+  return playerIds.map((userId) => {
+    const seedRecord = byUserId.get(userId);
+    const seed = String(seedRecord?.seed || "");
+    return {
+      userId,
+      seed,
+      seedHash: seedRecord?.seedHash || sha256Hex(seed),
+      source: seedRecord?.source || "server-fallback"
+    };
+  });
+}
+
+function buildClientSeed(tableId, playerIds, playerSeeds) {
+  if (!playerSeeds.length) {
+    return sha256Hex(playerIds.length ? playerIds.join("|") : String(tableId));
+  }
+  return sha256Hex(playerSeeds
+    .map((item) => `${item.userId}:${item.seed}`)
+    .join("|"));
+}
+
 function shuffleWithProof(cards, proof) {
   const result = [...cards];
   let cursor = 0;
@@ -1018,11 +1094,56 @@ function revealFairnessProof(proof) {
     handNumber: proof.handNumber,
     nonce: proof.nonce,
     playerIds: proof.playerIds,
+    playerSeeds: proof.playerSeeds,
     clientSeed: proof.clientSeed,
     serverSeedHash: proof.serverSeedHash,
     serverSeed: proof.serverSeed,
     deckHash: proof.deckHash,
     revealedAt: Date.now()
+  };
+}
+
+function publicCurrentFairness(table) {
+  if (!table.fairnessProof) return null;
+  return {
+    algorithm: table.fairnessProof.algorithm,
+    handNumber: table.fairnessProof.handNumber,
+    serverSeedHash: table.fairnessProof.serverSeedHash,
+    playerSeedHashes: (table.fairnessProof.playerSeeds || []).map((item) => ({
+      userId: item.userId,
+      seedHash: item.seedHash,
+      source: item.source
+    }))
+  };
+}
+
+function publicFairnessProof(proof) {
+  return {
+    algorithm: proof.algorithm,
+    tableId: proof.tableId,
+    handNumber: proof.handNumber,
+    nonce: proof.nonce,
+    playerIds: proof.playerIds,
+    playerSeeds: (proof.playerSeeds || []).map((item) => ({
+      userId: item.userId,
+      seed: item.seed,
+      seedHash: item.seedHash,
+      source: item.source
+    })),
+    clientSeed: proof.clientSeed,
+    serverSeedHash: proof.serverSeedHash,
+    serverSeed: proof.serverSeed,
+    deckHash: proof.deckHash,
+    revealedAt: proof.revealedAt
+  };
+}
+
+function publicPlayerFairnessSeed(seat) {
+  return {
+    userId: seat.userId,
+    seedHash: seat.fairnessSeed?.seedHash || "",
+    source: seat.fairnessSeed?.source || "server-fallback",
+    updatedAt: seat.fairnessSeed?.updatedAt || 0
   };
 }
 

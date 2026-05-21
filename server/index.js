@@ -54,6 +54,7 @@ import {
   leaveTable,
   maybeStartHand,
   publicTable,
+  setPlayerFairnessSeed,
   sitIn,
   sitOut,
   startHand,
@@ -591,6 +592,14 @@ async function handleApi(req, res, url) {
       return;
     }
 
+    if (req.method === "POST" && action === "fairness-seed") {
+      const body = await readJson(req);
+      const fairnessSeed = setPlayerFairnessSeed(table, user, body.seed);
+      await persistActiveTableSnapshot(table);
+      sendJson(res, 200, { fairnessSeed, table: tableView(table, user) });
+      return;
+    }
+
     if (req.method === "POST" && action === "act") {
       const body = await readJson(req);
       act(table, user, body);
@@ -1013,6 +1022,7 @@ function normalizeHydratedTable(table, now = Date.now()) {
     seat.totalBet = Math.max(0, Math.round(Number(seat.totalBet) || 0));
     seat.handStartStack = Math.max(0, Math.round(Number(seat.handStartStack) || seat.stack || 0));
     seat.sittingOutUntil = Number(seat.sittingOutUntil || 0);
+    seat.fairnessSeed = seat.fairnessSeed && typeof seat.fairnessSeed === "object" ? seat.fairnessSeed : null;
   }
 
   return table;

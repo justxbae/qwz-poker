@@ -9,6 +9,7 @@ import {
   leaveTable,
   maybeStartHand,
   publicTable,
+  setPlayerFairnessSeed,
   sitIn,
   sitOut,
   startHand,
@@ -37,12 +38,20 @@ test("provably fair deck is deterministic and verifiable", () => {
     tableId: "table_1",
     handNumber: 7,
     playerIds: ["p2", "owner"],
+    playerSeeds: [
+      { userId: "p2", seed: "player-two-seed-0001" },
+      { userId: "owner", seed: "owner-seed-0001" }
+    ],
     serverSeed: seed
   });
   const second = createProvablyFairDeck({
     tableId: "table_1",
     handNumber: 7,
     playerIds: ["owner", "p2"],
+    playerSeeds: [
+      { userId: "owner", seed: "owner-seed-0001" },
+      { userId: "p2", seed: "player-two-seed-0001" }
+    ],
     serverSeed: seed
   });
 
@@ -52,8 +61,28 @@ test("provably fair deck is deterministic and verifiable", () => {
   assert.equal(first.proof.serverSeed, seed);
   assert.equal(first.proof.serverSeedHash.length, 64);
   assert.equal(first.proof.deckHash.length, 64);
+  assert.equal(first.proof.playerSeeds.length, 2);
+  assert.equal(first.proof.clientSeed.length, 64);
   assert.equal(verifyProvablyFairDeck(first.deck, first.proof), true);
+  assert.equal(verifyProvablyFairDeck(first.deck, { ...first.proof, clientSeed: "0".repeat(64) }), false);
   assert.equal(verifyProvablyFairDeck([...first.deck].reverse(), first.proof), false);
+});
+
+test("player fairness seed participates in hand proof", () => {
+  const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
+  joinTable(table, player2);
+
+  const fairnessSeed = setPlayerFairnessSeed(table, owner, "owner custom fairness seed");
+  assert.equal(fairnessSeed.source, "player");
+  assert.equal(fairnessSeed.seedHash.length, 64);
+
+  maybeStartHand(table);
+  startHand(table);
+
+  assert.equal(table.fairnessProof.playerSeeds.length, 2);
+  assert.equal(table.fairnessProof.playerSeeds.find((seed) => seed.userId === owner.id).source, "player");
+  assert.equal(table.fairnessProof.playerSeeds.find((seed) => seed.userId === player2.id).source, "server-fallback");
+  assert.equal(publicTable(table, owner.id).fairness.serverSeedHash, table.fairnessProof.serverSeedHash);
 });
 
 test("first hand shows a starting intro before cards are dealt", () => {
