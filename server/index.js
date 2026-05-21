@@ -2208,7 +2208,7 @@ function requireSession(req) {
 }
 
 async function serveStatic(req, res, url) {
-  let filePath = path.join(publicDir, url.pathname === "/" ? "index.html" : url.pathname);
+  let filePath = path.join(publicDir, (url.pathname === "/" || url.pathname === "/admin") ? "index.html" : url.pathname);
   if (!filePath.startsWith(publicDir)) {
     sendJson(res, 403, { error: "Forbidden" });
     return;

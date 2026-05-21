@@ -4,7 +4,7 @@ const params = new URLSearchParams(window.location.search);
 const DEV_MODE = params.has("dev1")
   || params.get("dev") === "1"
   || window.localStorage.getItem("qwzDevMode") === "1";
-const ADMIN_MODE = params.get("admin") === "1";
+const ADMIN_MODE = params.get("admin") === "1" || window.location.pathname === "/admin";
 if ("scrollRestoration" in window.history) {
   window.history.scrollRestoration = "manual";
 }
@@ -202,6 +202,9 @@ async function boot() {
   await auth();
   await loadTables();
   await loadProfile();
+  if (ADMIN_MODE) {
+    selectLobbyTab("admin", { keepScroll: true });
+  }
 
   const startParam = tg?.initDataUnsafe?.start_param;
   if (startParam) await joinTable(startParam);
