@@ -160,12 +160,16 @@
 
           <section class="tg-menu-group">
             <button type="button" class="tg-menu-row" data-lobby-tab="profile">
-              <span class="tg-row-icon" aria-hidden="true">P</span>
+              <span class="tg-row-icon tg-row-icon--red" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 12.2a4.15 4.15 0 1 0 0-8.3 4.15 4.15 0 0 0 0 8.3Z"/><path d="M4.6 20.1c.8-4 3.3-6 7.4-6s6.6 2 7.4 6"/></svg>
+              </span>
               <span class="tg-row-main">Мой профиль</span>
               <span class="tg-chevron">›</span>
             </button>
             <button type="button" class="tg-menu-row" data-lobby-tab="cashier">
-              <span class="tg-row-icon" aria-hidden="true">₽</span>
+              <span class="tg-row-icon tg-row-icon--blue" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M3.5 7.2h16.8v10.2H3.5z"/><path d="M16.1 10.1h4.3v4h-4.3a2 2 0 1 1 0-4Z"/><path d="M6 7.2V5.3h11"/></svg>
+              </span>
               <span class="tg-row-main">Баланс</span>
               <span class="tg-row-value"><b id="lobbyBalance">0</b> chips</span>
               <span class="tg-chevron">›</span>
@@ -174,19 +178,25 @@
 
           <section class="tg-menu-group">
             <button type="button" class="tg-menu-row tg-menu-row-action" id="quickPlayButton">
-              <span class="tg-row-icon" aria-hidden="true">▶</span>
+              <span class="tg-row-icon tg-row-icon--green" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path class="svg-fill" d="M8 5.4 19 12 8 18.6z"/></svg>
+              </span>
               <span class="tg-row-main">Начать игру</span>
               <span class="tg-row-value" id="quickPlayHint">Минимальный вход на 25/50: 2 500 chips</span>
               <span class="tg-chevron">›</span>
             </button>
             <button type="button" class="tg-menu-row" data-lobby-tab="tables">
-              <span class="tg-row-icon" aria-hidden="true">♠</span>
+              <span class="tg-row-icon tg-row-icon--cyan" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4.2 7.3 7.3 4h9.2l3.3 3.3v10.8a2 2 0 0 1-2 2H6.2a2 2 0 0 1-2-2Z"/><path d="M7.5 4v5.1h9V4"/><path d="M8 13h8"/></svg>
+              </span>
               <span class="tg-row-main">Все столы</span>
               <span class="tg-row-value" id="onlineStatus">0 свободно</span>
               <span class="tg-chevron">›</span>
             </button>
             <div class="tg-menu-row tg-menu-row-stack">
-              <span class="tg-row-icon tg-row-icon-text" aria-hidden="true">BB</span>
+              <span class="tg-row-icon tg-row-icon--orange" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><circle cx="9" cy="12" r="6"/><path d="M9 9v6M7.5 10.3H10a1.2 1.2 0 0 1 0 2.4H7.5"/><path d="M15 6.8a6 6 0 0 1 0 10.4"/></svg>
+              </span>
               <span class="tg-row-main">Блайнды</span>
               <div class="limit-pills" id="limitPills">
                 <button type="button" class="active" data-small-blind="25">25/50</button>
@@ -207,19 +217,25 @@
 
           <section class="tg-menu-group">
             <button type="button" class="tg-menu-row" data-lobby-tab="tournaments">
-              <span class="tg-row-icon tg-row-icon-text" aria-hidden="true">T</span>
+              <span class="tg-row-icon tg-row-icon--purple" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M8 4.5h8v7.1a4 4 0 0 1-8 0Z"/><path d="M8 7H4.8v2.2a4 4 0 0 0 4 4M16 7h3.2v2.2a4 4 0 0 1-4 4"/><path d="M12 15.7V19M8.5 20h7"/></svg>
+              </span>
               <span class="tg-row-main">Турниры</span>
               <span class="tg-row-value">скоро</span>
               <span class="tg-chevron">›</span>
             </button>
             <button type="button" class="tg-menu-row" id="quickPrivateButton">
-              <span class="tg-row-icon tg-row-icon-text" aria-hidden="true">#</span>
+              <span class="tg-row-icon tg-row-icon--gold" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="4.5" y="10" width="15" height="10" rx="2"/><path d="M8 10V7.8a4 4 0 0 1 8 0V10"/><path d="M12 14v2.4"/></svg>
+              </span>
               <span class="tg-row-main">Приватный стол</span>
               <span class="tg-row-value">для друзей</span>
               <span class="tg-chevron">›</span>
             </button>
             <div class="tg-menu-row">
-              <span class="tg-row-icon tg-row-icon-text" aria-hidden="true">...</span>
+              <span class="tg-row-icon tg-row-icon--gray" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 12h3l2-4 4 8 2-4h5"/></svg>
+              </span>
               <span class="tg-row-main">Сессия</span>
               <span class="tg-row-value" id="homeActivityText">Выберите стол и начните игру.</span>
               <span class="session-pill" id="homeSessionPill">нет активных</span>
@@ -579,19 +595,19 @@
 
         <nav class="bottom-nav" aria-label="Главное меню">
           <button type="button" class="active" data-lobby-tab="home">
-            <span class="nav-icon nav-home" aria-hidden="true"></span>
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m4 11 8-7 8 7v9H4Z"/><path d="M9.5 20v-6h5v6"/></svg></span>
             <span class="nav-label">Главная</span>
           </button>
           <button type="button" data-lobby-tab="tables">
-            <span class="nav-icon nav-spade" aria-hidden="true">♠</span>
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path class="svg-fill" d="M12 3.3C10.3 6.1 4.5 8.5 4.5 13a4.4 4.4 0 0 0 7 3.5L9.8 21h4.4l-1.7-4.5a4.4 4.4 0 0 0 7-3.5c0-4.5-5.8-6.9-7.5-9.7Z"/></svg></span>
             <span class="nav-label">Столы</span>
           </button>
           <button type="button" data-lobby-tab="cashier">
-            <span class="nav-icon nav-wallet" aria-hidden="true"></span>
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 7h17v11h-17z"/><path d="M16.5 10h4v5h-4a2.5 2.5 0 0 1 0-5Z"/><path d="M6 7V5h11"/></svg></span>
             <span class="nav-label">Касса</span>
           </button>
           <button type="button" data-lobby-tab="tournaments">
-            <span class="nav-icon nav-trophy" aria-hidden="true"></span>
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 4.5h8v7a4 4 0 0 1-8 0Z"/><path d="M8 7H5v2a4 4 0 0 0 4 4M16 7h3v2a4 4 0 0 1-4 4M12 15.5V19M8.5 20h7"/></svg></span>
             <span class="nav-label">Турниры</span>
           </button>
           <button type="button" class="admin-nav-button" data-lobby-tab="admin" hidden>
