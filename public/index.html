@@ -144,21 +144,14 @@
 
       <section class="lobby-shell" id="lobby">
         <section class="lobby-view active" data-lobby-view="home">
-          <section class="tg-home-header">
-            <button type="button" class="tg-header-ghost" aria-label="QR"><span class="tg-qr-icon" aria-hidden="true"></span></button>
-            <div class="tg-header-profile" data-lobby-tab="profile">
-              <div class="lobby-avatar" id="lobbyAvatar">P</div>
-              <div>
-                <strong id="lobbyName">Игрок</strong>
-                <span id="lobbyUsername">Telegram profile</span>
-              </div>
-            </div>
-            <button type="button" class="tg-header-edit" data-lobby-tab="profile">Изм.</button>
+          <section class="lobby-brandbar">
+            <strong>QWZ Poker</strong>
+            <span>Texas Hold'em</span>
           </section>
 
           <section class="tg-balance-hero">
             <div>
-              <span>QWZ Poker</span>
+              <span>Открытая игра</span>
               <strong>Texas Hold’em</strong>
               <small id="homeOfferMeta">25/50 · вход от 2 500 chips</small>
             </div>
@@ -167,12 +160,12 @@
 
           <section class="tg-menu-group">
             <button type="button" class="tg-menu-row" data-lobby-tab="profile">
-              <span class="tg-row-icon tg-row-red">●</span>
+              <span class="tg-row-icon" aria-hidden="true">P</span>
               <span class="tg-row-main">Мой профиль</span>
               <span class="tg-chevron">›</span>
             </button>
             <button type="button" class="tg-menu-row" data-lobby-tab="cashier">
-              <span class="tg-row-icon tg-row-blue">◉</span>
+              <span class="tg-row-icon" aria-hidden="true">₽</span>
               <span class="tg-row-main">Баланс</span>
               <span class="tg-row-value"><b id="lobbyBalance">0</b> chips</span>
               <span class="tg-chevron">›</span>
@@ -181,19 +174,19 @@
 
           <section class="tg-menu-group">
             <button type="button" class="tg-menu-row tg-menu-row-action" id="quickPlayButton">
-              <span class="tg-row-icon tg-row-green">♠</span>
+              <span class="tg-row-icon" aria-hidden="true">▶</span>
               <span class="tg-row-main">Начать игру</span>
               <span class="tg-row-value" id="quickPlayHint">Минимальный вход на 25/50: 2 500 chips</span>
               <span class="tg-chevron">›</span>
             </button>
             <button type="button" class="tg-menu-row" data-lobby-tab="tables">
-              <span class="tg-row-icon tg-row-cyan">▦</span>
+              <span class="tg-row-icon" aria-hidden="true">♠</span>
               <span class="tg-row-main">Все столы</span>
               <span class="tg-row-value" id="onlineStatus">0 свободно</span>
               <span class="tg-chevron">›</span>
             </button>
             <div class="tg-menu-row tg-menu-row-stack">
-              <span class="tg-row-icon tg-row-gold">½</span>
+              <span class="tg-row-icon tg-row-icon-text" aria-hidden="true">BB</span>
               <span class="tg-row-main">Блайнды</span>
               <div class="limit-pills" id="limitPills">
                 <button type="button" class="active" data-small-blind="25">25/50</button>
@@ -214,19 +207,19 @@
 
           <section class="tg-menu-group">
             <button type="button" class="tg-menu-row" data-lobby-tab="tournaments">
-              <span class="tg-row-icon tg-row-purple">🏆</span>
+              <span class="tg-row-icon tg-row-icon-text" aria-hidden="true">T</span>
               <span class="tg-row-main">Турниры</span>
               <span class="tg-row-value">скоро</span>
               <span class="tg-chevron">›</span>
             </button>
             <button type="button" class="tg-menu-row" id="quickPrivateButton">
-              <span class="tg-row-icon tg-row-orange">🔒</span>
+              <span class="tg-row-icon tg-row-icon-text" aria-hidden="true">#</span>
               <span class="tg-row-main">Приватный стол</span>
               <span class="tg-row-value">для друзей</span>
               <span class="tg-chevron">›</span>
             </button>
             <div class="tg-menu-row">
-              <span class="tg-row-icon tg-row-gray">•</span>
+              <span class="tg-row-icon tg-row-icon-text" aria-hidden="true">...</span>
               <span class="tg-row-main">Сессия</span>
               <span class="tg-row-value" id="homeActivityText">Выберите стол и начните игру.</span>
               <span class="session-pill" id="homeSessionPill">нет активных</span>

@@ -319,8 +319,8 @@ async function auth() {
   state.token = data.token;
   state.user = data.user;
   profile.textContent = `${data.user.name} · ${data.user.balance.toLocaleString("ru-RU")}`;
-  lobbyName.textContent = data.user.name;
-  lobbyUsername.textContent = data.user.username ? `@${data.user.username}` : `id ${data.user.id}`;
+  if (lobbyName) lobbyName.textContent = data.user.name;
+  if (lobbyUsername) lobbyUsername.textContent = data.user.username ? `@${data.user.username}` : `id ${data.user.id}`;
   lobbyBalance.textContent = data.user.balance.toLocaleString("ru-RU");
   cashierBalance.textContent = data.user.balance.toLocaleString("ru-RU");
   renderAvatar(lobbyAvatar, data.user);
