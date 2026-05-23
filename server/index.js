@@ -45,6 +45,17 @@ import {
   upsertTelegramUser
 } from "./db.js";
 import {
+  deleteTableSnapshot as stateDeleteTableSnapshot,
+  getSession as stateGetSession,
+  initStateStore,
+  listTableSnapshots as stateListTableSnapshots,
+  setSession as stateSetSession,
+  setTableSnapshot as stateSetTableSnapshot,
+  stateStoreEnabled,
+  stateStoreHealth,
+  updateUserSessions as stateUpdateUserSessions
+} from "./state-store.js";
+import {
   ACTION_TIMEOUT_MS,
   NEXT_HAND_DELAY_MS,
   RUNOUT_CARD_DELAY_MS,
@@ -90,6 +101,7 @@ const TON_POLLING_ENABLED = process.env.TON_POLLING_ENABLED === "true";
 const TONCENTER_API_BASE = (process.env.TONCENTER_API_BASE || "https://toncenter.com/api/v3").replace(/\/$/, "");
 const TONCENTER_API_KEY = process.env.TONCENTER_API_KEY || "";
 const TON_POLLING_INTERVAL_MS = Number(process.env.TON_POLLING_INTERVAL_MS || 60 * 1000);
+const REAL_MONEY_ENABLED = process.env.REAL_MONEY_ENABLED === "true";
 const isProduction = process.env.NODE_ENV === "production";
 const HOST = process.env.HOST || (isProduction ? "0.0.0.0" : "127.0.0.1");
 const startedAt = Date.now();
@@ -100,6 +112,7 @@ registerProcessHandlers();
 
 const tables = new Map();
 const sessions = new Map();
+const sessionExpirations = new Map();
 const userProfiles = new Map();
 const savedStacks = new Map();
 const wallets = new Map();
@@ -119,6 +132,7 @@ const DEFAULT_STACK = 0;
 const DEFAULT_WALLET = 0;
 const RECONCILIATION_INTERVAL_MS = Number(process.env.RECONCILIATION_INTERVAL_MS || 15 * 60 * 1000);
 const RECONCILIATION_DRIFT_ALERT_CHIPS = Number(process.env.RECONCILIATION_DRIFT_ALERT_CHIPS || 1);
+const SESSION_TTL_MS = Number(process.env.SESSION_TTL_SECONDS || 24 * 60 * 60) * 1000;
 let lastReconciliationAlertKey = "";
 
 seedPublicTables();
@@ -141,6 +155,7 @@ const server = createServer(async (req, res) => {
 });
 
 await initDatabase();
+await initStateStore();
 await hydrateActiveTables();
 await hydrateTournamentRegistrations();
 
@@ -151,7 +166,8 @@ server.listen(PORT, HOST, () => {
     lines: [
       `Сервер: ${isProduction ? "production" : "development"}`,
       `Bot: @${BOT_USERNAME}`,
-      `Database: ${databaseEnabled() ? "PostgreSQL" : "memory"}`
+      `Database: ${databaseEnabled() ? "PostgreSQL" : "memory"}`,
+      `State store: ${stateStoreEnabled() ? "Redis" : "memory"}`
     ]
   });
 });
@@ -189,6 +205,15 @@ setInterval(async () => {
   }
 }, TON_POLLING_INTERVAL_MS);
 
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, expiresAt] of sessionExpirations.entries()) {
+    if (expiresAt > now) continue;
+    sessionExpirations.delete(token);
+    sessions.delete(token);
+  }
+}, Math.min(SESSION_TTL_MS, 60 * 1000));
+
 async function handleApi(req, res, url) {
   if (req.method === "GET" && url.pathname === "/api/health") {
     const health = await healthSnapshot({ publicView: true });
@@ -222,7 +247,7 @@ async function handleApi(req, res, url) {
     sendJson(res, 200, {
       appName: APP_NAME,
       botUsername: BOT_USERNAME,
-      realMoneyEnabled: false
+      realMoneyEnabled: REAL_MONEY_ENABLED
     });
     return;
   }
@@ -238,6 +263,8 @@ async function handleApi(req, res, url) {
     const token = randomId("session");
     const user = await normalizeUser(auth.user);
     sessions.set(token, user);
+    sessionExpirations.set(token, Date.now() + SESSION_TTL_MS);
+    await stateSetSession(token, user);
     if (!loggedAppOpens.has(user.id)) {
       loggedAppOpens.add(user.id);
       notifyAdmin("open", "Игрок открыл Mini App", {
@@ -251,7 +278,7 @@ async function handleApi(req, res, url) {
     return;
   }
 
-  const user = requireSession(req);
+  const user = await requireSession(req);
   if (!user) {
     sendJson(res, 401, { error: "Unauthorized" });
     return;
@@ -338,6 +365,7 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/cashier/stars-invoice") {
+    requireRealMoneyEnabled();
     await sendIdempotentJson(req, res, user, "cashier_stars_invoice", async () => {
       const body = await readJson(req);
       const quote = quoteDeposit(body);
@@ -385,6 +413,7 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/cashier/crypto-order") {
+    requireRealMoneyEnabled();
     await sendIdempotentJson(req, res, user, "cashier_crypto_order", async () => {
       const body = await readJson(req);
       const quote = quoteCryptoDeposit(body);
@@ -920,6 +949,7 @@ function recentFundMovements(limit = 20) {
 
 async function healthSnapshot({ publicView = false } = {}) {
   const database = await dbDatabaseHealth();
+  const stateStore = await stateStoreHealth();
   const tableStatuses = [...tables.values()].reduce((result, table) => {
     result[table.status] = (result[table.status] || 0) + 1;
     return result;
@@ -930,13 +960,14 @@ async function healthSnapshot({ publicView = false } = {}) {
   const uptimeSeconds = Math.round((Date.now() - startedAt) / 1000);
 
   const health = {
-    ok: Boolean(database.ok),
+    ok: Boolean(database.ok && stateStore.ok),
     appName: APP_NAME,
     environment: isProduction ? "production" : "development",
     uptimeSeconds,
     startedAt: new Date(startedAt).toISOString(),
     now: new Date().toISOString(),
     database,
+    stateStore,
     tables: {
       open: tables.size,
       active: activeTables,
@@ -1018,7 +1049,8 @@ async function persistCompletedHands(table) {
 }
 
 async function hydrateActiveTables() {
-  const snapshots = await dbListActiveTableSnapshots();
+  const redisSnapshots = await stateListTableSnapshots();
+  const snapshots = redisSnapshots?.length ? redisSnapshots : await dbListActiveTableSnapshots();
   if (!snapshots || snapshots.length === 0) return;
 
   tables.clear();
@@ -1034,7 +1066,7 @@ async function hydrateActiveTables() {
     return;
   }
 
-  console.log(`Restored ${tables.size} table snapshot${tables.size === 1 ? "" : "s"} from database`);
+  console.log(`Restored ${tables.size} table snapshot${tables.size === 1 ? "" : "s"} from ${redisSnapshots?.length ? "Redis" : "PostgreSQL"}`);
 }
 
 function normalizeHydratedTable(table, now = Date.now()) {
@@ -1075,27 +1107,32 @@ function normalizeHydratedTable(table, now = Date.now()) {
 }
 
 async function persistActiveTableSnapshots() {
-  if (!databaseEnabled()) return;
-
   for (const table of tables.values()) {
     await persistActiveTableSnapshot(table);
   }
 }
 
 async function persistActiveTableSnapshot(table) {
-  if (!databaseEnabled()) return;
   try {
-    await dbUpsertActiveTableSnapshot(table);
+    await Promise.all([
+      stateSetTableSnapshot(table),
+      dbUpsertActiveTableSnapshot(table)
+    ]);
   } catch (error) {
     console.error("Active table snapshot persist failed:", error.message);
+    reportError(error, { kind: "active_table_snapshot", tableId: table.id });
   }
 }
 
 async function deleteActiveTableSnapshot(tableId) {
   try {
-    await dbDeleteActiveTableSnapshot(tableId);
+    await Promise.all([
+      stateDeleteTableSnapshot(tableId),
+      dbDeleteActiveTableSnapshot(tableId)
+    ]);
   } catch (error) {
     console.error("Active table snapshot delete failed:", error.message);
+    reportError(error, { kind: "active_table_delete", tableId });
   }
 }
 
@@ -1226,7 +1263,8 @@ async function cashierView(user) {
     activeTableCount: activeTables.length,
     currency: "chips",
     mode: "chips",
-    deposit: depositSettings(),
+    realMoneyEnabled: REAL_MONEY_ENABLED,
+    deposit: depositSettings({ realMoneyEnabled: REAL_MONEY_ENABLED }),
     withdrawals: withdrawalSettings(),
     transactions: await getTransactions(user)
   };
@@ -1543,6 +1581,10 @@ function setWalletBalanceLocal(userId, balance) {
 
   const profile = userProfiles.get(id);
   if (profile) profile.balance = normalized;
+  stateUpdateUserSessions(id, { balance: normalized }).catch((error) => {
+    console.error("Redis session balance update failed:", error.message);
+    reportError(error, { kind: "session_balance_update", userId: id });
+  });
   return normalized;
 }
 
@@ -1855,6 +1897,7 @@ async function adjustWalletManually({ admin, targetId, type, amount, reason, req
 }
 
 async function createWithdrawalRequest(user, body = {}, idempotencyKey = "") {
+  requireRealMoneyEnabled();
   if (process.env.WITHDRAWALS_ENABLED !== "true") {
     const error = new Error("Вывод временно закрыт");
     error.status = 409;
@@ -2013,11 +2056,11 @@ function normalizeWithdrawalMethod(method) {
 
 function withdrawalSettings() {
   return {
-    enabled: process.env.WITHDRAWALS_ENABLED === "true",
+    enabled: REAL_MONEY_ENABLED && process.env.WITHDRAWALS_ENABLED === "true",
     minimumChips: ECONOMY.withdrawals.minimumChips,
     methods: ECONOMY.withdrawals.methods.map((method) => ({
       ...method,
-      enabled: process.env.WITHDRAWALS_ENABLED === "true"
+      enabled: REAL_MONEY_ENABLED && process.env.WITHDRAWALS_ENABLED === "true"
     }))
   };
 }
@@ -2493,10 +2536,27 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, Math.round(value)));
 }
 
-function requireSession(req) {
+async function requireSession(req) {
   const auth = req.headers.authorization || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  return sessions.get(token) || null;
+  if (!token) return null;
+  const localSession = sessions.get(token);
+  if (localSession) {
+    if ((sessionExpirations.get(token) || 0) <= Date.now()) {
+      sessions.delete(token);
+      sessionExpirations.delete(token);
+    } else {
+      sessionExpirations.set(token, Date.now() + SESSION_TTL_MS);
+      await stateSetSession(token, localSession);
+      return localSession;
+    }
+  }
+  const storedSession = await stateGetSession(token);
+  if (storedSession) {
+    sessions.set(token, storedSession);
+    sessionExpirations.set(token, Date.now() + SESSION_TTL_MS);
+  }
+  return storedSession;
 }
 
 async function serveStatic(req, res, url) {
@@ -2640,6 +2700,13 @@ function normalizeBotUsername(username) {
   return username.replace(/^@/, "");
 }
 
+function requireRealMoneyEnabled() {
+  if (REAL_MONEY_ENABLED) return;
+  const error = new Error("Режим реальных средств пока отключен");
+  error.status = 409;
+  throw error;
+}
+
 function parseIdList(value) {
   return new Set(
     String(value || "")
@@ -2655,8 +2722,14 @@ function validateEnvironment() {
   if (!BOT_TOKEN || BOT_TOKEN.includes("replace_with") || BOT_TOKEN === "test-token") {
     problems.push("BOT_TOKEN is required in production");
   }
-  if (!process.env.DATABASE_URL) {
-    console.warn("[warn] DATABASE_URL is empty — production will run in memory mode until PostgreSQL is configured.");
+  if (REAL_MONEY_ENABLED && !process.env.DATABASE_URL) {
+    problems.push("DATABASE_URL is required in production; money storage cannot use memory fallback");
+  }
+  if (REAL_MONEY_ENABLED && !process.env.REDIS_URL) {
+    problems.push("REDIS_URL is required in production; sessions and active table state cannot use memory fallback");
+  }
+  if (!REAL_MONEY_ENABLED && (!process.env.DATABASE_URL || !process.env.REDIS_URL)) {
+    console.warn("[warn] REAL_MONEY_ENABLED=false — PostgreSQL/Redis fallback allowed only for demo/play mode.");
   }
   if (!TELEGRAM_WEBHOOK_SECRET) {
     console.warn("[warn] TELEGRAM_WEBHOOK_SECRET is empty — webhook endpoint is unprotected.");
@@ -2727,7 +2800,7 @@ function verifyCryptoWebhook(req) {
 }
 
 function ensureCryptoPaymentMethodEnabled(method) {
-  const settings = depositSettings();
+  const settings = depositSettings({ realMoneyEnabled: REAL_MONEY_ENABLED });
   const item = settings.methods.find((candidate) => candidate.id === method);
   if (!item?.enabled) {
     const error = new Error("Этот crypto-метод еще не подключен");

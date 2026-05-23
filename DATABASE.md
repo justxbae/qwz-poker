@@ -1,6 +1,11 @@
 # QWZ Poker database
 
-The app uses PostgreSQL when `DATABASE_URL` is configured. Without `DATABASE_URL`, it falls back to in-memory storage for local development and tests.
+The app uses PostgreSQL when `DATABASE_URL` is configured and Redis when `REDIS_URL` is configured.
+
+There are two operating modes:
+
+- `REAL_MONEY_ENABLED=false`: demo/play mode. PostgreSQL and Redis are optional.
+- `REAL_MONEY_ENABLED=true`: real-money mode. PostgreSQL and Redis are required and the app exits if either is missing.
 
 ## Production storage
 
@@ -14,27 +19,33 @@ Persisted in PostgreSQL:
 - `saved_stacks` - saved stack after leaving a table.
 - `payment_orders` - Stars orders and payment statuses.
 - `payment_orders` also stores prepared TON/USDT order metadata: method, asset, network, expected crypto amount, external provider id, expiration.
-- `idempotency_keys` - dedupe cache for money endpoints, so retries/double taps return the same response instead of charging twice.
+- `idempotency_keys` - dedupe cache for money endpoints, so retries and double taps return the same response instead of charging twice.
 - `fund_movements` - movement of chips between wallet, table, saved stack, tournament escrow, and reserves.
-- `tournament_registrations` - active/cancelled tournament registrations.
-- `hand_histories` - completed hand summaries, board, pots, seats, and rake.
+- `tournament_registrations` - active and cancelled tournament registrations.
+- `hand_histories` - completed hand summaries, board, pots, seats, rake, and fairness proof.
 - `active_table_snapshots` - latest JSON snapshot of each open table for restart recovery.
-- `admin_events` - admin/audit log events.
+- `admin_events` - admin and audit log events.
 
-Still process-local in this MVP:
+Persisted in Redis when `REDIS_URL` is configured:
+
+- auth sessions and per-user session fan-out;
+- active table snapshots for fast boot and live state hydration.
+
+Still process-local in demo mode:
 
 - active poker table runtime objects;
 - timers and auto-actions;
-- short-lived auth sessions.
+- short-lived auth sessions when Redis is unavailable.
 
-`active_table_snapshots` protects against a single process restart: the server reloads open tables, seats, current hand state, deck, pot, cards, and stacks from PostgreSQL. It is not a multi-server game-state engine. Before scaling to multiple Node processes, active table ownership should move to a dedicated authoritative game layer, usually one game process per table cluster with Redis/PostgreSQL coordination or a queue/lock layer.
+`active_table_snapshots` protects against a single process restart: the server reloads open tables, seats, current hand state, deck, pot, cards, and stacks from PostgreSQL. Redis mirrors the same snapshots for faster boot and short-lived runtime recovery. This is not a multi-server game-state engine. Before scaling to multiple Node processes, active table ownership should move to a dedicated authoritative game layer, usually one game process per table cluster with Redis/PostgreSQL coordination or a queue/lock layer.
 
 ## Environment
 
-Required for production persistence:
+Required for real-money production persistence:
 
 ```text
 DATABASE_URL=<postgres connection string>
+REDIS_URL=<redis connection string>
 ```
 
 Optional:
@@ -53,7 +64,7 @@ Wallet changes should go through `ledger_entries`. The app writes the balance up
 - demo/dev deposits;
 - buy-ins;
 - rebuys;
-- manual admin grants/deducts.
+- manual admin grants and deducts.
 
 This keeps balances auditable and prevents silent balance rewrites.
 
@@ -71,7 +82,7 @@ All money-changing API calls accept `X-Idempotency-Key`:
 - `/api/tournaments/:id/register`
 - `/api/tournaments/:id/cancel`
 
-With PostgreSQL enabled, responses are stored in `idempotency_keys` for 24 hours. In local/test memory mode the same behavior is preserved only until process restart.
+With PostgreSQL enabled, responses are stored in `idempotency_keys` for 24 hours. In local or demo mode the same behavior is preserved only until process restart.
 
 ## Reconciliation
 
@@ -81,6 +92,10 @@ The server periodically compares:
 - paid Stars order chips against `deposit_stars` ledger credits.
 
 If drift is detected, the app writes an admin event and sends a Telegram admin alert when `ADMIN_CHAT_ID` is configured. This is an alert-only control: it does not silently edit balances.
+
+## Sessions
+
+In demo mode, sessions can live in memory and reset on restart. In real-money mode, Redis stores the auth session token and user session fan-out so a single restart does not log everyone out or orphan table presence.
 
 ## Messenger portability
 

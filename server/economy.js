@@ -29,13 +29,13 @@ export const ECONOMY = {
   riskReservePercent: 0.1
 };
 
-export function depositSettings() {
-  const tonEnabled = process.env.TON_PAYMENTS_ENABLED === "true" && Boolean(process.env.TON_RECEIVER_ADDRESS);
-  const usdtEnabled = process.env.USDT_TRC20_PAYMENTS_ENABLED === "true" && Boolean(process.env.CRYPTO_PROVIDER_API_KEY || process.env.USDT_TRC20_RECEIVER_ADDRESS);
+export function depositSettings({ realMoneyEnabled = true } = {}) {
+  const tonEnabled = realMoneyEnabled && process.env.TON_PAYMENTS_ENABLED === "true" && Boolean(process.env.TON_RECEIVER_ADDRESS);
+  const usdtEnabled = realMoneyEnabled && process.env.USDT_TRC20_PAYMENTS_ENABLED === "true" && Boolean(process.env.CRYPTO_PROVIDER_API_KEY || process.env.USDT_TRC20_RECEIVER_ADDRESS);
   return {
     ...ECONOMY.deposit,
     methods: [
-      { id: "stars", title: "Telegram Stars", enabled: true, speed: "моментально" },
+      { id: "stars", title: "Telegram Stars", enabled: realMoneyEnabled, speed: realMoneyEnabled ? "моментально" : "скоро" },
       { id: "ton", title: "TON", enabled: tonEnabled, speed: tonEnabled ? "on-chain" : "скоро" },
       { id: "usdt_trc20", title: "USDT TRC20", enabled: usdtEnabled, speed: usdtEnabled ? "on-chain" : "скоро" }
     ]

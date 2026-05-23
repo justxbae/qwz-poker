@@ -15,7 +15,8 @@ Steps:
 3. Render will read `render.yaml` and start the app with `node server/index.js`.
 4. Add the secret environment variable:
    - `BOT_TOKEN`
-   - `DATABASE_URL` (strongly recommended before public testing)
+   - `REAL_MONEY_ENABLED=false` for demo/play mode, or `true` for live-money mode
+   - `DATABASE_URL` and `REDIS_URL` when `REAL_MONEY_ENABLED=true`
    - `TELEGRAM_WEBHOOK_SECRET` (if setWebhook uses `secret_token`)
 5. Deploy.
 
@@ -46,21 +47,31 @@ NODE_ENV=production
 HOST=0.0.0.0
 BOT_USERNAME=qwzpokerbot
 BOT_TOKEN=<token from BotFather>
+REAL_MONEY_ENABLED=false
 TELEGRAM_WEBHOOK_SECRET=<random hex, см. setWebhook ниже>
 ADMIN_CHAT_ID=<your Telegram numeric user id for private admin logs>
 ADMIN_USER_IDS=<comma-separated Telegram user ids allowed to use admin commands>
 ADMIN_GRANT_MAX_CHIPS=500000
-DATABASE_URL=<Render PostgreSQL internal database URL>
 APP_NAME=QWZ Poker
 SENTRY_DSN=<optional, Sentry/GlitchTip DSN>
 SENTRY_TRACES_SAMPLE_RATE=0.1
+```
+
+For real-money mode, add:
+
+```text
+REAL_MONEY_ENABLED=true
+DATABASE_URL=<postgres connection string>
+REDIS_URL=<redis connection string>
 ```
 
 ## PostgreSQL
 
 Create a PostgreSQL database on Render and copy its internal connection string into `DATABASE_URL` for the web service. On startup, the app automatically creates the required tables.
 
-If `DATABASE_URL` is missing, the app falls back to memory storage. That is acceptable only for local testing; production balances and payments require PostgreSQL.
+If `REAL_MONEY_ENABLED=true`, both `DATABASE_URL` and `REDIS_URL` are mandatory. Without them the server exits on startup because money storage, sessions, and active table state cannot fall back to memory in real-money mode.
+
+If `REAL_MONEY_ENABLED=false`, the app can run in demo/play mode without PostgreSQL or Redis. That is acceptable for local testing and temporary preview deployments only.
 
 After deploy, set webhook exactly like above, replacing the domain with the Koyeb app URL.
 
@@ -97,4 +108,4 @@ You can also open the Mini App with `?admin=1` to show the hidden admin tab. The
 
 ## Important
 
-With `DATABASE_URL`, wallets, ledger, payments, saved stacks, tournaments, hand histories, and active table snapshots are persisted in PostgreSQL. Without `DATABASE_URL`, the app still deploys in memory mode for emergency/demo use, but balances and runtime state can reset after a server restart. Do not run public paid traffic without PostgreSQL connected.
+With `DATABASE_URL` and `REDIS_URL` in real-money mode, wallets, ledger, payments, saved stacks, tournaments, hand histories, sessions, and active table snapshots are persisted across restarts. Demo mode can still run without them, but balances and runtime state may reset after a restart and it must never be used for paid traffic.

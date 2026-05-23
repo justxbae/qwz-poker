@@ -125,6 +125,18 @@ test("health endpoint is public and admin dashboard exposes diagnostics", async 
   }
 });
 
+test("production real-money mode refuses to start without PostgreSQL and Redis", async () => {
+  const result = await startServerAndWaitForExit({
+    NODE_ENV: "production",
+    BOT_TOKEN: "prod-token",
+    REAL_MONEY_ENABLED: "true"
+  });
+
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /DATABASE_URL is required in production/);
+  assert.match(result.stderr, /REDIS_URL is required in production/);
+});
+
 test("player can set fairness seed before the hand starts", async () => {
   const server = await startServer();
   try {
@@ -310,7 +322,7 @@ test("cashier returns deposit settings and records wallet operations", async () 
     assert.equal(cashier.packages, undefined);
     assert.equal(cashier.deposit.minRub, 100);
     assert.equal(cashier.deposit.chipsPerRub, 50);
-    assert.equal(cashier.deposit.methods.find((method) => method.id === "stars").enabled, true);
+    assert.equal(cashier.deposit.methods.find((method) => method.id === "stars").enabled, false);
     assert.equal(cashier.deposit.methods.find((method) => method.id === "ton").enabled, false);
     assert.equal(cashier.deposit.methods.find((method) => method.id === "usdt_trc20").enabled, false);
     assert.equal(cashier.transactions.length, 0);
@@ -321,7 +333,7 @@ test("cashier returns deposit settings and records wallet operations", async () 
         token: auth.token,
         body: { method: "ton", rubAmount: 100 }
       }),
-      /crypto-метод еще не подключен/
+      /Режим реальных средств пока отключен/
     );
 
     cashier = (await request("/api/cashier/demo-topup", {
@@ -404,6 +416,7 @@ test("idempotency key prevents duplicated wallet money operations", async () => 
 
 test("crypto deposit order can be created but does not credit chips before confirmation", async () => {
   const server = await startServer({
+    REAL_MONEY_ENABLED: "true",
     TON_PAYMENTS_ENABLED: "true",
     TON_RECEIVER_ADDRESS: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
     TON_RUB_RATE: "250"
@@ -411,6 +424,7 @@ test("crypto deposit order can be created but does not credit chips before confi
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
     const cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.deposit.methods.find((method) => method.id === "stars").enabled, true);
     assert.equal(cashier.deposit.methods.find((method) => method.id === "ton").enabled, true);
 
     const data = await request("/api/cashier/crypto-order", {
@@ -450,6 +464,7 @@ test("crypto deposit order can be created but does not credit chips before confi
 test("admin can manually approve and reject crypto payment orders", async () => {
   const server = await startServer({
     ADMIN_USER_IDS: "dev-user",
+    REAL_MONEY_ENABLED: "true",
     TON_PAYMENTS_ENABLED: "true",
     TON_RECEIVER_ADDRESS: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
     TON_RUB_RATE: "250"
@@ -509,6 +524,7 @@ test("admin can manually approve and reject crypto payment orders", async () => 
 test("withdrawal request holds chips and admin can reject with refund", async () => {
   const server = await startServer({
     ADMIN_FINANCE_IDS: "dev-user",
+    REAL_MONEY_ENABLED: "true",
     WITHDRAWALS_ENABLED: "true"
   });
   try {
@@ -809,6 +825,36 @@ async function request(path, options = {}) {
   const data = await response.json();
   if (!response.ok) throw new Error(data.error);
   return data;
+}
+
+function startServerAndWaitForExit(extraEnv = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ["server/index.js"], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        PORT: String(PORT),
+        BOT_TOKEN: "test-token",
+        NODE_ENV: "test",
+        ...extraEnv
+      },
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.on("data", (chunk) => {
+      stdout += String(chunk);
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      resolve({ code, stdout, stderr });
+    });
+  });
 }
 
 async function topUp(token, count = 1) {
