@@ -40,6 +40,7 @@ const homeSessionPill = document.querySelector("#homeSessionPill");
 const homeOfferMeta = document.querySelector("#homeOfferMeta");
 const quickPlayHint = document.querySelector("#quickPlayHint");
 const gameModeSwitch = document.querySelector("#gameModeSwitch");
+const lobbyBalanceCurrency = document.querySelector("#lobbyBalanceCurrency");
 const modeBanner = document.querySelector("#modeBanner");
 const modeBannerKicker = document.querySelector("#modeBannerKicker");
 const modeBannerTitle = document.querySelector("#modeBannerTitle");
@@ -381,15 +382,22 @@ function activeBalance() {
 function renderModeBalance() {
   if (!lobbyBalance) return;
   lobbyBalance.textContent = state.gameMode === "cash" ? formatUsdt(activeBalance()) : formatChips(activeBalance());
-  const balanceRow = lobbyBalance.closest(".tg-row-value");
-  if (balanceRow?.lastChild) balanceRow.lastChild.textContent = state.gameMode === "cash" ? " T" : " chips";
+  if (!lobbyBalanceCurrency) return;
+  if (state.gameMode === "cash") {
+    lobbyBalanceCurrency.replaceChildren(" ", createTetherMark());
+  } else {
+    lobbyBalanceCurrency.textContent = " chips";
+  }
 }
 
 function renderModeContext() {
   if (!modeBanner) return;
   const cashMode = state.gameMode === "cash";
   if (modeBannerKicker) modeBannerKicker.textContent = cashMode ? "Cash mode" : "Play chips";
-  if (modeBannerTitle) modeBannerTitle.textContent = cashMode ? "USDT / T" : "Фантики";
+  if (modeBannerTitle) {
+    if (cashMode) modeBannerTitle.replaceChildren("USDT ", createTetherMark());
+    else modeBannerTitle.textContent = "Фантики";
+  }
   if (modeBannerText) {
     modeBannerText.textContent = cashMode
       ? "Реальные столы: баланс хранится в USDT, пополнение идёт через TON, а лимиты и стеки считаются отдельно от play-режима."
@@ -407,7 +415,7 @@ function renderLimitOptions() {
       button.type = "button";
       button.dataset.smallBlind = String(limit.smallBlind);
       button.className = Number(limit.smallBlind) === Number(state.selectedSmallBlind) ? "active" : "";
-      button.textContent = formatLimit(limit);
+      renderLimitValue(button, limit.smallBlind, limit.bigBlind, state.gameMode === "cash");
       return button;
     }));
   }
@@ -524,11 +532,11 @@ async function loadCashier() {
 
 function renderCashier(cashier) {
   const cashMode = Boolean(cashier.realMoneyEnabled);
-  cashierBalance.textContent = cashMode ? formatUsdt(cashier.cashBalanceMicros) : formatChips(cashier.playBalance);
-  cashierTableStack.textContent = cashMode ? formatUsdt(cashier.cashTableStackMicros || 0) : formatChips(cashier.tableStack || 0);
-  cashierTotalBankroll.textContent = cashMode
-    ? formatUsdt(cashier.cashTotalBankrollMicros || cashier.cashBalanceMicros || 0)
-    : formatChips(cashier.totalBankroll || cashier.balance || 0);
+  renderMoneyValue(cashierBalance, cashMode ? cashier.cashBalanceMicros : cashier.playBalance, cashMode);
+  renderMoneyValue(cashierTableStack, cashMode ? (cashier.cashTableStackMicros || 0) : (cashier.tableStack || 0), cashMode);
+  renderMoneyValue(cashierTotalBankroll, cashMode
+    ? (cashier.cashTotalBankrollMicros || cashier.cashBalanceMicros || 0)
+    : (cashier.totalBankroll || cashier.balance || 0), cashMode);
   cashierState.deposit = cashier.deposit || null;
   cashierState.demoTopup = DEV_MODE && !cashier.realMoneyEnabled;
   renderCashierControls(cashierState.demoTopup ? (state.config?.play?.deposit || {}) : (cashier.deposit || {}));
@@ -548,7 +556,8 @@ function renderCashierControls(deposit) {
     const button = document.createElement("button");
     button.type = "button";
     button.dataset.rubAmount = String(amount);
-    button.textContent = playDemo ? `${formatChips(amount)} ₽` : `${amount} T`;
+    if (playDemo) button.textContent = `${formatChips(amount)} ₽`;
+    else button.replaceChildren(String(amount), " ", createTetherMark());
     return button;
   }));
 
@@ -583,18 +592,21 @@ function onCashierMethodClick(event) {
 
 function syncCashierQuote() {
   const quote = cashierQuote();
-  if (cashierQuoteChips) cashierQuoteChips.textContent = cashierState.demoTopup
-    ? `${formatChips(quote.chips)} chips`
-    : `${Number(quote.usdtAmount).toFixed(2)} T`;
+  if (cashierQuoteChips) {
+    if (cashierState.demoTopup) cashierQuoteChips.textContent = `${formatChips(quote.chips)} chips`;
+    else cashierQuoteChips.replaceChildren(Number(quote.usdtAmount).toFixed(2), " ", createTetherMark());
+  }
   if (cashierQuoteStars) cashierQuoteStars.textContent = cashierState.demoTopup ? `${formatChips(quote.stars)} Stars` : "TON по курсу счета";
   if (!cashierPayButton) return;
   const enabledMethod = (cashierState.deposit?.methods || []).find((method) => method.id === cashierState.selectedMethod && method.enabled);
   cashierPayButton.disabled = !cashierState.demoTopup && !enabledMethod;
-  cashierPayButton.textContent = cashierState.demoTopup
-    ? `Dev: начислить ${formatChips(quote.chips)} play chips`
-    : enabledMethod
-      ? `Пополнить ${Number(quote.usdtAmount).toFixed(2)} T через TON`
-      : "Пополнение скоро";
+  if (cashierState.demoTopup) {
+    cashierPayButton.textContent = `Dev: начислить ${formatChips(quote.chips)} play chips`;
+  } else if (enabledMethod) {
+    cashierPayButton.replaceChildren(`Пополнить ${Number(quote.usdtAmount).toFixed(2)} `, createTetherMark(), " через TON");
+  } else {
+    cashierPayButton.textContent = "Пополнение скоро";
+  }
 }
 
 function cashierQuote() {
@@ -641,7 +653,8 @@ function renderCashierHistory(transactions, cashMode = false) {
     main.append(title, meta);
 
     const amount = document.createElement("b");
-    amount.textContent = `${transaction.type === "credit" ? "+" : "-"}${cashMode ? formatUsdt(transaction.amount) : formatChips(transaction.amount)}`;
+    amount.append(`${transaction.type === "credit" ? "+" : "-"}${cashMode ? formatUsdt(transaction.amount) : formatChips(transaction.amount)}`);
+    if (cashMode) amount.append(" ", createTetherMark());
 
     row.append(main, amount);
     cashierHistory.append(row);
@@ -711,7 +724,7 @@ function renderCryptoPaymentInstructions(order) {
   const comment = order.payload ? `\nКомментарий: ${order.payload}` : "";
   cashierStatus.textContent = [
     `Счёт TON создан: ${Number(order.cryptoAmount || 0).toFixed(6)} ${order.asset}.`,
-    `${Number(order.usdtAmount || 0).toFixed(2)} T будут начислены только после подтверждения сети.`,
+    `${Number(order.usdtAmount || 0).toFixed(2)} USDT будут начислены только после подтверждения сети.`,
     address,
     comment
   ].join("").trim();
@@ -757,9 +770,9 @@ function renderProfile(profileData) {
   const user = profileData.user || {};
   profileName.textContent = user.name || "Игрок";
   profileUsername.textContent = user.username ? `@${user.username}` : `id ${user.id || ""}`;
-  profileBalance.textContent = `${formatUsdt(profileData.cashBalanceMicros || 0)} T · ${formatChips(profileData.balance)} play`;
+  profileBalance.replaceChildren(`${formatUsdt(profileData.cashBalanceMicros || 0)} `, createTetherMark(), ` · ${formatChips(profileData.balance)} play`);
   profileChips.textContent = formatChips(profileData.balance);
-  profileTableStack.textContent = `${formatUsdt(profileData.cashTableStackMicros || 0)} T`;
+  profileTableStack.replaceChildren(`${formatUsdt(profileData.cashTableStackMicros || 0)} `, createTetherMark());
   profileSavedStack.textContent = formatChips(profileData.savedStack);
   lobbyTableStack.textContent = formatChips(profileData.tableStack);
   lobbyActiveTables.textContent = String(profileData.activeTableCount || 0);
@@ -975,13 +988,13 @@ function paymentMethodTitle(payment) {
 
 function adminPaymentMeta(payment) {
   const money = payment.creditedAsset === "USDT"
-    ? `${formatUsdt(payment.cashUsdtMicros || 0)} T`
+    ? `${formatUsdt(payment.cashUsdtMicros || 0)} USDT`
     : payment.method === "stars"
       ? `${formatChips(payment.stars || 0)} Stars`
       : `${payment.cryptoAmount || 0} ${payment.asset || ""} ${payment.network || ""}`.trim();
   return [
     payment.userName || payment.userId,
-    payment.creditedAsset === "USDT" ? `${formatUsdt(payment.cashUsdtMicros || 0)} T` : `${payment.rubAmount || 0} ₽`,
+    payment.creditedAsset === "USDT" ? `${formatUsdt(payment.cashUsdtMicros || 0)} USDT` : `${payment.rubAmount || 0} ₽`,
     money,
     payment.externalId ? `external ${payment.externalId}` : "",
     payment.id
@@ -990,7 +1003,7 @@ function adminPaymentMeta(payment) {
 
 function formatPaymentAmount(payment) {
   if (payment.creditedAsset === "USDT") {
-    return `${formatUsdt(payment.cashUsdtMicros || 0)} T`;
+    return `${formatUsdt(payment.cashUsdtMicros || 0)} USDT`;
   }
   if (payment.method === "stars") {
     return `${formatChips(payment.chips || 0)} chips`;
@@ -1179,21 +1192,27 @@ function renderHomeCta() {
   if (balance <= 0) {
     if (quickPlayTitle) quickPlayTitle.textContent = cashMode ? "Пополнить USDT" : "Пополнить фантики";
     else quickPlayButton.textContent = cashMode ? "Пополнить USDT" : "Пополнить фантики";
-    if (homeOfferMeta) homeOfferMeta.textContent = `${formatLimit(limit)} · ${cashMode ? "cash" : "play"} · вход от ${formatGameAmount(minBuyIn)}`;
-    quickPlayHint.textContent = cashMode
-      ? `Для cash-игры нужен бай-ин от ${formatGameAmount(minBuyIn)} USDT`
-      : `Для старта нужен бай-ин от ${formatGameAmount(minBuyIn)} chips`;
+    renderHomeOfferMeta(limit, minBuyIn, "entry", cashMode);
+    if (cashMode) {
+      quickPlayHint.replaceChildren("Для cash-игры нужен бай-ин от ");
+      renderMoneyValue(quickPlayHint, minBuyIn, true, { append: true });
+    } else {
+      quickPlayHint.textContent = `Для старта нужен бай-ин от ${formatGameAmount(minBuyIn)}`;
+    }
     return;
   }
 
   if (quickPlayTitle) quickPlayTitle.textContent = `Начать игру ${modeLabel}`;
   else quickPlayButton.textContent = `Начать игру ${modeLabel}`;
-  if (homeOfferMeta) homeOfferMeta.textContent = `${formatLimit(limit)} · ${cashMode ? "cash" : "play"} · баланс ${formatGameAmount(balance)}`;
-  quickPlayHint.textContent = balance < minBuyIn
-    ? (cashMode
-      ? `Баланс ниже минимального бай-ина ${formatGameAmount(minBuyIn)} USDT`
-      : `Баланс ниже минимального бай-ина ${formatGameAmount(minBuyIn)} chips`)
-    : `Подберём свободный ${cashMode ? "cash" : "play"}-стол автоматически`;
+  renderHomeOfferMeta(limit, balance, "balance", cashMode);
+  if (balance < minBuyIn && cashMode) {
+    quickPlayHint.replaceChildren("Баланс ниже минимального бай-ина ");
+    renderMoneyValue(quickPlayHint, minBuyIn, true, { append: true });
+  } else {
+    quickPlayHint.textContent = balance < minBuyIn
+      ? `Баланс ниже минимального бай-ина ${formatGameAmount(minBuyIn)}`
+      : `Подберём свободный ${cashMode ? "cash" : "play"}-стол автоматически`;
+  }
 }
 
 async function quickCreatePrivateTable() {
@@ -1231,9 +1250,14 @@ function syncLimitSelection() {
   });
   if (tablesFilterStatus) {
     const limit = currentLimits().find((item) => Number(item.smallBlind) === state.selectedSmallBlind);
-    tablesFilterStatus.textContent = limit
-      ? `${formatLimit(limit)} · ${state.gameMode === "cash" ? "cash" : "play"}`
-      : formatGameLimit(state.selectedSmallBlind, state.selectedSmallBlind * 2);
+    if (limit && state.gameMode === "cash") {
+      renderLimitValue(tablesFilterStatus, limit.smallBlind, limit.bigBlind, true);
+      tablesFilterStatus.append(" · cash");
+    } else {
+      tablesFilterStatus.textContent = limit
+        ? `${formatLimit(limit)} · play`
+        : formatGameLimit(state.selectedSmallBlind, state.selectedSmallBlind * 2);
+    }
   }
   renderHomeCta();
 }
@@ -1392,8 +1416,13 @@ function renderTableList(container, tables, emptyText) {
     const status = node.querySelector('[data-field="status"]');
     status.textContent = statusText;
     status.dataset.status = isFull ? "full" : isActive ? "live" : "open";
-    node.querySelector('[data-field="meta"]').textContent =
-      `${formatTableLimit(table)} · ${table.seats.length}/${table.maxPlayers} игроков${table.isPrivate ? " · приватный" : ""}`;
+    const meta = node.querySelector('[data-field="meta"]');
+    if (table.gameMode === "cash") {
+      renderLimitValue(meta, table.smallBlind, table.bigBlind, true);
+      meta.append(` · ${table.seats.length}/${table.maxPlayers} игроков${table.isPrivate ? " · приватный" : ""}`);
+    } else {
+      meta.textContent = `${formatTableLimit(table)} · ${table.seats.length}/${table.maxPlayers} игроков${table.isPrivate ? " · приватный" : ""}`;
+    }
     const button = node.querySelector('[data-action="join"]');
     button.textContent = isFull ? "Заполнен" : "Войти";
     button.disabled = isFull;
@@ -1491,20 +1520,22 @@ function openBuyInOverlay(intent) {
   const maxAmount = bounds.max;
   const defaultAmount = clampAmount(Number(intent.defaultAmount || bounds.defaultAmount), minAmount, maxAmount);
   if (buyInModeLabel) {
-    buyInModeLabel.textContent = cashMode ? "USDT" : "PLAY CHIPS";
+    if (cashMode) buyInModeLabel.replaceChildren("USDT ", createTetherMark());
+    else buyInModeLabel.textContent = "PLAY CHIPS";
   }
 
   document.querySelector(".buyin-title").textContent = intent.mode === "rebuy" ? "Докупка стека" : "Вход за стол";
-  buyInGameType.textContent = `БЛ Холдем ${formatGameLimit(smallBlind, bigBlind, cashMode)}`;
-  buyInBalance.textContent = formatModeAmount(balance, cashMode);
+  buyInGameType.replaceChildren("БЛ Холдем ");
+  renderLimitValue(buyInGameType, smallBlind, bigBlind, cashMode, { append: true });
+  renderMoneyValue(buyInBalance, balance, cashMode);
   buyInAmount.dataset.cashMode = cashMode ? "true" : "false";
   buyInAmount.dataset.min = String(minAmount);
   buyInAmount.dataset.max = String(maxAmount);
   buyInSlider.min = String(minAmount);
   buyInSlider.max = String(maxAmount);
   buyInSlider.step = String(Math.max(cashMode ? 10_000 : 100, bigBlind));
-  buyInMinButton.querySelector("span").textContent = formatModeAmount(minAmount, cashMode);
-  buyInMaxButton.querySelector("span").textContent = formatModeAmount(maxAmount, cashMode);
+  renderMoneyValue(buyInMinButton.querySelector("span"), minAmount, cashMode);
+  renderMoneyValue(buyInMaxButton.querySelector("span"), maxAmount, cashMode);
   setBuyInAmount(defaultAmount);
   buyInOverlay.hidden = false;
   updateTelegramBackButton();
@@ -1599,8 +1630,8 @@ function setBuyInAmount(amount) {
   buyInAmount.value = String(safeAmount);
   buyInSlider.value = String(safeAmount);
   const cashMode = buyInAmount.dataset.cashMode === "true";
-  buyInDebit.textContent = formatModeAmount(safeAmount, cashMode);
-  buyInStackPreview.textContent = formatModeAmount(safeAmount, cashMode);
+  renderMoneyValue(buyInDebit, safeAmount, cashMode);
+  renderMoneyValue(buyInStackPreview, safeAmount, cashMode);
 }
 
 async function loadCurrentTable() {
@@ -1854,11 +1885,12 @@ function renderCurrentTable(table) {
   currentTable.hidden = false;
   enterGameMode();
   tableCode.textContent = `#${table.id.slice(-8)}`;
-  blinds.textContent = formatTableLimit(table);
+  renderLimitValue(blinds, table.smallBlind, table.bigBlind, table.gameMode === "cash");
   tableDetails.textContent = `Texas NL · Блайнды ${formatTableLimit(table)} · #${table.handNumber || 1}`;
   const shouldCollectBets = shouldAnimateBetCollection(table);
   if (shouldCollectBets) animateBetStacksToPot();
-  pot.textContent = `Банк: ${formatTableAmount(table, table.pot)}`;
+  pot.replaceChildren("Банк: ");
+  renderTableValue(pot, table, table.pot, { append: true });
   if (potAmountKey !== String(table.pot)) {
     potAmountKey = String(table.pot);
     restartAnimation(pot, "pulse");
@@ -1937,9 +1969,9 @@ function renderCurrentTable(table) {
       ].filter(Boolean);
       renderAvatar(node.querySelector(".seat-avatar"), seat);
       node.querySelector(".seat-name").textContent = seat.name;
-      node.querySelector(".seat-meta").textContent = formatTableAmount(table, seat.stack);
+      renderTableValue(node.querySelector(".seat-meta"), table, seat.stack);
       node.querySelector(".seat-cards").replaceChildren(...renderCards(seat.cards, { animate: shouldAnimateCards }));
-      node.querySelector(".bet-amount").textContent = seat.bet ? formatTableAmount(table, seat.bet) : "";
+      if (seat.bet) renderTableValue(node.querySelector(".bet-amount"), table, seat.bet);
       node.dataset.badges = badges.join(" ");
       node.dataset.bet = seat.bet ? formatTableAmount(table, seat.bet) : "";
       node.dataset.betSize = chipSize(seat.bet, table.bigBlind);
@@ -2101,7 +2133,8 @@ function renderBettingActions(table) {
   call.hidden = !viewer.canCall;
   bet.hidden = !viewer.canBet;
   raise.hidden = viewer.canBet;
-  call.textContent = `Колл ${formatTableAmount(table, viewer.toCall)}`;
+  call.replaceChildren("Колл ");
+  renderTableValue(call, table, viewer.toCall, { append: true });
   bet.textContent = "Ставка";
   raise.textContent = "Рейз";
   amountLabel.textContent = viewer.canBet ? "Ставка" : "Рейз";
@@ -2465,7 +2498,7 @@ function formatUsdt(value) {
 }
 
 function formatModeAmount(value, cashMode) {
-  return cashMode ? `${formatUsdt(value)} T` : `${formatChips(value)} chips`;
+  return cashMode ? `${formatUsdt(value)} USDT` : `${formatChips(value)} chips`;
 }
 
 function formatGameAmount(value) {
@@ -2474,7 +2507,7 @@ function formatGameAmount(value) {
 
 function formatGameLimit(smallBlind, bigBlind, cashMode = state.gameMode === "cash") {
   return cashMode
-    ? `${formatUsdt(smallBlind)}/${formatUsdt(bigBlind)} T`
+    ? `${formatUsdt(smallBlind)}/${formatUsdt(bigBlind)} USDT`
     : `${formatChips(smallBlind)}/${formatChips(bigBlind)}`;
 }
 
@@ -2488,6 +2521,55 @@ function formatTableLimit(table) {
 
 function formatTableAmount(table, value) {
   return formatModeAmount(value, table?.gameMode === "cash");
+}
+
+function createTetherMark() {
+  const namespace = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(namespace, "svg");
+  svg.classList.add("tether-mark");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-label", "USDT");
+  svg.innerHTML = '<circle cx="12" cy="12" r="12"/><path d="M13.55 10.18V8.56h3.8V6H6.65v2.56h3.8v1.62C7.36 10.34 5 10.96 5 11.71c0 .75 2.36 1.37 5.45 1.53V18h3.1v-4.76c3.09-.16 5.45-.78 5.45-1.53 0-.75-2.36-1.37-5.45-1.53Zm0 2.07v-.01c-.49.03-1 .04-1.55.04s-1.06-.01-1.55-.04v.01c-2.21-.12-3.87-.51-3.87-.98 0-.39 1.18-.73 2.91-.9v.86c.78.07 1.63.11 2.51.11.88 0 1.73-.04 2.51-.11v-.86c1.73.17 2.91.51 2.91.9 0 .47-1.66.86-3.87.98Z"/>';
+  return svg;
+}
+
+function renderMoneyValue(node, value, cashMode, { append = false } = {}) {
+  if (!node) return;
+  const contents = cashMode
+    ? [formatUsdt(value), " ", createTetherMark()]
+    : [`${formatChips(value)} chips`];
+  if (append) node.append(...contents);
+  else node.replaceChildren(...contents);
+}
+
+function renderLimitValue(node, smallBlind, bigBlind, cashMode, { append = false } = {}) {
+  if (!node) return;
+  const contents = cashMode
+    ? [`${formatUsdt(smallBlind)}/${formatUsdt(bigBlind)} `, createTetherMark()]
+    : [`${formatChips(smallBlind)}/${formatChips(bigBlind)}`];
+  if (append) node.append(...contents);
+  else node.replaceChildren(...contents);
+}
+
+function renderHomeOfferMeta(limit, value, kind, cashMode) {
+  if (!homeOfferMeta) return;
+  if (!cashMode) {
+    const descriptor = kind === "entry" ? "вход от" : "баланс";
+    homeOfferMeta.textContent = `${formatLimit(limit)} · play · ${descriptor} ${formatGameAmount(value)}`;
+    return;
+  }
+  renderLimitValue(homeOfferMeta, limit.smallBlind, limit.bigBlind, true);
+  homeOfferMeta.append(kind === "entry" ? " · cash · вход от " : " · cash · баланс ");
+  renderMoneyValue(homeOfferMeta, value, true, { append: true });
+}
+
+function renderTableValue(node, table, value, { append = false } = {}) {
+  if (!node) return;
+  const contents = table?.gameMode === "cash"
+    ? [formatUsdt(value), " ", createTetherMark()]
+    : [formatChips(value)];
+  if (append) node.append(...contents);
+  else node.replaceChildren(...contents);
 }
 
 function formatDuration(seconds) {

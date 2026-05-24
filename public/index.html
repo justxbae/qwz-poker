@@ -151,7 +151,7 @@
           </section>
           <div class="game-mode-switch" id="gameModeSwitch" hidden>
             <button type="button" class="active" data-game-mode="play">Play chips</button>
-            <button type="button" data-game-mode="cash">Cash T</button>
+            <button type="button" data-game-mode="cash">Cash <svg class="tether-mark" viewBox="0 0 24 24" aria-label="USDT"><circle cx="12" cy="12" r="12"/><path d="M13.55 10.18V8.56h3.8V6H6.65v2.56h3.8v1.62C7.36 10.34 5 10.96 5 11.71c0 .75 2.36 1.37 5.45 1.53V18h3.1v-4.76c3.09-.16 5.45-.78 5.45-1.53 0-.75-2.36-1.37-5.45-1.53Zm0 2.07v-.01c-.49.03-1 .04-1.55.04s-1.06-.01-1.55-.04v.01c-2.21-.12-3.87-.51-3.87-.98 0-.39 1.18-.73 2.91-.9v.86c.78.07 1.63.11 2.51.11.88 0 1.73-.04 2.51-.11v-.86c1.73.17 2.91.51 2.91.9 0 .47-1.66.86-3.87.98Z"/></svg></button>
           </div>
           <section class="mode-banner" id="modeBanner">
             <div class="mode-banner-head">
@@ -183,7 +183,7 @@
                 <svg viewBox="0 0 24 24"><path d="M3.5 7.2h16.8v10.2H3.5z"/><path d="M16.1 10.1h4.3v4h-4.3a2 2 0 1 1 0-4Z"/><path d="M6 7.2V5.3h11"/></svg>
               </span>
               <span class="tg-row-main">Баланс</span>
-              <span class="tg-row-value"><b id="lobbyBalance">0</b> chips</span>
+              <span class="tg-row-value"><b id="lobbyBalance">0</b><span id="lobbyBalanceCurrency"> chips</span></span>
               <span class="tg-chevron">›</span>
             </button>
           </section>
@@ -338,7 +338,7 @@
               <small>USDT balance</small>
             </div>
             <div class="wallet-label">Доступно</div>
-            <div class="wallet-balance" id="cashierBalance">0</div>
+            <div class="wallet-balance money-value" id="cashierBalance">0</div>
             <div class="wallet-actions">
               <button type="button" id="cashierPrimaryButton">Пополнить</button>
               <button type="button" class="secondary-pill" disabled>Вывести</button>
@@ -362,18 +362,18 @@
               </div>
               <span>TON</span>
             </div>
-            <p class="cashier-note">Введите сумму в T. Счет в TON фиксирует курс, а после подтверждения сети на баланс поступает USDT.</p>
+            <p class="cashier-note">Введите сумму в USDT. Счет в TON фиксирует курс, а после подтверждения сети на баланс поступает USDT.</p>
             <div class="cashier-calculator">
               <label class="cashier-amount-field">
                 <span>Сумма пополнения</span>
                 <input id="cashierRubAmount" type="number" min="1" max="5000" step="1" value="5" inputmode="decimal" />
-                <small>T</small>
+                <small><svg class="tether-mark" viewBox="0 0 24 24" aria-label="USDT"><circle cx="12" cy="12" r="12"/><path d="M13.55 10.18V8.56h3.8V6H6.65v2.56h3.8v1.62C7.36 10.34 5 10.96 5 11.71c0 .75 2.36 1.37 5.45 1.53V18h3.1v-4.76c3.09-.16 5.45-.78 5.45-1.53 0-.75-2.36-1.37-5.45-1.53Zm0 2.07v-.01c-.49.03-1 .04-1.55.04s-1.06-.01-1.55-.04v.01c-2.21-.12-3.87-.51-3.87-.98 0-.39 1.18-.73 2.91-.9v.86c.78.07 1.63.11 2.51.11.88 0 1.73-.04 2.51-.11v-.86c1.73.17 2.91.51 2.91.9 0 .47-1.66.86-3.87.98Z"/></svg></small>
               </label>
               <div class="cashier-presets" id="cashierPresets"></div>
               <div class="cashier-quote">
                 <div>
                   <span>На баланс</span>
-                  <strong id="cashierQuoteChips">5.00 T</strong>
+                  <strong class="money-value" id="cashierQuoteChips">5.00</strong>
                 </div>
                 <div>
                   <span>К оплате</span>

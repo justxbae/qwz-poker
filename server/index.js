@@ -1331,7 +1331,7 @@ function seedPublicTables() {
   for (const limit of CASH_TABLE_LIMITS) {
     for (let index = 1; index <= limit.count; index += 1) {
       const table = createTable(null, {
-        name: `QWZ NL ${formatUsdtMicros(limit.smallBlind)}/${formatUsdtMicros(limit.bigBlind)} T #${index}`,
+        name: `QWZ NL ${formatUsdtMicros(limit.smallBlind)}/${formatUsdtMicros(limit.bigBlind)} USDT #${index}`,
         maxPlayers: 6,
         smallBlind: limit.smallBlind,
         minBuyIn: limit.minBuyIn,
@@ -1817,13 +1817,13 @@ async function recordTableTransaction(user, table, transaction) {
 
 function formatTableAmount(table, amount) {
   return table?.gameMode === "cash"
-    ? `${formatUsdtMicros(amount)} T`
+    ? `${formatUsdtMicros(amount)} USDT`
     : `${formatNumber(amount)} chips`;
 }
 
 function formatAvailableBalance(user, table) {
   return table?.gameMode === "cash"
-    ? `${formatUsdtMicros(user.cashBalanceMicros)} T`
+    ? `${formatUsdtMicros(user.cashBalanceMicros)} USDT`
     : `${formatNumber(user.balance)} chips`;
 }
 
@@ -2340,8 +2340,8 @@ async function handleAdminPaymentAction({ admin, paymentId, action, reason = "" 
       `Админ: ${formatUser(adminProfile)}`,
       `Order: ${order.id}`,
       `Метод: ${order.method}`,
-      `Сумма: ${formatUsdtMicros(order.cashUsdtMicros)} T`,
-      `Баланс: ${formatUsdtMicros(balance)} T`,
+      `Сумма: ${formatUsdtMicros(order.cashUsdtMicros)} USDT`,
+      `Баланс: ${formatUsdtMicros(balance)} USDT`,
       `Причина: ${normalizedReason}`
     ]
   });
@@ -2490,11 +2490,11 @@ async function handleCryptoWebhook(event) {
     user: { id: order.userId, name: order.userName, username: order.username },
     lines: [
       `Метод: ${order.asset} ${order.network}`,
-      `Зачисление: ${formatUsdtMicros(order.cashUsdtMicros)} T`,
+      `Зачисление: ${formatUsdtMicros(order.cashUsdtMicros)} USDT`,
       `Оплата: ${paidAmount || order.cryptoAmount} ${order.asset}`,
       `Order: ${order.id}`,
       `TX: ${txHash || externalId || "n/a"}`,
-      `Баланс: ${formatUsdtMicros(balance)} T`
+      `Баланс: ${formatUsdtMicros(balance)} USDT`
     ]
   });
 }

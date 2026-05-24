@@ -6701,9 +6701,9 @@ body:not(.in-game) .bottom-nav button.active {
 .mode-banner {
   display: grid;
   gap: 6px;
-  border: 1px solid var(--tg-line);
-  border-radius: 18px;
-  background: rgba(20, 24, 31, 0.72);
+  border: 0;
+  border-radius: var(--native-group-radius);
+  background: var(--native-surface);
   padding: 12px 14px;
 }
 
@@ -6737,11 +6737,85 @@ body:not(.in-game) .bottom-nav button.active {
 }
 
 .mode-banner[data-mode="cash"] {
-  border-color: rgba(42, 171, 238, 0.18);
-  background: rgba(21, 28, 38, 0.82);
+  background: var(--native-surface);
 }
 
 .mode-banner[data-mode="play"] {
-  border-color: rgba(47, 191, 113, 0.16);
-  background: rgba(18, 24, 20, 0.78);
+  background: var(--native-surface);
+}
+
+.tether-mark {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  vertical-align: -3px;
+}
+
+.tether-mark circle {
+  fill: #26a17b;
+}
+
+.tether-mark path {
+  fill: #fff;
+}
+
+.game-mode-switch button,
+.limit-pills button,
+.money-value,
+.cashier-presets button,
+.cashier-pay-button,
+.seat-meta,
+.bet-amount,
+.pot,
+.blinds {
+  align-items: center;
+}
+
+.game-mode-switch button,
+.limit-pills button,
+.cashier-presets button,
+.cashier-pay-button {
+  display: inline-flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.money-value,
+.seat-meta,
+.bet-amount,
+.pot,
+.blinds {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.tg-balance-hero small,
+.buyin-head > span,
+#tablesFilterStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.cashier-card .wallet-balance::after {
+  display: none;
+}
+
+.tg-row-value .tether-mark,
+.limit-pills .tether-mark,
+.seat-meta .tether-mark,
+.bet-amount .tether-mark {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+}
+
+.lobby-view.active {
+  gap: 10px;
+}
+
+.tables-filter-card {
+  background: var(--native-surface);
+  padding: 14px 16px;
 }
