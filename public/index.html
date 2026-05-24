@@ -132,7 +132,7 @@
             </div>
             <div>
               <span>Режим</span>
-              <strong id="buyInModeLabel">PLAY CHIPS</strong>
+              <strong id="buyInModeLabel">ИГРОВЫЕ ФИШКИ</strong>
             </div>
             <div>
               <span>После выхода</span>
@@ -157,7 +157,7 @@
             </div>
             <div class="home-balance">
               <span>Доступный баланс</span>
-              <strong><b id="lobbyBalance">0</b><small id="lobbyBalanceCurrency"> chips</small></strong>
+              <strong><b id="lobbyBalance">0</b><small id="lobbyBalanceCurrency"> фишек</small></strong>
             </div>
             <div class="home-wallet-actions">
               <button type="button" id="walletTopupButton">Депозит</button>
@@ -165,11 +165,64 @@
             </div>
           </section>
 
+          <section class="lobby-card home-marketing-card">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Для роста</p>
+                <h2>Бонусы, уровень и квесты</h2>
+              </div>
+              <span>3 раздела</span>
+            </div>
+            <div class="tg-menu-group">
+              <button type="button" class="tg-menu-row tg-menu-row-action" data-lobby-tab="cashier">
+                <span class="tg-row-icon tg-row-icon--gold" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M12 3.5 14.8 8l5 .8-3.6 3.5.9 5L12 14.9 6.9 17.3l.9-5L4.2 8.8l5-.8Z"/></svg>
+                </span>
+                <span class="tg-row-main">Бонусы</span>
+                <span class="tg-row-value">ежедневный бонус и акции</span>
+                <span class="tg-chevron">›</span>
+              </button>
+              <button type="button" class="tg-menu-row tg-menu-row-action" data-lobby-tab="profile">
+                <span class="tg-row-icon tg-row-icon--purple" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M12 3.8 14.8 9l5.7.8-4.1 4 1 5.6L12 16.8 6.6 19.4l1-5.6-4.1-4 5.7-.8Z"/></svg>
+                </span>
+                <span class="tg-row-main">Достижения</span>
+                <span class="tg-row-value">уровень, статус и награды</span>
+                <span class="tg-chevron">›</span>
+              </button>
+              <button type="button" class="tg-menu-row tg-menu-row-action" data-lobby-tab="tournaments">
+                <span class="tg-row-icon tg-row-icon--green" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M8 4.5h8v7.1a4 4 0 0 1-8 0Z"/><path d="M8 7H4.8v2.2a4 4 0 0 0 4 4M16 7h3.2v2.2a4 4 0 0 1-4 4"/><path d="M12 15.7V19M8.5 20h7"/></svg>
+                </span>
+                <span class="tg-row-main">Квесты</span>
+                <span class="tg-row-value">миссии и будущие награды</span>
+                <span class="tg-chevron">›</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="training-switcher">
+            <div>
+              <strong>Режим игры</strong>
+              <small id="modeBannerText">Отдельный режим для игры на игровых фишках без вывода.</small>
+            </div>
+            <div class="game-mode-switch" id="gameModeSwitch" aria-label="Режим игры">
+              <button type="button" data-game-mode="cash">USDT <svg class="tether-mark" viewBox="0 0 24 24" aria-label="USDT"><circle cx="12" cy="12" r="12"/><path d="M13.55 10.18V8.56h3.8V6H6.65v2.56h3.8v1.62C7.36 10.34 5 10.96 5 11.71c0 .75 2.36 1.37 5.45 1.53V18h3.1v-4.76c3.09-.16 5.45-.78 5.45-1.53 0-.75-2.36-1.37-5.45-1.53Zm0 2.07v-.01c-.49.03-1 .04-1.55.04s-1.06-.01-1.55-.04v.01c-2.21-.12-3.87-.51-3.87-.98 0-.39 1.18-.73 2.91-.9v.86c.78.07 1.63.11 2.51.11.88 0 1.73-.04 2.51-.11v-.86c1.73.17 2.91.51 2.91.9 0 .47-1.66.86-3.87.98Z"/></svg></button>
+              <button type="button" class="active" data-game-mode="play">Игровые фишки</button>
+            </div>
+            <div class="mode-banner" id="modeBanner">
+              <div class="mode-banner-head">
+                <strong id="modeBannerTitle">Игровые фишки</strong>
+                <span id="modeBannerKicker">Без вывода</span>
+              </div>
+            </div>
+          </section>
+
           <section class="lobby-card home-games">
             <div class="section-title">
               <div>
                 <p class="eyebrow">Texas Hold'em</p>
-                <h2 id="homeGamesTitle">Тренировочные столы</h2>
+                <h2 id="homeGamesTitle">Игровые столы</h2>
               </div>
               <span id="onlineStatus">0 столов</span>
             </div>
@@ -186,24 +239,7 @@
               </button>
               <button type="button" class="secondary-pill" data-lobby-tab="tables">Все столы</button>
             </div>
-            <small class="home-offer-meta" id="homeOfferMeta">25/50 · вход от 2 500 chips</small>
-          </section>
-
-          <section class="training-switcher">
-            <div>
-              <strong>Режим игры</strong>
-              <small id="modeBannerText">Тренировка использует отдельные бесплатные фишки без вывода.</small>
-            </div>
-            <div class="game-mode-switch" id="gameModeSwitch" aria-label="Режим игры">
-              <button type="button" data-game-mode="cash">Денежная <svg class="tether-mark" viewBox="0 0 24 24" aria-label="USDT"><circle cx="12" cy="12" r="12"/><path d="M13.55 10.18V8.56h3.8V6H6.65v2.56h3.8v1.62C7.36 10.34 5 10.96 5 11.71c0 .75 2.36 1.37 5.45 1.53V18h3.1v-4.76c3.09-.16 5.45-.78 5.45-1.53 0-.75-2.36-1.37-5.45-1.53Zm0 2.07v-.01c-.49.03-1 .04-1.55.04s-1.06-.01-1.55-.04v.01c-2.21-.12-3.87-.51-3.87-.98 0-.39 1.18-.73 2.91-.9v.86c.78.07 1.63.11 2.51.11.88 0 1.73-.04 2.51-.11v-.86c1.73.17 2.91.51 2.91.9 0 .47-1.66.86-3.87.98Z"/></svg></button>
-              <button type="button" class="active" data-game-mode="play">Тренировка</button>
-            </div>
-            <div class="mode-banner" id="modeBanner">
-              <div class="mode-banner-head">
-                <strong id="modeBannerTitle">Игровые фишки</strong>
-                <span id="modeBannerKicker">Без вывода</span>
-              </div>
-            </div>
+            <small class="home-offer-meta" id="homeOfferMeta">25/50 · вход от 2 500 игровых фишек</small>
           </section>
 
           <section class="lobby-card continue-card" id="continueCard" hidden>
@@ -264,7 +300,7 @@
           <div class="section-title">
             <div>
               <p class="eyebrow">Общие столы</p>
-              <h2 id="publicGamesTitle">Тренировочные столы</h2>
+              <h2 id="publicGamesTitle">Игровые столы</h2>
             </div>
             <span id="publicTablesStatus">live</span>
           </div>
@@ -274,7 +310,7 @@
           <div class="section-title">
             <div>
               <p class="eyebrow">Приватные столы</p>
-              <h2 id="privateGamesTitle">Приватные тренировочные столы</h2>
+              <h2 id="privateGamesTitle">Приватные столы</h2>
             </div>
             <span id="privateTablesStatus">private</span>
           </div>
@@ -416,9 +452,9 @@
             <div class="section-title">
               <div>
                 <p class="eyebrow">Банкролл</p>
-                <h2 id="profileBalance">0 chips</h2>
+                <h2 id="profileBalance">0 фишек</h2>
               </div>
-              <span>chips</span>
+              <span>фишек</span>
             </div>
             <div class="stats-cards">
               <div><span>За столами</span><strong id="profileTableStack">0</strong></div>

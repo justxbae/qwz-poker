@@ -7285,7 +7285,7 @@ body:not(.in-game) .profile-nav-fab {
 
 @media (max-width: 420px) {
   body:not(.in-game) .lobby-shell {
-    padding: max(14px, env(safe-area-inset-top)) 10px calc(92px + env(safe-area-inset-bottom));
+    padding: max(14px, env(safe-area-inset-top)) 10px calc(150px + env(safe-area-inset-bottom));
   }
 
   body:not(.in-game) .bottom-nav {
@@ -7296,4 +7296,57 @@ body:not(.in-game) .profile-nav-fab {
   body:not(.in-game) .profile-nav-fab {
     right: 10px;
   }
+}
+
+body:not(.in-game) .home-marketing-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+body:not(.in-game) .home-marketing-card .tg-menu-group {
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--tg-surface-2);
+}
+
+body:not(.in-game) .home-marketing-card .tg-menu-row {
+  min-height: 58px;
+  padding-inline: 12px;
+}
+
+body:not(.in-game) .home-marketing-card .tg-row-value {
+  max-width: 132px;
+  font-size: 13px;
+}
+
+body:not(.in-game) .home-marketing-card .tg-row-main {
+  font-size: 16px;
+}
+
+body:not(.in-game) .training-switcher {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+body:not(.in-game) .training-switcher > div:first-child small {
+  max-width: 100%;
+}
+
+body:not(.in-game) .home-games {
+  margin-top: 0;
+  padding: 14px;
+}
+
+body:not(.in-game) .home-games .section-title {
+  margin-bottom: 10px;
+}
+
+body:not(.in-game) .home-games .section-title h2 {
+  font-size: 19px;
+}
+
+body:not(.in-game) .home-limit-pills {
+  margin-bottom: 10px;
 }
