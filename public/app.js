@@ -419,20 +419,20 @@ function renderModeBalance() {
 function renderModeContext() {
   if (!modeBanner) return;
   const cashMode = state.gameMode === "cash";
-  if (modeBannerKicker) modeBannerKicker.textContent = cashMode ? "Денежная игра" : "Без вывода";
+  if (modeBannerKicker) modeBannerKicker.textContent = cashMode ? "USDT" : "Без вывода";
   if (modeBannerTitle) {
-    if (cashMode) modeBannerTitle.replaceChildren("Баланс USDT ", createTetherMark());
-    else modeBannerTitle.textContent = "Фантики";
+    if (cashMode) modeBannerTitle.replaceChildren("Денежная игра ", createTetherMark());
+    else modeBannerTitle.textContent = "Игровые фишки";
   }
   if (modeBannerText) {
     modeBannerText.textContent = cashMode
-      ? "Ставки и вывод в USDT. Пополнение принимается через TON после подтверждения сети."
-      : "Бесплатный режим для тренировки. Баланс не связан с денежной игрой.";
+      ? "Ставки и вывод в USDT. Депозит принимается через TON после подтверждения сети."
+      : "Тренировка использует отдельные бесплатные фишки без вывода.";
   }
-  if (homeGamesTitle) homeGamesTitle.textContent = cashMode ? "Cash-столы" : "Play-столы";
-  if (publicGamesTitle) publicGamesTitle.textContent = cashMode ? "Cash-столы" : "Play-столы";
-  if (privateGamesTitle) privateGamesTitle.textContent = cashMode ? "Приватные cash-столы" : "Приватные play-столы";
-  if (walletTopupButton) walletTopupButton.textContent = cashMode ? "Пополнить" : DEV_MODE ? "Начислить" : "Баланс";
+  if (homeGamesTitle) homeGamesTitle.textContent = cashMode ? "Cash-столы" : "Тренировочные столы";
+  if (publicGamesTitle) publicGamesTitle.textContent = cashMode ? "Cash-столы" : "Тренировочные столы";
+  if (privateGamesTitle) privateGamesTitle.textContent = cashMode ? "Приватные cash-столы" : "Приватные тренировочные столы";
+  if (walletTopupButton) walletTopupButton.textContent = "Депозит";
   if (walletWithdrawButton) walletWithdrawButton.disabled = !cashMode;
   modeBanner.dataset.mode = cashMode ? "cash" : "play";
 }
@@ -563,8 +563,8 @@ async function loadCashier() {
 
 function renderCashier(cashier) {
   const cashMode = Boolean(cashier.realMoneyEnabled);
-  if (cashierAssetLabel) cashierAssetLabel.textContent = cashMode ? "USDT balance" : "PLAY CHIPS";
-  if (cashierTopupTitle) cashierTopupTitle.textContent = cashMode ? "Пополнить USDT" : "Тестовый баланс";
+  if (cashierAssetLabel) cashierAssetLabel.textContent = cashMode ? "USDT balance" : "ИГРОВЫЕ ФИШКИ";
+  if (cashierTopupTitle) cashierTopupTitle.textContent = cashMode ? "Депозит USDT" : "Тестовый баланс";
   if (cashierDepositNetwork) cashierDepositNetwork.textContent = cashMode ? "TON" : "DEV";
   if (cashierAmountAsset) {
     if (cashMode) cashierAmountAsset.replaceChildren(createTetherMark());
@@ -573,13 +573,13 @@ function renderCashier(cashier) {
   if (cashierNote) {
     cashierNote.textContent = cashMode
       ? "Введите сумму в USDT. Счет в TON фиксирует курс, а после подтверждения сети на баланс поступает USDT."
-      : "Фантики не являются денежным балансом и не выводятся. Тестовое начисление доступно только в режиме разработчика.";
+      : "Игровые фишки используются только для тренировки и не выводятся. Тестовое начисление доступно только в режиме разработчика.";
   }
-  if (cashierWithdrawTitle) cashierWithdrawTitle.textContent = cashMode ? "Вывод USDT пока закрыт" : "У фантиков нет вывода";
+  if (cashierWithdrawTitle) cashierWithdrawTitle.textContent = cashMode ? "Вывод USDT пока закрыт" : "У игровых фишек нет вывода";
   if (cashierWithdrawText) {
     cashierWithdrawText.textContent = cashMode
       ? "Сначала запускаем честную экономику пополнений, открытые столы и историю операций. Методы вывода добавим после отдельной настройки правил и комиссий."
-      : "Фантики используются только в бесплатных столах и не обмениваются на денежный баланс.";
+      : "Игровые фишки используются только в тренировочных столах и не обмениваются на денежный баланс.";
   }
   renderMoneyValue(cashierBalance, cashMode ? cashier.cashBalanceMicros : cashier.playBalance, cashMode);
   renderMoneyValue(cashierTableStack, cashMode ? (cashier.cashTableStackMicros || 0) : (cashier.tableStack || 0), cashMode);
@@ -1253,19 +1253,19 @@ function renderHomeCta() {
   const balance = activeBalance();
   const quickPlayTitle = quickPlayButton.querySelector(".tg-row-main");
   const cashMode = state.gameMode === "cash";
-  const modeLabel = cashMode ? "USDT" : "фантики";
+  const modeLabel = cashMode ? "USDT" : "в тренировку";
   quickPlayButton.disabled = false;
 
   if (balance <= 0) {
     if (!cashMode && !DEV_MODE) {
-      if (quickPlayTitle) quickPlayTitle.textContent = "Фантики скоро";
+      if (quickPlayTitle) quickPlayTitle.textContent = "Тренировка скоро";
       quickPlayHint.textContent = "Ежедневная бесплатная выдача в разработке";
       renderHomeOfferMeta(limit, minBuyIn, "entry", cashMode);
       quickPlayButton.disabled = true;
       return;
     }
-    if (quickPlayTitle) quickPlayTitle.textContent = cashMode ? "Пополнить USDT" : "Пополнить фантики";
-    else quickPlayButton.textContent = cashMode ? "Пополнить USDT" : "Пополнить фантики";
+    if (quickPlayTitle) quickPlayTitle.textContent = cashMode ? "Внести депозит" : "Получить фишки";
+    else quickPlayButton.textContent = cashMode ? "Внести депозит" : "Получить фишки";
     renderHomeOfferMeta(limit, minBuyIn, "entry", cashMode);
     if (cashMode) {
       quickPlayHint.replaceChildren("Для cash-игры нужен бай-ин от ");
@@ -1285,7 +1285,7 @@ function renderHomeCta() {
   } else {
     quickPlayHint.textContent = balance < minBuyIn
       ? `Баланс ниже минимального бай-ина ${formatGameAmount(minBuyIn)}`
-      : `Подберём свободный ${cashMode ? "cash" : "play"}-стол автоматически`;
+      : `Подберём свободный ${cashMode ? "cash" : "тренировочный"} стол автоматически`;
   }
 }
 
@@ -1582,11 +1582,12 @@ function openBuyInOverlay(intent) {
   const balance = Number(intent.balance ?? (cashMode ? state.user?.cashBalanceMicros : state.user?.balance) ?? 0);
   const minimumBuyIn = Math.max(Number(table.minBuyIn || bigBlind * (cashMode ? 40 : 50)), bigBlind);
   if (balance < minimumBuyIn && intent.mode !== "rebuy") {
-    showError(`Для входа ${formatGameLimit(smallBlind, bigBlind, cashMode)} нужно минимум ${formatModeAmount(minimumBuyIn, cashMode)}`);
     selectLobbyTab("cashier");
     cashierStatus.textContent = cashMode
-      ? `Пополните USDT-баланс минимум до ${formatModeAmount(minimumBuyIn, true)}.`
-      : `Для play-режима нужен баланс минимум ${formatModeAmount(minimumBuyIn, false)}.`;
+      ? `Для входа на ${formatGameLimit(smallBlind, bigBlind, true)} внесите депозит минимум ${formatModeAmount(minimumBuyIn, true)}.`
+      : DEV_MODE
+        ? `Для тренировочного стола начислите минимум ${formatModeAmount(minimumBuyIn, false)}.`
+        : "Бесплатная выдача игровых фишек будет доступна перед запуском тренировочных столов.";
     document.querySelector(".cashier-topup-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
@@ -2630,7 +2631,7 @@ function renderHomeOfferMeta(limit, value, kind, cashMode) {
   if (!homeOfferMeta) return;
   if (!cashMode) {
     const descriptor = kind === "entry" ? "вход от" : "баланс";
-    homeOfferMeta.textContent = `${formatLimit(limit)} · play · ${descriptor} ${formatGameAmount(value)}`;
+    homeOfferMeta.textContent = `${formatLimit(limit)} · тренировка · ${descriptor} ${formatGameAmount(value)}`;
     return;
   }
   renderLimitValue(homeOfferMeta, limit.smallBlind, limit.bigBlind, true);

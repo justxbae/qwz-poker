@@ -7179,3 +7179,121 @@ body:not(.in-game) .home-table-list .table-item button {
     grid-template-columns: 1fr 92px;
   }
 }
+
+/* Mobile Telegram WebView alignment and secondary training mode. */
+body:not(.in-game) .lobby-shell {
+  padding-top: max(14px, env(safe-area-inset-top));
+}
+
+body:not(.in-game) .lobby-view,
+body:not(.in-game) .lobby-view > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.home-identity .player-rank {
+  display: inline-flex;
+  width: max-content;
+  margin-top: 4px;
+  border-radius: 10px;
+  background: var(--native-control);
+  color: var(--tg-hint);
+  font-size: 11px;
+  font-weight: 520;
+  line-height: 20px;
+  padding: 0 8px;
+}
+
+.home-account {
+  grid-template-columns: 48px minmax(0, 1fr) 30px;
+}
+
+.home-account .lobby-avatar {
+  width: 48px;
+  height: 48px;
+}
+
+.training-switcher {
+  display: grid;
+  gap: 10px;
+  border-radius: var(--native-group-radius);
+  background: var(--tg-surface);
+  padding: 14px;
+}
+
+.home-limit-pills {
+  max-width: 100%;
+}
+
+.training-switcher > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.training-switcher > div:first-child strong {
+  color: var(--tg-text);
+  font-size: 16px;
+  font-weight: 560;
+}
+
+.training-switcher > div:first-child small {
+  color: var(--tg-hint);
+  font-size: 13px;
+  font-weight: 430;
+  line-height: 1.38;
+}
+
+.training-switcher .game-mode-switch {
+  margin: 0;
+  background: var(--native-control);
+}
+
+.training-switcher .mode-banner {
+  border-top: 1px solid var(--native-divider);
+  border-radius: 0;
+  padding: 10px 0 0;
+}
+
+.training-switcher .mode-banner-head {
+  align-items: center;
+}
+
+body:not(.in-game) .bottom-nav {
+  left: max(10px, calc(50vw - 210px));
+  width: min(336px, calc(100vw - 88px));
+  min-height: 62px;
+  gap: 2px;
+  border-radius: 33px;
+  padding: 5px;
+}
+
+body:not(.in-game) .bottom-nav button {
+  min-height: 52px;
+  border-radius: 27px;
+  padding-inline: 2px;
+}
+
+body:not(.in-game) .bottom-nav .nav-label {
+  font-size: 10.5px;
+}
+
+body:not(.in-game) .profile-nav-fab {
+  right: max(10px, calc(50vw - 210px));
+  width: 62px;
+  min-height: 62px;
+}
+
+@media (max-width: 420px) {
+  body:not(.in-game) .lobby-shell {
+    padding: max(14px, env(safe-area-inset-top)) 10px calc(92px + env(safe-area-inset-bottom));
+  }
+
+  body:not(.in-game) .bottom-nav {
+    left: 10px;
+    width: calc(100vw - 88px);
+  }
+
+  body:not(.in-game) .profile-nav-fab {
+    right: 10px;
+  }
+}
