@@ -9,10 +9,14 @@ export const RUNOUT_CARD_DELAY_MS = 900;
 export const REBUY_TIMEOUT_MS = 3 * 60 * 1000;
 export const SIT_OUT_TIMEOUT_MS = 5 * 60 * 1000;
 
-export function createTable(owner, body = {}) {
+export function createTable(owner, body = {}, options = {}) {
   const maxPlayers = clamp(Number(body.maxPlayers || 6), 2, 6);
-  const smallBlind = clamp(Number(body.smallBlind || 25), 1, 100000);
+  const gameMode = body.gameMode === "cash" ? "cash" : "play";
+  const currency = gameMode === "cash" ? "USDT" : "PLAY_CHIPS";
+  const smallBlind = clamp(Number(body.smallBlind || 25), 1, 10_000_000_000);
   const bigBlind = smallBlind * 2;
+  const minBuyIn = Math.max(bigBlind, Math.round(Number(body.minBuyIn) || bigBlind * (gameMode === "cash" ? 40 : 50)));
+  const maxBuyIn = Math.max(minBuyIn, Math.round(Number(body.maxBuyIn) || bigBlind * (gameMode === "cash" ? 100 : 400)));
   const isPrivate = body.visibility === "private" || body.isPrivate === true;
   const isSystem = body.isSystem === true;
 
@@ -22,9 +26,13 @@ export function createTable(owner, body = {}) {
     ownerId: owner?.id || "system",
     isPrivate,
     isSystem,
+    gameMode,
+    currency,
     maxPlayers,
     smallBlind,
     bigBlind,
+    minBuyIn,
+    maxBuyIn,
     status: "waiting",
     handNumber: 0,
     startIntroUntil: 0,
@@ -51,7 +59,7 @@ export function createTable(owner, body = {}) {
     deck: []
   };
 
-  if (owner) joinTable(table, owner);
+  if (owner && options.joinOwner !== false) joinTable(table, owner);
   return table;
 }
 
@@ -161,7 +169,7 @@ export function addBuyIn(table, user, amount) {
     throwHttp(409, "Докупить фишки можно только между раздачами");
   }
 
-  const chips = clamp(Number(amount || 0), 1, 100000);
+  const chips = clamp(Number(amount || 0), 1, table.maxBuyIn || 10_000_000_000);
   seat.stack += chips;
   seat.sittingOut = false;
   seat.sittingOutUntil = 0;
@@ -396,9 +404,13 @@ export function publicTable(table, viewerId = "") {
     ownerId: table.ownerId,
     isPrivate: table.isPrivate,
     isSystem: table.isSystem,
+    gameMode: table.gameMode || "play",
+    currency: table.currency || "PLAY_CHIPS",
     maxPlayers: table.maxPlayers,
     smallBlind: table.smallBlind,
     bigBlind: table.bigBlind,
+    minBuyIn: table.minBuyIn || table.bigBlind * 50,
+    maxBuyIn: table.maxBuyIn || table.bigBlind * 100,
     status: table.status,
     handNumber: table.handNumber,
     startIntroUntil: table.startIntroUntil,

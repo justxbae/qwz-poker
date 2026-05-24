@@ -88,6 +88,13 @@ export async function getWallet(providerUserId, provider = "telegram") {
   return Number(result.rows[0].balance || 0);
 }
 
+export async function getCashWallet(providerUserId, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const result = await query("select cash_usdt_micros from wallets where app_user_id = $1", [appUserId]);
+  return result.rowCount ? Number(result.rows[0].cash_usdt_micros || 0) : 0;
+}
+
 export async function setWallet(providerUserId, balance, provider = "telegram") {
   if (!pool) return null;
   const appUserId = await ensureIdentity(provider, providerUserId);
@@ -96,6 +103,18 @@ export async function setWallet(providerUserId, balance, provider = "telegram") 
     insert into wallets (app_user_id, balance, updated_at)
     values ($1, $2, now())
     on conflict (app_user_id) do update set balance = excluded.balance, updated_at = now()
+  `, [appUserId, normalized]);
+  return normalized;
+}
+
+export async function setCashWallet(providerUserId, balance, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const normalized = Math.max(0, Math.round(Number(balance) || 0));
+  await query(`
+    insert into wallets (app_user_id, cash_usdt_micros, updated_at)
+    values ($1, $2, now())
+    on conflict (app_user_id) do update set cash_usdt_micros = excluded.cash_usdt_micros, updated_at = now()
   `, [appUserId, normalized]);
   return normalized;
 }
@@ -174,6 +193,80 @@ export async function addWalletEntry(providerUserId, entry, provider = "telegram
   }
 }
 
+export async function addCashWalletEntry(providerUserId, entry, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const amount = Math.max(0, Math.round(Number(entry.amount) || 0));
+  const idempotencyKey = normalizeIdempotencyKey(entry.idempotencyKey);
+  if (idempotencyKey) {
+    const existing = await query(`
+      select balance_after
+      from ledger_entries
+      where idempotency_key = $1
+      limit 1
+    `, [idempotencyKey]);
+    if (existing.rowCount) {
+      return {
+        balance: Number(existing.rows[0].balance_after || 0),
+        before: Number(existing.rows[0].balance_after || 0),
+        idempotentReplay: true
+      };
+    }
+  }
+  const delta = (entry.type === "debit" ? -1 : 1) * amount;
+  const client = await pool.connect();
+
+  try {
+    await client.query("begin");
+    await client.query(
+      "insert into wallets (app_user_id, cash_usdt_micros) values ($1, 0) on conflict do nothing",
+      [appUserId]
+    );
+    const current = await client.query(
+      "select cash_usdt_micros from wallets where app_user_id = $1 for update",
+      [appUserId]
+    );
+    const before = Number(current.rows[0]?.cash_usdt_micros || 0);
+    const after = before + delta;
+    if (after < 0) {
+      const error = new Error("Недостаточно USDT на балансе");
+      error.status = 409;
+      throw error;
+    }
+
+    await client.query(
+      "update wallets set cash_usdt_micros = $2, updated_at = now() where app_user_id = $1",
+      [appUserId, after]
+    );
+    await client.query(`
+      insert into ledger_entries (
+        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after,
+        idempotency_key, asset, balance_bucket
+      )
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'USDT', 'cash_usdt')
+    `, [
+      entry.id || id("ledger"),
+      appUserId,
+      provider,
+      String(providerUserId),
+      entry.type,
+      normalizeLedgerCategory(entry.category),
+      entry.title,
+      amount,
+      entry.meta || "",
+      after,
+      idempotencyKey || null
+    ]);
+    await client.query("commit");
+    return { balance: after, before };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function listLedger(providerUserId, limit = 30, provider = "telegram") {
   if (!pool) return null;
   const appUserId = await ensureIdentity(provider, providerUserId);
@@ -190,6 +283,21 @@ export async function listLedger(providerUserId, limit = 30, provider = "telegra
   }));
 }
 
+export async function listCashLedger(providerUserId, limit = 30, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const result = await query(`
+    select id, type, category, title, amount, meta, asset, balance_bucket as "balanceBucket", created_at as "createdAt"
+    from ledger_entries
+    where app_user_id = $1 and balance_bucket = 'cash_usdt'
+    order by created_at desc
+    limit $2
+  `, [appUserId, limit]);
+  return result.rows.map((row) => ({
+    ...row,
+    amount: Number(row.amount || 0)
+  }));
+}
 export async function recordFundMovement(providerUserId, movement, provider = "telegram") {
   if (!pool) return null;
   const appUserId = await ensureIdentity(provider, providerUserId);
@@ -543,9 +651,10 @@ export async function createPaymentOrder(order, provider = "telegram") {
   await query(`
     insert into payment_orders (
       id, app_user_id, provider, provider_user_id, method, status,
-      rub_amount, chips, stars, asset, network, crypto_amount, external_id, payload, raw, expires_at
+      rub_amount, chips, stars, asset, network, crypto_amount, external_id, payload, raw, expires_at,
+      credited_asset, cash_usdt_micros
     )
-    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
   `, [
     order.id,
     appUserId,
@@ -562,7 +671,9 @@ export async function createPaymentOrder(order, provider = "telegram") {
     order.externalId || "",
     order.payload || "",
     JSON.stringify(order),
-    order.expiresAt ? new Date(order.expiresAt) : null
+    order.expiresAt ? new Date(order.expiresAt) : null,
+    order.creditedAsset || "PLAY_CHIPS",
+    order.cashUsdtMicros || 0
   ]);
 }
 
@@ -630,8 +741,10 @@ export async function completePaymentOrder(orderId, payment) {
     }
 
     const order = paymentRow(currentOrder.rows[0]);
+    const cashPayment = order.creditedAsset === "USDT";
+    const balanceColumn = cashPayment ? "cash_usdt_micros" : "balance";
     if (order.status === "paid") {
-      const wallet = await client.query("select balance from wallets where app_user_id = $1", [currentOrder.rows[0].app_user_id]);
+      const wallet = await client.query(`select ${balanceColumn} as balance from wallets where app_user_id = $1`, [currentOrder.rows[0].app_user_id]);
       await client.query("commit");
       return { order, balance: Number(wallet.rows[0]?.balance || 0), alreadyPaid: true };
     }
@@ -641,22 +754,23 @@ export async function completePaymentOrder(orderId, payment) {
     }
 
     const appUserId = currentOrder.rows[0].app_user_id;
-    await client.query("insert into wallets (app_user_id, balance) values ($1, 0) on conflict do nothing", [appUserId]);
-    const wallet = await client.query("select balance from wallets where app_user_id = $1 for update", [appUserId]);
+    await client.query("insert into wallets (app_user_id, balance, cash_usdt_micros) values ($1, 0, 0) on conflict do nothing", [appUserId]);
+    const wallet = await client.query(`select ${balanceColumn} as balance from wallets where app_user_id = $1 for update`, [appUserId]);
     const before = Number(wallet.rows[0]?.balance || 0);
-    const amount = Math.max(0, Math.round(Number(order.chips) || 0));
+    const amount = Math.max(0, Math.round(Number(cashPayment ? order.cashUsdtMicros : order.chips) || 0));
     const after = before + amount;
     const method = normalizeLedgerCategory(order.method || "stars");
     const asset = order.asset || (method === "stars" ? "Stars" : method.toUpperCase());
     const network = order.network || "";
     const ledgerKey = `payment:${order.id}`;
 
-    await client.query("update wallets set balance = $2, updated_at = now() where app_user_id = $1", [appUserId, after]);
+    await client.query(`update wallets set ${balanceColumn} = $2, updated_at = now() where app_user_id = $1`, [appUserId, after]);
     await client.query(`
       insert into ledger_entries (
-        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after, idempotency_key
+        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after, idempotency_key,
+        asset, balance_bucket
       )
-      values ($1, $2, $3, $4, 'credit', $5, $6, $7, $8, $9, $10)
+      values ($1, $2, $3, $4, 'credit', $5, $6, $7, $8, $9, $10, $11, $12)
       on conflict do nothing
     `, [
       id("ledger"),
@@ -664,11 +778,13 @@ export async function completePaymentOrder(orderId, payment) {
       order.provider || "telegram",
       String(order.userId),
       `deposit_${method}`,
-      method === "stars" ? "Пополнение Stars" : "Пополнение баланса",
+      cashPayment ? "Пополнение USDT" : (method === "stars" ? "Пополнение Stars" : "Пополнение баланса"),
       amount,
       `${order.cryptoAmount || order.stars || 0} ${asset}${network ? ` ${network}` : ""} · order ${order.id}`,
       after,
-      ledgerKey
+      ledgerKey,
+      cashPayment ? "USDT" : "PLAY_CHIPS",
+      cashPayment ? "cash_usdt" : "play"
     ]);
     await client.query(`
       update payment_orders
@@ -1090,8 +1206,10 @@ async function migrate() {
     create table if not exists wallets (
       app_user_id text primary key references app_users(id) on delete cascade,
       balance bigint not null default 0 check (balance >= 0),
+      cash_usdt_micros bigint not null default 0 check (cash_usdt_micros >= 0),
       updated_at timestamptz not null default now()
     );
+    alter table wallets add column if not exists cash_usdt_micros bigint not null default 0 check (cash_usdt_micros >= 0);
 
     create table if not exists saved_stacks (
       app_user_id text primary key references app_users(id) on delete cascade,
@@ -1111,6 +1229,8 @@ async function migrate() {
       meta text not null default '',
       balance_after bigint,
       idempotency_key text,
+      asset text not null default 'PLAY_CHIPS',
+      balance_bucket text not null default 'play',
       reversal_of text references ledger_entries(id) on delete set null,
       created_at timestamptz not null default now()
     );
@@ -1118,6 +1238,8 @@ async function migrate() {
     create index if not exists idx_ledger_entries_app_user_created on ledger_entries(app_user_id, created_at desc);
     alter table ledger_entries add column if not exists category text not null default 'other';
     alter table ledger_entries add column if not exists idempotency_key text;
+    alter table ledger_entries add column if not exists asset text not null default 'PLAY_CHIPS';
+    alter table ledger_entries add column if not exists balance_bucket text not null default 'play';
     alter table ledger_entries add column if not exists reversal_of text references ledger_entries(id) on delete set null;
     create index if not exists idx_ledger_entries_category_created on ledger_entries(category, created_at desc);
     create unique index if not exists idx_ledger_entries_idempotency_key on ledger_entries(idempotency_key) where idempotency_key is not null;
@@ -1212,7 +1334,9 @@ async function migrate() {
       raw jsonb not null default '{}'::jsonb,
       created_at timestamptz not null default now(),
       expires_at timestamptz,
-      paid_at timestamptz
+      paid_at timestamptz,
+      credited_asset text not null default 'PLAY_CHIPS',
+      cash_usdt_micros bigint not null default 0 check (cash_usdt_micros >= 0)
     );
 
     alter table payment_orders add column if not exists asset text not null default '';
@@ -1220,6 +1344,8 @@ async function migrate() {
     alter table payment_orders add column if not exists crypto_amount numeric(24, 8);
     alter table payment_orders add column if not exists external_id text not null default '';
     alter table payment_orders add column if not exists expires_at timestamptz;
+    alter table payment_orders add column if not exists credited_asset text not null default 'PLAY_CHIPS';
+    alter table payment_orders add column if not exists cash_usdt_micros bigint not null default 0 check (cash_usdt_micros >= 0);
     create index if not exists idx_payment_orders_app_user_created on payment_orders(app_user_id, created_at desc);
     create index if not exists idx_payment_orders_status_created on payment_orders(status, created_at desc);
     create index if not exists idx_payment_orders_external_id on payment_orders(external_id) where external_id <> '';
@@ -1310,6 +1436,10 @@ function paymentRow(row) {
     username: row.username || "",
     rubAmount: Number(row.rub_amount || 0),
     chips: Number(row.chips || 0),
+    creditedAsset: row.credited_asset || "PLAY_CHIPS",
+    cashUsdtMicros: Number(row.cash_usdt_micros || 0),
+    usdtAmount: Number(row.raw?.usdtAmount || Number(row.cash_usdt_micros || 0) / 1_000_000),
+    tonUsdtRate: Number(row.raw?.tonUsdtRate || 0),
     stars: Number(row.stars || 0),
     asset: row.asset || "",
     network: row.network || "",

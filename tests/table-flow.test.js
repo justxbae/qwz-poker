@@ -339,12 +339,12 @@ test("cashier returns deposit settings and records wallet operations", async () 
     let cashier = (await request("/api/cashier", { token: auth.token })).cashier;
 
     assert.equal(cashier.balance, 0);
+    assert.equal(cashier.mode, "play");
+    assert.equal(cashier.currency, "PLAY_CHIPS");
     assert.equal(cashier.packages, undefined);
     assert.equal(cashier.deposit.minRub, 100);
     assert.equal(cashier.deposit.chipsPerRub, 50);
-    assert.equal(cashier.deposit.methods.find((method) => method.id === "stars").enabled, false);
-    assert.equal(cashier.deposit.methods.find((method) => method.id === "ton").enabled, false);
-    assert.equal(cashier.deposit.methods.find((method) => method.id === "usdt_trc20").enabled, false);
+    assert.equal(cashier.deposit.methods, undefined);
     assert.equal(cashier.transactions.length, 0);
 
     await assert.rejects(
@@ -439,25 +439,28 @@ test("crypto deposit order can be created but does not credit chips before confi
     REAL_MONEY_ENABLED: "true",
     TON_PAYMENTS_ENABLED: "true",
     TON_RECEIVER_ADDRESS: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
-    TON_RUB_RATE: "250"
+    TON_USDT_RATE: "250"
   });
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
     const cashier = (await request("/api/cashier", { token: auth.token })).cashier;
-    assert.equal(cashier.deposit.methods.find((method) => method.id === "stars").enabled, true);
+    assert.equal(cashier.mode, "cash");
+    assert.equal(cashier.currency, "USDT");
     assert.equal(cashier.deposit.methods.find((method) => method.id === "ton").enabled, true);
+    assert.equal(cashier.deposit.methods.length, 1);
 
     const data = await request("/api/cashier/crypto-order", {
       method: "POST",
       token: auth.token,
       idempotencyKey: "ton-order-once",
-      body: { method: "ton", rubAmount: 250 }
+      body: { method: "ton", usdtAmount: 250 }
     });
 
     assert.equal(data.order.method, "ton");
     assert.equal(data.order.asset, "TON");
     assert.equal(data.order.cryptoAmount, 1);
-    assert.equal(data.order.chips, 12500);
+    assert.equal(data.order.cashUsdtMicros, 250_000_000);
+    assert.equal(data.order.usdtAmount, 250);
     assert.equal(data.order.tonConnect.comment, data.order.payload);
 
     const after = (await request("/api/cashier", { token: auth.token })).cashier;
@@ -474,7 +477,7 @@ test("crypto deposit order can be created but does not credit chips before confi
     });
 
     const paid = (await request("/api/cashier", { token: auth.token })).cashier;
-    assert.equal(paid.balance, 12500);
+    assert.equal(paid.balance, 250_000_000);
     assert.equal(paid.transactions[0].category, "deposit_ton");
   } finally {
     server.kill();
@@ -487,7 +490,7 @@ test("admin can manually approve and reject crypto payment orders", async () => 
     REAL_MONEY_ENABLED: "true",
     TON_PAYMENTS_ENABLED: "true",
     TON_RECEIVER_ADDRESS: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
-    TON_RUB_RATE: "250"
+    TON_USDT_RATE: "250"
   });
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
@@ -496,7 +499,7 @@ test("admin can manually approve and reject crypto payment orders", async () => 
       method: "POST",
       token: auth.token,
       idempotencyKey: "admin-approve-ton-order",
-      body: { method: "ton", rubAmount: 250 }
+      body: { method: "ton", usdtAmount: 250 }
     })).order;
 
     let data = await request(`/api/admin/payments/${approveOrder.id}/approve`, {
@@ -508,7 +511,7 @@ test("admin can manually approve and reject crypto payment orders", async () => 
 
     assert.equal(data.payment.status, "paid");
     let cashier = (await request("/api/cashier", { token: auth.token })).cashier;
-    assert.equal(cashier.balance, 12500);
+    assert.equal(cashier.balance, 250_000_000);
 
     data = await request(`/api/admin/payments/${approveOrder.id}/approve`, {
       method: "POST",
@@ -518,13 +521,13 @@ test("admin can manually approve and reject crypto payment orders", async () => 
     });
     assert.equal(data.payment.status, "paid");
     cashier = (await request("/api/cashier", { token: auth.token })).cashier;
-    assert.equal(cashier.balance, 12500);
+    assert.equal(cashier.balance, 250_000_000);
 
     const rejectOrder = (await request("/api/cashier/crypto-order", {
       method: "POST",
       token: auth.token,
       idempotencyKey: "admin-reject-ton-order",
-      body: { method: "ton", rubAmount: 250 }
+      body: { method: "ton", usdtAmount: 250 }
     })).order;
 
     data = await request(`/api/admin/payments/${rejectOrder.id}/reject`, {
@@ -535,74 +538,30 @@ test("admin can manually approve and reject crypto payment orders", async () => 
 
     assert.equal(data.payment.status, "failed");
     cashier = (await request("/api/cashier", { token: auth.token })).cashier;
-    assert.equal(cashier.balance, 12500);
+    assert.equal(cashier.balance, 250_000_000);
   } finally {
     server.kill();
   }
 });
 
-test("withdrawal request holds chips and admin can reject with refund", async () => {
+test("withdrawals stay disabled until the payout rail is connected", async () => {
   const server = await startServer({
-    ADMIN_FINANCE_IDS: "dev-user",
-    REAL_MONEY_ENABLED: "true",
-    WITHDRAWALS_ENABLED: "true"
+    REAL_MONEY_ENABLED: "true"
   });
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    const cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.mode, "cash");
+    assert.equal(cashier.withdrawals.enabled, false);
+
     await assert.rejects(
-      request("/api/cashier/demo-topup", {
+      request("/api/cashier/withdraw", {
         method: "POST",
         token: auth.token,
-        body: { rubAmount: 100 }
+        body: { method: "ton", chips: 50000, destination: "UQB-test-wallet" }
       }),
-      /Demo-пополнение отключено/
+      /Вывод временно закрыт/
     );
-    await request("/api/admin/wallet-adjust", {
-      method: "POST",
-      token: auth.token,
-      body: {
-        telegramId: "dev-user",
-        type: "grant",
-        amount: 50000,
-        reason: "withdrawal_test_funding",
-        requestId: "withdrawal-test-funding"
-      }
-    });
-
-    let cashier = (await request("/api/cashier", { token: auth.token })).cashier;
-    assert.equal(cashier.balance, 50000);
-
-    const created = await request("/api/cashier/withdraw", {
-      method: "POST",
-      token: auth.token,
-      idempotencyKey: "withdraw-ton-once",
-      body: { method: "ton", chips: 50000, destination: "UQB-test-wallet" }
-    });
-
-    assert.equal(created.withdrawal.status, "pending");
-    assert.equal(created.withdrawal.chips, 50000);
-    assert.equal(created.withdrawal.feeChips, 2500);
-    cashier = (await request("/api/cashier", { token: auth.token })).cashier;
-    assert.equal(cashier.balance, 0);
-    assert.equal(cashier.transactions[0].category, "withdrawal_hold");
-
-    let dashboard = (await request("/api/admin", { token: auth.token })).admin;
-    assert.equal(dashboard.stats.pendingWithdrawals, 1);
-    assert.ok(dashboard.recentWithdrawals.some((order) => order.id === created.withdrawal.id));
-
-    const reviewed = await request(`/api/admin/withdrawals/${created.withdrawal.id}/reject`, {
-      method: "POST",
-      token: auth.token,
-      idempotencyKey: "withdraw-reject-once",
-      body: { reason: "test_refund" }
-    });
-
-    assert.equal(reviewed.withdrawal.status, "rejected");
-    cashier = (await request("/api/cashier", { token: auth.token })).cashier;
-    assert.equal(cashier.balance, 50000);
-    assert.equal(cashier.transactions[0].category, "withdrawal_refund");
-    dashboard = (await request("/api/admin", { token: auth.token })).admin;
-    assert.equal(dashboard.stats.pendingWithdrawals, 0);
   } finally {
     server.kill();
   }

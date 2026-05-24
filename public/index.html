@@ -132,11 +132,12 @@
             </div>
             <div>
               <span>Режим</span>
-              <strong>QWZ chips</strong>
+              <strong id="buyInModeLabel">PLAY CHIPS</strong>
             </div>
             <div>
               <span>После выхода</span>
               <strong>Стек сохранится</strong>
+            </div>
           </section>
           <button type="button" class="buyin-submit" id="confirmBuyInButton">OK</button>
         </div>
@@ -148,6 +149,10 @@
             <strong>QWZ Poker</strong>
             <span>Texas Hold'em</span>
           </section>
+          <div class="game-mode-switch" id="gameModeSwitch" hidden>
+            <button type="button" class="active" data-game-mode="play">Play chips</button>
+            <button type="button" data-game-mode="cash">Cash T</button>
+          </div>
 
           <section class="tg-balance-hero">
             <div>
@@ -323,7 +328,7 @@
           <section class="wallet-card cashier-card">
             <div class="miniapp-title">
               <span>Касса</span>
-              <small>QWZ chips</small>
+              <small>USDT balance</small>
             </div>
             <div class="wallet-label">Доступно</div>
             <div class="wallet-balance" id="cashierBalance">0</div>
@@ -348,24 +353,24 @@
                 <p class="eyebrow">Пополнение</p>
                 <h2>Стартовый баланс</h2>
               </div>
-              <span>Stars / TON / USDT</span>
+              <span>TON</span>
             </div>
-            <p class="cashier-note">Введите сумму в рублях, выберите способ оплаты и получите эквивалент в QWZ chips. Crypto-методы включаются только после подключения кошелька или провайдера.</p>
+            <p class="cashier-note">Введите сумму в T. Счет в TON фиксирует курс, а после подтверждения сети на баланс поступает USDT.</p>
             <div class="cashier-calculator">
               <label class="cashier-amount-field">
                 <span>Сумма пополнения</span>
-                <input id="cashierRubAmount" type="number" min="100" max="5000" step="50" value="100" inputmode="numeric" />
-                <small>RUB</small>
+                <input id="cashierRubAmount" type="number" min="1" max="5000" step="1" value="5" inputmode="decimal" />
+                <small>T</small>
               </label>
               <div class="cashier-presets" id="cashierPresets"></div>
               <div class="cashier-quote">
                 <div>
-                  <span>Получите</span>
-                  <strong id="cashierQuoteChips">5 000 chips</strong>
+                  <span>На баланс</span>
+                  <strong id="cashierQuoteChips">5.00 T</strong>
                 </div>
                 <div>
                   <span>К оплате</span>
-                  <strong id="cashierQuoteStars">50 Stars</strong>
+                  <strong id="cashierQuoteStars">TON по курсу счета</strong>
                 </div>
               </div>
             </div>
@@ -382,7 +387,7 @@
               <span>подготовка</span>
             </div>
             <div class="cashier-withdraw-state">
-              <strong>Вывод QWZ chips пока закрыт</strong>
+              <strong>Вывод USDT пока закрыт</strong>
               <span>Сначала запускаем честную экономику пополнений, открытые столы и историю операций. Методы вывода добавим после отдельной настройки правил и комиссий.</span>
             </div>
           </section>
@@ -392,7 +397,7 @@
                 <p class="eyebrow">Операции</p>
                 <h2>История</h2>
               </div>
-              <span>chips</span>
+              <span>USDT</span>
             </div>
             <div class="cashier-history" id="cashierHistory"></div>
           </section>

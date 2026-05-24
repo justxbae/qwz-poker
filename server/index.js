@@ -5,8 +5,21 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as Sentry from "@sentry/node";
-import { ECONOMY, depositSettings, quoteCryptoDeposit, quoteDeposit } from "./economy.js";
 import {
+  ASSETS,
+  BALANCE_BUCKETS,
+  CASH_TABLE_LIMITS,
+  ECONOMY,
+  PLAY_TABLE_LIMITS,
+  cashSettings,
+  depositSettings,
+  formatUsdtMicros,
+  playSettings,
+  quoteCryptoDeposit,
+  quoteDeposit
+} from "./economy.js";
+import {
+  addCashWalletEntry as dbAddCashWalletEntry,
   addWalletEntry as dbAddWalletEntry,
   completePaymentOrder as dbCompletePaymentOrder,
   createPaymentOrder as dbCreatePaymentOrder,
@@ -15,6 +28,7 @@ import {
   databaseHealth as dbDatabaseHealth,
   databaseEnabled,
   deleteActiveTableSnapshot as dbDeleteActiveTableSnapshot,
+  getCashWallet as dbGetCashWallet,
   getPaymentOrder as dbGetPaymentOrder,
   getIdempotencyResult as dbGetIdempotencyResult,
   getSavedStack as dbGetSavedStack,
@@ -23,6 +37,7 @@ import {
   initDatabase,
   listActiveTableSnapshots as dbListActiveTableSnapshots,
   listAdminEvents as dbListAdminEvents,
+  listCashLedger as dbListCashLedger,
   listLedger as dbListLedger,
   listTournamentRegistrations as dbListTournamentRegistrations,
   listHandHistories as dbListHandHistories,
@@ -39,6 +54,7 @@ import {
   saveIdempotencyResult as dbSaveIdempotencyResult,
   cancelTournamentRegistration as dbCancelTournamentRegistration,
   setSavedStack as dbSetSavedStack,
+  setCashWallet as dbSetCashWallet,
   setWallet as dbSetWallet,
   updatePaymentOrderStatus as dbUpdatePaymentOrderStatus,
   upsertActiveTableSnapshot as dbUpsertActiveTableSnapshot,
@@ -116,7 +132,9 @@ const sessionExpirations = new Map();
 const userProfiles = new Map();
 const savedStacks = new Map();
 const wallets = new Map();
+const cashWallets = new Map();
 const transactions = new Map();
+const cashTransactions = new Map();
 const fundMovements = new Map();
 const starOrders = new Map();
 const cryptoOrders = new Map();
@@ -247,7 +265,9 @@ async function handleApi(req, res, url) {
     sendJson(res, 200, {
       appName: APP_NAME,
       botUsername: BOT_USERNAME,
-      realMoneyEnabled: REAL_MONEY_ENABLED
+      realMoneyEnabled: REAL_MONEY_ENABLED,
+      play: playSettings(),
+      cash: cashSettings()
     });
     return;
   }
@@ -270,7 +290,8 @@ async function handleApi(req, res, url) {
       notifyAdmin("open", "Игрок открыл Mini App", {
         user,
         lines: [
-          `Баланс: ${formatNumber(user.balance)} chips`
+          `Play: ${formatNumber(user.balance)} chips`,
+          `Cash: ${formatUsdtMicros(user.cashBalanceMicros)} USDT`
         ]
       });
     }
@@ -370,51 +391,9 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/cashier/stars-invoice") {
-    requireRealMoneyEnabled();
-    await sendIdempotentJson(req, res, user, "cashier_stars_invoice", async () => {
-      const body = await readJson(req);
-      const quote = quoteDeposit(body);
-      if (!BOT_TOKEN || BOT_TOKEN.includes("replace_with") || BOT_TOKEN === "test-token") {
-        const error = new Error("BOT_TOKEN не настроен для Telegram Stars");
-        error.status = 409;
-        throw error;
-      }
-
-      const orderId = randomId("stars");
-      const payload = `qwz:${orderId}`;
-      const order = {
-        id: orderId,
-        userId: user.id,
-        userName: user.name,
-        username: user.username,
-        rubAmount: quote.rubAmount,
-        chips: quote.chips,
-        stars: quote.stars,
-        status: "pending",
-        createdAt: new Date().toISOString()
-      };
-      starOrders.set(orderId, order);
-      await dbCreatePaymentOrder(order);
-
-      const invoiceLink = await createStarsInvoiceLink({
-        title: `${formatNumber(quote.chips)} QWZ chips`,
-        description: `Пополнение игрового баланса QWZ Poker на ${formatNumber(quote.chips)} chips`,
-        payload,
-        stars: quote.stars
-      });
-      notifyAdmin("stars_invoice", "Создан счет Stars", {
-        user,
-        lines: [
-          `Сумма: ${formatNumber(quote.rubAmount)} ₽`,
-          `Пакет: ${formatNumber(quote.chips)} chips`,
-          `Стоимость: ${formatNumber(quote.stars)} Stars`,
-          `Order: ${order.id}`
-        ]
-      });
-
-      return { invoiceLink, orderId, cashier: await cashierView(user) };
-    });
-    return;
+    const error = new Error("Пополнение cash-баланса через Stars отключено. Используйте TON.");
+    error.status = 409;
+    throw error;
   }
 
   if (req.method === "POST" && url.pathname === "/api/cashier/crypto-order") {
@@ -435,8 +414,12 @@ async function handleApi(req, res, url) {
         method: quote.method,
         asset: quote.asset,
         network: quote.network,
-        rubAmount: quote.rubAmount,
-        chips: quote.chips,
+        rubAmount: 0,
+        chips: 0,
+        creditedAsset: quote.creditedAsset,
+        cashUsdtMicros: quote.cashUsdtMicros,
+        usdtAmount: quote.usdtAmount,
+        tonUsdtRate: quote.tonUsdtRate,
         cryptoAmount: quote.cryptoAmount,
         receiverAddress: quote.receiverAddress,
         confirmationsRequired: quote.confirmationsRequired,
@@ -451,9 +434,9 @@ async function handleApi(req, res, url) {
         user,
         lines: [
           `Метод: ${quote.asset} ${quote.network}`,
-          `Сумма: ${formatNumber(quote.rubAmount)} ₽`,
+          `Зачисление: ${formatUsdtMicros(quote.cashUsdtMicros)} USDT`,
           `К оплате: ${quote.cryptoAmount} ${quote.asset}`,
-          `Chips: ${formatNumber(quote.chips)}`,
+          `Курс: 1 TON = ${quote.tonUsdtRate} USDT`,
           `Order: ${order.id}`
         ]
       });
@@ -475,8 +458,9 @@ async function handleApi(req, res, url) {
     await sendIdempotentJson(req, res, user, "table_create", async (idempotencyKey) => {
       const body = await readJson(req);
       body.visibility = "private";
-      await prepareInitialStack(user, body, idempotencyKey);
-      const table = createTable(user, body);
+      const table = createTable(user, body, { joinOwner: false });
+      await prepareInitialStack(user, body, idempotencyKey, table);
+      joinTable(table, user);
       tables.set(table.id, table);
       await persistActiveTableSnapshot(table);
       notifyAdmin("table_create", "Создан приватный стол", {
@@ -484,7 +468,7 @@ async function handleApi(req, res, url) {
         lines: [
           `Стол: ${table.name}`,
           `Блайнды: ${table.smallBlind}/${table.bigBlind}`,
-          `Бай-ин: ${formatNumber(table.seats[0]?.stack || 0)} chips`
+          `Бай-ин: ${formatTableAmount(table, table.seats[0]?.stack || 0)}`
         ]
       });
       return { status: 201, body: { table: tableView(table, user) } };
@@ -522,7 +506,7 @@ async function handleApi(req, res, url) {
             lines: [
               `Стол: ${table.name}`,
               `Блайнды: ${table.smallBlind}/${table.bigBlind}`,
-              `Стек: ${formatNumber(table.seats.find((seat) => seat.userId === user.id)?.stack || 0)} chips`,
+              `Стек: ${formatTableAmount(table, table.seats.find((seat) => seat.userId === user.id)?.stack || 0)}`,
               `Игроков: ${table.seats.length}/${table.maxPlayers}`
             ]
           });
@@ -533,9 +517,10 @@ async function handleApi(req, res, url) {
     }
 
     if (req.method === "POST" && action === "leave") {
+      const departingStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
       const result = leaveTable(table, user);
       await persistCompletedHands(table);
-      await saveStack(user, result.stack);
+      await settleLeftTableStack(user, table, departingStack || result.stack);
       if (result.tableEmpty && table.isPrivate) {
         tables.delete(table.id);
         await deleteActiveTableSnapshot(table.id);
@@ -546,8 +531,8 @@ async function handleApi(req, res, url) {
         user,
         lines: [
           `Стол: ${table.name}`,
-          `Сохраненный стек: ${formatNumber(result.stack)} chips`,
-          `Баланс: ${formatNumber(user.balance)} chips`
+          `${table.gameMode === "cash" ? "Возврат" : "Сохраненный стек"}: ${formatTableAmount(table, result.stack)}`,
+          `Баланс: ${formatAvailableBalance(user, table)}`
         ]
       });
       sendJson(res, 200, { ok: true, balance: user.balance });
@@ -555,9 +540,10 @@ async function handleApi(req, res, url) {
     }
 
     if (req.method === "POST" && action === "stand") {
+      const departingStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
       const result = leaveTable(table, user);
       await persistCompletedHands(table);
-      await saveStack(user, result.stack);
+      await settleLeftTableStack(user, table, departingStack || result.stack);
       if (result.tableEmpty && table.isPrivate) {
         tables.delete(table.id);
         await deleteActiveTableSnapshot(table.id);
@@ -568,8 +554,8 @@ async function handleApi(req, res, url) {
         user,
         lines: [
           `Стол: ${table.name}`,
-          `Сохраненный стек: ${formatNumber(result.stack)} chips`,
-          `Баланс: ${formatNumber(user.balance)} chips`
+          `${table.gameMode === "cash" ? "Возврат" : "Сохраненный стек"}: ${formatTableAmount(table, result.stack)}`,
+          `Баланс: ${formatAvailableBalance(user, table)}`
         ]
       });
       sendJson(res, 200, { table: result.tableEmpty && table.isPrivate ? null : tableView(table, user), balance: user.balance });
@@ -593,18 +579,19 @@ async function handleApi(req, res, url) {
     if (req.method === "POST" && action === "rebuy") {
       await sendIdempotentJson(req, res, user, `table_rebuy:${table.id}`, async (idempotencyKey) => {
         const body = await readJson(req);
-        if (user.balance <= 0) {
+        const availableBalance = tableWalletBalance(user, table);
+        if (availableBalance <= 0) {
           const error = new Error("На общем балансе нет средств для докупки");
           error.status = 409;
           throw error;
         }
 
-        const amount = clamp(Number(body.amount || DEFAULT_STACK), 1, user.balance);
+        const amount = clamp(Number(body.amount || DEFAULT_STACK), 1, availableBalance);
         const beforeStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
         const afterStack = addBuyIn(table, user, amount);
         const actualAmount = afterStack - beforeStack;
         if (actualAmount > 0) {
-          user.balance = await recordTransaction(user, {
+          await recordTableTransaction(user, table, {
             type: "debit",
             category: "table_rebuy",
             title: "Докупка за столом",
@@ -624,9 +611,9 @@ async function handleApi(req, res, url) {
             user,
             lines: [
               `Стол: ${table.name}`,
-              `Сумма: ${formatNumber(actualAmount)} chips`,
-              `Стек: ${formatNumber(afterStack)} chips`,
-              `Баланс: ${formatNumber(user.balance)} chips`
+              `Сумма: ${formatTableAmount(table, actualAmount)}`,
+              `Стек: ${formatTableAmount(table, afterStack)}`,
+              `Баланс: ${formatAvailableBalance(user, table)}`
             ]
           });
         }
@@ -662,6 +649,11 @@ async function handleApi(req, res, url) {
     }
 
     if (req.method === "POST" && action === "add-test-player") {
+      if (table.gameMode === "cash") {
+        const error = new Error("Тестовые игроки недоступны за денежным столом");
+        error.status = 409;
+        throw error;
+      }
       const testUser = createTestUser(table.seats.length + 1);
       joinTable(table, testUser);
       maybeStartHand(table);
@@ -1085,6 +1077,10 @@ function normalizeHydratedTable(table, now = Date.now()) {
   table.runoutQueue = Array.isArray(table.runoutQueue) ? table.runoutQueue : [];
   table.deck = Array.isArray(table.deck) ? table.deck : [];
   table.status = table.status || "waiting";
+  table.gameMode = table.gameMode === "cash" ? "cash" : "play";
+  table.currency = table.gameMode === "cash" ? ASSETS.CASH : ASSETS.PLAY;
+  table.minBuyIn = Math.max(table.bigBlind || 1, Number(table.minBuyIn || table.bigBlind * (table.gameMode === "cash" ? 40 : 50)));
+  table.maxBuyIn = Math.max(table.minBuyIn, Number(table.maxBuyIn || table.bigBlind * (table.gameMode === "cash" ? 100 : 400)));
   table.startIntroUntil = 0;
   table.runoutNextAt = 0;
   table.actionDeadline = 0;
@@ -1221,10 +1217,12 @@ async function normalizeUser(user) {
     name: user.first_name || user.username || "Player",
     username: user.username || "",
     photoUrl: user.photo_url || "",
-    balance: 0
+    balance: 0,
+    cashBalanceMicros: 0
   };
   await upsertTelegramUser(normalized);
   normalized.balance = await getWallet(id);
+  normalized.cashBalanceMicros = await getCashWallet(id);
   userProfiles.set(id, normalized);
   return normalized;
 }
@@ -1242,12 +1240,15 @@ async function profileView(user) {
         handNumber: table.handNumber,
         status: table.status,
         stack: seat.stack,
+        gameMode: table.gameMode || "play",
+        currency: table.currency || ASSETS.PLAY,
         sittingOut: seat.sittingOut,
         sitOutNextHand: seat.sitOutNextHand
       };
     })
     .filter(Boolean);
-  const tableStack = activeTables.reduce((sum, table) => sum + table.stack, 0);
+  const tableStack = activeTables.filter((table) => table.gameMode !== "cash").reduce((sum, table) => sum + table.stack, 0);
+  const cashTableStackMicros = activeTables.filter((table) => table.gameMode === "cash").reduce((sum, table) => sum + table.stack, 0);
   const handsPlayed = activeTables.reduce((sum, table) => sum + table.handNumber, 0);
 
   return {
@@ -1258,8 +1259,11 @@ async function profileView(user) {
       photoUrl: user.photoUrl || ""
     },
     balance: user.balance,
+    playBalance: user.balance,
+    cashBalanceMicros: user.cashBalanceMicros,
     savedStack: await getSavedStack(user),
     tableStack,
+    cashTableStackMicros,
     activeTables,
     activeTableCount: activeTables.length,
     handsPlayed
@@ -1268,18 +1272,27 @@ async function profileView(user) {
 
 async function cashierView(user) {
   const activeTables = userActiveTables(user);
-  const tableStack = activeTables.reduce((sum, table) => sum + table.stack, 0);
+  const playTableStack = activeTables.filter((table) => table.gameMode !== "cash").reduce((sum, table) => sum + table.stack, 0);
+  const cashTableStackMicros = activeTables.filter((table) => table.gameMode === "cash").reduce((sum, table) => sum + table.stack, 0);
+  const cashMode = REAL_MONEY_ENABLED;
+  const balance = cashMode ? user.cashBalanceMicros : user.balance;
+  const tableStack = cashMode ? cashTableStackMicros : playTableStack;
   return {
-    balance: user.balance,
+    balance,
+    playBalance: user.balance,
+    cashBalanceMicros: user.cashBalanceMicros,
     tableStack,
-    totalBankroll: user.balance + tableStack,
+    cashTableStackMicros,
+    totalBankroll: balance + tableStack,
+    cashTotalBankrollMicros: user.cashBalanceMicros + cashTableStackMicros,
     activeTableCount: activeTables.length,
-    currency: "chips",
-    mode: "chips",
+    currency: cashMode ? ASSETS.CASH : ASSETS.PLAY,
+    mode: cashMode ? "cash" : "play",
     realMoneyEnabled: REAL_MONEY_ENABLED,
-    deposit: depositSettings({ realMoneyEnabled: REAL_MONEY_ENABLED }),
+    deposit: cashMode ? depositSettings({ realMoneyEnabled: REAL_MONEY_ENABLED }) : ECONOMY.play.deposit,
     withdrawals: withdrawalSettings(),
-    transactions: await getTransactions(user)
+    transactions: cashMode ? await getCashTransactions(user) : await getTransactions(user),
+    playTransactions: await getTransactions(user)
   };
 }
 
@@ -1291,25 +1304,39 @@ function userActiveTables(user) {
       return {
         id: table.id,
         name: table.name,
-        stack: seat.stack
+        stack: seat.stack,
+        gameMode: table.gameMode || "play",
+        currency: table.currency || ASSETS.PLAY
       };
     })
     .filter(Boolean);
 }
 
 function seedPublicTables() {
-  const limits = [
-    { smallBlind: 25, count: 4 },
-    { smallBlind: 50, count: 4 },
-    { smallBlind: 100, count: 3 }
-  ];
-
-  for (const limit of limits) {
+  for (const limit of PLAY_TABLE_LIMITS) {
     for (let index = 1; index <= limit.count; index += 1) {
       const table = createTable(null, {
         name: `QWZ NL ${limit.smallBlind}/${limit.smallBlind * 2} #${index}`,
         maxPlayers: 6,
         smallBlind: limit.smallBlind,
+        gameMode: "play",
+        isSystem: true,
+        isPrivate: false
+      });
+      tables.set(table.id, table);
+    }
+  }
+
+  if (!REAL_MONEY_ENABLED) return;
+  for (const limit of CASH_TABLE_LIMITS) {
+    for (let index = 1; index <= limit.count; index += 1) {
+      const table = createTable(null, {
+        name: `QWZ NL ${formatUsdtMicros(limit.smallBlind)}/${formatUsdtMicros(limit.bigBlind)} T #${index}`,
+        maxPlayers: 6,
+        smallBlind: limit.smallBlind,
+        minBuyIn: limit.minBuyIn,
+        maxBuyIn: limit.maxBuyIn,
+        gameMode: "cash",
         isSystem: true,
         isPrivate: false
       });
@@ -1521,6 +1548,11 @@ async function getSavedStack(user) {
 async function prepareInitialStack(user, body = {}, idempotencyKey = "", table = null) {
   const requested = Number(body.buyInAmount || 0);
   if (!requested) {
+    if (table?.gameMode === "cash") {
+      const error = new Error("Выберите сумму бай-ина для денежного стола");
+      error.status = 409;
+      throw error;
+    }
     user.stack = await getSavedStack(user);
     if (user.stack <= 0) {
       const error = new Error("Сначала пополните баланс и выберите бай-ин");
@@ -1530,25 +1562,27 @@ async function prepareInitialStack(user, body = {}, idempotencyKey = "", table =
     return;
   }
 
-  if (user.balance <= 0) {
+  const availableBalance = tableWalletBalance(user, table);
+  if (availableBalance <= 0) {
     const error = new Error("На общем балансе нет средств для бай-ина");
     error.status = 409;
     throw error;
   }
-  const amount = clamp(requested, 1, user.balance);
+  const amount = clamp(requested, 1, availableBalance);
   const bigBlind = Number(table?.bigBlind || Number(body.smallBlind || 25) * 2);
-  const minimumBuyIn = Math.max(bigBlind * 50, bigBlind);
+  const minimumBuyIn = Math.max(Number(table?.minBuyIn || bigBlind * 50), bigBlind);
+  const maximumBuyIn = Math.max(minimumBuyIn, Number(table?.maxBuyIn || bigBlind * 100));
   if (amount < minimumBuyIn) {
-    const error = new Error(`Минимальный бай-ин для ${bigBlind / 2}/${bigBlind}: ${formatNumber(minimumBuyIn)} chips`);
+    const error = new Error(`Минимальный бай-ин: ${formatTableAmount(table, minimumBuyIn)}`);
     error.status = 409;
     throw error;
   }
-  user.stack = amount;
-  user.balance = await recordTransaction(user, {
+  user.stack = Math.min(amount, maximumBuyIn);
+  await recordTableTransaction(user, table, {
     type: "debit",
     category: "table_buyin",
     title: "Бай-ин за стол",
-    amount,
+    amount: user.stack,
     meta: "Texas NL",
     idempotencyKey
   });
@@ -1556,7 +1590,7 @@ async function prepareInitialStack(user, body = {}, idempotencyKey = "", table =
     category: "wallet_to_table",
     from: "wallet",
     to: "table",
-    amount,
+    amount: user.stack,
     meta: "Texas NL buy-in"
   });
 }
@@ -1578,11 +1612,42 @@ async function saveStack(user, stack) {
   }
 }
 
+async function settleLeftTableStack(user, table, stack) {
+  if (table.gameMode !== "cash") {
+    await saveStack(user, stack);
+    return;
+  }
+  if (stack <= 0) return;
+  await recordCashTransaction(user, {
+    type: "credit",
+    category: "table_cashout",
+    title: "Возврат со стола",
+    amount: stack,
+    meta: table.name,
+    idempotencyKey: `cashout:${table.id}:${user.id}:${table.handNumber}:${stack}`
+  });
+  await recordFundMovement(user, {
+    category: "table_to_cash_wallet",
+    from: "table",
+    to: "cash_usdt",
+    amount: stack,
+    contextId: table.id,
+    meta: table.name
+  });
+}
+
 async function getWallet(userId) {
   const dbBalance = await dbGetWallet(userId);
   if (dbBalance !== null) return setWalletBalanceLocal(userId, dbBalance);
   if (!wallets.has(userId)) wallets.set(userId, DEFAULT_WALLET);
   return wallets.get(userId);
+}
+
+async function getCashWallet(userId) {
+  const dbBalance = await dbGetCashWallet(userId);
+  if (dbBalance !== null) return setCashWalletBalanceLocal(userId, dbBalance);
+  if (!cashWallets.has(userId)) cashWallets.set(userId, 0);
+  return cashWallets.get(userId);
 }
 
 async function setWalletBalance(userId, balance) {
@@ -1604,6 +1669,21 @@ function setWalletBalanceLocal(userId, balance) {
   stateUpdateUserSessions(id, { balance: normalized }).catch((error) => {
     console.error("Redis session balance update failed:", error.message);
     reportError(error, { kind: "session_balance_update", userId: id });
+  });
+  return normalized;
+}
+
+function setCashWalletBalanceLocal(userId, balance) {
+  const id = String(userId);
+  const normalized = Math.max(0, Math.round(Number(balance) || 0));
+  cashWallets.set(id, normalized);
+  for (const sessionUser of sessions.values()) {
+    if (sessionUser.id === id) sessionUser.cashBalanceMicros = normalized;
+  }
+  const profile = userProfiles.get(id);
+  if (profile) profile.cashBalanceMicros = normalized;
+  stateUpdateUserSessions(id, { cashBalanceMicros: normalized }).catch((error) => {
+    reportError(error, { kind: "cash_session_balance_update", userId: id });
   });
   return normalized;
 }
@@ -1656,6 +1736,43 @@ async function recordTransaction(user, transaction) {
   return nextBalance;
 }
 
+async function getCashTransactions(user) {
+  const dbLedger = await dbListCashLedger(user.id, 30);
+  if (dbLedger) {
+    cashTransactions.set(user.id, dbLedger);
+    return dbLedger;
+  }
+  if (!cashTransactions.has(user.id)) cashTransactions.set(user.id, []);
+  return cashTransactions.get(user.id);
+}
+
+async function recordCashTransaction(user, transaction) {
+  const dbEntry = await dbAddCashWalletEntry(user.id, transaction);
+  if (dbEntry) {
+    setCashWalletBalanceLocal(user.id, dbEntry.balance);
+    await getCashTransactions(user);
+    return dbEntry.balance;
+  }
+  const nextBalance = setCashWalletBalanceLocal(
+    user.id,
+    getCashWalletLocal(user.id) + (transaction.type === "debit" ? -transaction.amount : transaction.amount)
+  );
+  const history = await getCashTransactions(user);
+  history.unshift({
+    id: randomId("tx"),
+    type: transaction.type,
+    category: normalizeLedgerCategory(transaction.category),
+    title: transaction.title,
+    amount: transaction.amount,
+    asset: ASSETS.CASH,
+    balanceBucket: BALANCE_BUCKETS.CASH,
+    meta: transaction.meta || "",
+    createdAt: new Date().toISOString()
+  });
+  cashTransactions.set(user.id, history.slice(0, 30));
+  return nextBalance;
+}
+
 async function recordFundMovement(user, movement) {
   const normalized = {
     id: randomId("move"),
@@ -1679,6 +1796,35 @@ async function recordFundMovement(user, movement) {
 function getWalletLocal(userId) {
   if (!wallets.has(userId)) wallets.set(userId, DEFAULT_WALLET);
   return wallets.get(userId);
+}
+
+function getCashWalletLocal(userId) {
+  if (!cashWallets.has(userId)) cashWallets.set(userId, 0);
+  return cashWallets.get(userId);
+}
+
+function tableWalletBalance(user, table) {
+  return table?.gameMode === "cash" ? Number(user.cashBalanceMicros || 0) : Number(user.balance || 0);
+}
+
+async function recordTableTransaction(user, table, transaction) {
+  if (table?.gameMode === "cash") {
+    return recordCashTransaction(user, transaction);
+  }
+  user.balance = await recordTransaction(user, transaction);
+  return user.balance;
+}
+
+function formatTableAmount(table, amount) {
+  return table?.gameMode === "cash"
+    ? `${formatUsdtMicros(amount)} T`
+    : `${formatNumber(amount)} chips`;
+}
+
+function formatAvailableBalance(user, table) {
+  return table?.gameMode === "cash"
+    ? `${formatUsdtMicros(user.cashBalanceMicros)} T`
+    : `${formatNumber(user.balance)} chips`;
 }
 
 function isAdminUser(userId) {
@@ -2169,11 +2315,11 @@ async function handleAdminPaymentAction({ admin, paymentId, action, reason = "" 
     if (idempotencyResults.has(paymentKey)) {
       return { ...order, status: "paid" };
     }
-    balance = await recordTransaction({ id: order.userId }, {
+    balance = await recordCashTransaction({ id: order.userId }, {
       type: "credit",
       category: `deposit_${normalizeLedgerCategory(order.method)}`,
-      title: "Пополнение баланса",
-      amount: order.chips,
+      title: "Пополнение USDT",
+      amount: order.cashUsdtMicros,
       meta: `manual approval · ${order.cryptoAmount || 0} ${order.asset || order.method} · admin ${adminProfile.id}`,
       idempotencyKey: paymentKey
     });
@@ -2187,15 +2333,15 @@ async function handleAdminPaymentAction({ admin, paymentId, action, reason = "" 
     paidAt: new Date().toISOString()
   };
   cryptoOrders.set(order.id, paidOrder);
-  setWalletBalanceLocal(order.userId, balance);
+  setCashWalletBalanceLocal(order.userId, balance);
   notifyAdmin("payment_approved", "Админ подтвердил платеж", {
     user: { id: order.userId, name: order.userName, username: order.username },
     lines: [
       `Админ: ${formatUser(adminProfile)}`,
       `Order: ${order.id}`,
       `Метод: ${order.method}`,
-      `Сумма: ${formatNumber(order.chips)} chips`,
-      `Баланс: ${formatNumber(balance)} chips`,
+      `Сумма: ${formatUsdtMicros(order.cashUsdtMicros)} T`,
+      `Баланс: ${formatUsdtMicros(balance)} T`,
       `Причина: ${normalizedReason}`
     ]
   });
@@ -2324,11 +2470,11 @@ async function handleCryptoWebhook(event) {
   if (!completed) {
     const paymentKey = `payment:${order.id}`;
     if (idempotencyResults.has(paymentKey)) return;
-    balance = await recordTransaction({ id: order.userId }, {
+    balance = await recordCashTransaction({ id: order.userId }, {
       type: "credit",
       category: `deposit_${normalizeLedgerCategory(order.method)}`,
-      title: "Пополнение баланса",
-      amount: order.chips,
+      title: "Пополнение USDT",
+      amount: order.cashUsdtMicros,
       meta: `${paidAmount || order.cryptoAmount} ${order.asset} ${order.network} · ${txHash || externalId || order.id}`,
       idempotencyKey: paymentKey
     });
@@ -2339,17 +2485,16 @@ async function handleCryptoWebhook(event) {
 
   const paidOrder = { ...order, status: "paid", externalId, txHash, paidAt: new Date().toISOString() };
   cryptoOrders.set(order.id, paidOrder);
-  setWalletBalanceLocal(order.userId, balance);
+  setCashWalletBalanceLocal(order.userId, balance);
   notifyAdmin("crypto_paid", "Оплачено crypto-пополнение", {
     user: { id: order.userId, name: order.userName, username: order.username },
     lines: [
       `Метод: ${order.asset} ${order.network}`,
-      `Сумма: ${formatNumber(order.rubAmount)} ₽`,
+      `Зачисление: ${formatUsdtMicros(order.cashUsdtMicros)} T`,
       `Оплата: ${paidAmount || order.cryptoAmount} ${order.asset}`,
-      `Chips: ${formatNumber(order.chips)}`,
       `Order: ${order.id}`,
       `TX: ${txHash || externalId || "n/a"}`,
-      `Баланс: ${formatNumber(balance)} chips`
+      `Баланс: ${formatUsdtMicros(balance)} T`
     ]
   });
 }
@@ -2546,8 +2691,8 @@ function formatNumber(value) {
 
 function tableView(table, user) {
   const view = publicTable(table, user.id);
-  view.viewer.balance = user.balance;
-  view.viewer.canBuyIn = view.viewer.canBuyIn && user.balance > 0;
+  view.viewer.balance = tableWalletBalance(user, table);
+  view.viewer.canBuyIn = view.viewer.canBuyIn && view.viewer.balance > 0;
   return view;
 }
 
@@ -2835,8 +2980,10 @@ function cryptoOrderView(order) {
     method: order.method,
     asset: order.asset,
     network: order.network,
-    rubAmount: order.rubAmount,
-    chips: order.chips,
+    creditedAsset: order.creditedAsset || ASSETS.CASH,
+    cashUsdtMicros: order.cashUsdtMicros || 0,
+    usdtAmount: Number(order.usdtAmount || (order.cashUsdtMicros || 0) / 1_000_000),
+    tonUsdtRate: order.tonUsdtRate,
     cryptoAmount: order.cryptoAmount,
     receiverAddress: order.receiverAddress || "",
     payload: order.payload || "",

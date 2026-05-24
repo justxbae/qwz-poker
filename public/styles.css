@@ -5589,6 +5589,29 @@ body:not(.in-game) .bottom-nav button.active {
 }
 
 /* Minimal functional UI layer: stable geometry while product flows are built out. */
+.game-mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 10px 0;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--tg-surface, #232e3b);
+}
+
+.game-mode-switch button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tg-hint, #8c99a5);
+  font-size: 14px;
+}
+
+.game-mode-switch button.active {
+  background: var(--tg-button, #2aabee);
+  color: var(--tg-button-text, #fff);
+}
 :root {
   --ui-bg: var(--tg-theme-bg-color, #111922);
   --ui-surface: var(--tg-theme-secondary-bg-color, #18232e);
