@@ -339,6 +339,11 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/cashier/demo-topup") {
+    if (REAL_MONEY_ENABLED) {
+      const error = new Error("Demo-пополнение отключено в режиме реальных средств");
+      error.status = 409;
+      throw error;
+    }
     await sendIdempotentJson(req, res, user, "cashier_demo_topup", async (idempotencyKey) => {
       const body = await readJson(req);
       const quote = quoteDeposit(body);
@@ -506,7 +511,7 @@ async function handleApi(req, res, url) {
         const body = await readJson(req);
         const wasSeated = table.seats.some((seat) => seat.userId === user.id);
         if (!wasSeated) {
-          await prepareInitialStack(user, body, idempotencyKey);
+          await prepareInitialStack(user, body, idempotencyKey, table);
         }
         joinTable(table, user);
         maybeStartHand(table);
@@ -1076,6 +1081,7 @@ function normalizeHydratedTable(table, now = Date.now()) {
   table.communityCards = Array.isArray(table.communityCards) ? table.communityCards : [];
   table.actionLog = Array.isArray(table.actionLog) ? table.actionLog : [];
   table.handHistory = Array.isArray(table.handHistory) ? table.handHistory : [];
+  table.departedContributions = Array.isArray(table.departedContributions) ? table.departedContributions : [];
   table.runoutQueue = Array.isArray(table.runoutQueue) ? table.runoutQueue : [];
   table.deck = Array.isArray(table.deck) ? table.deck : [];
   table.status = table.status || "waiting";
@@ -1101,6 +1107,13 @@ function normalizeHydratedTable(table, now = Date.now()) {
     seat.handStartStack = Math.max(0, Math.round(Number(seat.handStartStack) || seat.stack || 0));
     seat.sittingOutUntil = Number(seat.sittingOutUntil || 0);
     seat.fairnessSeed = seat.fairnessSeed && typeof seat.fairnessSeed === "object" ? seat.fairnessSeed : null;
+  }
+  for (const departed of table.departedContributions) {
+    departed.cards = Array.isArray(departed.cards) ? departed.cards : [];
+    departed.stack = Math.max(0, Math.round(Number(departed.stack) || 0));
+    departed.totalBet = Math.max(0, Math.round(Number(departed.totalBet) || 0));
+    departed.handStartStack = Math.max(0, Math.round(Number(departed.handStartStack) || departed.stack || 0));
+    departed.folded = true;
   }
 
   return table;
@@ -1505,7 +1518,7 @@ async function getSavedStack(user) {
   return savedStacks.get(user.id) || DEFAULT_STACK;
 }
 
-async function prepareInitialStack(user, body = {}, idempotencyKey = "") {
+async function prepareInitialStack(user, body = {}, idempotencyKey = "", table = null) {
   const requested = Number(body.buyInAmount || 0);
   if (!requested) {
     user.stack = await getSavedStack(user);
@@ -1523,6 +1536,13 @@ async function prepareInitialStack(user, body = {}, idempotencyKey = "") {
     throw error;
   }
   const amount = clamp(requested, 1, user.balance);
+  const bigBlind = Number(table?.bigBlind || Number(body.smallBlind || 25) * 2);
+  const minimumBuyIn = Math.max(bigBlind * 50, bigBlind);
+  if (amount < minimumBuyIn) {
+    const error = new Error(`Минимальный бай-ин для ${bigBlind / 2}/${bigBlind}: ${formatNumber(minimumBuyIn)} chips`);
+    error.status = 409;
+    throw error;
+  }
   user.stack = amount;
   user.balance = await recordTransaction(user, {
     type: "debit",

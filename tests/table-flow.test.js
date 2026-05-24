@@ -280,7 +280,8 @@ test("standing keeps the table open as observer and allows sitting again", async
 
     assert.equal(reseated.table.viewer.isSeated, true);
     assert.equal(reseated.table.seats.length, 2);
-    assert.equal(reseated.table.seats.find((seat) => seat.userId === "dev-user").stack, 9925);
+    assert.equal(reseated.table.status, "showdown");
+    assert.equal(reseated.table.seats.find((seat) => seat.userId === "dev-user").stack, 9975);
   } finally {
     server.kill();
   }
@@ -307,6 +308,25 @@ test("initial buy-in chooses table stack and spends wallet balance", async () =>
       && movement.to === "table"
       && movement.amount === 20000
     )));
+  } finally {
+    server.kill();
+  }
+});
+
+test("table entry rejects a buy-in below the displayed limit minimum", async () => {
+  const server = await startServer();
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await topUp(auth.token, 1);
+
+    await assert.rejects(
+      request("/api/tables", {
+        method: "POST",
+        token: auth.token,
+        body: { name: "Too short", maxPlayers: 2, smallBlind: 25, buyInAmount: 1000 }
+      }),
+      /Минимальный бай-ин/
+    );
   } finally {
     server.kill();
   }
@@ -529,7 +549,25 @@ test("withdrawal request holds chips and admin can reject with refund", async ()
   });
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
-    await topUp(auth.token, 10);
+    await assert.rejects(
+      request("/api/cashier/demo-topup", {
+        method: "POST",
+        token: auth.token,
+        body: { rubAmount: 100 }
+      }),
+      /Demo-пополнение отключено/
+    );
+    await request("/api/admin/wallet-adjust", {
+      method: "POST",
+      token: auth.token,
+      body: {
+        telegramId: "dev-user",
+        type: "grant",
+        amount: 50000,
+        reason: "withdrawal_test_funding",
+        requestId: "withdrawal-test-funding"
+      }
+    });
 
     let cashier = (await request("/api/cashier", { token: auth.token })).cashier;
     assert.equal(cashier.balance, 50000);

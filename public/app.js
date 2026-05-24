@@ -22,7 +22,8 @@ const state = {
 };
 const cashierState = {
   deposit: null,
-  selectedMethod: "stars"
+  selectedMethod: "stars",
+  demoTopup: false
 };
 
 const profile = document.querySelector("#profile");
@@ -447,6 +448,7 @@ function renderCashier(cashier) {
   cashierTableStack.textContent = formatChips(cashier.tableStack || 0);
   cashierTotalBankroll.textContent = formatChips(cashier.totalBankroll || cashier.balance || 0);
   cashierState.deposit = cashier.deposit || null;
+  cashierState.demoTopup = DEV_MODE && !cashier.realMoneyEnabled;
   renderCashierControls(cashier.deposit || {});
   renderCashierHistory(cashier.transactions || []);
 }
@@ -500,7 +502,14 @@ function syncCashierQuote() {
   const quote = cashierQuote();
   if (cashierQuoteChips) cashierQuoteChips.textContent = `${formatChips(quote.chips)} chips`;
   if (cashierQuoteStars) cashierQuoteStars.textContent = `${formatChips(quote.stars)} Stars`;
-  if (cashierPayButton) cashierPayButton.textContent = `Пополнить на ${formatChips(quote.chips)} chips`;
+  if (!cashierPayButton) return;
+  const enabledMethod = (cashierState.deposit?.methods || []).find((method) => method.id === cashierState.selectedMethod && method.enabled);
+  cashierPayButton.disabled = !cashierState.demoTopup && !enabledMethod;
+  cashierPayButton.textContent = cashierState.demoTopup
+    ? `Dev: начислить ${formatChips(quote.chips)} chips`
+    : enabledMethod
+      ? `Пополнить на ${formatChips(quote.chips)} chips`
+      : "Пополнение скоро";
 }
 
 function cashierQuote() {
@@ -564,6 +573,24 @@ function formatTransactionMeta(transaction) {
 
 async function payCashierAmount() {
   if (cashierPayButton) cashierPayButton.disabled = true;
+  if (cashierState.demoTopup) {
+    try {
+      const quote = cashierQuote();
+      const data = await api("/api/cashier/demo-topup", {
+        method: "POST",
+        idempotencyKey: requestKey("demo-topup"),
+        body: { rubAmount: quote.rubAmount }
+      });
+      renderCashier(data.cashier);
+      await auth();
+      await loadProfile();
+      cashierStatus.textContent = "Dev-баланс начислен.";
+      haptic("success");
+      return;
+    } finally {
+      if (cashierPayButton) cashierPayButton.disabled = false;
+    }
+  }
   cashierStatus.textContent = cashierState.selectedMethod === "stars"
     ? "Открываем оплату Telegram Stars..."
     : "Создаём crypto-счёт...";
@@ -1339,10 +1366,11 @@ function openBuyInOverlay(intent) {
   const smallBlind = Number(intent.smallBlind || state.selectedSmallBlind || 25);
   const bigBlind = smallBlind * 2;
   const balance = Number(intent.balance ?? state.user?.balance ?? 0);
-  if (balance <= 0) {
-    showError("Выберите стартовый пакет, чтобы сесть за открытый стол");
+  const minimumBuyIn = Math.max(bigBlind * 50, bigBlind);
+  if (balance < minimumBuyIn && intent.mode !== "rebuy") {
+    showError(`Для входа ${smallBlind}/${bigBlind} нужно минимум ${formatChips(minimumBuyIn)} chips`);
     selectLobbyTab("cashier");
-    cashierStatus.textContent = "Стартовый пакет 5 000 chips подходит для лимита 25/50.";
+    cashierStatus.textContent = `Пополните баланс минимум до ${formatChips(minimumBuyIn)} chips для лимита ${smallBlind}/${bigBlind}.`;
     document.querySelector(".cashier-topup-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }

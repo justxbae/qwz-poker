@@ -44,6 +44,7 @@ export function createTable(owner, body = {}) {
     message: "Ожидание игроков",
     actionLog: [],
     handHistory: [],
+    departedContributions: [],
     fairnessProof: null,
     rakeCollected: 0,
     seats: [],
@@ -97,10 +98,32 @@ export function leaveTable(table, user) {
   const seatIndex = table.seats.findIndex((seat) => seat.userId === user.id);
   if (seatIndex === -1) throwHttp(404, "Вы не сидите за этим столом");
 
-  const [seat] = table.seats.splice(seatIndex, 1);
+  const seat = table.seats[seatIndex];
+  const handInProgress = ["preflop", "flop", "turn", "river", "runout"].includes(table.status) && seat.cards.length > 0;
+  if (handInProgress && (table.status === "runout" || (!seat.folded && seat.stack === 0))) {
+    throwHttp(409, "Дождитесь завершения all-in раздачи");
+  }
+
+  if (handInProgress) {
+    if (!seat.folded) {
+      seat.folded = true;
+      seat.acted = true;
+      table.message = `${seat.name} вышел и сбросил карты`;
+      addLog(table, `${seat.name}: leave / fold`);
+    }
+    rememberDepartedContribution(table, seat);
+  }
+
+  table.seats.splice(seatIndex, 1);
   normalizeIndexesAfterSeatRemoval(table, seatIndex);
 
-  if (table.seats.length < 2) {
+  if (handInProgress) {
+    if (activeSeats(table).length === 1) {
+      finishByFold(table);
+    } else if (table.activeSeatIndex === -1) {
+      setActiveTurn(table, nextActiveIndex(table, seatIndex - 1));
+    }
+  } else if (table.seats.length < 2) {
     table.status = "waiting";
     table.communityCards = [];
     table.pot = 0;
@@ -112,6 +135,7 @@ export function leaveTable(table, user) {
     table.actionDeadline = 0;
     table.runoutQueue = [];
     table.runoutNextAt = 0;
+    table.departedContributions = [];
     table.message = "Ожидание игроков";
     for (const remainingSeat of table.seats) {
       remainingSeat.bet = 0;
@@ -121,12 +145,6 @@ export function leaveTable(table, user) {
       remainingSeat.acted = false;
       remainingSeat.sitOutNextHand = false;
       remainingSeat.cards = [];
-    }
-  } else if (table.status !== "waiting" && table.status !== "showdown") {
-    if (!seat.folded && activeSeats(table).length === 1) {
-      finishByFold(table);
-    } else if (table.activeSeatIndex === -1) {
-      setActiveTurn(table, nextActiveIndex(table, seatIndex - 1));
     }
   }
 
@@ -265,6 +283,7 @@ export function startHand(table, user) {
   });
   table.deck = fairness.deck;
   table.fairnessProof = fairness.proof;
+  table.departedContributions = [];
   table.communityCards = [];
   table.pot = 0;
   table.currentBet = 0;
@@ -633,12 +652,29 @@ function advanceStreet(table) {
 function finishByFold(table) {
   const winner = activeSeats(table)[0];
   const totalPot = table.pot;
-  winner.stack += table.pot;
-  table.message = `${winner.name} забирает банк ${table.pot}`;
+  const uncalledAmount = uncalledAmountForWinner(table, winner);
+  const contestedPot = Math.max(0, totalPot - uncalledAmount);
+  const rake = calculateRake({
+    pot: contestedPot,
+    bigBlind: table.bigBlind,
+    boardCards: table.communityCards.length
+  });
+  const wonAmount = contestedPot - rake;
+  winner.stack += wonAmount + uncalledAmount;
+  table.rakeCollected += rake;
+  table.message = `${winner.name} забирает банк ${wonAmount}`;
+  if (uncalledAmount > 0) table.message += `; возврат ${uncalledAmount}`;
   addLog(table, table.message);
+  const pots = [];
+  if (contestedPot > 0) {
+    pots.push({ label: "банк", amount: wonAmount, grossAmount: contestedPot, rake, winners: [winner.name], handDescription: "fold" });
+  }
+  if (uncalledAmount > 0) {
+    pots.push({ label: "возврат", amount: uncalledAmount, grossAmount: uncalledAmount, rake: 0, winners: [winner.name], handDescription: "uncalled bet" });
+  }
   recordHandHistory(table, {
-    pots: [{ label: "банк", amount: totalPot, grossAmount: totalPot, rake: 0, winners: [winner.name], handDescription: "fold" }],
-    rake: 0
+    pots,
+    rake
   });
   table.pot = 0;
   table.status = "showdown";
@@ -653,8 +689,11 @@ function finishByFold(table) {
 function finishShowdown(table) {
   const totalPot = table.pot;
   const pots = buildPots(table);
+  const contestedPot = pots
+    .filter((pot) => !pot.isUncalled)
+    .reduce((sum, pot) => sum + pot.amount, 0);
   let rakeLeft = calculateRake({
-    pot: totalPot,
+    pot: contestedPot,
     bigBlind: table.bigBlind,
     boardCards: table.communityCards.length
   });
@@ -663,6 +702,21 @@ function finishShowdown(table) {
   const historyPots = [];
 
   for (const pot of pots) {
+    if (pot.isUncalled) {
+      const receiver = pot.eligible[0];
+      receiver.stack += pot.amount;
+      summaries.push(`${receiver.name} получает возврат ${pot.amount}`);
+      historyPots.push({
+        label: "возврат",
+        amount: pot.amount,
+        grossAmount: pot.amount,
+        rake: 0,
+        winners: [receiver.name],
+        handDescription: "uncalled bet"
+      });
+      continue;
+    }
+
     const potRake = Math.min(pot.amount, rakeLeft);
     const payoutAmount = pot.amount - potRake;
     rakeLeft -= potRake;
@@ -716,7 +770,7 @@ function recordHandHistory(table, { pots, rake = 0 }) {
     rake,
     fairnessProof: revealFairnessProof(table.fairnessProof),
     pots,
-    seats: table.seats
+    seats: [...table.seats, ...(table.departedContributions || [])]
       .filter((seat) => seat.cards.length > 0)
       .map((seat) => ({
         name: seat.name,
@@ -789,28 +843,53 @@ function applyPendingSitOut(table, seat) {
 }
 
 function buildPots(table) {
-  const levels = [...new Set(table.seats
+  const contributionSeats = [...table.seats, ...(table.departedContributions || [])];
+  const levels = [...new Set(contributionSeats
     .map((seat) => seat.totalBet)
     .filter((amount) => amount > 0))]
     .sort((a, b) => a - b);
   const pots = [];
   let previousLevel = 0;
+  let contestedIndex = 0;
 
   for (const level of levels) {
-    const contributors = table.seats.filter((seat) => seat.totalBet >= level);
+    const contributors = contributionSeats.filter((seat) => seat.totalBet >= level);
     const amount = (level - previousLevel) * contributors.length;
     const eligible = contributors.filter((seat) => !seat.folded && seat.cards.length > 0);
     if (amount > 0 && eligible.length > 0) {
+      const isUncalled = contributors.length === 1;
       pots.push({
         amount,
         eligible,
-        label: pots.length === 0 ? "банк" : `сайд-пот ${pots.length}`
+        isUncalled,
+        label: isUncalled ? "возврат" : contestedIndex++ === 0 ? "банк" : `сайд-пот ${contestedIndex - 1}`
       });
     }
     previousLevel = level;
   }
 
   return pots;
+}
+
+function rememberDepartedContribution(table, seat) {
+  table.departedContributions ||= [];
+  table.departedContributions.push({
+    userId: seat.userId,
+    name: seat.name,
+    cards: [...seat.cards],
+    folded: true,
+    totalBet: seat.totalBet,
+    handStartStack: seat.handStartStack,
+    stack: seat.stack
+  });
+}
+
+function uncalledAmountForWinner(table, winner) {
+  const contributionSeats = [...table.seats, ...(table.departedContributions || [])];
+  const highestOtherContribution = contributionSeats
+    .filter((seat) => seat !== winner)
+    .reduce((max, seat) => Math.max(max, Number(seat.totalBet || 0)), 0);
+  return Math.max(0, Number(winner.totalBet || 0) - highestOtherContribution);
 }
 
 function orderWinnersForOddChips(table, winners) {

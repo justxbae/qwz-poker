@@ -174,7 +174,7 @@ test("first voluntary chip action on a checked street is bet, not raise", () => 
   assert.equal(table.activeSeatIndex, 0);
 });
 
-test("leaving the table returns the current stack for persistence", () => {
+test("leaving during a hand folds the player and awards committed chips", () => {
   const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
   joinTable(table, player2);
   maybeStartHand(table);
@@ -183,8 +183,30 @@ test("leaving the table returns the current stack for persistence", () => {
   const result = leaveTable(table, owner);
 
   assert.equal(result.stack, 9975);
-  assert.equal(table.status, "waiting");
+  assert.equal(table.status, "showdown");
   assert.equal(table.seats.length, 1);
+  assert.equal(table.seats[0].stack, 10025);
+  assert.equal(table.handHistory[0].seats.find((seat) => seat.name === "Owner").folded, true);
+});
+
+test("postflop fold applies rake only to called chips and returns uncalled bet", () => {
+  const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
+  joinTable(table, player2);
+  maybeStartHand(table);
+  startHand(table);
+
+  act(table, owner, { action: "call" });
+  act(table, player2, { action: "check" });
+  act(table, player2, { action: "bet", amount: 100 });
+  act(table, owner, { action: "fold" });
+
+  assert.equal(table.status, "showdown");
+  assert.equal(table.rakeCollected, 5);
+  assert.equal(table.seats[1].stack, 10045);
+  assert.equal(table.handHistory[0].pots[0].grossAmount, 100);
+  assert.equal(table.handHistory[0].pots[0].rake, 5);
+  assert.equal(table.handHistory[0].pots[1].label, "возврат");
+  assert.equal(table.handHistory[0].pots[1].amount, 100);
 });
 
 test("expired turn auto-checks when possible", () => {
@@ -330,6 +352,34 @@ test("heads-up all-in runs the board without asking for meaningless checks", () 
 
   assert.equal(table.status, "showdown");
   assert.equal(table.communityCards.length, 5);
+});
+
+test("uncalled all-in excess is refunded and excluded from rake", () => {
+  const table = createTable({ ...owner, stack: 100 }, { maxPlayers: 2, smallBlind: 25 });
+  joinTable(table, { ...player2, stack: 1000 });
+  maybeStartHand(table);
+  startHand(table);
+  table.seats[0].cards = ["As", "Ah"];
+  table.seats[1].cards = ["Ks", "Kh"];
+  table.deck = ["4s", "Jc", "9h", "7d", "2c"];
+
+  act(table, owner, { action: "call" });
+  act(table, player2, { action: "check" });
+  act(table, player2, { action: "bet", amount: 150 });
+  act(table, owner, { action: "call" });
+
+  while (table.status === "runout") {
+    table.runoutNextAt = Date.now() - 1;
+    tickTables(new Map([[table.id, table]]));
+  }
+
+  assert.equal(table.status, "showdown");
+  assert.equal(table.rakeCollected, 10);
+  assert.equal(table.seats[0].stack, 190);
+  assert.equal(table.seats[1].stack, 900);
+  assert.equal(table.handHistory[0].pots[0].grossAmount, 200);
+  assert.equal(table.handHistory[0].pots[1].label, "возврат");
+  assert.equal(table.handHistory[0].pots[1].amount, 100);
 });
 
 test("showdown distributes main pot and side pot by contribution eligibility", () => {
