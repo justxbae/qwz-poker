@@ -6819,3 +6819,363 @@ body:not(.in-game) .bottom-nav button.active {
   background: var(--native-surface);
   padding: 14px 16px;
 }
+
+/* Lobby v2: compact Telegram-native poker lobby inspired by real in-chat products. */
+body:not(.in-game) {
+  background: var(--tg-bg);
+}
+
+.lobby-shell {
+  padding-top: 0;
+}
+
+.lobby-brandbar {
+  min-height: 48px;
+  padding: 12px 4px 5px;
+}
+
+.lobby-brandbar strong {
+  font-size: 19px;
+  font-weight: 590;
+}
+
+.lobby-brandbar span {
+  font-size: 13px;
+}
+
+.home-wallet {
+  display: grid;
+  gap: 14px;
+  border-radius: 16px;
+  background: var(--tg-surface);
+  padding: 14px;
+}
+
+.home-account {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 10px;
+}
+
+.home-account .lobby-avatar {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  font-size: 18px;
+}
+
+.home-identity {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.home-identity strong {
+  overflow: hidden;
+  color: var(--tg-text);
+  font-size: 16px;
+  font-weight: 560;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-identity span {
+  overflow: hidden;
+  color: var(--tg-hint);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-profile-link {
+  min-height: 30px;
+  border-radius: 15px;
+  background: transparent;
+  color: var(--tg-hint);
+  font-size: 25px;
+  font-weight: 400;
+  padding: 0;
+}
+
+.home-profile-link:hover,
+.home-profile-link:active {
+  background: transparent;
+  transform: none;
+}
+
+.home-balance {
+  display: grid;
+  gap: 3px;
+  border-top: 1px solid var(--native-divider);
+  padding-top: 12px;
+}
+
+.home-balance > span {
+  color: var(--tg-hint);
+  font-size: 13px;
+}
+
+.home-balance strong {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--tg-text);
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.12;
+}
+
+.home-balance strong b {
+  font: inherit;
+}
+
+.home-balance strong small {
+  color: var(--tg-hint);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.home-balance .tether-mark {
+  width: 20px;
+  height: 20px;
+}
+
+.home-wallet-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.home-wallet-actions button {
+  min-height: 44px;
+  border-radius: 12px;
+  background: var(--tg-button);
+  color: var(--tg-button-text);
+  font-size: 15px;
+  font-weight: 560;
+}
+
+.home-wallet-actions .home-withdraw {
+  background: var(--native-control);
+  color: var(--tg-text);
+}
+
+.game-mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  min-height: 45px;
+  margin: 2px 0 0;
+  border-radius: 13px;
+  background: var(--tg-surface);
+  padding: 4px;
+}
+
+.game-mode-switch button {
+  min-height: 37px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--tg-hint);
+  font-size: 14px;
+  font-weight: 540;
+}
+
+.game-mode-switch button.active {
+  background: var(--tg-button);
+  color: var(--tg-button-text);
+}
+
+.game-mode-switch button:disabled {
+  opacity: 0.48;
+}
+
+.mode-banner {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
+  border-radius: 13px;
+  background: transparent;
+  padding: 0 4px 2px;
+}
+
+.mode-banner-head {
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.mode-banner-head strong {
+  order: 0;
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.mode-banner-head span {
+  order: 1;
+  border-radius: 10px;
+  background: var(--native-control);
+  color: var(--tg-hint);
+  font-size: 11px;
+  font-weight: 530;
+  line-height: 20px;
+  padding: 0 8px;
+  text-transform: none;
+}
+
+.mode-banner small {
+  font-size: 12px;
+  font-weight: 430;
+}
+
+.home-games {
+  padding: 14px;
+}
+
+.home-games .section-title {
+  align-items: end;
+  margin-bottom: 10px;
+}
+
+.home-games .section-title h2 {
+  font-size: 20px;
+  font-weight: 570;
+}
+
+.home-limit-pills {
+  display: flex;
+  overflow-x: auto;
+  margin-bottom: 8px;
+  scrollbar-width: none;
+}
+
+.home-limit-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.home-limit-pills button {
+  flex: 0 0 auto;
+  min-width: 86px;
+  min-height: 35px;
+  padding: 0 6px;
+}
+
+.home-table-list {
+  border-top: 1px solid var(--native-divider);
+  margin-bottom: 9px;
+}
+
+body:not(.in-game) .home-table-list .table-item {
+  min-height: 60px;
+}
+
+.home-table-list .table-avatar {
+  display: none;
+}
+
+body:not(.in-game) .home-table-list .table-item {
+  grid-template-columns: minmax(0, 1fr) 76px;
+  gap: 8px;
+}
+
+.home-table-list .table-summary {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.home-table-list .table-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.home-table-list .table-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-table-list .table-summary > span {
+  margin-top: 0;
+  font-size: 12px;
+}
+
+body:not(.in-game) .home-table-list .table-item button {
+  width: 76px;
+  min-width: 76px;
+  min-height: 34px;
+  margin: 0;
+  padding: 0 8px;
+}
+
+.home-table-list .empty {
+  margin: 10px 0 4px;
+  padding: 12px;
+  font-size: 13px;
+}
+
+.home-game-actions {
+  display: grid;
+  grid-template-columns: 1fr 105px;
+  gap: 8px;
+}
+
+.home-game-actions button {
+  display: grid;
+  justify-items: start;
+  min-height: 48px;
+  border-radius: 12px;
+  padding: 7px 13px;
+}
+
+.home-game-actions #quickPlayButton {
+  background: var(--tg-button);
+  color: var(--tg-button-text);
+}
+
+.home-game-actions #quickPlayButton .tg-row-main {
+  color: inherit;
+  font-size: 15px;
+  font-weight: 560;
+}
+
+.home-game-actions #quickPlayButton small {
+  overflow: hidden;
+  width: 100%;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 11px;
+  font-weight: 440;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-game-actions .secondary-pill {
+  place-items: center;
+  background: var(--native-control);
+  color: var(--tg-text);
+  font-size: 14px;
+  font-weight: 530;
+  padding: 0 8px;
+}
+
+.home-offer-meta {
+  display: block;
+  margin-top: 10px;
+  color: var(--tg-hint);
+  font-size: 12px;
+  text-align: center;
+}
+
+.continue-card {
+  background: var(--tg-surface);
+}
+
+@media (max-width: 360px) {
+  .home-balance strong {
+    font-size: 28px;
+  }
+
+  .home-game-actions {
+    grid-template-columns: 1fr 92px;
+  }
+}

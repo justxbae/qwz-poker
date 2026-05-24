@@ -25,7 +25,8 @@ const state = {
 const cashierState = {
   deposit: null,
   selectedMethod: "ton",
-  demoTopup: false
+  demoTopup: false,
+  disabled: false
 };
 
 const profile = document.querySelector("#profile");
@@ -39,15 +40,27 @@ const homeActivityText = document.querySelector("#homeActivityText");
 const homeSessionPill = document.querySelector("#homeSessionPill");
 const homeOfferMeta = document.querySelector("#homeOfferMeta");
 const quickPlayHint = document.querySelector("#quickPlayHint");
+const homeGamesTitle = document.querySelector("#homeGamesTitle");
+const homeTableList = document.querySelector("#homeTableList");
 const gameModeSwitch = document.querySelector("#gameModeSwitch");
 const lobbyBalanceCurrency = document.querySelector("#lobbyBalanceCurrency");
 const modeBanner = document.querySelector("#modeBanner");
 const modeBannerKicker = document.querySelector("#modeBannerKicker");
 const modeBannerTitle = document.querySelector("#modeBannerTitle");
 const modeBannerText = document.querySelector("#modeBannerText");
+const publicGamesTitle = document.querySelector("#publicGamesTitle");
+const privateGamesTitle = document.querySelector("#privateGamesTitle");
 const cashierBalance = document.querySelector("#cashierBalance");
+const cashierAssetLabel = document.querySelector("#cashierAssetLabel");
+const cashierTopupTitle = document.querySelector("#cashierTopupTitle");
+const cashierDepositNetwork = document.querySelector("#cashierDepositNetwork");
+const cashierNote = document.querySelector("#cashierNote");
+const cashierAmountAsset = document.querySelector("#cashierAmountAsset");
+const cashierWithdrawTitle = document.querySelector("#cashierWithdrawTitle");
+const cashierWithdrawText = document.querySelector("#cashierWithdrawText");
 const cashierPrimaryButton = document.querySelector("#cashierPrimaryButton");
 const walletTopupButton = document.querySelector("#walletTopupButton");
+const walletWithdrawButton = document.querySelector(".home-withdraw");
 const cashierTableStack = document.querySelector("#cashierTableStack");
 const cashierTotalBankroll = document.querySelector("#cashierTotalBankroll");
 const cashierRubAmount = document.querySelector("#cashierRubAmount");
@@ -348,7 +361,20 @@ async function auth() {
 
 async function loadConfig() {
   state.config = await api("/api/config", { auth: false });
-  gameModeSwitch.hidden = !state.config.realMoneyEnabled;
+  const cashButton = gameModeSwitch?.querySelector('[data-game-mode="cash"]');
+  if (cashButton) {
+    cashButton.disabled = !state.config.realMoneyEnabled;
+    cashButton.title = state.config.realMoneyEnabled ? "" : "USDT-игра станет доступна после запуска денежных операций";
+  }
+  if (state.config.realMoneyEnabled) {
+    state.gameMode = "cash";
+    const limits = currentLimits();
+    state.selectedSmallBlind = Number(limits[0]?.smallBlind || 25);
+  }
+  gameModeSwitch?.querySelectorAll("[data-game-mode]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.gameMode === state.gameMode);
+  });
+  renderModeBalance();
   renderModeContext();
   renderLimitOptions();
 }
@@ -393,16 +419,21 @@ function renderModeBalance() {
 function renderModeContext() {
   if (!modeBanner) return;
   const cashMode = state.gameMode === "cash";
-  if (modeBannerKicker) modeBannerKicker.textContent = cashMode ? "Cash mode" : "Play chips";
+  if (modeBannerKicker) modeBannerKicker.textContent = cashMode ? "Денежная игра" : "Без вывода";
   if (modeBannerTitle) {
-    if (cashMode) modeBannerTitle.replaceChildren("USDT ", createTetherMark());
+    if (cashMode) modeBannerTitle.replaceChildren("Баланс USDT ", createTetherMark());
     else modeBannerTitle.textContent = "Фантики";
   }
   if (modeBannerText) {
     modeBannerText.textContent = cashMode
-      ? "Реальные столы: баланс хранится в USDT, пополнение идёт через TON, а лимиты и стеки считаются отдельно от play-режима."
-      : "Бесплатный режим для тренировки и игры без вывода. Здесь отдельные столы, отдельные блайнды и отдельный баланс.";
+      ? "Ставки и вывод в USDT. Пополнение принимается через TON после подтверждения сети."
+      : "Бесплатный режим для тренировки. Баланс не связан с денежной игрой.";
   }
+  if (homeGamesTitle) homeGamesTitle.textContent = cashMode ? "Cash-столы" : "Play-столы";
+  if (publicGamesTitle) publicGamesTitle.textContent = cashMode ? "Cash-столы" : "Play-столы";
+  if (privateGamesTitle) privateGamesTitle.textContent = cashMode ? "Приватные cash-столы" : "Приватные play-столы";
+  if (walletTopupButton) walletTopupButton.textContent = cashMode ? "Пополнить" : DEV_MODE ? "Начислить" : "Баланс";
+  if (walletWithdrawButton) walletWithdrawButton.disabled = !cashMode;
   modeBanner.dataset.mode = cashMode ? "cash" : "play";
 }
 
@@ -532,6 +563,24 @@ async function loadCashier() {
 
 function renderCashier(cashier) {
   const cashMode = Boolean(cashier.realMoneyEnabled);
+  if (cashierAssetLabel) cashierAssetLabel.textContent = cashMode ? "USDT balance" : "PLAY CHIPS";
+  if (cashierTopupTitle) cashierTopupTitle.textContent = cashMode ? "Пополнить USDT" : "Тестовый баланс";
+  if (cashierDepositNetwork) cashierDepositNetwork.textContent = cashMode ? "TON" : "DEV";
+  if (cashierAmountAsset) {
+    if (cashMode) cashierAmountAsset.replaceChildren(createTetherMark());
+    else cashierAmountAsset.textContent = "₽";
+  }
+  if (cashierNote) {
+    cashierNote.textContent = cashMode
+      ? "Введите сумму в USDT. Счет в TON фиксирует курс, а после подтверждения сети на баланс поступает USDT."
+      : "Фантики не являются денежным балансом и не выводятся. Тестовое начисление доступно только в режиме разработчика.";
+  }
+  if (cashierWithdrawTitle) cashierWithdrawTitle.textContent = cashMode ? "Вывод USDT пока закрыт" : "У фантиков нет вывода";
+  if (cashierWithdrawText) {
+    cashierWithdrawText.textContent = cashMode
+      ? "Сначала запускаем честную экономику пополнений, открытые столы и историю операций. Методы вывода добавим после отдельной настройки правил и комиссий."
+      : "Фантики используются только в бесплатных столах и не обмениваются на денежный баланс.";
+  }
   renderMoneyValue(cashierBalance, cashMode ? cashier.cashBalanceMicros : cashier.playBalance, cashMode);
   renderMoneyValue(cashierTableStack, cashMode ? (cashier.cashTableStackMicros || 0) : (cashier.tableStack || 0), cashMode);
   renderMoneyValue(cashierTotalBankroll, cashMode
@@ -539,6 +588,7 @@ function renderCashier(cashier) {
     : (cashier.totalBankroll || cashier.balance || 0), cashMode);
   cashierState.deposit = cashier.deposit || null;
   cashierState.demoTopup = DEV_MODE && !cashier.realMoneyEnabled;
+  cashierState.disabled = !cashMode && !cashierState.demoTopup;
   renderCashierControls(cashierState.demoTopup ? (state.config?.play?.deposit || {}) : (cashier.deposit || {}));
   renderCashierHistory(cashierState.demoTopup ? (cashier.playTransactions || []) : (cashier.transactions || []), cashMode);
 }
@@ -547,6 +597,22 @@ function renderCashierControls(deposit) {
   if (!cashierRubAmount || !cashierPresets || !cashierMethods) return;
 
   const playDemo = cashierState.demoTopup;
+  if (cashierState.disabled) {
+    cashierRubAmount.disabled = true;
+    cashierRubAmount.value = "";
+    cashierRubAmount.placeholder = "Недоступно";
+    cashierPresets.replaceChildren();
+    cashierMethods.replaceChildren();
+    if (cashierQuoteChips) cashierQuoteChips.textContent = "—";
+    if (cashierQuoteStars) cashierQuoteStars.textContent = "Без оплаты";
+    if (cashierPayButton) {
+      cashierPayButton.disabled = true;
+      cashierPayButton.textContent = "Пополнение выключено";
+    }
+    return;
+  }
+  cashierRubAmount.disabled = false;
+  cashierRubAmount.placeholder = "";
   cashierRubAmount.min = String(playDemo ? (deposit.minRub || 100) : ((deposit.minUsdtMicros || 1_000_000) / 1_000_000));
   cashierRubAmount.max = String(playDemo ? (deposit.maxRub || 5000) : ((deposit.maxUsdtMicros || 5_000_000_000) / 1_000_000));
   cashierRubAmount.step = playDemo ? "50" : "1";
@@ -1188,8 +1254,16 @@ function renderHomeCta() {
   const quickPlayTitle = quickPlayButton.querySelector(".tg-row-main");
   const cashMode = state.gameMode === "cash";
   const modeLabel = cashMode ? "USDT" : "фантики";
+  quickPlayButton.disabled = false;
 
   if (balance <= 0) {
+    if (!cashMode && !DEV_MODE) {
+      if (quickPlayTitle) quickPlayTitle.textContent = "Фантики скоро";
+      quickPlayHint.textContent = "Ежедневная бесплатная выдача в разработке";
+      renderHomeOfferMeta(limit, minBuyIn, "entry", cashMode);
+      quickPlayButton.disabled = true;
+      return;
+    }
     if (quickPlayTitle) quickPlayTitle.textContent = cashMode ? "Пополнить USDT" : "Пополнить фантики";
     else quickPlayButton.textContent = cashMode ? "Пополнить USDT" : "Пополнить фантики";
     renderHomeOfferMeta(limit, minBuyIn, "entry", cashMode);
@@ -1389,6 +1463,7 @@ function renderTables() {
   privateTablesStatus.textContent = `${privateTables.length} ${plural(privateTables.length, "стол", "стола", "столов")}`;
   renderContinueCard();
   const limitText = formatGameLimit(selectedBlind, Number(currentLimits().find((item) => Number(item.smallBlind) === selectedBlind)?.bigBlind || selectedBlind * 2));
+  renderTableList(homeTableList, availablePublicTables.slice(0, 2), `На лимите ${limitText} сейчас нет свободных столов.`);
   renderTableList(publicTableList, publicTables, `На лимите ${limitText} свободных общих столов пока нет.`);
   renderTableList(privateTableList, privateTables, `Приватных столов ${limitText} пока нет. Создай игру для друзей.`);
 }
@@ -2545,7 +2620,7 @@ function renderMoneyValue(node, value, cashMode, { append = false } = {}) {
 function renderLimitValue(node, smallBlind, bigBlind, cashMode, { append = false } = {}) {
   if (!node) return;
   const contents = cashMode
-    ? [`${formatUsdt(smallBlind)}/${formatUsdt(bigBlind)} `, createTetherMark()]
+    ? [`$${formatUsdt(smallBlind)}/$${formatUsdt(bigBlind)}`]
     : [`${formatChips(smallBlind)}/${formatChips(bigBlind)}`];
   if (append) node.append(...contents);
   else node.replaceChildren(...contents);
