@@ -6697,3 +6697,51 @@ body:not(.in-game) .bottom-nav button.active {
     right: 10px;
   }
 }
+
+.mode-banner {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--tg-line);
+  border-radius: 18px;
+  background: rgba(20, 24, 31, 0.72);
+  padding: 12px 14px;
+}
+
+.mode-banner-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mode-banner-head span {
+  color: var(--tg-link);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.mode-banner-head strong {
+  color: var(--tg-text);
+  font-size: 17px;
+  font-weight: 750;
+  line-height: 1.1;
+}
+
+.mode-banner small {
+  color: var(--tg-hint);
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.35;
+}
+
+.mode-banner[data-mode="cash"] {
+  border-color: rgba(42, 171, 238, 0.18);
+  background: rgba(21, 28, 38, 0.82);
+}
+
+.mode-banner[data-mode="play"] {
+  border-color: rgba(47, 191, 113, 0.16);
+  background: rgba(18, 24, 20, 0.78);
+}
