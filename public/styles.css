@@ -6194,7 +6194,7 @@ body.in-game .betting-actions.amount-open label input {
 /* Telegram grouped-layout pass: product UI follows native Mini App surfaces. */
 :root {
   --native-bg: var(--tg-theme-bg-color, #17212b);
-  --native-surface: var(--tg-theme-secondary-bg-color, #212c38);
+  --native-surface: #202b36;
   --native-surface-elevated: #253341;
   --native-control: #283746;
   --native-divider: rgba(124, 145, 166, 0.18);
@@ -6847,7 +6847,7 @@ body:not(.in-game) {
   display: grid;
   gap: 14px;
   border-radius: 16px;
-  background: var(--tg-surface);
+  background: var(--native-surface);
   padding: 14px;
 }
 
@@ -7217,7 +7217,7 @@ body:not(.in-game) .lobby-view > * {
   display: grid;
   gap: 10px;
   border-radius: var(--native-group-radius);
-  background: var(--tg-surface);
+  background: var(--native-surface);
   padding: 14px;
 }
 
@@ -7298,35 +7298,37 @@ body:not(.in-game) .profile-nav-fab {
   }
 }
 
-body:not(.in-game) .home-marketing-card {
-  display: grid;
-  gap: 10px;
-  padding: 14px;
-}
-
-body:not(.in-game) .home-marketing-card .tg-menu-group {
+body:not(.in-game) .home-marketing-list {
   overflow: hidden;
-  border-radius: 18px;
-  background: var(--tg-surface-2);
+  border: 1px solid var(--tg-separator);
+  border-radius: var(--native-group-radius);
+  background: var(--tg-surface);
 }
 
-body:not(.in-game) .home-marketing-card .tg-menu-row {
-  min-height: 58px;
+body:not(.in-game) .home-marketing-list .tg-menu-row {
+  grid-template-columns: 40px minmax(0, 1fr) 14px;
+  min-height: 54px;
   padding-inline: 12px;
 }
 
-body:not(.in-game) .home-marketing-card .tg-row-value {
-  max-width: 132px;
-  font-size: 13px;
+body:not(.in-game) .home-marketing-list .tg-row-value {
+  display: none;
 }
 
-body:not(.in-game) .home-marketing-card .tg-row-main {
-  font-size: 16px;
+body:not(.in-game) .home-marketing-list .tg-row-main {
+  font-size: 15px;
+}
+
+body:not(.in-game) .home-marketing-list .tg-chevron {
+  font-size: 24px;
 }
 
 body:not(.in-game) .training-switcher {
   display: grid;
-  gap: 10px;
+  gap: 8px;
+  border: 1px solid var(--tg-separator);
+  border-radius: var(--native-group-radius);
+  background: var(--tg-surface);
   padding: 14px;
 }
 
@@ -7334,13 +7336,20 @@ body:not(.in-game) .training-switcher > div:first-child small {
   max-width: 100%;
 }
 
+body:not(.in-game) .training-switcher .mode-banner {
+  display: none;
+}
+
 body:not(.in-game) .home-games {
   margin-top: 0;
+  border: 1px solid var(--tg-separator);
+  border-radius: var(--native-group-radius);
+  background: var(--tg-surface);
   padding: 14px;
 }
 
 body:not(.in-game) .home-games .section-title {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 body:not(.in-game) .home-games .section-title h2 {
@@ -7348,5 +7357,13 @@ body:not(.in-game) .home-games .section-title h2 {
 }
 
 body:not(.in-game) .home-limit-pills {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+}
+
+body:not(.in-game) .home-games .home-offer-meta {
+  display: none;
+}
+
+body:not(.in-game) .home-games .home-game-actions {
+  margin-top: 8px;
 }
