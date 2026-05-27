@@ -252,6 +252,7 @@ async function boot() {
   quickPrivateButton.addEventListener("click", () => runAction(quickCreatePrivateTable));
   continueGameButton.addEventListener("click", continueGame);
   if (adminNavButton) adminNavButton.hidden = !ADMIN_MODE;
+  updateBottomNavIndicator();
   adminLookupForm?.addEventListener("submit", (event) => {
     event.preventDefault();
     runAction(() => loadAdminPlayer(adminUserId.value));
@@ -1340,6 +1341,7 @@ function syncLimitSelection() {
 function selectLobbyTab(tab, options = {}) {
   const tabChanged = currentLobbyTab !== tab;
   currentLobbyTab = tab;
+  updateBottomNavIndicator(tab);
   haptic("light");
   document.querySelectorAll("[data-lobby-tab]").forEach((button) => {
     button.classList.toggle("active", button.dataset.lobbyTab === tab);
@@ -1361,6 +1363,16 @@ function selectLobbyTab(tab, options = {}) {
     window.requestAnimationFrame(resetScroll);
   }
   updateTelegramBackButton();
+}
+
+function updateBottomNavIndicator(tab = currentLobbyTab) {
+  const nav = document.querySelector(".bottom-nav");
+  if (!nav) return;
+  const visibleButtons = [...nav.querySelectorAll("[data-lobby-tab]")].filter((button) => !button.hidden);
+  const index = visibleButtons.findIndex((button) => button.dataset.lobbyTab === tab);
+  nav.style.setProperty("--nav-count", String(Math.max(1, visibleButtons.length)));
+  nav.style.setProperty("--nav-active-index", String(Math.max(0, index)));
+  nav.classList.toggle("has-active-tab", index >= 0);
 }
 
 function openCashierTopup() {
