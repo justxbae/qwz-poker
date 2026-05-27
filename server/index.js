@@ -15,9 +15,19 @@ import {
   depositSettings,
   formatUsdtMicros,
   playSettings,
-  quoteCryptoDeposit,
+  quoteCashDeposit,
   quoteDeposit
 } from "./economy.js";
+import {
+  createCryptoBotInvoice,
+  createTelegramStarsInvoiceLink,
+  createXRocketInvoice,
+  normalizeExternalInvoiceOrderId,
+  parseCryptoBotInvoiceWebhook,
+  parseXRocketInvoiceWebhook,
+  verifyCryptoBotWebhookSignature,
+  verifyXRocketWebhookSignature
+} from "./payments.js";
 import {
   addCashWalletEntry as dbAddCashWalletEntry,
   addWalletEntry as dbAddWalletEntry,
@@ -113,6 +123,13 @@ const ADMIN_GRANT_MAX_CHIPS = Number(process.env.ADMIN_GRANT_MAX_CHIPS || 500000
 const METRICS_TOKEN = process.env.METRICS_TOKEN || "";
 const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
 const CRYPTO_WEBHOOK_SECRET = process.env.CRYPTO_WEBHOOK_SECRET || "";
+const CRYPTOBOT_API_KEY = process.env.CRYPTOBOT_API_KEY || process.env.CRYPTO_PROVIDER_API_KEY || "";
+const CRYPTOBOT_API_BASE = (process.env.CRYPTOBOT_API_BASE || "https://pay.crypt.bot/api").replace(/\/$/, "");
+const XROCKET_PAY_API_KEY = process.env.XROCKET_PAY_API_KEY || "";
+const XROCKET_PAY_API_BASE = (process.env.XROCKET_PAY_API_BASE || "https://pay.xrocket.tg").replace(/\/$/, "");
+const XROCKET_WEBHOOK_SECRET = process.env.XROCKET_WEBHOOK_SECRET || "";
+const TELEGRAM_API_BASE = (process.env.TELEGRAM_API_BASE || "https://api.telegram.org").replace(/\/$/, "");
+const APP_PUBLIC_URL = (process.env.APP_PUBLIC_URL || "").replace(/\/$/, "");
 const TON_RECEIVER_ADDRESS = process.env.TON_RECEIVER_ADDRESS || "";
 const TON_POLLING_ENABLED = process.env.TON_POLLING_ENABLED === "true";
 const TONCENTER_API_BASE = (process.env.TONCENTER_API_BASE || "https://toncenter.com/api/v3").replace(/\/$/, "");
@@ -265,11 +282,52 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/payments/crypto/webhook") {
+    const rawBody = await readRawBody(req);
+    const signature = String(req.headers["crypto-pay-api-signature"] || req.headers["rocket-pay-signature"] || "");
+    const isCryptoBotWebhook = Boolean(req.headers["crypto-pay-api-signature"]) || rawBody.includes('"update_type":"invoice_paid"') || rawBody.includes('"type":"invoice_paid"');
+    const isXRocketWebhook = Boolean(req.headers["rocket-pay-signature"]) || rawBody.includes('"type":"invoicePay"');
+
+    if (isCryptoBotWebhook) {
+      if (!verifyCryptoBotWebhookSignature(rawBody, signature, CRYPTOBOT_API_KEY)) {
+        sendJson(res, 403, { error: "Invalid crypto webhook signature" });
+        return;
+      }
+      const event = parseCryptoBotInvoiceWebhook(rawBody);
+      if (!event) {
+        sendJson(res, 400, { error: "Invalid Crypto Bot webhook payload" });
+        return;
+      }
+      await handleCryptoWebhook(event);
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+
+    if (isXRocketWebhook) {
+      if (!verifyXRocketWebhookSignature(rawBody, signature, XROCKET_WEBHOOK_SECRET || XROCKET_PAY_API_KEY)) {
+        sendJson(res, 403, { error: "Invalid xRocket webhook signature" });
+        return;
+      }
+      const event = parseXRocketInvoiceWebhook(rawBody);
+      if (!event) {
+        sendJson(res, 400, { error: "Invalid xRocket webhook payload" });
+        return;
+      }
+      await handleCryptoWebhook(event);
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+
+    let event;
+    try {
+      event = rawBody ? JSON.parse(rawBody) : {};
+    } catch (error) {
+      sendJson(res, 400, { error: "Invalid crypto webhook payload" });
+      return;
+    }
     if (!verifyCryptoWebhook(req)) {
       sendJson(res, 403, { error: "Invalid crypto webhook secret" });
       return;
     }
-    const event = await readJson(req);
     await handleCryptoWebhook(event);
     sendJson(res, 200, { ok: true });
     return;
@@ -405,19 +463,69 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/cashier/stars-invoice") {
-    const error = new Error("Пополнение cash-баланса через Stars отключено. Используйте TON.");
-    error.status = 409;
-    throw error;
+    requireRealMoneyEnabled();
+    await sendIdempotentJson(req, res, user, "cashier_stars_invoice", async () => {
+      const body = await readJson(req);
+      const quote = quoteCashDeposit({ ...body, method: "stars" });
+      const orderId = randomId("stars");
+      const payload = `qwz:${orderId}`;
+      const order = {
+        id: orderId,
+        userId: user.id,
+        userName: user.name,
+        username: user.username,
+        provider: "telegram",
+        method: "stars",
+        asset: "USDT",
+        network: "Telegram Stars",
+        rubAmount: 0,
+        chips: 0,
+        stars: quote.stars,
+        creditedAsset: quote.creditedAsset,
+        cashUsdtMicros: quote.cashUsdtMicros,
+        usdtAmount: quote.usdtAmount,
+        starsUsdtRate: quote.starsUsdtRate,
+        cryptoAmount: quote.cryptoAmount,
+        receiverAddress: "",
+        confirmationsRequired: 0,
+        payload,
+        raw: {},
+        status: "pending",
+        expiresAt: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
+        createdAt: new Date().toISOString()
+      };
+      starOrders.set(orderId, order);
+      await dbCreatePaymentOrder(order);
+      const invoiceLink = await createTelegramStarsInvoiceLink({
+        botToken: BOT_TOKEN,
+        baseUrl: TELEGRAM_API_BASE,
+        title: "QWZ Poker deposit",
+        description: `Пополнение ${formatUsdtMicros(quote.cashUsdtMicros)} USDT`,
+        payload,
+        stars: quote.stars
+      });
+      order.invoiceLink = invoiceLink;
+      order.invoiceUrl = invoiceLink;
+      order.raw = { invoiceUrl: invoiceLink, provider: "telegram" };
+      starOrders.set(orderId, order);
+      await dbUpdatePaymentOrderStatus(order.id, {
+        status: "pending",
+        externalId: order.externalId || order.id,
+        raw: { invoiceUrl: invoiceLink, provider: "telegram" }
+      });
+      return { order: cryptoOrderView(order), cashier: await cashierView(user) };
+    });
+    return;
   }
 
   if (req.method === "POST" && url.pathname === "/api/cashier/crypto-order") {
     requireRealMoneyEnabled();
     await sendIdempotentJson(req, res, user, "cashier_crypto_order", async () => {
       const body = await readJson(req);
-      const quote = quoteCryptoDeposit(body);
+      const quote = quoteCashDeposit(body);
       ensureCryptoPaymentMethodEnabled(quote.method);
 
-      const orderId = randomId(quote.method === "ton" ? "ton" : "usdt");
+      const orderId = randomId(quote.method);
       const expiresAt = new Date(Date.now() + 20 * 60 * 1000).toISOString();
       const payload = `qwz:${orderId}`;
       const order = {
@@ -425,6 +533,7 @@ async function handleApi(req, res, url) {
         userId: user.id,
         userName: user.name,
         username: user.username,
+        provider: quote.provider || quote.method,
         method: quote.method,
         asset: quote.asset,
         network: quote.network,
@@ -434,16 +543,129 @@ async function handleApi(req, res, url) {
         cashUsdtMicros: quote.cashUsdtMicros,
         usdtAmount: quote.usdtAmount,
         tonUsdtRate: quote.tonUsdtRate,
+        starsUsdtRate: quote.starsUsdtRate,
+        stars: quote.stars || 0,
         cryptoAmount: quote.cryptoAmount,
         receiverAddress: quote.receiverAddress,
         confirmationsRequired: quote.confirmationsRequired,
         payload,
+        raw: {},
         status: "pending",
         expiresAt,
         createdAt: new Date().toISOString()
       };
       cryptoOrders.set(orderId, order);
       await dbCreatePaymentOrder(order);
+
+      if (quote.method === "stars") {
+        const invoiceLink = await createTelegramStarsInvoiceLink({
+          botToken: BOT_TOKEN,
+          baseUrl: TELEGRAM_API_BASE,
+          title: "QWZ Poker deposit",
+          description: `Пополнение ${formatUsdtMicros(quote.cashUsdtMicros)} USDT`,
+          payload,
+          stars: quote.stars
+        });
+        order.invoiceLink = invoiceLink;
+        order.invoiceUrl = invoiceLink;
+        order.raw = { invoiceUrl: invoiceLink, provider: "telegram" };
+        starOrders.set(orderId, order);
+        notifyAdmin("stars_order", "Создан Stars-счет", {
+          user,
+          lines: [
+            `Зачисление: ${formatUsdtMicros(quote.cashUsdtMicros)} USDT`,
+            `Оплата: ${formatNumber(quote.stars)} Stars`,
+            `Order: ${order.id}`
+          ]
+        });
+        return { order: cryptoOrderView(order), cashier: await cashierView(user) };
+      }
+
+      if (quote.method === "cryptobot") {
+        const result = await createCryptoBotInvoice({
+          apiKey: CRYPTOBOT_API_KEY,
+          baseUrl: CRYPTOBOT_API_BASE,
+          title: "QWZ Poker deposit",
+          description: `Пополнение ${formatUsdtMicros(quote.cashUsdtMicros)} USDT`,
+          payload,
+          usdtAmount: quote.usdtAmount,
+          callbackUrl: APP_PUBLIC_URL || ""
+        });
+        order.externalId = result.invoiceId || order.externalId;
+        order.invoiceUrl = result.link || "";
+        order.raw = {
+          ...(order.raw || {}),
+          invoiceUrl: result.link || "",
+          provider: "cryptobot"
+        };
+        cryptoOrders.set(orderId, order);
+        await dbUpdatePaymentOrderStatus(order.id, {
+          status: "pending",
+          externalId: order.externalId,
+          raw: { invoiceUrl: result.link || "", provider: "cryptobot" }
+        });
+        notifyAdmin("crypto_order", "Создан Crypto Bot счет", {
+          user,
+          lines: [
+            `Метод: Crypto Bot`,
+            `Зачисление: ${formatUsdtMicros(quote.cashUsdtMicros)} USDT`,
+            `К оплате: ${quote.usdtAmount} USDT`,
+            `Order: ${order.id}`
+          ]
+        });
+        return { order: cryptoOrderView(order), cashier: await cashierView(user) };
+      }
+
+      if (quote.method === "xrocket") {
+        const result = await createXRocketInvoice({
+          apiKey: XROCKET_PAY_API_KEY,
+          baseUrl: XROCKET_PAY_API_BASE,
+          title: "QWZ Poker deposit",
+          description: `Пополнение ${formatUsdtMicros(quote.cashUsdtMicros)} USDT`,
+          payload,
+          usdtAmount: quote.usdtAmount,
+          callbackUrl: APP_PUBLIC_URL || "",
+          platformId: process.env.XROCKET_PLATFORM_ID || ""
+        });
+        order.externalId = result.invoiceId || order.externalId;
+        order.invoiceUrl = result.link || "";
+        order.raw = {
+          ...(order.raw || {}),
+          invoiceUrl: result.link || "",
+          provider: "xrocket"
+        };
+        cryptoOrders.set(orderId, order);
+        await dbUpdatePaymentOrderStatus(order.id, {
+          status: "pending",
+          externalId: order.externalId,
+          raw: { invoiceUrl: result.link || "", provider: "xrocket" }
+        });
+        notifyAdmin("crypto_order", "Создан xRocket счет", {
+          user,
+          lines: [
+            `Метод: xRocket`,
+            `Зачисление: ${formatUsdtMicros(quote.cashUsdtMicros)} USDT`,
+            `К оплате: ${quote.usdtAmount} USDT`,
+            `Order: ${order.id}`
+          ]
+        });
+        return { order: cryptoOrderView(order), cashier: await cashierView(user) };
+      }
+
+      if (quote.method === "ton") {
+        notifyAdmin("crypto_order", "Создан crypto-счет", {
+          user,
+          lines: [
+            `Метод: ${quote.asset} ${quote.network}`,
+            `Зачисление: ${formatUsdtMicros(quote.cashUsdtMicros)} USDT`,
+            `К оплате: ${quote.cryptoAmount} ${quote.asset}`,
+            `Курс: 1 TON = ${quote.tonUsdtRate} USDT`,
+            `Order: ${order.id}`
+          ]
+        });
+        return { order: cryptoOrderView(order), cashier: await cashierView(user) };
+      }
+
       notifyAdmin("crypto_order", "Создан crypto-счет", {
         user,
         lines: [
@@ -2391,12 +2613,12 @@ async function processSuccessfulStarPayment(payment) {
   } else {
     const paymentKey = `payment:${order.id}`;
     if (idempotencyResults.has(paymentKey)) return;
-    balance = await recordTransaction({ id: order.userId }, {
+    balance = await recordCashTransaction({ id: order.userId }, {
       type: "credit",
       category: "deposit_stars",
       title: "Пополнение Stars",
-      amount: order.chips,
-      meta: `${order.stars} Stars · QWZ chips`,
+      amount: order.cashUsdtMicros,
+      meta: `${order.stars} Stars · ${formatUsdtMicros(order.cashUsdtMicros)} USDT`,
       idempotencyKey: paymentKey
     });
     idempotencyResults.set(paymentKey, { balance });
@@ -2411,21 +2633,31 @@ async function processSuccessfulStarPayment(payment) {
   notifyAdmin("stars_paid", "Оплачено Stars-пополнение", {
     user: { id: order.userId, name: order.userName, username: order.username },
     lines: [
-      `Сумма: ${formatNumber(order.rubAmount || 0)} ₽`,
-      `Пакет: ${formatNumber(order.chips)} chips`,
+      `Зачисление: ${formatUsdtMicros(order.cashUsdtMicros)} USDT`,
       `Оплата: ${formatNumber(order.stars)} Stars`,
       `Order: ${order.id}`,
       `Telegram charge: ${order.telegramPaymentChargeId || "n/a"}`,
-      `Баланс: ${formatNumber(balance)} chips`
+      `Баланс: ${formatUsdtMicros(balance)} USDT`
     ]
   });
 }
 
 async function handleCryptoWebhook(event) {
-  const orderId = String(event.orderId || event.order_id || event.merchantOrderId || "").trim();
+  const normalizedEvent = event?.provider
+    ? event
+    : {
+        provider: "legacy",
+        orderId: event?.orderId || event?.order_id || event?.merchantOrderId || "",
+        status: event?.status || event?.paymentStatus || event?.state || "pending",
+        paidAmount: event?.paidAmount ?? event?.amount ?? event?.cryptoAmount ?? 0,
+        externalId: event?.externalId || event?.paymentId || event?.invoiceId || "",
+        txHash: event?.txHash || event?.tx_hash || event?.transactionHash || "",
+        raw: event
+      };
+  const orderId = normalizeExternalInvoiceOrderId(normalizedEvent.orderId);
   if (!orderId) {
     notifyAdmin("crypto_webhook_error", "Crypto webhook без orderId", {
-      lines: [`Payload: ${JSON.stringify(event).slice(0, 500)}`]
+      lines: [`Payload: ${JSON.stringify(normalizedEvent.raw || event).slice(0, 500)}`]
     });
     return;
   }
@@ -2433,15 +2665,15 @@ async function handleCryptoWebhook(event) {
   const order = await cryptoOrderFromId(orderId);
   if (!order) {
     notifyAdmin("crypto_webhook_error", "Crypto webhook для неизвестного order", {
-      lines: [`Order: ${orderId}`, `Payload: ${JSON.stringify(event).slice(0, 500)}`]
+      lines: [`Order: ${orderId}`, `Payload: ${JSON.stringify(normalizedEvent.raw || event).slice(0, 500)}`]
     });
     return;
   }
 
-  const status = normalizeCryptoPaymentStatus(event.status || event.paymentStatus || event.state);
-  const paidAmount = Number(event.paidAmount ?? event.amount ?? event.cryptoAmount ?? 0);
-  const txHash = String(event.txHash || event.tx_hash || event.transactionHash || "");
-  const externalId = String(event.externalId || event.paymentId || event.invoiceId || "");
+  const status = normalizeCryptoPaymentStatus(normalizedEvent.status || normalizedEvent.paymentStatus || normalizedEvent.state);
+  const paidAmount = Number(normalizedEvent.paidAmount ?? normalizedEvent.amount ?? normalizedEvent.cryptoAmount ?? 0);
+  const txHash = String(normalizedEvent.txHash || normalizedEvent.tx_hash || normalizedEvent.transactionHash || "");
+  const externalId = String(normalizedEvent.externalId || normalizedEvent.paymentId || normalizedEvent.invoiceId || "");
   const expectedAmount = Number(order.cryptoAmount || 0);
   const underpaid = paidAmount > 0 && expectedAmount > 0 && paidAmount + 0.00000001 < expectedAmount;
 
@@ -2449,7 +2681,7 @@ async function handleCryptoWebhook(event) {
     await dbUpdatePaymentOrderStatus(order.id, {
       status: "manual_review",
       externalId,
-      raw: { cryptoWebhook: event, reason: "underpaid" }
+      raw: { cryptoWebhook: normalizedEvent.raw || event, reason: "underpaid" }
     });
     notifyAdmin("crypto_manual_review", "Crypto-платеж требует проверки", {
       user: { id: order.userId, name: order.userName, username: order.username },
@@ -2469,7 +2701,7 @@ async function handleCryptoWebhook(event) {
     await dbUpdatePaymentOrderStatus(order.id, {
       status: mappedStatus,
       externalId,
-      raw: { cryptoWebhook: event }
+      raw: { cryptoWebhook: normalizedEvent.raw || event }
     });
     return;
   }
@@ -2477,7 +2709,7 @@ async function handleCryptoWebhook(event) {
   const completed = await dbCompletePaymentOrder(order.id, {
     crypto_payment: true,
     telegram_payment_charge_id: txHash || externalId,
-    provider_event: event
+    provider_event: normalizedEvent.raw || event
   });
   if (completed?.alreadyPaid || completed?.ignored) return;
   let balance = completed?.balance;
@@ -2762,10 +2994,14 @@ async function serveStatic(req, res, url) {
 }
 
 async function readJson(req) {
+  const raw = await readRawBody(req);
+  return raw ? JSON.parse(raw) : {};
+}
+
+async function readRawBody(req) {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
-  const raw = Buffer.concat(chunks).toString("utf8");
-  return raw ? JSON.parse(raw) : {};
+  return Buffer.concat(chunks).toString("utf8");
 }
 
 function sendJson(res, status, payload) {
@@ -3007,6 +3243,9 @@ function validateEnvironment() {
   if ((process.env.TON_PAYMENTS_ENABLED === "true" || process.env.USDT_TRC20_PAYMENTS_ENABLED === "true") && !CRYPTO_WEBHOOK_SECRET) {
     console.warn("[warn] CRYPTO_WEBHOOK_SECRET is empty — crypto confirmations will be rejected in production.");
   }
+  if (process.env.REAL_MONEY_ENABLED === "true" && !process.env.CRYPTOBOT_API_KEY && !process.env.XROCKET_PAY_API_KEY && process.env.TON_PAYMENTS_ENABLED !== "true") {
+    console.warn("[warn] No payment rail configured yet — Stars/Crypto Bot/xRocket/TON invoices will stay disabled.");
+  }
   if (problems.length) {
     for (const message of problems) console.error(`[fatal] ${message}`);
     process.exit(1);
@@ -3090,14 +3329,18 @@ function cryptoOrderView(order) {
   return {
     id: order.id,
     method: order.method,
+    provider: order.provider || order.method,
     asset: order.asset,
     network: order.network,
     creditedAsset: order.creditedAsset || ASSETS.CASH,
     cashUsdtMicros: order.cashUsdtMicros || 0,
     usdtAmount: Number(order.usdtAmount || (order.cashUsdtMicros || 0) / 1_000_000),
     tonUsdtRate: order.tonUsdtRate,
+    starsUsdtRate: order.starsUsdtRate,
+    stars: Number(order.stars || 0),
     cryptoAmount: order.cryptoAmount,
     receiverAddress: order.receiverAddress || "",
+    invoiceUrl: order.invoiceUrl || order.raw?.invoiceUrl || "",
     payload: order.payload || "",
     status: order.status,
     expiresAt: order.expiresAt,

@@ -1446,6 +1446,7 @@ function paymentRow(row) {
     cryptoAmount: row.crypto_amount === null || row.crypto_amount === undefined ? null : Number(row.crypto_amount),
     externalId: row.external_id || "",
     receiverAddress: row.raw?.receiverAddress || "",
+    invoiceUrl: row.raw?.invoiceUrl || "",
     confirmationsRequired: Number(row.raw?.confirmationsRequired || 0),
     status: row.status,
     payload: row.payload || "",

@@ -65,12 +65,20 @@ export const ECONOMY = {
 };
 
 export function depositSettings({ realMoneyEnabled = true } = {}) {
+  const starsEnabled = realMoneyEnabled && Boolean(process.env.BOT_TOKEN);
+  const cryptoBotEnabled = realMoneyEnabled && Boolean(process.env.CRYPTOBOT_API_KEY || process.env.CRYPTO_PROVIDER_API_KEY);
+  const xRocketEnabled = realMoneyEnabled && Boolean(process.env.XROCKET_PAY_API_KEY);
   const tonEnabled = realMoneyEnabled && process.env.TON_PAYMENTS_ENABLED === "true" && Boolean(process.env.TON_RECEIVER_ADDRESS);
   return {
     ...ECONOMY.cash.deposit,
     currency: ASSETS.CASH,
     balanceBucket: BALANCE_BUCKETS.CASH,
+    starsUsdtRate: Number(process.env.STARS_USDT_RATE || 0.0125),
+    tonUsdtRate: Number(process.env.TON_USDT_RATE || 3),
     methods: [
+      { id: "stars", title: "Stars", enabled: starsEnabled, speed: starsEnabled ? "Telegram invoice" : "скоро" },
+      { id: "cryptobot", title: "Crypto Bot", enabled: cryptoBotEnabled, speed: cryptoBotEnabled ? "Crypto invoice" : "скоро" },
+      { id: "xrocket", title: "xRocket", enabled: xRocketEnabled, speed: xRocketEnabled ? "xRocket invoice" : "скоро" },
       { id: "ton", title: "TON", enabled: tonEnabled, speed: tonEnabled ? "TON Connect" : "скоро" }
     ]
   };
@@ -89,7 +97,9 @@ export function cashSettings() {
   return {
     currency: ASSETS.CASH,
     scale: USDT_SCALE,
-    limits: CASH_TABLE_LIMITS
+    limits: CASH_TABLE_LIMITS,
+    starsUsdtRate: Number(process.env.STARS_USDT_RATE || 0.0125),
+    tonUsdtRate: Number(process.env.TON_USDT_RATE || 3)
   };
 }
 
@@ -109,18 +119,59 @@ export function quoteDeposit({ rubAmount = 0 } = {}) {
   };
 }
 
-export function quoteCryptoDeposit({ usdtAmount = 0, method = "ton" } = {}) {
-  const methodId = String(method || "ton").toLowerCase();
-  if (methodId !== "ton") {
-    const error = new Error("На первом этапе поддерживается только пополнение TON");
-    error.status = 400;
-    throw error;
-  }
-
+export function quoteCashDeposit({ usdtAmount = 0, method = "stars" } = {}) {
+  const methodId = String(method || "stars").toLowerCase();
   const deposit = ECONOMY.cash.deposit;
   const requestedMicros = toUsdtMicros(usdtAmount || deposit.minUsdtMicros / USDT_SCALE);
   const cashUsdtMicros = clamp(requestedMicros, deposit.minUsdtMicros, deposit.maxUsdtMicros);
   const tonUsdtRate = Number(process.env.TON_USDT_RATE || 3);
+  const starsUsdtRate = Number(process.env.STARS_USDT_RATE || 0.0125);
+  const usdtAmountValue = fromUsdtMicros(cashUsdtMicros);
+
+  if (methodId === "stars") {
+    if (!Number.isFinite(starsUsdtRate) || starsUsdtRate <= 0) {
+      const error = new Error("Stars/USDT quote is unavailable");
+      error.status = 503;
+      throw error;
+    }
+    const stars = Math.max(1, Math.ceil(usdtAmountValue / starsUsdtRate));
+    return {
+      method: "stars",
+      provider: "telegram",
+      asset: "USDT",
+      network: "Telegram Stars",
+      creditedAsset: ASSETS.CASH,
+      balanceBucket: BALANCE_BUCKETS.CASH,
+      cashUsdtMicros,
+      usdtAmount: usdtAmountValue,
+      stars,
+      starsUsdtRate,
+      cryptoAmount: stars,
+      confirmationsRequired: 0
+    };
+  }
+
+  if (methodId === "cryptobot" || methodId === "xrocket") {
+    return {
+      method: methodId,
+      provider: methodId,
+      asset: "USDT",
+      network: "USDT",
+      creditedAsset: ASSETS.CASH,
+      balanceBucket: BALANCE_BUCKETS.CASH,
+      cashUsdtMicros,
+      usdtAmount: usdtAmountValue,
+      cryptoAmount: decimalAmount(usdtAmountValue, 6),
+      confirmationsRequired: 1
+    };
+  }
+
+  if (methodId !== "ton") {
+    const error = new Error("Метод пополнения не поддерживается");
+    error.status = 400;
+    throw error;
+  }
+
   if (!Number.isFinite(tonUsdtRate) || tonUsdtRate <= 0) {
     const error = new Error("TON/USDT quote is unavailable");
     error.status = 503;
@@ -129,18 +180,21 @@ export function quoteCryptoDeposit({ usdtAmount = 0, method = "ton" } = {}) {
 
   return {
     method: "ton",
+    provider: "ton",
     asset: "TON",
     network: "TON",
     creditedAsset: ASSETS.CASH,
     balanceBucket: BALANCE_BUCKETS.CASH,
     cashUsdtMicros,
-    usdtAmount: fromUsdtMicros(cashUsdtMicros),
+    usdtAmount: usdtAmountValue,
     tonUsdtRate,
-    cryptoAmount: decimalAmount(fromUsdtMicros(cashUsdtMicros) / tonUsdtRate, 6),
+    cryptoAmount: decimalAmount(usdtAmountValue / tonUsdtRate, 6),
     receiverAddress: process.env.TON_RECEIVER_ADDRESS || "",
     confirmationsRequired: Number(process.env.TON_CONFIRMATIONS_REQUIRED || 1)
   };
 }
+
+export const quoteCryptoDeposit = quoteCashDeposit;
 
 export function toUsdtMicros(value) {
   return Math.max(0, Math.round(Number(value || 0) * USDT_SCALE));

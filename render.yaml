@@ -19,6 +19,18 @@ services:
         sync: false
       - key: CRYPTO_WEBHOOK_SECRET
         sync: false
+      - key: CRYPTOBOT_API_KEY
+        sync: false
+      - key: CRYPTOBOT_API_BASE
+        value: https://pay.crypt.bot/api
+      - key: XROCKET_PAY_API_KEY
+        sync: false
+      - key: XROCKET_PAY_API_BASE
+        value: https://pay.xrocket.tg
+      - key: XROCKET_WEBHOOK_SECRET
+        sync: false
+      - key: APP_PUBLIC_URL
+        sync: false
       - key: TON_PAYMENTS_ENABLED
         value: "false"
       - key: TON_RECEIVER_ADDRESS
@@ -29,6 +41,8 @@ services:
         sync: false
       - key: TON_RUB_RATE
         sync: false
+      - key: STARS_USDT_RATE
+        value: "0.0125"
       - key: USDT_TRC20_PAYMENTS_ENABLED
         value: "false"
       - key: USDT_TRC20_RECEIVER_ADDRESS

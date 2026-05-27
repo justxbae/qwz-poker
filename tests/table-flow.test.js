@@ -1,9 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash, createHmac } from "node:crypto";
+import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 
-const PORT = 3901;
-const BASE_URL = `http://127.0.0.1:${PORT}`;
+let PORT = 3901;
+let BASE_URL = `http://127.0.0.1:${PORT}`;
 
 test("table auto-starts, accepts custom raise, and pays the pot at showdown", async () => {
   const server = await startServer({ ADMIN_USER_IDS: "dev-user" });
@@ -460,7 +462,8 @@ test("crypto deposit order can be created but does not credit chips before confi
     assert.equal(cashier.mode, "cash");
     assert.equal(cashier.currency, "USDT");
     assert.equal(cashier.deposit.methods.find((method) => method.id === "ton").enabled, true);
-    assert.equal(cashier.deposit.methods.length, 1);
+    assert.equal(cashier.deposit.methods.find((method) => method.id === "stars").enabled, true);
+    assert.equal(cashier.deposit.methods.filter((method) => method.enabled).length, 2);
 
     const data = await request("/api/cashier/crypto-order", {
       method: "POST",
@@ -494,6 +497,180 @@ test("crypto deposit order can be created but does not credit chips before confi
     assert.equal(paid.transactions[0].category, "deposit_ton");
   } finally {
     server.kill();
+  }
+});
+
+test("Stars, Crypto Bot, and xRocket deposit rails create invoices and credit cash on confirmation", async () => {
+  const telegramApi = await startMockApiServer(async (req) => {
+    if (req.method !== "POST" || !req.url.startsWith("/bottest-token/createInvoiceLink")) {
+      return { status: 404, body: { ok: false, description: "not found" } };
+    }
+    return { status: 200, body: { ok: true, result: "https://t.me/$qwz_test_invoice" } };
+  });
+
+  const cryptoBotApi = await startMockApiServer(async (req, body) => {
+    if (req.method !== "POST" || req.url !== "/createInvoice") {
+      return { status: 404, body: { ok: false, error: "not found" } };
+    }
+    const payload = JSON.parse(body);
+    assert.equal(req.headers["crypto-pay-api-token"], "crypto-test-key");
+    assert.equal(payload.asset, "USDT");
+    assert.equal(payload.amount, 25);
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        result: {
+          invoice_id: "cb_invoice_1",
+          mini_app_invoice_url: "https://pay.crypt.bot/invoice/cb_invoice_1"
+        }
+      }
+    };
+  });
+
+  const xRocketApi = await startMockApiServer(async (req, body) => {
+    if (req.method !== "POST" || req.url !== "/tg-invoices") {
+      return { status: 404, body: { success: false, error: "not found" } };
+    }
+    const payload = JSON.parse(body);
+    assert.equal(req.headers["rocket-pay-key"], "rocket-test-key");
+    assert.equal(payload.currency, "USDT");
+    assert.equal(payload.amount, 25);
+    return {
+      status: 200,
+      body: {
+        success: true,
+        data: {
+          id: "xr_invoice_1",
+          link: "https://pay.xrocket.tg/invoice/xr_invoice_1"
+        }
+      }
+    };
+  });
+
+  const server = await startServer({
+    REAL_MONEY_ENABLED: "true",
+    TELEGRAM_API_BASE: telegramApi.url,
+    CRYPTOBOT_API_KEY: "crypto-test-key",
+    CRYPTOBOT_API_BASE: cryptoBotApi.url,
+    XROCKET_PAY_API_KEY: "rocket-test-key",
+    XROCKET_WEBHOOK_SECRET: "rocket-webhook-secret",
+    XROCKET_PAY_API_BASE: xRocketApi.url
+  });
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    const cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.mode, "cash");
+    assert.equal(cashier.currency, "USDT");
+    assert.equal(cashier.deposit.methods.find((method) => method.id === "stars").enabled, true);
+    assert.equal(cashier.deposit.methods.find((method) => method.id === "cryptobot").enabled, true);
+    assert.equal(cashier.deposit.methods.find((method) => method.id === "xrocket").enabled, true);
+    assert.equal(cashier.deposit.methods.find((method) => method.id === "ton").enabled, false);
+
+    const starsInvoice = await request("/api/cashier/stars-invoice", {
+      method: "POST",
+      token: auth.token,
+      body: { usdtAmount: 25 }
+    });
+    assert.equal(starsInvoice.order.method, "stars");
+    assert.equal(starsInvoice.order.stars, 2000);
+    assert.equal(starsInvoice.order.invoiceUrl, "https://t.me/$qwz_test_invoice");
+
+    await request("/api/telegram/webhook", {
+      method: "POST",
+      body: {
+        message: {
+          successful_payment: {
+            invoice_payload: starsInvoice.order.payload,
+            currency: "XTR",
+            total_amount: starsInvoice.order.stars,
+            telegram_payment_charge_id: "stars-charge-1"
+          }
+        }
+      }
+    });
+
+    let paidCashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(paidCashier.balance, 25_000_000);
+    assert.equal(paidCashier.transactions[0].category, "deposit_stars");
+
+    const cryptoOrder = await request("/api/cashier/crypto-order", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "cryptobot-invoice",
+      body: { method: "cryptobot", usdtAmount: 25 }
+    });
+
+    assert.equal(cryptoOrder.order.method, "cryptobot");
+    assert.equal(cryptoOrder.order.invoiceUrl, "https://pay.crypt.bot/invoice/cb_invoice_1");
+
+    const cryptoWebhookBody = JSON.stringify({
+      update_type: "invoice_paid",
+      payload: {
+        payload: cryptoOrder.order.payload,
+        invoice_id: "cb_invoice_1",
+        status: "paid",
+        paid_amount: 25
+      }
+    });
+    const cryptoWebhookSignature = signCryptoBotWebhook(cryptoWebhookBody, "crypto-test-key");
+
+    await requestText("/api/payments/crypto/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "crypto-pay-api-signature": cryptoWebhookSignature
+      },
+      body: JSON.parse(cryptoWebhookBody)
+    });
+
+    paidCashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(paidCashier.balance, 50_000_000);
+    assert.equal(paidCashier.transactions[0].category, "deposit_cryptobot");
+
+    const xRocketOrder = await request("/api/cashier/crypto-order", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "xrocket-invoice",
+      body: { method: "xrocket", usdtAmount: 25 }
+    });
+
+    assert.equal(xRocketOrder.order.method, "xrocket");
+    assert.equal(xRocketOrder.order.invoiceUrl, "https://pay.xrocket.tg/invoice/xr_invoice_1");
+
+    const xRocketWebhookBody = JSON.stringify({
+      type: "invoicePay",
+      data: {
+        id: "xr_invoice_1",
+        payload: xRocketOrder.order.payload,
+        status: "paid",
+        amount: 25,
+        payment: {
+          paymentAmountReceived: 25,
+          txHash: "xr-tx-1"
+        }
+      }
+    });
+    const xRocketWebhookSignature = signXRocketWebhook(xRocketWebhookBody, "rocket-webhook-secret");
+
+    await requestText("/api/payments/crypto/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "rocket-pay-signature": xRocketWebhookSignature
+      },
+      body: JSON.parse(xRocketWebhookBody)
+    });
+
+    paidCashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(paidCashier.balance, 75_000_000);
+    assert.equal(paidCashier.transactions[0].category, "deposit_xrocket");
+  } finally {
+    await Promise.all([
+      telegramApi.close(),
+      cryptoBotApi.close(),
+      xRocketApi.close()
+    ]);
   }
 });
 
@@ -850,7 +1027,67 @@ async function requestText(path, options = {}) {
   return data;
 }
 
-function startServerAndWaitForExit(extraEnv = {}) {
+function signCryptoBotWebhook(body, apiKey) {
+  const secret = createHash("sha256").update(apiKey).digest();
+  return createHmac("sha256", secret).update(body).digest("hex");
+}
+
+function signXRocketWebhook(body, secretKey) {
+  const secret = createHash("sha256").update(secretKey).digest();
+  return createHmac("sha256", secret).update(body).digest("hex");
+}
+
+async function startMockApiServer(handler) {
+  const server = createServer((req, res) => {
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", async () => {
+      const body = Buffer.concat(chunks).toString("utf8");
+      try {
+        const result = await handler(req, body);
+        res.statusCode = result?.status || 200;
+        res.setHeader("content-type", "application/json");
+        res.end(JSON.stringify(result?.body || {}));
+      } catch (error) {
+        res.statusCode = 500;
+        res.setHeader("content-type", "application/json");
+        res.end(JSON.stringify({ ok: false, error: error.message }));
+      }
+    });
+  });
+
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address();
+  return {
+    url: `http://127.0.0.1:${port}`,
+    close: () => new Promise((resolve) => server.close(resolve))
+  };
+}
+
+async function reservePort() {
+  return await new Promise((resolve, reject) => {
+    const probe = createServer((req, res) => {
+      res.statusCode = 404;
+      res.end();
+    });
+    probe.listen(0, "127.0.0.1", () => {
+      const { port } = probe.address();
+      probe.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(port);
+      });
+    });
+    probe.on("error", reject);
+  });
+}
+
+async function startServerAndWaitForExit(extraEnv = {}) {
+  const port = await reservePort();
+  PORT = port;
+  BASE_URL = `http://127.0.0.1:${PORT}`;
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ["server/index.js"], {
       cwd: process.cwd(),
@@ -877,6 +1114,9 @@ function startServerAndWaitForExit(extraEnv = {}) {
     child.on("exit", (code) => {
       resolve({ code, stdout, stderr });
     });
+    child.unref();
+    child.stdout?.unref?.();
+    child.stderr?.unref?.();
   });
 }
 
@@ -892,7 +1132,10 @@ async function topUp(token, count = 1) {
   return cashier;
 }
 
-function startServer(extraEnv = {}) {
+async function startServer(extraEnv = {}) {
+  const port = await reservePort();
+  PORT = port;
+  BASE_URL = `http://127.0.0.1:${PORT}`;
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ["server/index.js"], {
       cwd: process.cwd(),
@@ -926,5 +1169,10 @@ function startServer(extraEnv = {}) {
       }
     });
     child.on("error", reject);
+    const kill = child.kill.bind(child);
+    child.kill = (signal = "SIGKILL") => kill(signal);
+    child.unref();
+    child.stdout?.unref?.();
+    child.stderr?.unref?.();
   });
 }

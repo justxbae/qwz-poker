@@ -24,7 +24,7 @@ const state = {
 };
 const cashierState = {
   deposit: null,
-  selectedMethod: "ton",
+  selectedMethod: "stars",
   demoTopup: false,
   disabled: false
 };
@@ -701,6 +701,11 @@ function renderCashierControls(deposit) {
   cashierRubAmount.step = playDemo ? "50" : "1";
   cashierRubAmount.value = String(playDemo ? (deposit.minRub || 100) : 5);
 
+  const methods = playDemo ? [] : (deposit.methods || []);
+  if (methods.length && !methods.some((method) => method.id === cashierState.selectedMethod && method.enabled)) {
+    cashierState.selectedMethod = methods.find((method) => method.enabled)?.id || methods[0].id || "stars";
+  }
+
   cashierPresets.replaceChildren(...(playDemo ? (deposit.presetsRub || []) : (deposit.presetsUsdt || [])).map((amount) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -710,7 +715,7 @@ function renderCashierControls(deposit) {
     return button;
   }));
 
-  cashierMethods.replaceChildren(...(playDemo ? [] : (deposit.methods || [])).map((method) => {
+  cashierMethods.replaceChildren(...methods.map((method) => {
     const button = document.createElement("button");
     button.type = "button";
     button.dataset.method = method.id;
@@ -737,6 +742,7 @@ function onCashierMethodClick(event) {
   cashierMethods.querySelectorAll("button").forEach((item) => {
     item.classList.toggle("active", item.dataset.method === cashierState.selectedMethod);
   });
+  syncCashierQuote();
 }
 
 function syncCashierQuote() {
@@ -745,14 +751,24 @@ function syncCashierQuote() {
     if (cashierState.demoTopup) cashierQuoteChips.textContent = `${formatChips(quote.chips)} фишек`;
     else cashierQuoteChips.replaceChildren(Number(quote.usdtAmount).toFixed(2), " ", createTetherMark());
   }
-  if (cashierQuoteStars) cashierQuoteStars.textContent = cashierState.demoTopup ? `${formatChips(quote.stars)} Stars` : "TON по курсу счета";
+  if (cashierQuoteStars) {
+    if (cashierState.demoTopup) {
+      cashierQuoteStars.textContent = `${formatChips(quote.stars)} Stars`;
+    } else if (cashierState.selectedMethod === "stars") {
+      cashierQuoteStars.textContent = `${formatNumber(quote.stars || 0)} Stars`;
+    } else if (cashierState.selectedMethod === "ton") {
+      cashierQuoteStars.textContent = `${Number(quote.cryptoAmount || 0).toFixed(6)} TON`;
+    } else {
+      cashierQuoteStars.replaceChildren(Number(quote.usdtAmount || 0).toFixed(2), " ", createTetherMark());
+    }
+  }
   if (!cashierPayButton) return;
   const enabledMethod = (cashierState.deposit?.methods || []).find((method) => method.id === cashierState.selectedMethod && method.enabled);
   cashierPayButton.disabled = !cashierState.demoTopup && !enabledMethod;
   if (cashierState.demoTopup) {
     cashierPayButton.textContent = `Dev: начислить ${formatChips(quote.chips)} игровых фишек`;
   } else if (enabledMethod) {
-    cashierPayButton.replaceChildren(`Пополнить ${Number(quote.usdtAmount).toFixed(2)} `, createTetherMark(), " через TON");
+    cashierPayButton.textContent = paymentButtonLabel(cashierState.selectedMethod, quote);
   } else {
     cashierPayButton.textContent = "Пополнение скоро";
   }
@@ -763,9 +779,17 @@ function cashierQuote() {
   if (!cashierState.demoTopup) {
     const minUsdt = Number(deposit.minUsdtMicros || 1_000_000) / 1_000_000;
     const maxUsdt = Number(deposit.maxUsdtMicros || 5_000_000_000) / 1_000_000;
-    return {
-      usdtAmount: clampAmount(Number(cashierRubAmount?.value || minUsdt), minUsdt, maxUsdt)
-    };
+    const usdtAmount = clampAmount(Number(cashierRubAmount?.value || minUsdt), minUsdt, maxUsdt);
+    const quote = { usdtAmount };
+    if (cashierState.selectedMethod === "stars") {
+      const starsUsdtRate = Number(deposit.starsUsdtRate || 0.0125);
+      quote.stars = starsUsdtRate > 0 ? Math.max(1, Math.ceil(usdtAmount / starsUsdtRate)) : 0;
+    }
+    if (cashierState.selectedMethod === "ton") {
+      const tonUsdtRate = Number(deposit.tonUsdtRate || 3);
+      quote.cryptoAmount = tonUsdtRate > 0 ? decimalAmount(usdtAmount / tonUsdtRate, 6) : 0;
+    }
+    return quote;
   }
   const minRub = Number(deposit.minRub || 100);
   const maxRub = Number(deposit.maxRub || 5000);
@@ -778,6 +802,23 @@ function cashierQuote() {
     stars,
     chips: Math.round(rubAmount * chipsPerRub)
   };
+}
+
+function paymentButtonLabel(method, quote) {
+  if (method === "stars") return `Оплатить ${formatNumber(quote.stars || 0)} Stars`;
+  if (method === "cryptobot") return "Открыть счёт Crypto Bot";
+  if (method === "xrocket") return "Открыть счёт xRocket";
+  if (method === "ton") return "Открыть TON счёт";
+  return "Пополнить";
+}
+
+function openPaymentUrl(url) {
+  if (!url) return;
+  if (tg?.openLink) {
+    tg.openLink(url);
+    return;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
 }
 
 function renderCashierHistory(transactions, cashMode = false) {
@@ -845,19 +886,51 @@ async function payCashierAmount() {
       if (cashierPayButton) cashierPayButton.disabled = false;
     }
   }
-  cashierStatus.textContent = "Создаём счёт TON...";
+  const method = cashierState.selectedMethod || "stars";
+  cashierStatus.textContent = method === "stars"
+    ? "Создаём счёт Stars..."
+    : method === "cryptobot"
+      ? "Создаём счёт Crypto Bot..."
+      : method === "xrocket"
+        ? "Создаём счёт xRocket..."
+        : "Создаём счёт TON...";
 
   try {
     const quote = cashierQuote();
+    if (method === "stars") {
+      const data = await api("/api/cashier/stars-invoice", {
+        method: "POST",
+        idempotencyKey: requestKey("stars-invoice"),
+        body: {
+          usdtAmount: quote.usdtAmount
+        }
+      });
+      openStarsInvoice(data.order?.invoiceUrl || data.order?.invoiceLink || "");
+      cashierStatus.textContent = "Счёт Stars открыт.";
+      return;
+    }
+
     const data = await api("/api/cashier/crypto-order", {
       method: "POST",
-      idempotencyKey: requestKey("crypto-order-ton"),
+      idempotencyKey: requestKey(`crypto-order-${method}`),
       body: {
-        method: "ton",
+        method,
         usdtAmount: quote.usdtAmount
       }
     });
-    renderCryptoPaymentInstructions(data.order);
+
+    if (method === "ton") {
+      renderCryptoPaymentInstructions(data.order);
+      return;
+    }
+
+    const invoiceUrl = data.order?.invoiceUrl || "";
+    if (!invoiceUrl) {
+      cashierStatus.textContent = "Не удалось создать счёт.";
+      return;
+    }
+    openPaymentUrl(invoiceUrl);
+    cashierStatus.textContent = `${method === "cryptobot" ? "Crypto Bot" : "xRocket"} счёт открыт.`;
   } finally {
     if (cashierPayButton) cashierPayButton.disabled = false;
   }
@@ -1130,17 +1203,19 @@ function renderAdminPayments(payments) {
 
 function paymentMethodTitle(payment) {
   if (payment.method === "stars") return "Stars";
+  if (payment.method === "cryptobot") return "Crypto Bot";
+  if (payment.method === "xrocket") return "xRocket";
   if (payment.method === "ton") return "TON";
   if (payment.method === "usdt_trc20") return "USDT TRC20";
   return payment.method || "payment";
 }
 
 function adminPaymentMeta(payment) {
-  const money = payment.creditedAsset === "USDT"
-    ? `${formatUsdt(payment.cashUsdtMicros || 0)} USDT`
-    : payment.method === "stars"
-      ? `${formatChips(payment.stars || 0)} Stars`
-      : `${payment.cryptoAmount || 0} ${payment.asset || ""} ${payment.network || ""}`.trim();
+  const money = payment.method === "stars"
+    ? `${formatUsdt(payment.cashUsdtMicros || 0)} USDT · ${formatNumber(payment.stars || 0)} Stars`
+    : payment.creditedAsset === "USDT"
+      ? `${formatUsdt(payment.cashUsdtMicros || 0)} USDT`
+      : `${Number(payment.cryptoAmount || 0).toFixed(6)} ${payment.asset || ""} ${payment.network || ""}`.trim();
   return [
     payment.userName || payment.userId,
     payment.creditedAsset === "USDT" ? `${formatUsdt(payment.cashUsdtMicros || 0)} USDT` : `${payment.rubAmount || 0} ₽`,
@@ -1155,7 +1230,7 @@ function formatPaymentAmount(payment) {
     return `${formatUsdt(payment.cashUsdtMicros || 0)} USDT`;
   }
   if (payment.method === "stars") {
-    return `${formatChips(payment.chips || 0)} chips`;
+    return `${formatNumber(payment.stars || 0)} Stars`;
   }
   return `${Number(payment.cryptoAmount || 0).toFixed(6)} ${payment.asset || payment.method || ""}`.trim();
 }
