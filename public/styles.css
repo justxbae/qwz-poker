@@ -7387,8 +7387,8 @@ body:not(.in-game) .home-promo-banners {
   display: flex;
   overflow-x: auto;
   gap: 10px;
-  margin-inline: -10px;
-  padding: 0 10px 2px;
+  margin-inline: 0;
+  padding: 0 0 2px;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
 }
@@ -7398,9 +7398,41 @@ body:not(.in-game) .home-promo-banners::-webkit-scrollbar {
 }
 
 body:not(.in-game) .promo-banner {
-  flex: 0 0 min(300px, calc(100vw - 48px));
+  flex: 0 0 min(300px, calc(100vw - 68px));
   min-height: 116px;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
   scroll-snap-align: start;
+}
+
+body:not(.in-game) .promo-banner::after {
+  display: none;
+}
+
+body:not(.in-game) .promo-banner--primary {
+  background: var(--tg-button);
+  color: var(--tg-button-text);
+}
+
+body:not(.in-game) .promo-banner--primary .promo-kicker,
+body:not(.in-game) .promo-banner--primary strong,
+body:not(.in-game) .promo-banner--primary small {
+  color: var(--tg-button-text);
+}
+
+body:not(.in-game) .promo-banner--primary small {
+  opacity: 0.78;
+}
+
+body:not(.in-game) .promo-banner--primary .promo-action {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--tg-button-text);
+}
+
+body:not(.in-game) .promo-banner--event,
+body:not(.in-game) .promo-banner--status {
+  background: var(--native-surface);
 }
 
 body:not(.in-game) .training-switcher {
