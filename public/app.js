@@ -242,7 +242,7 @@ async function boot() {
   createTableForm.addEventListener("submit", onCreateTable);
   refreshButton?.addEventListener("click", loadTables);
   profileRefreshButton.addEventListener("click", () => runAction(loadProfile));
-  cashierPrimaryButton.addEventListener("click", () => {
+  cashierPrimaryButton?.addEventListener("click", () => {
     document.querySelector(".cashier-topup-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
   walletTopupButton?.addEventListener("click", () => openCashierTopup());
@@ -271,7 +271,13 @@ async function boot() {
   tableLimitPills.addEventListener("click", onLimitSelect);
   gameModeSwitch?.addEventListener("click", onGameModeSelect);
   document.querySelectorAll("[data-lobby-tab]").forEach((button) => {
-    button.addEventListener("click", () => selectLobbyTab(button.dataset.lobbyTab));
+    button.addEventListener("click", () => {
+      if (button.dataset.lobbyTab === "cashier" && button.dataset.cashierSection) {
+        openCashierSection(button.dataset.cashierSection);
+        return;
+      }
+      selectLobbyTab(button.dataset.lobbyTab);
+    });
   });
   if (DEV_MODE) {
     addTestPlayerButton.addEventListener("click", () => runAction(addTestPlayer));
@@ -646,16 +652,16 @@ async function loadCashier() {
 
 function renderCashier(cashier) {
   const cashMode = Boolean(cashier.realMoneyEnabled);
-  if (cashierAssetLabel) cashierAssetLabel.textContent = cashMode ? "USDT balance" : "ИГРОВЫЕ ФИШКИ";
-  if (cashierTopupTitle) cashierTopupTitle.textContent = cashMode ? "Депозит USDT" : "Тестовый баланс";
-  if (cashierDepositNetwork) cashierDepositNetwork.textContent = cashMode ? "TON" : "DEV";
+  if (cashierAssetLabel) cashierAssetLabel.textContent = cashMode ? "Баланс USDT" : "Игровые фишки";
+  if (cashierTopupTitle) cashierTopupTitle.textContent = cashMode ? "Пополнить баланс" : "Тестовый баланс";
+  if (cashierDepositNetwork) cashierDepositNetwork.textContent = cashMode ? "USDT" : "DEV";
   if (cashierAmountAsset) {
     if (cashMode) cashierAmountAsset.replaceChildren(createTetherMark());
     else cashierAmountAsset.textContent = "₽";
   }
   if (cashierNote) {
     cashierNote.textContent = cashMode
-      ? "Введите сумму в USDT. Счет в TON фиксирует курс, а после подтверждения сети на баланс поступает USDT."
+      ? "Введите сумму в USDT, выберите способ оплаты и откройте счет. Баланс пополнится после подтверждения платежа."
       : "Игровые фишки используются только в игровом режиме и не выводятся. Тестовое начисление доступно только в режиме разработчика.";
   }
   if (cashierWithdrawTitle) cashierWithdrawTitle.textContent = cashMode ? "Вывод USDT пока закрыт" : "У игровых фишек нет вывода";
@@ -747,6 +753,7 @@ function onCashierMethodClick(event) {
 
 function syncCashierQuote() {
   const quote = cashierQuote();
+  if (!cashierState.demoTopup) updateCashierMethodCopy(cashierState.selectedMethod);
   if (cashierQuoteChips) {
     if (cashierState.demoTopup) cashierQuoteChips.textContent = `${formatChips(quote.chips)} фишек`;
     else cashierQuoteChips.replaceChildren(Number(quote.usdtAmount).toFixed(2), " ", createTetherMark());
@@ -772,6 +779,36 @@ function syncCashierQuote() {
   } else {
     cashierPayButton.textContent = "Пополнение скоро";
   }
+}
+
+function updateCashierMethodCopy(method) {
+  if (cashierDepositNetwork) cashierDepositNetwork.textContent = paymentMethodTitleShort(method);
+  if (!cashierNote) return;
+  if (method === "stars") {
+    cashierNote.textContent = "Оплата пройдет через Telegram Stars. Баланс USDT начислится после успешного платежа в Telegram.";
+    return;
+  }
+  if (method === "cryptobot") {
+    cashierNote.textContent = "Откроется счет Crypto Bot. После оплаты webhook подтвердит платеж и зачислит USDT на баланс.";
+    return;
+  }
+  if (method === "xrocket") {
+    cashierNote.textContent = "Откроется счет xRocket. USDT зачисляются только после подтверждения платежа провайдером.";
+    return;
+  }
+  if (method === "ton") {
+    cashierNote.textContent = "Счет TON фиксирует сумму перевода. USDT поступят на баланс после подтверждения сети.";
+    return;
+  }
+  cashierNote.textContent = "Введите сумму в USDT, выберите способ оплаты и откройте счет.";
+}
+
+function paymentMethodTitleShort(method) {
+  if (method === "stars") return "Stars";
+  if (method === "cryptobot") return "Crypto Bot";
+  if (method === "xrocket") return "xRocket";
+  if (method === "ton") return "TON";
+  return "USDT";
 }
 
 function cashierQuote() {
@@ -1545,10 +1582,19 @@ function updateBottomNavIndicator(tab = currentLobbyTab) {
 }
 
 function openCashierTopup() {
+  openCashierSection("deposit");
+}
+
+function openCashierSection(section = "deposit") {
   haptic("light");
   selectLobbyTab("cashier");
+  const selector = section === "withdraw"
+    ? ".cashier-withdraw-card"
+    : section === "history"
+      ? ".cashier-history-card"
+      : ".cashier-topup-card";
   window.requestAnimationFrame(() => {
-    document.querySelector(".cashier-topup-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.querySelector(selector)?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 }
 

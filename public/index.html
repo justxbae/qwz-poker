@@ -161,12 +161,12 @@
             </div>
             <div class="home-wallet-actions">
               <button type="button" id="walletTopupButton">Депозит</button>
-              <button type="button" class="home-withdraw" data-lobby-tab="cashier">Вывести</button>
+              <button type="button" class="home-withdraw" data-lobby-tab="cashier" data-cashier-section="withdraw">Вывести</button>
             </div>
           </section>
 
           <section class="home-promo-banners" aria-label="Акции QWZ Poker">
-            <button type="button" class="promo-banner promo-banner--primary" data-lobby-tab="cashier">
+            <button type="button" class="promo-banner promo-banner--primary" data-lobby-tab="cashier" data-cashier-section="deposit">
               <span class="promo-kicker">Первый депозит</span>
               <strong>Бонус к старту</strong>
               <small>Пополните баланс и садитесь за cash-стол</small>
@@ -253,7 +253,7 @@
               <span class="tg-row-value">для друзей</span>
               <span class="tg-chevron">›</span>
             </button>
-            <button type="button" class="tg-menu-row" data-lobby-tab="cashier">
+            <button type="button" class="tg-menu-row" data-lobby-tab="cashier" data-cashier-section="history">
               <span class="tg-row-icon tg-row-icon--gray" aria-hidden="true">
                 <svg viewBox="0 0 24 24"><path d="M4 12h3l2-4 4 8 2-4h5"/></svg>
               </span>
@@ -338,10 +338,6 @@
             </div>
             <div class="wallet-label">Доступно</div>
             <div class="wallet-balance money-value" id="cashierBalance">0</div>
-            <div class="wallet-actions">
-              <button type="button" id="cashierPrimaryButton">Пополнить</button>
-              <button type="button" class="secondary-pill" disabled>Вывести</button>
-            </div>
             <div class="cashier-breakdown">
               <div>
                 <span>За столами</span>
@@ -397,7 +393,7 @@
               <span id="cashierWithdrawText">Сначала запускаем честную экономику пополнений, открытые столы и историю операций. Методы вывода добавим после отдельной настройки правил и комиссий.</span>
             </div>
           </section>
-          <section class="lobby-card">
+          <section class="lobby-card cashier-history-card">
             <div class="section-title">
               <div>
                 <p class="eyebrow">Операции</p>
