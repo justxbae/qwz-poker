@@ -814,11 +814,24 @@ function paymentButtonLabel(method, quote) {
 
 function openPaymentUrl(url) {
   if (!url) return;
+  if (tg?.openTelegramLink && isTelegramUrl(url)) {
+    tg.openTelegramLink(url);
+    return;
+  }
   if (tg?.openLink) {
     tg.openLink(url);
     return;
   }
   window.open(url, "_blank", "noopener,noreferrer");
+}
+
+function isTelegramUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "tg:" || parsed.hostname === "t.me" || parsed.hostname.endsWith(".t.me");
+  } catch {
+    return String(url || "").startsWith("tg:");
+  }
 }
 
 function renderCashierHistory(transactions, cashMode = false) {
@@ -2733,6 +2746,10 @@ function headerRow(labels) {
 
 function formatChips(value) {
   return Number(value).toLocaleString("ru-RU");
+}
+
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString("ru-RU");
 }
 
 function formatUsdt(value) {

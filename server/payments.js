@@ -140,7 +140,7 @@ export async function createCryptoBotInvoice({
   const invoice = response.result || response.data || response;
   return {
     invoiceId: invoice.invoice_id || invoice.id || "",
-    link: invoice.mini_app_invoice_url || invoice.web_app_invoice_url || invoice.bot_invoice_url || invoice.pay_url || ""
+    link: invoice.bot_invoice_url || invoice.mini_app_invoice_url || invoice.web_app_invoice_url || invoice.pay_url || ""
   };
 }
 
