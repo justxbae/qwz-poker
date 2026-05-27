@@ -110,6 +110,7 @@ const ADMIN_FINANCE_IDS = parseIdList(process.env.ADMIN_FINANCE_IDS || "");
 const ADMIN_SUPPORT_IDS = parseIdList(process.env.ADMIN_SUPPORT_IDS || "");
 const ADMIN_RISK_IDS = parseIdList(process.env.ADMIN_RISK_IDS || "");
 const ADMIN_GRANT_MAX_CHIPS = Number(process.env.ADMIN_GRANT_MAX_CHIPS || 500000);
+const METRICS_TOKEN = process.env.METRICS_TOKEN || "";
 const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
 const CRYPTO_WEBHOOK_SECRET = process.env.CRYPTO_WEBHOOK_SECRET || "";
 const TON_RECEIVER_ADDRESS = process.env.TON_RECEIVER_ADDRESS || "";
@@ -236,6 +237,19 @@ async function handleApi(req, res, url) {
   if (req.method === "GET" && url.pathname === "/api/health") {
     const health = await healthSnapshot({ publicView: true });
     sendJson(res, health.ok ? 200 : 503, { health });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/metrics") {
+    if (!verifyMetricsAccess(req)) {
+      sendJson(res, 403, { error: "Invalid metrics token" });
+      return;
+    }
+    const [health, dbStats] = await Promise.all([
+      healthSnapshot(),
+      dbDashboardStats()
+    ]);
+    sendMetrics(res, buildPrometheusMetrics(health, dbStats));
     return;
   }
 
@@ -2759,6 +2773,11 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function sendMetrics(res, body) {
+  res.writeHead(200, { "content-type": "text/plain; version=0.0.4; charset=utf-8" });
+  res.end(body);
+}
+
 async function sendIdempotentJson(req, res, user, scope, handler) {
   const rawKey = requestIdempotencyKey(req);
   const key = rawKey ? normalizeIdempotencyKey({
@@ -2806,6 +2825,92 @@ async function sendIdempotentJson(req, res, user, scope, handler) {
   } finally {
     pendingIdempotencyResults.delete(key);
   }
+}
+
+function buildPrometheusMetrics(health, stats = null) {
+  const databaseMode = String(health?.database?.mode || "memory");
+  const stateStoreMode = String(health?.stateStore?.mode || "memory");
+  const memory = health?.memory || process.memoryUsage();
+  const reconciliation = buildMetricsReconciliation(stats);
+  const lines = [
+    "# HELP qwz_app_up Application availability indicator.",
+    "# TYPE qwz_app_up gauge",
+    `qwz_app_up ${health?.ok ? 1 : 0}`,
+    "# HELP qwz_uptime_seconds App uptime in seconds.",
+    "# TYPE qwz_uptime_seconds gauge",
+    `qwz_uptime_seconds ${Number(health?.uptimeSeconds || 0)}`,
+    "# HELP qwz_database_ok PostgreSQL health indicator.",
+    "# TYPE qwz_database_ok gauge",
+    `qwz_database_ok{mode="${escapePrometheusLabelValue(databaseMode)}"} ${health?.database?.ok ? 1 : 0}`,
+    "# HELP qwz_state_store_ok Redis health indicator.",
+    "# TYPE qwz_state_store_ok gauge",
+    `qwz_state_store_ok{mode="${escapePrometheusLabelValue(stateStoreMode)}"} ${health?.stateStore?.ok ? 1 : 0}`,
+    "# HELP qwz_open_tables Total open tables in memory.",
+    "# TYPE qwz_open_tables gauge",
+    `qwz_open_tables ${Number(health?.tables?.open || 0)}`,
+    "# HELP qwz_active_tables Tables with seated players.",
+    "# TYPE qwz_active_tables gauge",
+    `qwz_active_tables ${Number(health?.tables?.active || 0)}`,
+    "# HELP qwz_sessions Active session count.",
+    "# TYPE qwz_sessions gauge",
+    `qwz_sessions ${Number(health?.sessions || 0)}`,
+    "# HELP qwz_tournament_registrations Active tournament registrations.",
+    "# TYPE qwz_tournament_registrations gauge",
+    `qwz_tournament_registrations ${Number(health?.tournaments?.registrations || 0)}`,
+    "# HELP qwz_pending_withdrawals Pending or manual-review withdrawals.",
+    "# TYPE qwz_pending_withdrawals gauge",
+    `qwz_pending_withdrawals ${Number(stats?.pendingWithdrawals ?? 0)}`,
+    "# HELP qwz_pending_stars_orders Pending Stars orders.",
+    "# TYPE qwz_pending_stars_orders gauge",
+    `qwz_pending_stars_orders ${Number(stats?.pendingStars ?? 0)}`,
+    "# HELP qwz_wallet_total_chips Player wallet total in chips.",
+    "# TYPE qwz_wallet_total_chips gauge",
+    `qwz_wallet_total_chips ${Number(stats?.walletTotal ?? 0)}`,
+    "# HELP qwz_ledger_net_total_chips Ledger credit minus debit in chips.",
+    "# TYPE qwz_ledger_net_total_chips gauge",
+    `qwz_ledger_net_total_chips ${Number(stats?.ledgerCreditTotal ?? 0) - Number(stats?.ledgerDebitTotal ?? 0)}`,
+    "# HELP qwz_wallet_ledger_drift_chips Difference between wallet total and ledger net.",
+    "# TYPE qwz_wallet_ledger_drift_chips gauge",
+    `qwz_wallet_ledger_drift_chips ${reconciliation.walletLedgerDrift}`,
+    "# HELP qwz_stars_deposit_drift_chips Difference between paid Stars chips and ledger deposits.",
+    "# TYPE qwz_stars_deposit_drift_chips gauge",
+    `qwz_stars_deposit_drift_chips ${reconciliation.starsDepositDrift}`,
+    "# HELP qwz_process_resident_memory_bytes Resident set size.",
+    "# TYPE qwz_process_resident_memory_bytes gauge",
+    `qwz_process_resident_memory_bytes ${Number(memory.rss || 0)}`,
+    "# HELP qwz_process_heap_used_bytes Heap used bytes.",
+    "# TYPE qwz_process_heap_used_bytes gauge",
+    `qwz_process_heap_used_bytes ${Number(memory.heapUsed || 0)}`,
+    "# HELP qwz_process_heap_total_bytes Heap total bytes.",
+    "# TYPE qwz_process_heap_total_bytes gauge",
+    `qwz_process_heap_total_bytes ${Number(memory.heapTotal || 0)}`,
+    "# HELP qwz_process_external_bytes External memory bytes.",
+    "# TYPE qwz_process_external_bytes gauge",
+    `qwz_process_external_bytes ${Number(memory.external || 0)}`,
+    "# HELP qwz_process_array_buffers_bytes Array buffer bytes.",
+    "# TYPE qwz_process_array_buffers_bytes gauge",
+    `qwz_process_array_buffers_bytes ${Number(memory.arrayBuffers || 0)}`
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
+function buildMetricsReconciliation(stats) {
+  const walletTotal = Number(stats?.walletTotal || 0);
+  const ledgerCreditTotal = Number(stats?.ledgerCreditTotal || 0);
+  const ledgerDebitTotal = Number(stats?.ledgerDebitTotal || 0);
+  const paidStarsChipsTotal = Number(stats?.paidStarsChipsTotal || 0);
+  const depositStarsLedgerTotal = Number(stats?.depositStarsLedgerTotal || 0);
+  return {
+    walletLedgerDrift: walletTotal - (ledgerCreditTotal - ledgerDebitTotal),
+    starsDepositDrift: paidStarsChipsTotal - depositStarsLedgerTotal
+  };
+}
+
+function escapePrometheusLabelValue(value) {
+  return String(value)
+    .replace(/\\/g, "\\\\")
+    .replace(/\n/g, "\\n")
+    .replace(/"/g, '\\"');
 }
 
 function requestIdempotencyKey(req) {
@@ -2956,6 +3061,13 @@ function verifyTelegramWebhook(req) {
   if (!TELEGRAM_WEBHOOK_SECRET) return true;
   const provided = req.headers["x-telegram-bot-api-secret-token"] || "";
   return provided === TELEGRAM_WEBHOOK_SECRET;
+}
+
+function verifyMetricsAccess(req) {
+  if (!METRICS_TOKEN) return true;
+  const provided = req.headers["x-qwz-metrics-token"] || req.headers["authorization"] || "";
+  const token = String(provided).replace(/^Bearer\s+/i, "").trim();
+  return token === METRICS_TOKEN;
 }
 
 function verifyCryptoWebhook(req) {

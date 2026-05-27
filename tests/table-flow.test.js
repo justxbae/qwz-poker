@@ -125,6 +125,19 @@ test("health endpoint is public and admin dashboard exposes diagnostics", async 
   }
 });
 
+test("metrics endpoint exposes prometheus text", async () => {
+  const server = await startServer();
+  try {
+    const metrics = await requestText("/api/metrics");
+    assert.match(metrics, /# TYPE qwz_app_up gauge/);
+    assert.match(metrics, /qwz_app_up 1/);
+    assert.match(metrics, /qwz_uptime_seconds \d+/);
+    assert.match(metrics, /qwz_process_resident_memory_bytes \d+/);
+  } finally {
+    server.kill();
+  }
+});
+
 test("production real-money mode refuses to start without PostgreSQL and Redis", async () => {
   const result = await startServerAndWaitForExit({
     NODE_ENV: "production",
@@ -821,6 +834,19 @@ async function request(path, options = {}) {
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error);
+  return data;
+}
+
+async function requestText(path, options = {}) {
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method: options.method || "GET",
+    headers: {
+      ...(options.headers || {})
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined
+  });
+  const data = await response.text();
+  if (!response.ok) throw new Error(data);
   return data;
 }
 
