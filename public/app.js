@@ -215,12 +215,14 @@ let pendingBuyIn = null;
 let currentLobbyTab = "home";
 let fairnessSeedSyncing = false;
 const fairnessSeedSyncedTables = new Set();
+let revealObserver = null;
 
 boot();
 
 async function boot() {
   resetScroll();
   setupTapGuards();
+  setupScrollDynamics();
   tg?.ready();
   tg?.expand();
   setupTelegramControls();
@@ -229,6 +231,7 @@ async function boot() {
   await loadConfig();
   await loadTables();
   await loadProfile();
+  setupScrollReveal();
   if (ADMIN_MODE) {
     selectLobbyTab("admin", { keepScroll: true });
   }
@@ -500,6 +503,83 @@ function setupTapGuards() {
     }
     lastTapAt = now;
   }, { passive: false });
+}
+
+function setupScrollDynamics() {
+  let lastY = getScrollY();
+  let ticking = false;
+  let settleTimer = 0;
+
+  const update = () => {
+    const y = getScrollY();
+    const delta = y - lastY;
+    if (Math.abs(delta) > 1) {
+      document.body.classList.add("is-scrolling");
+      document.body.classList.toggle("scrolling-down", delta > 0);
+      document.body.classList.toggle("scrolling-up", delta < 0);
+      document.body.classList.toggle("scroll-at-top", y <= 2);
+      window.clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(() => {
+        document.body.classList.remove("is-scrolling", "scrolling-down", "scrolling-up");
+        document.body.classList.toggle("scroll-at-top", getScrollY() <= 2);
+      }, 150);
+    }
+    lastY = y;
+    ticking = false;
+  };
+
+  window.addEventListener("scroll", () => {
+    if (ticking) return;
+    ticking = true;
+    window.requestAnimationFrame(update);
+  }, { passive: true });
+}
+
+function setupScrollReveal() {
+  if (revealObserver) revealObserver.disconnect();
+  const items = revealItems();
+  if (!items.length) return;
+  if (!("IntersectionObserver" in window)) {
+    items.forEach((item) => item.classList.add("scroll-reveal", "is-visible"));
+    return;
+  }
+  revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add("is-visible");
+      revealObserver.unobserve(entry.target);
+    });
+  }, {
+    threshold: 0.12,
+    rootMargin: "0px 0px -8% 0px"
+  });
+  items.forEach((item, index) => {
+    item.classList.add("scroll-reveal");
+    item.style.setProperty("--reveal-delay", `${Math.min(index, 8) * 26}ms`);
+    revealObserver.observe(item);
+  });
+}
+
+function refreshScrollReveal() {
+  window.requestAnimationFrame(setupScrollReveal);
+}
+
+function revealItems() {
+  return [...document.querySelectorAll(`
+    .lobby-view.active > section,
+    .lobby-view.active > form,
+    .lobby-view.active .lobby-card,
+    .lobby-view.active .tg-menu-group
+  `)]
+    .filter((item) => !item.closest(".bottom-nav") && !item.closest(".profile-nav-fab"));
+}
+
+function getScrollY() {
+  return window.scrollY
+    || document.scrollingElement?.scrollTop
+    || document.documentElement.scrollTop
+    || document.body.scrollTop
+    || 0;
 }
 
 async function handleTelegramBack() {
@@ -1362,6 +1442,7 @@ function selectLobbyTab(tab, options = {}) {
   if (tabChanged && !options.keepScroll) {
     window.requestAnimationFrame(resetScroll);
   }
+  if (tabChanged) refreshScrollReveal();
   updateTelegramBackButton();
 }
 
