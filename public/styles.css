@@ -327,7 +327,7 @@ h2 {
 .lobby-card {
   border: 1px solid var(--tg-line);
   border-radius: 16px;
-  background: var(--tg-surface);
+  background: var(--native-surface);
   box-shadow: none;
   padding: 14px;
 }
@@ -6969,11 +6969,10 @@ body:not(.in-game) {
 .promo-banner {
   position: relative;
   display: grid;
-  min-height: 118px;
-  overflow: hidden;
+  min-height: 104px;
   justify-items: start;
-  border: 1px solid var(--tg-separator);
-  border-radius: 18px;
+  border: 0;
+  border-radius: var(--native-group-radius);
   background: var(--tg-surface);
   color: var(--tg-text);
   padding: 14px;
@@ -6981,39 +6980,29 @@ body:not(.in-game) {
 }
 
 .promo-banner::after {
-  content: "";
-  position: absolute;
-  right: -32px;
-  bottom: -40px;
-  width: 128px;
-  height: 128px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  pointer-events: none;
+  display: none;
 }
 
 .promo-banner--primary {
-  background: linear-gradient(135deg, #229ed9 0%, #168acd 52%, #1771bd 100%);
-  color: #ffffff;
+  background: var(--native-surface);
 }
 
 .promo-banner--event {
-  background: linear-gradient(135deg, #222c38 0%, #26384a 100%);
+  background: var(--native-surface);
 }
 
 .promo-banner--status {
-  background: linear-gradient(135deg, #202a36 0%, #253142 48%, #2f3a4d 100%);
+  background: var(--native-surface);
 }
 
 .promo-kicker {
   position: relative;
   z-index: 1;
-  color: currentColor;
+  color: var(--tg-button);
   font-size: 11px;
   font-weight: 650;
-  letter-spacing: 0.7px;
+  letter-spacing: 0.4px;
   line-height: 1.15;
-  opacity: 0.72;
   text-transform: uppercase;
 }
 
@@ -7021,9 +7010,9 @@ body:not(.in-game) {
   position: relative;
   z-index: 1;
   margin-top: 7px;
-  color: currentColor;
-  font-size: 20px;
-  font-weight: 620;
+  color: var(--tg-text);
+  font-size: 18px;
+  font-weight: 590;
   line-height: 1.12;
 }
 
@@ -7032,11 +7021,10 @@ body:not(.in-game) {
   z-index: 1;
   max-width: 220px;
   margin-top: 5px;
-  color: currentColor;
+  color: var(--tg-hint);
   font-size: 13px;
   font-weight: 430;
   line-height: 1.28;
-  opacity: 0.76;
 }
 
 .promo-action {
@@ -7045,12 +7033,17 @@ body:not(.in-game) {
   align-self: end;
   margin-top: 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16);
-  color: currentColor;
+  background: var(--native-control);
+  color: var(--tg-text);
   font-size: 12px;
   font-weight: 620;
   line-height: 25px;
   padding: 0 11px;
+}
+
+.promo-banner--primary .promo-action {
+  background: var(--tg-button);
+  color: var(--tg-button-text);
 }
 
 .game-mode-switch {
@@ -7406,7 +7399,7 @@ body:not(.in-game) .home-promo-banners::-webkit-scrollbar {
 
 body:not(.in-game) .promo-banner {
   flex: 0 0 min(300px, calc(100vw - 48px));
-  min-height: 126px;
+  min-height: 116px;
   scroll-snap-align: start;
 }
 
