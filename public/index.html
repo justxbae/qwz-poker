@@ -349,13 +349,14 @@
               </div>
             </div>
           </section>
-          <section class="lobby-card cashier-topup-card">
+          <section class="lobby-card cashier-topup-card" data-cashier-sheet="deposit" aria-modal="true">
             <div class="section-title">
               <div>
                 <p class="eyebrow">Пополнение</p>
                 <h2 id="cashierTopupTitle">Стартовый баланс</h2>
               </div>
               <span id="cashierDepositNetwork">TON</span>
+              <button type="button" class="cashier-sheet-close" data-cashier-sheet-close aria-label="Закрыть">×</button>
             </div>
             <p class="cashier-note" id="cashierNote">Введите сумму в USDT. Счет в TON фиксирует курс, а после подтверждения сети на баланс поступает USDT.</p>
             <div class="cashier-calculator">
@@ -380,13 +381,14 @@
             <button type="button" class="cashier-pay-button" id="cashierPayButton">Пополнить</button>
             <div class="cashier-status" id="cashierStatus" role="status"></div>
           </section>
-          <section class="lobby-card cashier-withdraw-card">
+          <section class="lobby-card cashier-withdraw-card" data-cashier-sheet="withdraw" aria-modal="true">
             <div class="section-title">
               <div>
                 <p class="eyebrow">Вывод</p>
                 <h2>Скоро</h2>
               </div>
               <span>подготовка</span>
+              <button type="button" class="cashier-sheet-close" data-cashier-sheet-close aria-label="Закрыть">×</button>
             </div>
             <div class="cashier-withdraw-state">
               <strong id="cashierWithdrawTitle">Вывод USDT пока закрыт</strong>
@@ -599,6 +601,8 @@
             <div class="cashier-history" id="adminRecentEvents"></div>
           </section>
         </section>
+
+        <div class="cashier-sheet-backdrop" id="cashierSheetBackdrop" hidden></div>
 
         <nav class="bottom-nav" aria-label="Главное меню">
           <button type="button" class="active" data-lobby-tab="home">

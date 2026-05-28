@@ -26,8 +26,10 @@ const cashierState = {
   deposit: null,
   selectedMethod: "stars",
   demoTopup: false,
-  disabled: false
+  disabled: false,
+  sheet: ""
 };
+const cashierSheetHomes = new Map();
 
 const profile = document.querySelector("#profile");
 const lobbyAvatar = document.querySelector("#lobbyAvatar");
@@ -59,6 +61,8 @@ const cashierAmountAsset = document.querySelector("#cashierAmountAsset");
 const cashierWithdrawTitle = document.querySelector("#cashierWithdrawTitle");
 const cashierWithdrawText = document.querySelector("#cashierWithdrawText");
 const cashierPrimaryButton = document.querySelector("#cashierPrimaryButton");
+const cashierSheetBackdrop = document.querySelector("#cashierSheetBackdrop");
+const cashierSheetCloseButtons = document.querySelectorAll("[data-cashier-sheet-close]");
 const walletTopupButton = document.querySelector("#walletTopupButton");
 const walletWithdrawButton = document.querySelector(".home-withdraw");
 const cashierTableStack = document.querySelector("#cashierTableStack");
@@ -245,7 +249,11 @@ async function boot() {
   cashierPrimaryButton?.addEventListener("click", () => {
     document.querySelector(".cashier-topup-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
-  walletTopupButton?.addEventListener("click", () => openCashierTopup());
+  walletTopupButton?.addEventListener("click", () => runAction(openCashierTopup));
+  cashierSheetBackdrop?.addEventListener("click", closeCashierSheet);
+  cashierSheetCloseButtons.forEach((button) => {
+    button.addEventListener("click", closeCashierSheet);
+  });
   cashierRubAmount?.addEventListener("input", syncCashierQuote);
   cashierPresets?.addEventListener("click", onCashierPresetClick);
   cashierMethods?.addEventListener("click", onCashierMethodClick);
@@ -273,7 +281,7 @@ async function boot() {
   document.querySelectorAll("[data-lobby-tab]").forEach((button) => {
     button.addEventListener("click", () => {
       if (button.dataset.lobbyTab === "cashier" && button.dataset.cashierSection) {
-        openCashierSection(button.dataset.cashierSection);
+        runAction(() => openCashierSection(button.dataset.cashierSection));
         return;
       }
       selectLobbyTab(button.dataset.lobbyTab);
@@ -589,6 +597,10 @@ function getScrollY() {
 }
 
 async function handleTelegramBack() {
+  if (cashierState.sheet) {
+    closeCashierSheet();
+    return;
+  }
   if (!buyInOverlay.hidden) {
     hideBuyInOverlay();
     return;
@@ -616,6 +628,7 @@ async function handleTelegramBack() {
 
 function updateTelegramBackButton() {
   const shouldShow = !buyInOverlay.hidden
+    || Boolean(cashierState.sheet)
     || !sideMenu.hidden
     || !infoDrawer.hidden
     || !sitOutPopover.hidden
@@ -1544,6 +1557,7 @@ function syncLimitSelection() {
 }
 
 function selectLobbyTab(tab, options = {}) {
+  if (cashierState.sheet) closeCashierSheet({ silent: true });
   const tabChanged = currentLobbyTab !== tab;
   currentLobbyTab = tab;
   updateBottomNavIndicator(tab);
@@ -1581,12 +1595,17 @@ function updateBottomNavIndicator(tab = currentLobbyTab) {
   nav.classList.toggle("has-active-tab", index >= 0);
 }
 
-function openCashierTopup() {
-  openCashierSection("deposit");
+async function openCashierTopup() {
+  await openCashierSection("deposit");
 }
 
-function openCashierSection(section = "deposit") {
+async function openCashierSection(section = "deposit") {
   haptic("light");
+  if (section === "deposit" || section === "withdraw") {
+    await loadCashier();
+    openCashierSheet(section);
+    return;
+  }
   selectLobbyTab("cashier");
   const selector = section === "withdraw"
     ? ".cashier-withdraw-card"
@@ -1596,6 +1615,50 @@ function openCashierSection(section = "deposit") {
   window.requestAnimationFrame(() => {
     document.querySelector(selector)?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
+}
+
+function openCashierSheet(section = "deposit") {
+  const normalized = section === "withdraw" ? "withdraw" : "deposit";
+  closeCashierSheet({ silent: true });
+  const sheet = document.querySelector(`[data-cashier-sheet="${normalized}"]`);
+  if (!sheet) return;
+  if (!cashierSheetHomes.has(sheet)) {
+    cashierSheetHomes.set(sheet, {
+      parent: sheet.parentNode,
+      nextSibling: sheet.nextSibling
+    });
+  }
+  cashierSheetBackdrop?.before(sheet);
+  cashierState.sheet = normalized;
+  document.body.classList.add("cashier-sheet-open");
+  if (cashierSheetBackdrop) cashierSheetBackdrop.hidden = false;
+  sheet.classList.add("sheet-open");
+  sheet.removeAttribute("hidden");
+  window.requestAnimationFrame(() => {
+    sheet.classList.add("sheet-visible");
+  });
+  updateTelegramBackButton();
+}
+
+function closeCashierSheet(options = {}) {
+  const sheet = cashierState.sheet ? document.querySelector(`[data-cashier-sheet="${cashierState.sheet}"]`) : null;
+  cashierState.sheet = "";
+  document.body.classList.remove("cashier-sheet-open");
+  cashierSheetBackdrop?.setAttribute("hidden", "");
+  document.querySelectorAll("[data-cashier-sheet].sheet-open").forEach((item) => {
+    item.classList.remove("sheet-visible", "sheet-open");
+    const home = cashierSheetHomes.get(item);
+    if (home?.parent) {
+      home.parent.insertBefore(item, home.nextSibling);
+    }
+  });
+  if (!options.silent) {
+    haptic("light");
+    updateTelegramBackButton();
+  }
+  if (sheet?.contains(document.activeElement)) {
+    document.activeElement.blur();
+  }
 }
 
 async function loadTables() {
