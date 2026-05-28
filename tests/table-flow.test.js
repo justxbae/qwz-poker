@@ -220,7 +220,7 @@ test("seated player can control test bots at public system tables", async () => 
   }
 });
 
-test("leaving a table persists the player stack in the session", async () => {
+test("leaving to lobby returns the table stack to the wallet", async () => {
   const server = await startServer();
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
@@ -243,15 +243,21 @@ test("leaving a table persists the player stack in the session", async () => {
 
     assert.equal(table.seats[0].stack, 9975);
 
-    await request(`/api/tables/${table.id}/leave`, {
+    const left = await request(`/api/tables/${table.id}/leave`, {
       method: "POST",
       token: auth.token
     });
 
+    assert.equal(left.balance, 9975);
+    const profile = (await request("/api/profile", { token: auth.token })).profile;
+    assert.equal(profile.balance, 9975);
+    assert.equal(profile.savedStack, 0);
+    assert.equal(profile.tableStack, 0);
+
     const nextTable = (await request("/api/tables", {
       method: "POST",
       token: auth.token,
-      body: { name: "Rejoin", maxPlayers: 2, smallBlind: 25 }
+      body: { name: "Rejoin", maxPlayers: 2, smallBlind: 25, buyInAmount: 9975 }
     })).table;
 
     assert.equal(nextTable.seats[0].stack, 9975);

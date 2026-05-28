@@ -756,7 +756,7 @@ async function handleApi(req, res, url) {
       const departingStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
       const result = leaveTable(table, user);
       await persistCompletedHands(table);
-      await settleLeftTableStack(user, table, departingStack || result.stack);
+      await settleLeftTableStack(user, table, departingStack || result.stack, { returnToWallet: true });
       if (result.tableEmpty && table.isPrivate) {
         tables.delete(table.id);
         await deleteActiveTableSnapshot(table.id);
@@ -767,7 +767,7 @@ async function handleApi(req, res, url) {
         user,
         lines: [
           `Стол: ${table.name}`,
-          `${table.gameMode === "cash" ? "Возврат" : "Сохраненный стек"}: ${formatTableAmount(table, result.stack)}`,
+          `${table.gameMode === "cash" ? "Возврат" : "Возврат на баланс"}: ${formatTableAmount(table, result.stack)}`,
           `Баланс: ${formatAvailableBalance(user, table)}`
         ]
       });
@@ -1848,8 +1848,12 @@ async function saveStack(user, stack) {
   }
 }
 
-async function settleLeftTableStack(user, table, stack) {
+async function settleLeftTableStack(user, table, stack, options = {}) {
   if (table.gameMode !== "cash") {
+    if (options.returnToWallet) {
+      await returnPlayTableStackToWallet(user, table, stack);
+      return;
+    }
     await saveStack(user, stack);
     return;
   }
@@ -1867,6 +1871,28 @@ async function settleLeftTableStack(user, table, stack) {
     from: "table",
     to: "cash_usdt",
     amount: stack,
+    contextId: table.id,
+    meta: table.name
+  });
+}
+
+async function returnPlayTableStackToWallet(user, table, stack) {
+  const amount = Math.max(0, Math.round(Number(stack) || 0));
+  await saveStack(user, 0);
+  if (amount <= 0) return;
+  await recordTransaction(user, {
+    type: "credit",
+    category: "table_cashout",
+    title: "Возврат со стола",
+    amount,
+    meta: table.name,
+    idempotencyKey: randomId("play-cashout")
+  });
+  await recordFundMovement(user, {
+    category: "table_to_wallet",
+    from: "table",
+    to: "wallet",
+    amount,
     contextId: table.id,
     meta: table.name
   });
