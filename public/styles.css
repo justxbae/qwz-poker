@@ -2268,6 +2268,31 @@ body.in-game .game-toolbar [data-panel-tab="waitlist"] {
   transform: translate(-50%, -50%);
 }
 
+.board-card-slot {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  aspect-ratio: 2.5 / 3.5;
+  border: 1px solid rgba(220, 226, 230, 0.2);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012)),
+    rgba(8, 10, 12, 0.18);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.18),
+    inset 0 8px 18px rgba(255, 255, 255, 0.025);
+}
+
+.board-card-slot.filled {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.board-card-slot .card {
+  width: 100%;
+}
+
 .card {
   display: grid;
   place-items: center;
@@ -3730,7 +3755,7 @@ body.in-game .game-screen {
   gap: 5px;
 }
 
-.community .card {
+.community .board-card-slot {
   width: 50px;
 }
 

@@ -2280,7 +2280,7 @@ function renderCurrentTable(table) {
   const nextCommunityKey = table.communityCards.join("|");
   const animateCommunity = nextCommunityKey !== communityCardsKey;
   communityCardsKey = nextCommunityKey;
-  communityCards.replaceChildren(...renderCards(table.communityCards, { animate: animateCommunity }));
+  communityCards.replaceChildren(...renderCommunityCards(table.communityCards, { animate: animateCommunity }));
   seats.replaceChildren(
     ...table.seats.map((seat, index) => {
       const node = document.createElement("article");
@@ -3189,6 +3189,21 @@ function renderCards(cards, options = {}) {
       node.replaceChildren(rank, suit);
     }
     return node;
+  });
+}
+
+function renderCommunityCards(cards, options = {}) {
+  return Array.from({ length: 5 }, (_, index) => {
+    const slot = document.createElement("span");
+    const card = cards[index];
+    slot.className = `board-card-slot${card ? " filled" : ""}`;
+    slot.setAttribute("aria-hidden", card ? "false" : "true");
+    if (card) {
+      slot.replaceChildren(...renderCards([card], {
+        animate: options.animate
+      }));
+    }
+    return slot;
   });
 }
 
