@@ -227,6 +227,7 @@ async function boot() {
   resetScroll();
   setupTapGuards();
   setupScrollDynamics();
+  setupLobbyOverscroll();
   tg?.ready();
   tg?.expand();
   setupTelegramControls();
@@ -437,24 +438,20 @@ function renderModeBalance() {
 }
 
 function renderModeContext() {
-  if (!modeBanner) return;
   const cashMode = state.gameMode === "cash";
-  if (modeBannerKicker) modeBannerKicker.textContent = cashMode ? "USDT" : "Без вывода";
-  if (modeBannerTitle) {
-    if (cashMode) modeBannerTitle.replaceChildren("Денежная игра ", createTetherMark());
-    else modeBannerTitle.textContent = "Игровые фишки";
-  }
-  if (modeBannerText) {
-    modeBannerText.textContent = cashMode
-      ? "Ставки и вывод в USDT. Депозит принимается через TON после подтверждения сети."
-      : "Отдельный режим для игры на игровых фишках без вывода.";
+  if (modeBanner) {
+    if (modeBannerKicker) modeBannerKicker.textContent = cashMode ? "USDT" : "Без вывода";
+    if (modeBannerTitle) {
+      if (cashMode) modeBannerTitle.replaceChildren("Денежная игра ", createTetherMark());
+      else modeBannerTitle.textContent = "Игровые фишки";
+    }
+    modeBanner.dataset.mode = cashMode ? "cash" : "play";
   }
   if (homeGamesTitle) homeGamesTitle.textContent = cashMode ? "Cash-столы" : "Игровые столы";
   if (publicGamesTitle) publicGamesTitle.textContent = cashMode ? "Cash-столы" : "Игровые столы";
   if (privateGamesTitle) privateGamesTitle.textContent = cashMode ? "Приватные cash-столы" : "Приватные столы";
   if (walletTopupButton) walletTopupButton.textContent = "Депозит";
   if (walletWithdrawButton) walletWithdrawButton.disabled = !cashMode;
-  modeBanner.dataset.mode = cashMode ? "cash" : "play";
 }
 
 function renderLimitOptions() {
@@ -547,6 +544,47 @@ function setupScrollDynamics() {
     ticking = true;
     window.requestAnimationFrame(update);
   }, { passive: true });
+}
+
+function setupLobbyOverscroll() {
+  let startY = 0;
+  let overscroll = 0;
+
+  const maxScrollY = () => Math.max(0, (document.scrollingElement?.scrollHeight || 0) - window.innerHeight);
+  const reset = () => {
+    if (!overscroll) return;
+    overscroll = 0;
+    document.body.classList.add("scroll-bounce-release");
+    document.body.classList.remove("scroll-bounce-active");
+    lobby?.style.setProperty("--scroll-bounce-y", "0px");
+    window.setTimeout(() => document.body.classList.remove("scroll-bounce-release"), 220);
+  };
+
+  window.addEventListener("touchstart", (event) => {
+    if (document.body.classList.contains("in-game") || event.touches.length !== 1) return;
+    startY = event.touches[0].clientY;
+    overscroll = 0;
+  }, { passive: true });
+
+  window.addEventListener("touchmove", (event) => {
+    if (document.body.classList.contains("in-game") || !lobby || event.touches.length !== 1) return;
+    if (cashierState.sheet || !buyInOverlay.hidden || !sideMenu.hidden || !infoDrawer.hidden) return;
+    const pull = event.touches[0].clientY - startY;
+    const y = getScrollY();
+    const atTop = y <= 0 && pull > 0;
+    const atBottom = y >= maxScrollY() - 2 && pull < 0;
+    if (!atTop && !atBottom) {
+      reset();
+      return;
+    }
+    overscroll = Math.max(-26, Math.min(26, pull * 0.18));
+    document.body.classList.add("scroll-bounce-active");
+    document.body.classList.remove("scroll-bounce-release");
+    lobby.style.setProperty("--scroll-bounce-y", `${overscroll.toFixed(1)}px`);
+  }, { passive: true });
+
+  window.addEventListener("touchend", reset, { passive: true });
+  window.addEventListener("touchcancel", reset, { passive: true });
 }
 
 function setupScrollReveal() {

@@ -186,20 +186,16 @@
             </button>
           </section>
 
-          <section class="training-switcher">
-            <div>
-              <strong>Режим игры</strong>
-              <small id="modeBannerText">Отдельный режим для игры на игровых фишках без вывода.</small>
-            </div>
+          <section class="training-switcher" aria-label="Выбор режима">
             <div class="game-mode-switch" id="gameModeSwitch" aria-label="Режим игры">
-              <button type="button" data-game-mode="cash">USDT <svg class="tether-mark" viewBox="0 0 24 24" aria-label="USDT"><circle cx="12" cy="12" r="12"/><path d="M13.55 10.18V8.56h3.8V6H6.65v2.56h3.8v1.62C7.36 10.34 5 10.96 5 11.71c0 .75 2.36 1.37 5.45 1.53V18h3.1v-4.76c3.09-.16 5.45-.78 5.45-1.53 0-.75-2.36-1.37-5.45-1.53Zm0 2.07v-.01c-.49.03-1 .04-1.55.04s-1.06-.01-1.55-.04v.01c-2.21-.12-3.87-.51-3.87-.98 0-.39 1.18-.73 2.91-.9v.86c.78.07 1.63.11 2.51.11.88 0 1.73-.04 2.51-.11v-.86c1.73.17 2.91.51 2.91.9 0 .47-1.66.86-3.87.98Z"/></svg></button>
-              <button type="button" class="active" data-game-mode="play">Игровые фишки</button>
-            </div>
-            <div class="mode-banner" id="modeBanner">
-              <div class="mode-banner-head">
-                <strong id="modeBannerTitle">Игровые фишки</strong>
-                <span id="modeBannerKicker">Без вывода</span>
-              </div>
+              <button type="button" class="active" data-game-mode="play">
+                <span>Фишки</span>
+                <small>игровой режим</small>
+              </button>
+              <button type="button" data-game-mode="cash">
+                <span>USDT <svg class="tether-mark" viewBox="0 0 24 24" aria-label="USDT"><circle cx="12" cy="12" r="12"/><path d="M13.55 10.18V8.56h3.8V6H6.65v2.56h3.8v1.62C7.36 10.34 5 10.96 5 11.71c0 .75 2.36 1.37 5.45 1.53V18h3.1v-4.76c3.09-.16 5.45-.78 5.45-1.53 0-.75-2.36-1.37-5.45-1.53Zm0 2.07v-.01c-.49.03-1 .04-1.55.04s-1.06-.01-1.55-.04v.01c-2.21-.12-3.87-.51-3.87-.98 0-.39 1.18-.73 2.91-.9v.86c.78.07 1.63.11 2.51.11.88 0 1.73-.04 2.51-.11v-.86c1.73.17 2.91.51 2.91.9 0 .47-1.66.86-3.87.98Z"/></svg></span>
+                <small>cash-столы</small>
+              </button>
             </div>
           </section>
 

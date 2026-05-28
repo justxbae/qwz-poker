@@ -7517,6 +7517,19 @@ body:not(.in-game).scrolling-up .profile-nav-fab {
   transform: translateY(0) scale(1);
 }
 
+body:not(.in-game) .lobby-shell {
+  transform: translate3d(0, var(--scroll-bounce-y, 0px), 0);
+  will-change: transform;
+}
+
+body:not(.in-game).scroll-bounce-active .lobby-shell {
+  transition: none;
+}
+
+body:not(.in-game).scroll-bounce-release .lobby-shell {
+  transition: transform 260ms cubic-bezier(0.18, 0.9, 0.2, 1);
+}
+
 .scroll-reveal {
   opacity: 0;
   transform: translateY(10px) scale(0.992);
@@ -7601,11 +7614,11 @@ body:not(.in-game) .promo-banner--status {
 
 body:not(.in-game) .training-switcher {
   display: grid;
-  gap: 8px;
-  border: 1px solid var(--tg-separator);
-  border-radius: var(--native-group-radius);
-  background: var(--tg-surface);
-  padding: 14px;
+  gap: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
 }
 
 body:not(.in-game) .training-switcher > div:first-child small {
@@ -7614,6 +7627,55 @@ body:not(.in-game) .training-switcher > div:first-child small {
 
 body:not(.in-game) .training-switcher .mode-banner {
   display: none;
+}
+
+body:not(.in-game) .training-switcher .game-mode-switch {
+  gap: 8px;
+  min-height: 60px;
+  border-radius: 17px;
+  background: var(--native-surface);
+  padding: 6px;
+}
+
+body:not(.in-game) .training-switcher .game-mode-switch button {
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  min-height: 48px;
+  border-radius: 13px;
+  color: var(--tg-hint);
+  font-size: 13px;
+  line-height: 1.1;
+}
+
+body:not(.in-game) .training-switcher .game-mode-switch button span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: inherit;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+body:not(.in-game) .training-switcher .game-mode-switch button small {
+  color: inherit;
+  font-size: 11px;
+  font-weight: 480;
+  opacity: 0.82;
+}
+
+body:not(.in-game) .training-switcher .game-mode-switch button.active {
+  background: var(--tg-button);
+  color: var(--tg-button-text);
+}
+
+body:not(.in-game) .training-switcher .game-mode-switch button:disabled {
+  opacity: 0.46;
+}
+
+body:not(.in-game) .training-switcher .game-mode-switch .tether-mark {
+  width: 17px;
+  height: 17px;
 }
 
 body:not(.in-game) .home-games {
