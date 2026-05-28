@@ -2307,6 +2307,7 @@ function renderCurrentTable(table) {
         seat.sitOutNextHand ? "sitout-pending" : "",
         seat.folded ? "folded" : "",
         becameFolded ? "fold-out" : "",
+        seat.userId === state.user?.id ? "viewer-seat" : "",
         seat.isAllIn ? "all-in" : "",
         shouldAnimateBet ? "bet-pop" : "",
         isWinningSeat(table, seat) ? "winner" : ""
