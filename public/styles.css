@@ -7575,9 +7575,11 @@ body:not(.in-game).scroll-bounce-release .lobby-view.active {
 body:not(.in-game) .home-promo-banners {
   display: flex;
   overflow-x: auto;
-  gap: 10px;
+  gap: 8px;
   margin-inline: 0;
-  padding: 0 0 2px;
+  border-radius: var(--native-group-radius);
+  background: var(--native-surface);
+  padding: 10px;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
 }
@@ -7587,9 +7589,10 @@ body:not(.in-game) .home-promo-banners::-webkit-scrollbar {
 }
 
 body:not(.in-game) .promo-banner {
-  flex: 0 0 min(300px, calc(100vw - 68px));
+  flex: 0 0 clamp(158px, calc((100vw - 58px) / 2), 186px);
   min-height: 116px;
   border: 0;
+  border-radius: 14px;
   outline: 0;
   box-shadow: none;
   scroll-snap-align: start;
@@ -7621,16 +7624,16 @@ body:not(.in-game) .promo-banner--primary .promo-action {
 
 body:not(.in-game) .promo-banner--event,
 body:not(.in-game) .promo-banner--status {
-  background: var(--native-surface);
+  background: var(--native-control);
 }
 
 body:not(.in-game) .training-switcher {
   display: grid;
   gap: 0;
   border: 0;
-  border-radius: 0;
-  background: transparent;
-  padding: 0;
+  border-radius: var(--native-group-radius);
+  background: var(--native-surface);
+  padding: 10px;
 }
 
 body:not(.in-game) .training-switcher > div:first-child small {
@@ -7643,18 +7646,19 @@ body:not(.in-game) .training-switcher .mode-banner {
 
 body:not(.in-game) .training-switcher .game-mode-switch {
   gap: 8px;
-  min-height: 60px;
-  border-radius: 17px;
-  background: var(--native-surface);
-  padding: 6px;
+  min-height: 64px;
+  border-radius: 16px;
+  background: transparent;
+  padding: 0;
 }
 
 body:not(.in-game) .training-switcher .game-mode-switch button {
   display: grid;
   place-items: center;
   gap: 3px;
-  min-height: 48px;
-  border-radius: 13px;
+  min-height: 64px;
+  border-radius: 15px;
+  background: var(--native-control);
   color: var(--tg-hint);
   font-size: 13px;
   line-height: 1.1;
