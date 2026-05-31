@@ -1823,6 +1823,7 @@ function renderTableList(container, tables, emptyText) {
     const meta = node.querySelector('[data-field="meta"]');
     if (table.gameMode === "cash") {
       renderLimitValue(meta, table.smallBlind, table.bigBlind, true);
+      meta.append(` · бай-ин ${formatUsdt(table.minBuyIn || table.bigBlind * 50)}-${formatUsdt(table.maxBuyIn || table.bigBlind * 250)} USDT`);
       meta.append(` · ${table.seats.length}/${table.maxPlayers} игроков${table.isPrivate ? " · приватный" : ""}`);
     } else {
       meta.textContent = `${formatTableLimit(table)} · ${table.seats.length}/${table.maxPlayers} игроков${table.isPrivate ? " · приватный" : ""}`;
@@ -1909,7 +1910,7 @@ function openBuyInOverlay(intent) {
   const smallBlind = Number(table.smallBlind || intent.smallBlind || state.selectedSmallBlind || 25);
   const bigBlind = Number(table.bigBlind || smallBlind * 2);
   const balance = Number(intent.balance ?? (cashMode ? state.user?.cashBalanceMicros : state.user?.balance) ?? 0);
-  const minimumBuyIn = Math.max(Number(table.minBuyIn || bigBlind * (cashMode ? 40 : 50)), bigBlind);
+  const minimumBuyIn = Math.max(Number(table.minBuyIn || bigBlind * 50), bigBlind);
   if (balance < minimumBuyIn && intent.mode !== "rebuy") {
     selectLobbyTab("cashier");
     cashierStatus.textContent = cashMode

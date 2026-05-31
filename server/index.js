@@ -1299,6 +1299,7 @@ async function hydrateActiveTables() {
     return;
   }
 
+  await reconcileSystemPublicTables();
   console.log(`Restored ${tables.size} table snapshot${tables.size === 1 ? "" : "s"} from ${redisSnapshots?.length ? "Redis" : "PostgreSQL"}`);
 }
 
@@ -1555,6 +1556,7 @@ function seedPublicTables() {
         name: `QWZ NL ${limit.smallBlind}/${limit.smallBlind * 2} #${index}`,
         maxPlayers: 6,
         smallBlind: limit.smallBlind,
+        bigBlind: limit.bigBlind,
         gameMode: "play",
         isSystem: true,
         isPrivate: false
@@ -1570,6 +1572,7 @@ function seedPublicTables() {
         name: `QWZ NL ${formatUsdtMicros(limit.smallBlind)}/${formatUsdtMicros(limit.bigBlind)} USDT #${index}`,
         maxPlayers: 6,
         smallBlind: limit.smallBlind,
+        bigBlind: limit.bigBlind,
         minBuyIn: limit.minBuyIn,
         maxBuyIn: limit.maxBuyIn,
         gameMode: "cash",
@@ -1579,6 +1582,65 @@ function seedPublicTables() {
       tables.set(table.id, table);
     }
   }
+}
+
+async function reconcileSystemPublicTables() {
+  const targets = [
+    ...PLAY_TABLE_LIMITS.map((limit) => ({ ...limit, gameMode: "play" })),
+    ...(REAL_MONEY_ENABLED ? CASH_TABLE_LIMITS.map((limit) => ({ ...limit, gameMode: "cash" })) : [])
+  ];
+  const targetCounts = new Map(targets.map((limit) => [systemTableKey(limit), Number(limit.count || 0)]));
+  const seen = new Map();
+
+  for (const table of [...tables.values()]) {
+    if (!table.isSystem || table.isPrivate) continue;
+    const key = systemTableKey(table);
+    const desiredCount = targetCounts.get(key) || 0;
+    const currentCount = seen.get(key) || 0;
+    const removable = table.seats.length === 0 && table.status === "waiting";
+    if (removable && (desiredCount === 0 || currentCount >= desiredCount)) {
+      tables.delete(table.id);
+      await Promise.all([
+        stateDeleteTableSnapshot(table.id),
+        dbDeleteActiveTableSnapshot(table.id)
+      ]);
+      continue;
+    }
+    seen.set(key, currentCount + 1);
+  }
+
+  for (const limit of targets) {
+    const key = systemTableKey(limit);
+    const desiredCount = Number(limit.count || 0);
+    const currentCount = seen.get(key) || 0;
+    for (let index = currentCount + 1; index <= desiredCount; index += 1) {
+      const cashMode = limit.gameMode === "cash";
+      const table = createTable(null, {
+        name: cashMode
+          ? `QWZ NL ${formatUsdtMicros(limit.smallBlind)}/${formatUsdtMicros(limit.bigBlind)} USDT #${index}`
+          : `QWZ NL ${limit.smallBlind}/${limit.bigBlind} #${index}`,
+        maxPlayers: 6,
+        smallBlind: limit.smallBlind,
+        bigBlind: limit.bigBlind,
+        minBuyIn: limit.minBuyIn,
+        maxBuyIn: limit.maxBuyIn,
+        gameMode: limit.gameMode,
+        isSystem: true,
+        isPrivate: false
+      });
+      tables.set(table.id, table);
+      await persistActiveTableSnapshot(table);
+    }
+  }
+}
+
+function systemTableKey(table) {
+  return [
+    table.gameMode === "cash" ? "cash" : "play",
+    Number(table.smallBlind || 0),
+    Number(table.bigBlind || 0),
+    Number(table.maxPlayers || 6)
+  ].join(":");
 }
 
 function seedTournaments() {

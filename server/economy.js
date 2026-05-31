@@ -15,14 +15,16 @@ export const PLAY_TABLE_LIMITS = [
 ];
 
 // Values are stored as micro-USDT. All cash accounting remains integer based.
+// Cash limits follow a poker-room style ladder: Low tables for liquidity,
+// Mid tables for regulars, and VIP kept sparse until the room has demand.
 export const CASH_TABLE_LIMITS = [
-  cashLimit("0.01", "0.02", 2),
-  cashLimit("0.02", "0.05", 2),
-  cashLimit("0.05", "0.10", 2),
-  cashLimit("0.10", "0.25", 1),
-  cashLimit("0.25", "0.50", 1),
-  cashLimit("0.50", "1.00", 1),
-  cashLimit("1.00", "2.00", 1)
+  cashLimit("0.02", "0.05", 2, { tier: "low", minBuyIn: "2.50", maxBuyIn: "12.50" }),
+  cashLimit("0.05", "0.10", 2, { tier: "low", minBuyIn: "2.50", maxBuyIn: "25.00" }),
+  cashLimit("0.10", "0.25", 2, { tier: "low", minBuyIn: "6.25", maxBuyIn: "62.50" }),
+  cashLimit("0.25", "0.50", 1, { tier: "mid", minBuyIn: "12.50", maxBuyIn: "125.00" }),
+  cashLimit("0.50", "1.00", 1, { tier: "mid", minBuyIn: "25.00", maxBuyIn: "250.00" }),
+  cashLimit("1.00", "2.00", 1, { tier: "mid", minBuyIn: "50.00", maxBuyIn: "500.00" }),
+  cashLimit("2.00", "5.00", 1, { tier: "vip", minBuyIn: "250.00", maxBuyIn: "1250.00" })
 ];
 
 export const ECONOMY = {
@@ -227,14 +229,17 @@ export function calculateRake({ pot, bigBlind, boardCards = 0 }) {
   return Math.min(Math.floor(pot * ECONOMY.rake.percent), rakeCap(bigBlind));
 }
 
-function cashLimit(smallBlind, bigBlind, count) {
+function cashLimit(smallBlind, bigBlind, count, options = {}) {
   const smallBlindMicros = toUsdtMicros(smallBlind);
   const bigBlindMicros = toUsdtMicros(bigBlind);
+  const minBuyIn = options.minBuyIn ? toUsdtMicros(options.minBuyIn) : bigBlindMicros * 50;
+  const maxBuyIn = options.maxBuyIn ? toUsdtMicros(options.maxBuyIn) : bigBlindMicros * 250;
   return {
+    tier: options.tier || "low",
     smallBlind: smallBlindMicros,
     bigBlind: bigBlindMicros,
-    minBuyIn: bigBlindMicros * 40,
-    maxBuyIn: bigBlindMicros * 100,
+    minBuyIn,
+    maxBuyIn,
     count
   };
 }

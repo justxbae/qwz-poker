@@ -14,7 +14,7 @@ export function createTable(owner, body = {}, options = {}) {
   const gameMode = body.gameMode === "cash" ? "cash" : "play";
   const currency = gameMode === "cash" ? "USDT" : "PLAY_CHIPS";
   const smallBlind = clamp(Number(body.smallBlind || 25), 1, 10_000_000_000);
-  const bigBlind = smallBlind * 2;
+  const bigBlind = clamp(Number(body.bigBlind || smallBlind * 2), smallBlind, 20_000_000_000);
   const minBuyIn = Math.max(bigBlind, Math.round(Number(body.minBuyIn) || bigBlind * (gameMode === "cash" ? 40 : 50)));
   const maxBuyIn = Math.max(minBuyIn, Math.round(Number(body.maxBuyIn) || bigBlind * (gameMode === "cash" ? 100 : 400)));
   const isPrivate = body.visibility === "private" || body.isPrivate === true;
