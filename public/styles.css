@@ -7863,3 +7863,17 @@ body.in-game .drawer-tabs button.active:focus,
 body.in-game .drawer-tabs button.active:focus-visible {
   box-shadow: inset 0 -3px 0 var(--tg-link);
 }
+
+/* Final mobile nav guard: the lobby tab bar must stay pinned to the viewport,
+   independent of page height or Telegram WebView scroll quirks. */
+body:not(.in-game) .bottom-nav {
+  position: fixed !important;
+  bottom: max(10px, env(safe-area-inset-bottom)) !important;
+  z-index: 120 !important;
+}
+
+body:not(.in-game) .profile-nav-fab {
+  position: fixed !important;
+  bottom: max(10px, env(safe-area-inset-bottom)) !important;
+  z-index: 121 !important;
+}
