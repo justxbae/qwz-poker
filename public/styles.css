@@ -7580,7 +7580,7 @@ body:not(.in-game) .home-promo-banners {
   border-radius: var(--native-group-radius);
   background: var(--native-surface);
   padding: 10px;
-  scroll-snap-type: x mandatory;
+  scroll-snap-type: none;
   scrollbar-width: none;
 }
 
@@ -7590,12 +7590,17 @@ body:not(.in-game) .home-promo-banners::-webkit-scrollbar {
 
 body:not(.in-game) .promo-banner {
   flex: 0 0 clamp(158px, calc((100vw - 58px) / 2), 186px);
+  margin-left: 14px;
   min-height: 116px;
   border: 0;
   border-radius: 14px;
   outline: 0;
   box-shadow: none;
   scroll-snap-align: start;
+}
+
+body:not(.in-game) .promo-banner + .promo-banner {
+  margin-left: 0;
 }
 
 body:not(.in-game) .promo-banner::after {
@@ -7756,13 +7761,14 @@ body.cashier-sheet-open [data-cashier-sheet].sheet-open {
   background: var(--native-surface);
   padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
   box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.38);
-  transform: translateY(102%);
+  transform: translateY(calc(102% + var(--sheet-drag-y, 0px)));
   transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  touch-action: pan-y;
   overscroll-behavior: contain;
 }
 
 body.cashier-sheet-open [data-cashier-sheet].sheet-visible {
-  transform: translateY(0);
+  transform: translateY(var(--sheet-drag-y, 0px));
 }
 
 body.cashier-sheet-open [data-cashier-sheet].sheet-open::before {
@@ -7776,7 +7782,7 @@ body.cashier-sheet-open [data-cashier-sheet].sheet-open::before {
 }
 
 body.cashier-sheet-open .cashier-sheet-close {
-  display: inline-grid;
+  display: none;
   place-items: center;
   width: 30px;
   height: 30px;

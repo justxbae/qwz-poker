@@ -254,6 +254,9 @@ async function boot() {
   });
   walletTopupButton?.addEventListener("click", () => runAction(openCashierTopup));
   cashierSheetBackdrop?.addEventListener("click", closeCashierSheet);
+  document.querySelectorAll("[data-cashier-sheet]").forEach((sheet) => {
+    wireCashierSheetDrag(sheet);
+  });
   cashierSheetCloseButtons.forEach((button) => {
     button.addEventListener("click", closeCashierSheet);
   });
@@ -1735,6 +1738,7 @@ function closeCashierSheet(options = {}) {
   cashierSheetBackdrop?.setAttribute("hidden", "");
   document.querySelectorAll("[data-cashier-sheet].sheet-open").forEach((item) => {
     item.classList.remove("sheet-visible", "sheet-open");
+    item.style.removeProperty("--sheet-drag-y");
     const home = cashierSheetHomes.get(item);
     if (home?.parent) {
       home.parent.insertBefore(item, home.nextSibling);
@@ -1747,6 +1751,43 @@ function closeCashierSheet(options = {}) {
   if (sheet?.contains(document.activeElement)) {
     document.activeElement.blur();
   }
+}
+
+function wireCashierSheetDrag(sheet) {
+  let startY = 0;
+  let dragY = 0;
+  let tracking = false;
+
+  sheet.addEventListener("pointerdown", (event) => {
+    const rect = sheet.getBoundingClientRect();
+    if (!sheet.classList.contains("sheet-open") || event.clientY - rect.top > 72) return;
+    startY = event.clientY;
+    dragY = 0;
+    tracking = true;
+    sheet.setPointerCapture?.(event.pointerId);
+    sheet.style.transition = "none";
+  });
+
+  sheet.addEventListener("pointermove", (event) => {
+    if (!tracking) return;
+    dragY = Math.max(0, event.clientY - startY);
+    sheet.style.setProperty("--sheet-drag-y", `${Math.round(dragY)}px`);
+  });
+
+  const finish = (event) => {
+    if (!tracking) return;
+    tracking = false;
+    sheet.releasePointerCapture?.(event.pointerId);
+    sheet.style.transition = "";
+    if (dragY > 74) {
+      closeCashierSheet();
+      return;
+    }
+    sheet.style.setProperty("--sheet-drag-y", "0px");
+  };
+
+  sheet.addEventListener("pointerup", finish);
+  sheet.addEventListener("pointercancel", finish);
 }
 
 async function loadTables() {
