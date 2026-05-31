@@ -46,6 +46,8 @@ const homeOfferMeta = document.querySelector("#homeOfferMeta");
 const quickPlayHint = document.querySelector("#quickPlayHint");
 const homeGamesTitle = document.querySelector("#homeGamesTitle");
 const homeTableList = document.querySelector("#homeTableList");
+const promoCarousel = document.querySelector(".home-promo-banners");
+const promoDots = document.querySelector("#homePromoDots");
 const gameModeSwitch = document.querySelector("#gameModeSwitch");
 const lobbyBalanceCurrency = document.querySelector("#lobbyBalanceCurrency");
 const modeBanner = document.querySelector("#modeBanner");
@@ -239,6 +241,7 @@ async function boot() {
   await loadTables();
   await loadProfile();
   setupScrollReveal();
+  setupPromoCarousel();
   if (ADMIN_MODE) {
     selectLobbyTab("admin", { keepScroll: true });
   }
@@ -667,6 +670,52 @@ function setupScrollReveal() {
 
 function refreshScrollReveal() {
   window.requestAnimationFrame(setupScrollReveal);
+}
+
+function setupPromoCarousel() {
+  if (!promoCarousel || !promoDots) return;
+  const items = [...promoCarousel.querySelectorAll(".promo-banner")];
+  if (items.length <= 1) return;
+  promoDots.replaceChildren(...items.map((_, index) => {
+    const dot = document.createElement("span");
+    dot.className = index === 0 ? "active" : "";
+    dot.addEventListener("click", () => {
+      items[index].scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+    });
+    return dot;
+  }));
+
+  const update = () => {
+    const center = promoCarousel.scrollLeft + promoCarousel.clientWidth / 2;
+    let active = 0;
+    let distance = Number.POSITIVE_INFINITY;
+    items.forEach((item, index) => {
+      const itemCenter = item.offsetLeft + item.offsetWidth / 2;
+      const nextDistance = Math.abs(center - itemCenter);
+      if (nextDistance < distance) {
+        distance = nextDistance;
+        active = index;
+      }
+    });
+    [...promoDots.children].forEach((dot, index) => {
+      dot.classList.toggle("active", index === active);
+    });
+  };
+
+  let scrollTimer = 0;
+  promoCarousel.addEventListener("scroll", () => {
+    window.clearTimeout(scrollTimer);
+    scrollTimer = window.setTimeout(update, 80);
+  }, { passive: true });
+
+  window.setInterval(() => {
+    if (document.hidden || document.body.classList.contains("in-game")) return;
+    const active = [...promoDots.children].findIndex((dot) => dot.classList.contains("active"));
+    const next = items[(active + 1) % items.length];
+    next?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+  }, 10000);
+
+  update();
 }
 
 function revealItems() {
@@ -1759,8 +1808,9 @@ function wireCashierSheetDrag(sheet) {
   let tracking = false;
 
   sheet.addEventListener("pointerdown", (event) => {
-    const rect = sheet.getBoundingClientRect();
-    if (!sheet.classList.contains("sheet-open") || event.clientY - rect.top > 72) return;
+    const isGrabber = Boolean(event.target.closest?.(".cashier-sheet-grabber"));
+    const canDragFromTop = sheet.scrollTop <= 0 && !event.target.closest?.("button, input, select, textarea, a");
+    if (!sheet.classList.contains("sheet-open") || (!isGrabber && !canDragFromTop)) return;
     startY = event.clientY;
     dragY = 0;
     tracking = true;

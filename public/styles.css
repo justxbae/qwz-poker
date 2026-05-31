@@ -7575,13 +7575,15 @@ body:not(.in-game).scroll-bounce-release .lobby-view.active {
 body:not(.in-game) .home-promo-banners {
   display: flex;
   overflow-x: auto;
-  gap: 8px;
+  gap: 10px;
   margin-inline: 0;
   border-radius: var(--native-group-radius);
   background: var(--native-surface);
-  padding: 10px;
-  scroll-snap-type: none;
+  padding: 14px;
+  scroll-padding-left: 14px;
+  scroll-snap-type: x mandatory;
   scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 body:not(.in-game) .home-promo-banners::-webkit-scrollbar {
@@ -7589,9 +7591,8 @@ body:not(.in-game) .home-promo-banners::-webkit-scrollbar {
 }
 
 body:not(.in-game) .promo-banner {
-  flex: 0 0 clamp(158px, calc((100vw - 58px) / 2), 186px);
-  margin-left: 14px;
-  min-height: 116px;
+  flex: 0 0 min(304px, calc(100vw - 86px));
+  min-height: 142px;
   border: 0;
   border-radius: 14px;
   outline: 0;
@@ -7599,8 +7600,26 @@ body:not(.in-game) .promo-banner {
   scroll-snap-align: start;
 }
 
-body:not(.in-game) .promo-banner + .promo-banner {
-  margin-left: 0;
+body:not(.in-game) .home-promo-dots {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  margin-top: -7px;
+}
+
+body:not(.in-game) .home-promo-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--native-control);
+  opacity: 0.72;
+  transition: width 180ms ease, background-color 180ms ease, opacity 180ms ease;
+}
+
+body:not(.in-game) .home-promo-dots span.active {
+  width: 14px;
+  background: var(--tg-button);
+  opacity: 1;
 }
 
 body:not(.in-game) .promo-banner::after {
@@ -7759,7 +7778,7 @@ body.cashier-sheet-open [data-cashier-sheet].sheet-open {
   border: 0;
   border-radius: 24px 24px 0 0;
   background: var(--native-surface);
-  padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+  padding: 8px 16px calc(18px + env(safe-area-inset-bottom));
   box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.38);
   transform: translateY(calc(102% + var(--sheet-drag-y, 0px)));
   transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -7772,11 +7791,27 @@ body.cashier-sheet-open [data-cashier-sheet].sheet-visible {
 }
 
 body.cashier-sheet-open [data-cashier-sheet].sheet-open::before {
+  display: none;
+}
+
+.cashier-sheet-grabber {
+  display: none;
+}
+
+body.cashier-sheet-open .cashier-sheet-grabber {
+  display: block;
+  width: 100%;
+  height: 30px;
+  margin: 0 0 4px;
+  touch-action: none;
+}
+
+body.cashier-sheet-open .cashier-sheet-grabber::before {
   content: "";
   display: block;
   width: 38px;
   height: 4px;
-  margin: 0 auto 14px;
+  margin: 8px auto 0;
   border-radius: 999px;
   background: rgba(142, 155, 170, 0.42);
 }
@@ -7816,6 +7851,10 @@ body.cashier-sheet-open .profile-nav-fab {
 
   body:not(.in-game) .promo-banner {
     min-width: 0;
+  }
+
+  body:not(.in-game) .home-promo-dots {
+    display: none;
   }
 }
 
