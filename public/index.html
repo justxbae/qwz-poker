@@ -160,8 +160,12 @@
               <strong><b id="lobbyBalance">0</b><small id="lobbyBalanceCurrency"> фишек</small></strong>
             </div>
             <div class="home-wallet-actions">
-              <button type="button" id="walletTopupButton">Депозит</button>
-              <button type="button" class="home-withdraw" data-lobby-tab="cashier" data-cashier-section="withdraw">Вывести</button>
+              <button type="button" id="walletTopupButton" aria-label="Депозит" title="Депозит">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              </button>
+              <button type="button" class="home-withdraw" data-lobby-tab="cashier" data-cashier-section="withdraw" aria-label="Вывести" title="Вывести">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6.5 10.5 12 5l5.5 5.5"/><path d="M5 20h14"/></svg>
+              </button>
             </div>
           </section>
 

@@ -452,7 +452,6 @@ function renderModeContext() {
   if (homeGamesTitle) homeGamesTitle.textContent = cashMode ? "Cash-столы" : "Игровые столы";
   if (publicGamesTitle) publicGamesTitle.textContent = cashMode ? "Cash-столы" : "Игровые столы";
   if (privateGamesTitle) privateGamesTitle.textContent = cashMode ? "Приватные cash-столы" : "Приватные столы";
-  if (walletTopupButton) walletTopupButton.textContent = "Депозит";
   if (walletWithdrawButton) walletWithdrawButton.disabled = !cashMode;
 }
 

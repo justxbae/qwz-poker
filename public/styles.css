@@ -7028,16 +7028,28 @@ body:not(.in-game) {
 .home-wallet-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 10px;
 }
 
 .home-wallet-actions button {
-  min-height: 44px;
-  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  min-height: 72px;
+  border-radius: 18px;
   background: var(--tg-button);
   color: var(--tg-button-text);
-  font-size: 15px;
-  font-weight: 560;
+  padding: 0;
+}
+
+.home-wallet-actions button svg {
+  display: block;
+  width: 31px;
+  height: 31px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .home-wallet-actions .home-withdraw {
@@ -7517,16 +7529,16 @@ body:not(.in-game).scrolling-up .profile-nav-fab {
   transform: translateY(0) scale(1);
 }
 
-body:not(.in-game) .lobby-shell {
+body:not(.in-game) .lobby-view.active {
   transform: translate3d(0, var(--scroll-bounce-y, 0px), 0);
   will-change: transform;
 }
 
-body:not(.in-game).scroll-bounce-active .lobby-shell {
+body:not(.in-game).scroll-bounce-active .lobby-view.active {
   transition: none;
 }
 
-body:not(.in-game).scroll-bounce-release .lobby-shell {
+body:not(.in-game).scroll-bounce-release .lobby-view.active {
   transition: transform 260ms cubic-bezier(0.18, 0.9, 0.2, 1);
 }
 
