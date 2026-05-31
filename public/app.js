@@ -40,6 +40,8 @@ const lobbyTableStack = document.querySelector("#lobbyTableStack");
 const lobbyActiveTables = document.querySelector("#lobbyActiveTables");
 const homeActivityText = document.querySelector("#homeActivityText");
 const homeSessionPill = document.querySelector("#homeSessionPill");
+const homeScreenInstallButton = document.querySelector("#homeScreenInstallButton");
+const homeScreenInstallStatus = document.querySelector("#homeScreenInstallStatus");
 const homeOfferMeta = document.querySelector("#homeOfferMeta");
 const quickPlayHint = document.querySelector("#quickPlayHint");
 const homeGamesTitle = document.querySelector("#homeGamesTitle");
@@ -472,9 +474,58 @@ function renderLimitOptions() {
 function setupTelegramControls() {
   applyTelegramTheme();
   tg?.onEvent?.("themeChanged", applyTelegramTheme);
+  setupTelegramHomeScreenInstall();
   tg?.BackButton?.onClick?.(() => {
     runAction(handleTelegramBack);
   });
+}
+
+function setupTelegramHomeScreenInstall() {
+  if (!homeScreenInstallButton) return;
+
+  const canInstall = Boolean(tg?.addToHomeScreen && tg?.checkHomeScreenStatus);
+  if (!canInstall) {
+    homeScreenInstallButton.hidden = true;
+    return;
+  }
+
+  homeScreenInstallButton.addEventListener("click", () => {
+    haptic("selection");
+    if (homeScreenInstallStatus) homeScreenInstallStatus.textContent = "откройте подсказку";
+    try {
+      tg.addToHomeScreen();
+    } catch {
+      homeScreenInstallButton.hidden = true;
+    }
+  });
+
+  tg?.onEvent?.("homeScreenAdded", () => {
+    updateHomeScreenInstallRow("added");
+    haptic("success");
+  });
+
+  refreshHomeScreenInstallStatus();
+}
+
+function refreshHomeScreenInstallStatus() {
+  try {
+    tg?.checkHomeScreenStatus?.((status) => {
+      updateHomeScreenInstallRow(status || "unknown");
+    });
+  } catch {
+    homeScreenInstallButton.hidden = true;
+  }
+}
+
+function updateHomeScreenInstallRow(status) {
+  if (!homeScreenInstallButton) return;
+  const normalized = String(status || "unknown");
+  const shouldShow = normalized === "unknown" || normalized === "missed";
+  homeScreenInstallButton.hidden = !shouldShow;
+  if (!homeScreenInstallStatus) return;
+  if (normalized === "missed") homeScreenInstallStatus.textContent = "можно добавить";
+  else if (normalized === "added") homeScreenInstallStatus.textContent = "уже добавлено";
+  else homeScreenInstallStatus.textContent = "быстрый вход";
 }
 
 function applyTelegramTheme() {
