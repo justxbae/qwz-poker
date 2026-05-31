@@ -676,11 +676,34 @@ function setupPromoCarousel() {
   if (!promoCarousel || !promoDots) return;
   const items = [...promoCarousel.querySelectorAll(".promo-banner")];
   if (items.length <= 1) return;
+  let autoTimer = 0;
+  let scrollTimer = 0;
+
+  const scheduleAuto = () => {
+    window.clearTimeout(autoTimer);
+    autoTimer = window.setTimeout(() => {
+      if (document.hidden || document.body.classList.contains("in-game")) {
+        scheduleAuto();
+        return;
+      }
+      const active = [...promoDots.children].findIndex((dot) => dot.classList.contains("active"));
+      const next = items[((active >= 0 ? active : 0) + 1) % items.length];
+      next?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+      scheduleAuto();
+    }, 10000);
+  };
+
+  const pauseAuto = () => {
+    window.clearTimeout(autoTimer);
+  };
+
   promoDots.replaceChildren(...items.map((_, index) => {
     const dot = document.createElement("span");
     dot.className = index === 0 ? "active" : "";
     dot.addEventListener("click", () => {
+      pauseAuto();
       items[index].scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+      scheduleAuto();
     });
     return dot;
   }));
@@ -702,20 +725,23 @@ function setupPromoCarousel() {
     });
   };
 
-  let scrollTimer = 0;
   promoCarousel.addEventListener("scroll", () => {
     window.clearTimeout(scrollTimer);
-    scrollTimer = window.setTimeout(update, 80);
+    scrollTimer = window.setTimeout(() => {
+      update();
+      scheduleAuto();
+    }, 80);
   }, { passive: true });
 
-  window.setInterval(() => {
-    if (document.hidden || document.body.classList.contains("in-game")) return;
-    const active = [...promoDots.children].findIndex((dot) => dot.classList.contains("active"));
-    const next = items[(active + 1) % items.length];
-    next?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
-  }, 10000);
+  promoCarousel.addEventListener("pointerdown", pauseAuto);
+  promoCarousel.addEventListener("pointerup", scheduleAuto);
+  promoCarousel.addEventListener("pointercancel", scheduleAuto);
+  promoCarousel.addEventListener("touchstart", pauseAuto, { passive: true });
+  promoCarousel.addEventListener("touchend", scheduleAuto, { passive: true });
+  promoCarousel.addEventListener("touchcancel", scheduleAuto, { passive: true });
 
   update();
+  scheduleAuto();
 }
 
 function revealItems() {
@@ -1806,38 +1832,71 @@ function wireCashierSheetDrag(sheet) {
   let startY = 0;
   let dragY = 0;
   let tracking = false;
+  let pointerId = null;
 
-  sheet.addEventListener("pointerdown", (event) => {
-    const isGrabber = Boolean(event.target.closest?.(".cashier-sheet-grabber"));
-    const canDragFromTop = sheet.scrollTop <= 0 && !event.target.closest?.("button, input, select, textarea, a");
-    if (!sheet.classList.contains("sheet-open") || (!isGrabber && !canDragFromTop)) return;
-    startY = event.clientY;
+  const canStartDrag = (target) => {
+    const isGrabber = Boolean(target.closest?.(".cashier-sheet-grabber"));
+    const isInteractive = Boolean(target.closest?.("button, input, select, textarea, a, [contenteditable='true']"));
+    return sheet.classList.contains("sheet-open") && (isGrabber || (sheet.scrollTop <= 2 && !isInteractive));
+  };
+
+  const begin = (clientY, target, id = null) => {
+    if (!canStartDrag(target)) return false;
+    startY = clientY;
     dragY = 0;
     tracking = true;
-    sheet.setPointerCapture?.(event.pointerId);
+    pointerId = id;
     sheet.style.transition = "none";
-  });
+    sheet.style.setProperty("--sheet-drag-y", "0px");
+    return true;
+  };
 
-  sheet.addEventListener("pointermove", (event) => {
+  const move = (clientY, event) => {
     if (!tracking) return;
-    dragY = Math.max(0, event.clientY - startY);
+    dragY = Math.max(0, clientY - startY);
+    if (dragY > 0) event?.preventDefault?.();
     sheet.style.setProperty("--sheet-drag-y", `${Math.round(dragY)}px`);
-  });
+  };
 
   const finish = (event) => {
     if (!tracking) return;
     tracking = false;
-    sheet.releasePointerCapture?.(event.pointerId);
+    if (pointerId !== null) sheet.releasePointerCapture?.(pointerId);
+    pointerId = null;
     sheet.style.transition = "";
-    if (dragY > 74) {
+    if (dragY > 58) {
       closeCashierSheet();
       return;
     }
     sheet.style.setProperty("--sheet-drag-y", "0px");
   };
 
+  sheet.addEventListener("pointerdown", (event) => {
+    if (!begin(event.clientY, event.target, event.pointerId)) return;
+    sheet.setPointerCapture?.(event.pointerId);
+  });
+
+  sheet.addEventListener("pointermove", (event) => {
+    move(event.clientY, event);
+  });
+
   sheet.addEventListener("pointerup", finish);
   sheet.addEventListener("pointercancel", finish);
+
+  sheet.addEventListener("touchstart", (event) => {
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    begin(touch.clientY, event.target);
+  }, { passive: true });
+
+  sheet.addEventListener("touchmove", (event) => {
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    move(touch.clientY, event);
+  }, { passive: false });
+
+  sheet.addEventListener("touchend", finish);
+  sheet.addEventListener("touchcancel", finish);
 }
 
 async function loadTables() {
