@@ -1830,41 +1830,59 @@ function closeCashierSheet(options = {}) {
 
 function wireCashierSheetDrag(sheet) {
   let startY = 0;
+  let dragStartY = 0;
   let dragY = 0;
+  let pending = false;
   let tracking = false;
   let pointerId = null;
 
-  const canStartDrag = (target) => {
-    const isGrabber = Boolean(target.closest?.(".cashier-sheet-grabber"));
-    const isInteractive = Boolean(target.closest?.("button, input, select, textarea, a, [contenteditable='true']"));
-    return sheet.classList.contains("sheet-open") && (isGrabber || (sheet.scrollTop <= 2 && !isInteractive));
-  };
-
-  const begin = (clientY, target, id = null) => {
-    if (!canStartDrag(target)) return false;
+  const begin = (clientY, id = null) => {
+    if (!sheet.classList.contains("sheet-open")) return false;
     startY = clientY;
+    dragStartY = clientY;
     dragY = 0;
-    tracking = true;
+    pending = true;
+    tracking = false;
     pointerId = id;
-    sheet.style.transition = "none";
     sheet.style.setProperty("--sheet-drag-y", "0px");
     return true;
   };
 
   const move = (clientY, event) => {
-    if (!tracking) return;
-    dragY = Math.max(0, clientY - startY);
+    if (!pending && !tracking) return;
+    const delta = clientY - startY;
+    if (!tracking) {
+      if (delta < -4) {
+        pending = false;
+        return;
+      }
+      if (delta <= 4) return;
+      if (sheet.scrollTop > 2) {
+        startY = clientY;
+        return;
+      }
+      tracking = true;
+      pending = false;
+      dragStartY = startY;
+      sheet.style.transition = "none";
+      if (sheet.contains(document.activeElement)) {
+        document.activeElement.blur();
+      }
+    }
+    dragY = Math.max(0, clientY - dragStartY);
     if (dragY > 0) event?.preventDefault?.();
     sheet.style.setProperty("--sheet-drag-y", `${Math.round(dragY)}px`);
   };
 
   const finish = (event) => {
-    if (!tracking) return;
+    if (!pending && !tracking) return;
+    const shouldClose = tracking && dragY > 58;
+    pending = false;
     tracking = false;
     if (pointerId !== null) sheet.releasePointerCapture?.(pointerId);
     pointerId = null;
     sheet.style.transition = "";
-    if (dragY > 58) {
+    if (shouldClose) {
       closeCashierSheet();
       return;
     }
@@ -1872,7 +1890,7 @@ function wireCashierSheetDrag(sheet) {
   };
 
   sheet.addEventListener("pointerdown", (event) => {
-    if (!begin(event.clientY, event.target, event.pointerId)) return;
+    if (!begin(event.clientY, event.pointerId)) return;
     sheet.setPointerCapture?.(event.pointerId);
   });
 
@@ -1886,7 +1904,7 @@ function wireCashierSheetDrag(sheet) {
   sheet.addEventListener("touchstart", (event) => {
     const touch = event.touches?.[0];
     if (!touch) return;
-    begin(touch.clientY, event.target);
+    begin(touch.clientY);
   }, { passive: true });
 
   sheet.addEventListener("touchmove", (event) => {
