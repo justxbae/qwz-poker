@@ -2231,13 +2231,19 @@ function openBuyInOverlay(intent) {
   const maxAmount = bounds.max;
   const defaultAmount = clampAmount(Number(intent.defaultAmount || bounds.defaultAmount), minAmount, maxAmount);
   if (buyInModeLabel) {
-    if (cashMode) buyInModeLabel.replaceChildren("USDT ", createTetherMark());
-    else buyInModeLabel.textContent = "ИГРОВЫЕ ФИШКИ";
+    buyInModeLabel.replaceChildren("Texas Hold'em ");
+    renderLimitValue(buyInModeLabel, smallBlind, bigBlind, cashMode, { append: true });
+    buyInModeLabel.append(" · ");
+    if (cashMode) {
+      buyInModeLabel.append("USDT ");
+      buyInModeLabel.append(createTetherMark());
+    } else {
+      buyInModeLabel.append("фишки");
+    }
   }
 
-  document.querySelector(".buyin-title").textContent = intent.mode === "rebuy" ? "Докупка стека" : "Вход за стол";
-  buyInGameType.replaceChildren("БЛ Холдем ");
-  renderLimitValue(buyInGameType, smallBlind, bigBlind, cashMode, { append: true });
+  document.querySelector(".buyin-title").textContent = intent.mode === "rebuy" ? "Re-buy" : "Buy-in";
+  buyInGameType.textContent = "";
   renderMoneyValue(buyInBalance, balance, cashMode);
   buyInAmount.dataset.cashMode = cashMode ? "true" : "false";
   buyInAmount.dataset.min = String(minAmount);
@@ -2249,6 +2255,7 @@ function openBuyInOverlay(intent) {
   renderMoneyValue(buyInMaxButton.querySelector("span"), maxAmount, cashMode);
   setBuyInAmount(defaultAmount);
   buyInOverlay.hidden = false;
+  document.documentElement.classList.add("buyin-sheet-open");
   document.body.classList.add("buyin-sheet-open");
   buyInOverlay.classList.add("sheet-open");
   buyInSheet?.classList.remove("sheet-visible");
@@ -2276,6 +2283,7 @@ function buyInBounds(bigBlind, balance, intent = {}) {
 function hideBuyInOverlay() {
   buyInSheet?.classList.remove("sheet-visible");
   buyInSheet?.style.removeProperty("--buyin-drag-y");
+  document.documentElement.classList.remove("buyin-sheet-open");
   document.body.classList.remove("buyin-sheet-open");
   buyInOverlay.classList.remove("sheet-open");
   buyInOverlay.hidden = true;
@@ -2291,6 +2299,7 @@ async function confirmBuyIn() {
   const intent = pendingBuyIn;
   buyInSheet?.classList.remove("sheet-visible");
   buyInSheet?.style.removeProperty("--buyin-drag-y");
+  document.documentElement.classList.remove("buyin-sheet-open");
   document.body.classList.remove("buyin-sheet-open");
   buyInOverlay.classList.remove("sheet-open");
   buyInOverlay.hidden = true;

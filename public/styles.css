@@ -6139,6 +6139,8 @@ body:not(.in-game) .bottom-nav button.active {
   background: rgba(0, 0, 0, 0.38);
   opacity: 0;
   transition: opacity 180ms ease;
+  touch-action: none;
+  overscroll-behavior: contain;
 }
 
 .buyin-overlay.sheet-open {
@@ -6152,11 +6154,11 @@ body:not(.in-game) .bottom-nav button.active {
   bottom: 0;
   display: grid;
   align-content: start;
-  gap: 12px;
+  gap: 10px;
   width: auto;
   max-width: 520px;
   min-height: 0;
-  max-height: min(86vh, 740px);
+  max-height: min(84vh, 720px);
   margin: 0 auto;
   overflow: auto;
   border: 0;
@@ -6198,6 +6200,7 @@ body:not(.in-game) .bottom-nav button.active {
 
 .buyin-head {
   padding: 0;
+  gap: 2px;
 }
 
 .buyin-kicker {
@@ -6208,22 +6211,74 @@ body:not(.in-game) .bottom-nav button.active {
 
 .buyin-title {
   color: var(--tg-text);
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 650;
+  line-height: 1.02;
 }
 
 .buyin-head span {
-  color: var(--tg-hint);
+  display: none;
 }
 
 .buyin-summary,
 .buyin-info-card,
-.buyin-amount-grid button,
-.buyin-amount-grid label,
 .buyin-auto {
   border: 0;
   border-radius: 16px;
   background: var(--native-control, var(--ui-surface-active));
+}
+
+.buyin-summary {
+  overflow: hidden;
+}
+
+.buyin-row {
+  min-height: 48px;
+  padding: 10px 13px;
+}
+
+.buyin-row strong {
+  font-size: 18px;
+}
+
+.buyin-amount-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
+}
+
+.buyin-amount-grid button,
+.buyin-amount-grid label {
+  display: grid;
+  place-items: center;
+  min-height: 72px;
+  border: 0;
+  border-radius: 15px;
+  background: var(--native-control, var(--ui-surface-active));
+  color: var(--tg-text);
+  padding: 8px;
+  text-align: center;
+}
+
+.buyin-amount-grid button {
+  align-content: center;
+  font-size: 17px;
+  line-height: 1.05;
+}
+
+.buyin-amount-grid button span {
+  margin-top: 3px;
+  color: var(--tg-hint);
+  font-size: 15px;
+  line-height: 1.08;
+}
+
+.buyin-amount-grid label {
+  align-content: center;
+  gap: 6px;
+  color: var(--tg-hint);
+  font-size: 13px;
+  font-weight: 650;
 }
 
 .buyin-row strong,
@@ -6232,12 +6287,62 @@ body:not(.in-game) .bottom-nav button.active {
 }
 
 .buyin-amount-grid input {
-  min-height: 58px;
+  width: 100%;
+  min-height: 36px;
   border: 0;
-  border-radius: 14px;
-  background: var(--native-control, var(--ui-surface-active));
+  border-radius: 0;
+  background: transparent;
   color: var(--tg-text);
+  font-size: 20px;
+  font-weight: 650;
+  text-align: center;
   box-shadow: none;
+}
+
+.buyin-slider {
+  height: 24px;
+  margin: 0;
+}
+
+.buyin-auto {
+  min-height: 48px;
+  border-radius: 15px;
+  color: var(--tg-hint);
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.buyin-auto strong {
+  color: var(--tg-text);
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.buyin-auto small {
+  color: var(--tg-hint);
+  font-size: 12px;
+  font-weight: 560;
+}
+
+.buyin-info-card {
+  overflow: hidden;
+}
+
+.buyin-info-card div {
+  min-height: 46px;
+  padding: 10px 13px;
+}
+
+.buyin-info-card strong {
+  display: inline-flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 5px;
+  max-width: 205px;
+  font-size: 14px;
+  line-height: 1.15;
 }
 
 .buyin-submit {
@@ -7959,6 +8064,17 @@ body.cashier-sheet-open .profile-nav-fab {
 body.buyin-sheet-open .bottom-nav,
 body.buyin-sheet-open .profile-nav-fab {
   transform: translateY(120%);
+}
+
+html.buyin-sheet-open,
+html.buyin-sheet-open body,
+body.buyin-sheet-open {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.buyin-head > #buyInGameType {
+  display: none !important;
 }
 
 @media (min-width: 720px) {

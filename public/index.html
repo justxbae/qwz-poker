@@ -103,7 +103,7 @@
           <button type="button" class="buyin-close" id="closeBuyInOverlay" aria-label="Закрыть" hidden>×</button>
           <header class="buyin-head">
             <p class="buyin-kicker">QWZ Poker</p>
-            <h2 class="buyin-title">Вход за стол</h2>
+            <h2 class="buyin-title">Buy-in</h2>
             <span id="buyInGameType">БЛ Холдем 25/50</span>
           </header>
           <div class="buyin-summary">
@@ -125,7 +125,10 @@
             <button type="button" id="buyInMaxButton">Макс.<br /><span>40 000</span></button>
           </div>
           <input id="buyInSlider" class="buyin-slider" type="range" min="10000" max="40000" step="500" value="10000" />
-          <button type="button" class="buyin-auto" disabled>Авто Бай-ин и Авто Ребай</button>
+          <button type="button" class="buyin-auto" disabled>
+            <strong>Авто Бай-ин / Ребай</strong>
+            <small>скоро</small>
+          </button>
           <section class="buyin-info-card">
             <div>
               <span>Стек за столом</span>
@@ -134,10 +137,6 @@
             <div>
               <span>Режим</span>
               <strong id="buyInModeLabel">ИГРОВЫЕ ФИШКИ</strong>
-            </div>
-            <div>
-              <span>После выхода</span>
-              <strong>Стек сохранится</strong>
             </div>
           </section>
           <button type="button" class="buyin-submit" id="confirmBuyInButton">OK</button>
