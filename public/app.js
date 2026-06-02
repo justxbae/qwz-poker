@@ -184,6 +184,7 @@ const sitOutInfoText = document.querySelector("#sitOutInfoText");
 const infoDrawer = document.querySelector("#infoDrawer");
 const closeDrawerButton = document.querySelector("#closeDrawerButton");
 const buyInOverlay = document.querySelector("#buyInOverlay");
+const buyInSheet = document.querySelector(".buyin-sheet");
 const closeBuyInOverlay = document.querySelector("#closeBuyInOverlay");
 const buyInGameType = document.querySelector("#buyInGameType");
 const buyInBalance = document.querySelector("#buyInBalance");
@@ -331,6 +332,11 @@ async function boot() {
   currentTable.addEventListener("click", onTableBackdropClick);
   actionAmount.addEventListener("input", syncSliderFromAmount);
   betSlider.addEventListener("input", syncAmountFromSlider);
+  buyInOverlay.addEventListener("click", (event) => {
+    if (event.target === buyInOverlay) hideBuyInOverlay();
+  });
+  buyInSheet?.addEventListener("click", (event) => event.stopPropagation());
+  wireBuyInSheetDrag();
   closeBuyInOverlay.addEventListener("click", hideBuyInOverlay);
   buyInAmount.addEventListener("input", syncBuyInSliderFromAmount);
   buyInSlider.addEventListener("input", syncBuyInAmountFromSlider);
@@ -1917,6 +1923,87 @@ function wireCashierSheetDrag(sheet) {
   sheet.addEventListener("touchcancel", finish);
 }
 
+function wireBuyInSheetDrag() {
+  if (!buyInSheet || !buyInOverlay) return;
+  let startY = 0;
+  let dragStartY = 0;
+  let dragY = 0;
+  let pending = false;
+  let tracking = false;
+  let pointerId = null;
+
+  const begin = (clientY, id = null) => {
+    if (buyInOverlay.hidden) return false;
+    startY = clientY;
+    dragStartY = clientY;
+    dragY = 0;
+    pending = true;
+    tracking = false;
+    pointerId = id;
+    buyInSheet.style.setProperty("--buyin-drag-y", "0px");
+    return true;
+  };
+
+  const move = (clientY, event) => {
+    if (!pending && !tracking) return;
+    const delta = clientY - startY;
+    if (!tracking) {
+      if (delta < -4) {
+        pending = false;
+        return;
+      }
+      if (delta <= 4) return;
+      if (buyInSheet.scrollTop > 2) {
+        startY = clientY;
+        return;
+      }
+      tracking = true;
+      pending = false;
+      dragStartY = startY;
+      buyInSheet.style.transition = "none";
+      if (buyInSheet.contains(document.activeElement)) {
+        document.activeElement.blur();
+      }
+    }
+    dragY = Math.max(0, clientY - dragStartY);
+    if (dragY > 0) event?.preventDefault?.();
+    buyInSheet.style.setProperty("--buyin-drag-y", `${Math.round(dragY)}px`);
+  };
+
+  const finish = () => {
+    if (!pending && !tracking) return;
+    const shouldClose = tracking && dragY > 58;
+    pending = false;
+    tracking = false;
+    if (pointerId !== null) buyInSheet.releasePointerCapture?.(pointerId);
+    pointerId = null;
+    buyInSheet.style.transition = "";
+    if (shouldClose) {
+      hideBuyInOverlay();
+      return;
+    }
+    buyInSheet.style.setProperty("--buyin-drag-y", "0px");
+  };
+
+  buyInSheet.addEventListener("pointerdown", (event) => {
+    if (!begin(event.clientY, event.pointerId)) return;
+    buyInSheet.setPointerCapture?.(event.pointerId);
+  });
+  buyInSheet.addEventListener("pointermove", (event) => move(event.clientY, event));
+  buyInSheet.addEventListener("pointerup", finish);
+  buyInSheet.addEventListener("pointercancel", finish);
+  buyInSheet.addEventListener("touchstart", (event) => {
+    const touch = event.touches?.[0];
+    if (touch) begin(touch.clientY);
+  }, { passive: true });
+  buyInSheet.addEventListener("touchmove", (event) => {
+    const touch = event.touches?.[0];
+    if (touch) move(touch.clientY, event);
+  }, { passive: false });
+  buyInSheet.addEventListener("touchend", finish);
+  buyInSheet.addEventListener("touchcancel", finish);
+}
+
 async function loadTables() {
   const data = await api("/api/tables");
   state.tables = data.tables;
@@ -2162,6 +2249,13 @@ function openBuyInOverlay(intent) {
   renderMoneyValue(buyInMaxButton.querySelector("span"), maxAmount, cashMode);
   setBuyInAmount(defaultAmount);
   buyInOverlay.hidden = false;
+  document.body.classList.add("buyin-sheet-open");
+  buyInOverlay.classList.add("sheet-open");
+  buyInSheet?.classList.remove("sheet-visible");
+  buyInSheet?.style.removeProperty("--buyin-drag-y");
+  window.requestAnimationFrame(() => {
+    buyInSheet?.classList.add("sheet-visible");
+  });
   updateTelegramBackButton();
 }
 
@@ -2180,6 +2274,10 @@ function buyInBounds(bigBlind, balance, intent = {}) {
 }
 
 function hideBuyInOverlay() {
+  buyInSheet?.classList.remove("sheet-visible");
+  buyInSheet?.style.removeProperty("--buyin-drag-y");
+  document.body.classList.remove("buyin-sheet-open");
+  buyInOverlay.classList.remove("sheet-open");
   buyInOverlay.hidden = true;
   pendingBuyIn = null;
   haptic("light");
@@ -2191,6 +2289,10 @@ async function confirmBuyIn() {
   haptic("medium");
   const buyInAmount = Number(buyInAmountValue());
   const intent = pendingBuyIn;
+  buyInSheet?.classList.remove("sheet-visible");
+  buyInSheet?.style.removeProperty("--buyin-drag-y");
+  document.body.classList.remove("buyin-sheet-open");
+  buyInOverlay.classList.remove("sheet-open");
   buyInOverlay.hidden = true;
   pendingBuyIn = null;
   updateTelegramBackButton();
