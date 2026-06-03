@@ -540,23 +540,26 @@ function updateHomeScreenInstallRow(status) {
 }
 
 function applyTelegramTheme() {
-  const themeBg = tg?.themeParams?.bg_color || tg?.themeParams?.secondary_bg_color || "#17212b";
-  const secondaryBg = tg?.themeParams?.secondary_bg_color || themeBg;
-  const textColor = tg?.themeParams?.text_color || "#f4f7fb";
-  const hintColor = tg?.themeParams?.hint_color || "#7d8b99";
-  const linkColor = tg?.themeParams?.link_color || "#2aabee";
-  const buttonColor = tg?.themeParams?.button_color || linkColor;
-  const buttonTextColor = tg?.themeParams?.button_text_color || "#ffffff";
-  document.documentElement.style.setProperty("--tg-bg", themeBg);
-  document.documentElement.style.setProperty("--tg-secondary-bg", secondaryBg);
-  document.documentElement.style.setProperty("--tg-surface", secondaryBg);
-  document.documentElement.style.setProperty("--tg-text", textColor);
-  document.documentElement.style.setProperty("--tg-hint", hintColor);
-  document.documentElement.style.setProperty("--tg-link", linkColor);
-  document.documentElement.style.setProperty("--tg-button", buttonColor);
-  document.documentElement.style.setProperty("--tg-button-text", buttonTextColor);
-  tg?.setHeaderColor?.(themeBg);
-  tg?.setBackgroundColor?.(themeBg);
+  const fixedTheme = {
+    bg: "#17212b",
+    secondaryBg: "#17212b",
+    surface: "#202b36",
+    text: "#f4f7fb",
+    hint: "#8b98a5",
+    link: "#2aabee",
+    button: "#2aabee",
+    buttonText: "#ffffff",
+  };
+  document.documentElement.style.setProperty("--tg-bg", fixedTheme.bg);
+  document.documentElement.style.setProperty("--tg-secondary-bg", fixedTheme.secondaryBg);
+  document.documentElement.style.setProperty("--tg-surface", fixedTheme.surface);
+  document.documentElement.style.setProperty("--tg-text", fixedTheme.text);
+  document.documentElement.style.setProperty("--tg-hint", fixedTheme.hint);
+  document.documentElement.style.setProperty("--tg-link", fixedTheme.link);
+  document.documentElement.style.setProperty("--tg-button", fixedTheme.button);
+  document.documentElement.style.setProperty("--tg-button-text", fixedTheme.buttonText);
+  tg?.setHeaderColor?.(fixedTheme.bg);
+  tg?.setBackgroundColor?.(fixedTheme.bg);
 }
 
 function setupTapGuards() {

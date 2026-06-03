@@ -9,15 +9,15 @@
   --accent: #28c76f;
   --accent-dark: #159455;
   --danger: #ff5f57;
-  --tg-bg: var(--tg-theme-bg-color, #17212b);
-  --tg-secondary-bg: var(--tg-theme-secondary-bg-color, #17212b);
-  --tg-surface: var(--tg-theme-secondary-bg-color, #202b36);
+  --tg-bg: #17212b;
+  --tg-secondary-bg: #17212b;
+  --tg-surface: #202b36;
   --tg-surface-soft: rgba(32, 43, 54, 0.92);
-  --tg-text: var(--tg-theme-text-color, #f4f7fb);
-  --tg-hint: var(--tg-theme-hint-color, #7d8b99);
-  --tg-link: var(--tg-theme-link-color, #2aabee);
-  --tg-button: var(--tg-theme-button-color, #2aabee);
-  --tg-button-text: var(--tg-theme-button-text-color, #ffffff);
+  --tg-text: #f4f7fb;
+  --tg-hint: #8b98a5;
+  --tg-link: #2aabee;
+  --tg-button: #2aabee;
+  --tg-button-text: #ffffff;
   --tg-line: rgba(122, 162, 194, 0.16);
   --tg-poker-green: #2fbf71;
   --tg-gold: #d9a441;
@@ -4923,18 +4923,18 @@ body.in-game .betting-actions.amount-open .bet-confirm span {
 
 /* Telegram-native redesign layer */
 :root {
-  --tg-bg: var(--tg-theme-bg-color, #17212b);
-  --tg-secondary-bg: var(--tg-theme-secondary-bg-color, #17212b);
+  --tg-bg: #17212b;
+  --tg-secondary-bg: #17212b;
   --tg-surface: #202b36;
   --tg-surface-2: #253241;
   --tg-surface-pressed: #2b3a4b;
   --tg-separator: rgba(112, 132, 153, 0.22);
-  --tg-text: var(--tg-theme-text-color, #f4f7fb);
-  --tg-hint: var(--tg-theme-hint-color, #8b98a5);
+  --tg-text: #f4f7fb;
+  --tg-hint: #8b98a5;
   --tg-subtitle: #a8b3c0;
-  --tg-link: var(--tg-theme-link-color, #2aabee);
-  --tg-button: var(--tg-theme-button-color, #2aabee);
-  --tg-button-text: var(--tg-theme-button-text-color, #ffffff);
+  --tg-link: #2aabee;
+  --tg-button: #2aabee;
+  --tg-button-text: #ffffff;
   --tg-danger: #ff5f57;
   --tg-success: #34c759;
   --tg-warning: #ffb340;
@@ -5697,15 +5697,15 @@ body:not(.in-game) .bottom-nav button.active {
   color: var(--tg-button-text, #fff);
 }
 :root {
-  --ui-bg: var(--tg-theme-bg-color, #111922);
-  --ui-surface: var(--tg-theme-secondary-bg-color, #18232e);
+  --ui-bg: #17212b;
+  --ui-surface: #202b36;
   --ui-surface-alt: #202d39;
   --ui-surface-active: #253645;
   --ui-line: rgba(139, 155, 171, 0.2);
-  --ui-text: var(--tg-theme-text-color, #f2f5f7);
-  --ui-muted: var(--tg-theme-hint-color, #8f9eac);
-  --ui-accent: var(--tg-theme-button-color, #2aabee);
-  --ui-accent-text: var(--tg-theme-button-text-color, #ffffff);
+  --ui-text: #f4f7fb;
+  --ui-muted: #8b98a5;
+  --ui-accent: #2aabee;
+  --ui-accent-text: #ffffff;
   --ui-danger: #e25b61;
   --ui-radius: 8px;
   --ui-control: 44px;
@@ -6498,14 +6498,14 @@ body.in-game .betting-actions.amount-open label input {
 
 /* Telegram grouped-layout pass: product UI follows native Mini App surfaces. */
 :root {
-  --native-bg: var(--tg-theme-bg-color, #17212b);
+  --native-bg: #17212b;
   --native-surface: #202b36;
   --native-surface-elevated: #253341;
   --native-control: #283746;
   --native-divider: rgba(124, 145, 166, 0.18);
-  --native-text: var(--tg-theme-text-color, #f4f7fa);
-  --native-muted: var(--tg-theme-hint-color, #8e9baa);
-  --native-blue: var(--tg-theme-button-color, #2aabee);
+  --native-text: #f4f7fa;
+  --native-muted: #8e9baa;
+  --native-blue: #2aabee;
   --native-blue-pressed: #229bd9;
   --native-red: #fa525d;
   --native-green: #31ba68;
