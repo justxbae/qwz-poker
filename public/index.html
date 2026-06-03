@@ -497,118 +497,177 @@
         </section>
 
         <section class="lobby-view admin-view" data-lobby-view="admin">
-          <section class="wallet-card admin-hero">
-            <div class="miniapp-title">
-              <span>Админ</span>
-              <small>QWZ control</small>
-            </div>
-            <div class="wallet-label">Банкролл в системе</div>
-            <div class="wallet-balance" id="adminBankrollTotal">0</div>
-            <div class="admin-grid" id="adminSummary"></div>
-          </section>
-
-          <section class="lobby-card">
-            <div class="section-title">
+          <section class="admin-shell">
+            <header class="admin-topbar">
               <div>
-                <p class="eyebrow">Выводы</p>
-                <h2>Withdrawal queue</h2>
+                <p class="eyebrow">QWZ Poker admin</p>
+                <h1>Control center</h1>
+                <span id="adminOperationalStatus">Загрузка статуса...</span>
               </div>
-              <span>finance</span>
-            </div>
-            <div class="cashier-history" id="adminRecentWithdrawals"></div>
-          </section>
+              <button type="button" id="adminRefreshButton">Обновить</button>
+            </header>
 
-          <section class="lobby-card">
-            <div class="section-title">
-              <div>
-                <p class="eyebrow">Игрок</p>
-                <h2>Поиск по Telegram ID</h2>
-              </div>
-              <span>admin</span>
-            </div>
-            <form class="admin-form" id="adminLookupForm">
-              <input id="adminUserId" inputmode="numeric" placeholder="Telegram ID игрока" />
-              <button type="submit">Найти</button>
-            </form>
-            <div class="cashier-status" id="adminStatus" role="status"></div>
-          </section>
+            <nav class="admin-tabs" aria-label="Разделы админки">
+              <button type="button" class="active" data-admin-tab="overview">Overview</button>
+              <button type="button" data-admin-tab="users">Users</button>
+              <button type="button" data-admin-tab="finance">Finance</button>
+              <button type="button" data-admin-tab="gameplay">Gameplay</button>
+              <button type="button" data-admin-tab="risk">Risk</button>
+              <button type="button" data-admin-tab="settings">Settings</button>
+              <button type="button" data-admin-tab="logs">Logs</button>
+            </nav>
 
-          <section class="lobby-card admin-player-card" id="adminPlayerCard" hidden>
-            <div class="section-title">
-              <div>
-                <p class="eyebrow">Карточка игрока</p>
-                <h2 id="adminPlayerName">Игрок</h2>
-              </div>
-              <span id="adminPlayerId">ID</span>
-            </div>
-            <div class="stats-cards">
-              <div><span>Кошелек</span><strong id="adminPlayerBalance">0</strong></div>
-              <div><span>За столами</span><strong id="adminPlayerTableStack">0</strong></div>
-              <div><span>Всего</span><strong id="adminPlayerTotal">0</strong></div>
-            </div>
-            <form class="admin-form admin-adjust-form" id="adminAdjustForm">
-              <select id="adminAdjustType">
-                <option value="grant">Начислить</option>
-                <option value="deduct">Списать</option>
-              </select>
-              <input id="adminAdjustAmount" inputmode="numeric" placeholder="Сумма chips" />
-              <input id="adminAdjustReason" placeholder="Причина" value="manual_adjustment" />
-              <button type="submit">Применить</button>
-            </form>
-            <div class="cashier-history" id="adminPlayerTransactions"></div>
-          </section>
+            <section class="admin-panel active" data-admin-panel="overview">
+              <section class="wallet-card admin-hero">
+                <div class="miniapp-title">
+                  <span>Bankroll</span>
+                  <small>player funds</small>
+                </div>
+                <div class="wallet-label">Банкролл в системе</div>
+                <div class="wallet-balance" id="adminBankrollTotal">0</div>
+                <div class="admin-health-strip" id="adminHealthStrip"></div>
+                <div class="admin-grid" id="adminSummary"></div>
+              </section>
+            </section>
 
-          <section class="lobby-card">
-            <div class="section-title">
-              <div>
-                <p class="eyebrow">Платежи</p>
-                <h2>Orders</h2>
-              </div>
-              <span>admin</span>
-            </div>
-            <div class="admin-payment-tools">
-              <select id="adminPaymentFilter" aria-label="Фильтр платежей">
-                <option value="all">Все платежи</option>
-                <option value="pending">Pending</option>
-                <option value="manual_review">Manual review</option>
-                <option value="paid">Paid</option>
-                <option value="failed">Failed / expired</option>
-              </select>
-            </div>
-            <div class="cashier-history" id="adminRecentPayments"></div>
-          </section>
+            <section class="admin-panel" data-admin-panel="users">
+              <section class="lobby-card">
+                <div class="section-title">
+                  <div>
+                    <p class="eyebrow">Игрок</p>
+                    <h2>Поиск и управление</h2>
+                  </div>
+                  <span>support / finance</span>
+                </div>
+                <form class="admin-form" id="adminLookupForm">
+                  <input id="adminUserId" inputmode="numeric" placeholder="Telegram ID игрока" />
+                  <button type="submit">Найти</button>
+                </form>
+                <div class="cashier-status" id="adminStatus" role="status"></div>
+              </section>
 
-          <section class="lobby-card">
-            <div class="section-title">
-              <div>
-                <p class="eyebrow">Движение chips</p>
-                <h2>Transfers</h2>
-              </div>
-              <span>audit</span>
-            </div>
-            <div class="cashier-history" id="adminFundMovements"></div>
-          </section>
+              <section class="lobby-card admin-player-card" id="adminPlayerCard" hidden>
+                <div class="section-title">
+                  <div>
+                    <p class="eyebrow">Карточка игрока</p>
+                    <h2 id="adminPlayerName">Игрок</h2>
+                  </div>
+                  <span id="adminPlayerId">ID</span>
+                </div>
+                <div class="stats-cards">
+                  <div><span>Кошелек</span><strong id="adminPlayerBalance">0</strong></div>
+                  <div><span>За столами</span><strong id="adminPlayerTableStack">0</strong></div>
+                  <div><span>Всего</span><strong id="adminPlayerTotal">0</strong></div>
+                </div>
+                <form class="admin-form admin-adjust-form" id="adminAdjustForm">
+                  <select id="adminAdjustType">
+                    <option value="grant">Начислить</option>
+                    <option value="deduct">Списать</option>
+                  </select>
+                  <input id="adminAdjustAmount" inputmode="numeric" placeholder="Сумма chips" />
+                  <input id="adminAdjustReason" placeholder="Причина" value="manual_adjustment" />
+                  <button type="submit">Применить через ledger</button>
+                </form>
+                <div class="admin-warning">Любое ручное изменение должно иметь причину. Баланс меняется только через ledger и audit trail.</div>
+                <div class="cashier-history" id="adminPlayerTransactions"></div>
+              </section>
+            </section>
 
-          <section class="lobby-card">
-            <div class="section-title">
-              <div>
-                <p class="eyebrow">Раздачи</p>
-                <h2>Hand history</h2>
-              </div>
-              <span>audit</span>
-            </div>
-            <div class="cashier-history" id="adminRecentHands"></div>
-          </section>
+            <section class="admin-panel" data-admin-panel="finance">
+              <section class="lobby-card">
+                <div class="section-title">
+                  <div>
+                    <p class="eyebrow">Выводы</p>
+                    <h2>Withdrawal queue</h2>
+                  </div>
+                  <span>finance</span>
+                </div>
+                <div class="cashier-history" id="adminRecentWithdrawals"></div>
+              </section>
 
-          <section class="lobby-card">
-            <div class="section-title">
-              <div>
-                <p class="eyebrow">Логи</p>
-                <h2>События</h2>
-              </div>
-              <span>live</span>
-            </div>
-            <div class="cashier-history" id="adminRecentEvents"></div>
+              <section class="lobby-card">
+                <div class="section-title">
+                  <div>
+                    <p class="eyebrow">Платежи</p>
+                    <h2>Payment orders</h2>
+                  </div>
+                  <span>reconciliation</span>
+                </div>
+                <div class="admin-payment-tools">
+                  <select id="adminPaymentFilter" aria-label="Фильтр платежей">
+                    <option value="all">Все платежи</option>
+                    <option value="pending">Pending</option>
+                    <option value="manual_review">Manual review</option>
+                    <option value="paid">Paid</option>
+                    <option value="failed">Failed / expired</option>
+                  </select>
+                </div>
+                <div class="cashier-history" id="adminRecentPayments"></div>
+              </section>
+
+              <section class="lobby-card">
+                <div class="section-title">
+                  <div>
+                    <p class="eyebrow">Ledger</p>
+                    <h2>Движение средств</h2>
+                  </div>
+                  <span>audit</span>
+                </div>
+                <div class="cashier-history" id="adminFundMovements"></div>
+              </section>
+            </section>
+
+            <section class="admin-panel" data-admin-panel="gameplay">
+              <section class="lobby-card">
+                <div class="section-title">
+                  <div>
+                    <p class="eyebrow">Раздачи</p>
+                    <h2>Hand history</h2>
+                  </div>
+                  <span>fairness / rake</span>
+                </div>
+                <div class="cashier-history" id="adminRecentHands"></div>
+              </section>
+            </section>
+
+            <section class="admin-panel" data-admin-panel="risk">
+              <section class="lobby-card">
+                <div class="section-title">
+                  <div>
+                    <p class="eyebrow">Risk desk</p>
+                    <h2>Сигналы риска</h2>
+                  </div>
+                  <span>risk</span>
+                </div>
+                <div class="admin-risk-list" id="adminRiskSignals"></div>
+              </section>
+            </section>
+
+            <section class="admin-panel" data-admin-panel="settings">
+              <section class="lobby-card">
+                <div class="section-title">
+                  <div>
+                    <p class="eyebrow">System</p>
+                    <h2>Настройки и роли</h2>
+                  </div>
+                  <span>owner</span>
+                </div>
+                <div class="admin-settings-list" id="adminSettingsList"></div>
+              </section>
+            </section>
+
+            <section class="admin-panel" data-admin-panel="logs">
+              <section class="lobby-card">
+                <div class="section-title">
+                  <div>
+                    <p class="eyebrow">Логи</p>
+                    <h2>События</h2>
+                  </div>
+                  <span>live</span>
+                </div>
+                <div class="cashier-history" id="adminRecentEvents"></div>
+              </section>
+            </section>
           </section>
         </section>
 

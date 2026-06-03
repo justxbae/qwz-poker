@@ -93,8 +93,11 @@ const profileSessionBadge = document.querySelector("#profileSessionBadge");
 const profileSessionList = document.querySelector("#profileSessionList");
 const profileRefreshButton = document.querySelector("#profileRefreshButton");
 const adminNavButton = document.querySelector(".admin-nav-button");
+const adminRefreshButton = document.querySelector("#adminRefreshButton");
+const adminOperationalStatus = document.querySelector("#adminOperationalStatus");
 const adminBankrollTotal = document.querySelector("#adminBankrollTotal");
 const adminSummary = document.querySelector("#adminSummary");
+const adminHealthStrip = document.querySelector("#adminHealthStrip");
 const adminLookupForm = document.querySelector("#adminLookupForm");
 const adminUserId = document.querySelector("#adminUserId");
 const adminStatus = document.querySelector("#adminStatus");
@@ -115,6 +118,8 @@ const adminPaymentFilter = document.querySelector("#adminPaymentFilter");
 const adminRecentEvents = document.querySelector("#adminRecentEvents");
 const adminFundMovements = document.querySelector("#adminFundMovements");
 const adminRecentHands = document.querySelector("#adminRecentHands");
+const adminRiskSignals = document.querySelector("#adminRiskSignals");
+const adminSettingsList = document.querySelector("#adminSettingsList");
 const tournamentList = document.querySelector("#tournamentList");
 const tournamentStatus = document.querySelector("#tournamentStatus");
 const continueCard = document.querySelector("#continueCard");
@@ -288,6 +293,10 @@ async function boot() {
   adminRecentPayments?.addEventListener("click", onAdminPaymentAction);
   adminRecentWithdrawals?.addEventListener("click", onAdminWithdrawalAction);
   adminPaymentFilter?.addEventListener("change", () => runAction(loadAdminDashboard));
+  adminRefreshButton?.addEventListener("click", () => runAction(loadAdminDashboard));
+  document.querySelectorAll("[data-admin-tab]").forEach((button) => {
+    button.addEventListener("click", () => selectAdminPanel(button.dataset.adminTab));
+  });
   limitPills.addEventListener("click", onLimitSelect);
   tableLimitPills.addEventListener("click", onLimitSelect);
   gameModeSwitch?.addEventListener("click", onGameModeSelect);
@@ -1293,8 +1302,18 @@ function renderProfileSessions(activeTables) {
 
 async function loadAdminDashboard() {
   if (!ADMIN_MODE || !state.token) return;
+  if (adminOperationalStatus) adminOperationalStatus.textContent = "Обновляем данные...";
   const data = await api("/api/admin");
   renderAdminDashboard(data.admin);
+}
+
+function selectAdminPanel(panel) {
+  document.querySelectorAll("[data-admin-tab]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.adminTab === panel);
+  });
+  document.querySelectorAll("[data-admin-panel]").forEach((item) => {
+    item.classList.toggle("active", item.dataset.adminPanel === panel);
+  });
 }
 
 function renderAdminDashboard(admin) {
@@ -1302,7 +1321,22 @@ function renderAdminDashboard(admin) {
   const diagnostics = admin?.diagnostics || {};
   const database = diagnostics.database || {};
   const memory = diagnostics.memory || {};
+  const reconciliation = admin?.audit?.reconciliation || {};
+  const roles = admin?.adminRoles || {};
+
+  if (adminOperationalStatus) {
+    adminOperationalStatus.textContent = diagnostics.ok
+      ? `System ok · uptime ${formatDuration(diagnostics.uptimeSeconds || 0)}`
+      : "System requires attention";
+  }
   adminBankrollTotal.textContent = formatChips(stats.bankrollTotal || 0);
+  renderAdminHealthStrip({
+    diagnostics,
+    database,
+    memory,
+    stats,
+    reconciliation
+  });
   adminSummary.replaceChildren(...[
     ["Health", diagnostics.ok ? "ok" : "fail"],
     ["DB", database.enabled ? `${database.ok ? "ok" : "fail"} · ${database.mode}` : "memory"],
@@ -1342,7 +1376,124 @@ function renderAdminDashboard(admin) {
   renderAdminWithdrawals(admin?.recentWithdrawals || []);
   renderAdminFundMovements(admin?.recentFundMovements || []);
   renderAdminHands(admin?.recentHands || []);
+  renderAdminRiskSignals({ diagnostics, database, stats, reconciliation });
+  renderAdminSettings({ diagnostics, database, roles, stats, notes: admin?.audit?.notes || [] });
   renderAdminEvents(admin?.recentEvents || []);
+}
+
+function renderAdminHealthStrip({ diagnostics, database, memory, stats, reconciliation }) {
+  if (!adminHealthStrip) return;
+  const items = [
+    {
+      label: "API",
+      value: diagnostics.ok ? "online" : "attention",
+      state: diagnostics.ok ? "ok" : "danger"
+    },
+    {
+      label: "Database",
+      value: database.enabled ? `${database.mode || "postgres"} · ${database.ok ? "ok" : "fail"}` : "memory",
+      state: database.enabled && database.ok ? "ok" : "warning"
+    },
+    {
+      label: "Withdrawals",
+      value: `${stats.pendingWithdrawals || 0} pending`,
+      state: Number(stats.pendingWithdrawals || 0) > 0 ? "warning" : "ok"
+    },
+    {
+      label: "Wallet drift",
+      value: formatChips(reconciliation.walletLedgerDrift || 0),
+      state: Number(reconciliation.walletLedgerDrift || 0) === 0 ? "ok" : "danger"
+    },
+    {
+      label: "Heap",
+      value: memory.heapUsedMb ? `${memory.heapUsedMb}/${memory.heapTotalMb} MB` : "n/a",
+      state: "neutral"
+    }
+  ];
+  adminHealthStrip.replaceChildren(...items.map(adminStatusPill));
+}
+
+function adminStatusPill(item) {
+  const pill = document.createElement("div");
+  pill.className = `admin-status-pill ${item.state || "neutral"}`;
+  pill.innerHTML = "<span></span><strong></strong>";
+  pill.querySelector("span").textContent = item.label;
+  pill.querySelector("strong").textContent = item.value;
+  return pill;
+}
+
+function renderAdminRiskSignals({ diagnostics, database, stats, reconciliation }) {
+  if (!adminRiskSignals) return;
+  const signals = [
+    {
+      title: "Wallet / ledger drift",
+      value: formatChips(reconciliation.walletLedgerDrift || 0),
+      status: Number(reconciliation.walletLedgerDrift || 0) === 0 ? "ok" : "critical",
+      meta: "Должно быть 0. Любое отклонение значит финансовую рассинхронизацию."
+    },
+    {
+      title: "Stars deposit drift",
+      value: formatChips(reconciliation.starsDepositDrift || 0),
+      status: Number(reconciliation.starsDepositDrift || 0) === 0 ? "ok" : "critical",
+      meta: "Сверка оплаченных Stars с ledger deposit_stars."
+    },
+    {
+      title: "Pending withdrawals",
+      value: String(stats.pendingWithdrawals || 0),
+      status: Number(stats.pendingWithdrawals || 0) > 0 ? "review" : "ok",
+      meta: `${formatChips(stats.pendingWithdrawalChipsTotal || 0)} chips на hold.`
+    },
+    {
+      title: "Database mode",
+      value: database.enabled ? database.mode || "postgres" : "memory",
+      status: database.enabled && database.ok ? "ok" : "critical",
+      meta: database.enabled ? "Production must use persistent DB." : "Memory mode нельзя использовать с реальными деньгами."
+    },
+    {
+      title: "Idempotency keys",
+      value: String(stats.idempotencyKeyCount || 0),
+      status: "info",
+      meta: "Контроль дублей для платежей и ручных операций."
+    },
+    {
+      title: "Service health",
+      value: diagnostics.ok ? "ok" : "fail",
+      status: diagnostics.ok ? "ok" : "critical",
+      meta: "Общий health snapshot backend."
+    }
+  ];
+  adminRiskSignals.replaceChildren(...signals.map((signal) => {
+    const row = document.createElement("div");
+    row.className = `admin-risk-row ${signal.status}`;
+    row.innerHTML = "<div><strong></strong><span></span></div><b></b>";
+    row.querySelector("strong").textContent = signal.title;
+    row.querySelector("span").textContent = signal.meta;
+    row.querySelector("b").textContent = signal.value;
+    return row;
+  }));
+}
+
+function renderAdminSettings({ diagnostics, database, roles, stats, notes }) {
+  if (!adminSettingsList) return;
+  const rows = [
+    ["Owner roles", roles.owner || 0],
+    ["Finance roles", roles.finance || 0],
+    ["Support roles", roles.support || 0],
+    ["Risk roles", roles.risk || 0],
+    ["Database", database.enabled ? `${database.mode || "postgres"} · ${database.ok ? "ok" : "fail"}` : "memory fallback"],
+    ["Uptime", formatDuration(diagnostics.uptimeSeconds || 0)],
+    ["Active tables", stats.activeTables || 0],
+    ["Total tables", stats.openTables || 0],
+    ["Audit notes", (notes || []).join(" / ") || "n/a"]
+  ];
+  adminSettingsList.replaceChildren(...rows.map(([label, value]) => {
+    const row = document.createElement("div");
+    row.className = "admin-setting-row";
+    row.innerHTML = "<span></span><strong></strong>";
+    row.querySelector("span").textContent = label;
+    row.querySelector("strong").textContent = String(value);
+    return row;
+  }));
 }
 
 async function loadAdminPlayer(telegramId) {
