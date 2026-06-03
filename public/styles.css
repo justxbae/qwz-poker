@@ -8580,23 +8580,32 @@ html.admin-mode body:not(.in-game) .lobby-view.admin-view {
 html.admin-mode body:not(.in-game) .admin-shell {
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
-  grid-template-rows: auto 1fr;
   gap: 18px;
   align-items: start;
 }
 
-html.admin-mode body:not(.in-game) .admin-topbar {
+html.admin-mode body:not(.in-game) .admin-sidebar {
   position: sticky;
   top: 24px;
   z-index: 3;
   display: grid;
-  gap: 22px;
+  gap: 16px;
   min-height: calc(100vh - 48px);
   align-content: start;
   border: 1px solid rgba(122, 162, 194, 0.12);
   border-radius: 22px;
   background: #1d2a37;
   padding: 24px;
+  box-shadow: none;
+}
+
+html.admin-mode body:not(.in-game) .admin-topbar {
+  display: grid;
+  gap: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   box-shadow: none;
 }
 
@@ -8624,14 +8633,9 @@ html.admin-mode body:not(.in-game) .admin-topbar button {
 }
 
 html.admin-mode body:not(.in-game) .admin-tabs {
-  position: sticky;
-  top: calc(24px + 236px);
-  z-index: 4;
-  grid-column: 1;
-  grid-row: 1;
   display: grid;
   gap: 7px;
-  margin-top: 206px;
+  margin-top: 4px;
   overflow: visible;
   border: 0;
   border-radius: 18px;
@@ -8659,7 +8663,6 @@ html.admin-mode body:not(.in-game) .admin-tabs button.active {
 
 html.admin-mode body:not(.in-game) .admin-panel.active {
   grid-column: 2;
-  grid-row: 1 / span 2;
   display: grid;
   gap: 18px;
   min-width: 0;
@@ -8831,12 +8834,15 @@ html.admin-mode body:not(.in-game) .admin-settings-list {
     grid-template-columns: 1fr;
   }
 
+  html.admin-mode body:not(.in-game) .admin-sidebar {
+    position: static;
+    min-height: auto;
+  }
+
   html.admin-mode body:not(.in-game) .admin-topbar,
   html.admin-mode body:not(.in-game) .admin-tabs {
-    position: static;
     grid-column: auto;
     grid-row: auto;
-    min-height: auto;
     margin-top: 0;
   }
 
@@ -8855,7 +8861,6 @@ html.admin-mode body:not(.in-game) .admin-settings-list {
 
   html.admin-mode body:not(.in-game) .admin-panel.active {
     grid-column: auto;
-    grid-row: auto;
   }
 
   html.admin-mode body:not(.in-game) .admin-form,

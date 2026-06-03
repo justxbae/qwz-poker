@@ -498,24 +498,26 @@
 
         <section class="lobby-view admin-view" data-lobby-view="admin">
           <section class="admin-shell">
-            <header class="admin-topbar">
-              <div>
-                <p class="eyebrow">QWZ Poker admin</p>
-                <h1>Control center</h1>
-                <span id="adminOperationalStatus">Загрузка статуса...</span>
-              </div>
-              <button type="button" id="adminRefreshButton">Обновить</button>
-            </header>
+            <aside class="admin-sidebar">
+              <header class="admin-topbar">
+                <div>
+                  <p class="eyebrow">QWZ Poker admin</p>
+                  <h1>Control center</h1>
+                  <span id="adminOperationalStatus">Загрузка статуса...</span>
+                </div>
+                <button type="button" id="adminRefreshButton">Обновить</button>
+              </header>
 
-            <nav class="admin-tabs" aria-label="Разделы админки">
-              <button type="button" class="active" data-admin-tab="overview">Overview</button>
-              <button type="button" data-admin-tab="users">Users</button>
-              <button type="button" data-admin-tab="finance">Finance</button>
-              <button type="button" data-admin-tab="gameplay">Gameplay</button>
-              <button type="button" data-admin-tab="risk">Risk</button>
-              <button type="button" data-admin-tab="settings">Settings</button>
-              <button type="button" data-admin-tab="logs">Logs</button>
-            </nav>
+              <nav class="admin-tabs" aria-label="Разделы админки">
+                <button type="button" class="active" data-admin-tab="overview">Overview</button>
+                <button type="button" data-admin-tab="users">Users</button>
+                <button type="button" data-admin-tab="finance">Finance</button>
+                <button type="button" data-admin-tab="gameplay">Gameplay</button>
+                <button type="button" data-admin-tab="risk">Risk</button>
+                <button type="button" data-admin-tab="settings">Settings</button>
+                <button type="button" data-admin-tab="logs">Logs</button>
+              </nav>
+            </aside>
 
             <section class="admin-panel active" data-admin-panel="overview">
               <section class="wallet-card admin-hero">
