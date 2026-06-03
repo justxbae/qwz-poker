@@ -6,8 +6,9 @@ const DEV_MODE = params.has("dev1")
   || window.localStorage.getItem("qwzDevMode") === "1";
 const ADMIN_MODE = params.get("admin") === "1" || window.location.pathname === "/admin";
 const ADMIN_SECRET_STORAGE_KEY = "qwzAdminWebSecret";
-if (ADMIN_MODE && params.has("key")) {
-  window.localStorage.setItem(ADMIN_SECRET_STORAGE_KEY, params.get("key") || "");
+const adminHashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+if (ADMIN_MODE && (params.has("key") || adminHashParams.has("key"))) {
+  window.localStorage.setItem(ADMIN_SECRET_STORAGE_KEY, params.get("key") || adminHashParams.get("key") || "");
   window.history.replaceState({}, "", "/admin");
 }
 if ("scrollRestoration" in window.history) {
@@ -390,7 +391,7 @@ async function auth() {
     initData: tg?.initData || ""
   };
   if (ADMIN_MODE) {
-    body.adminSecret = window.localStorage.getItem(ADMIN_SECRET_STORAGE_KEY) || "";
+    body.adminSecret = adminWebSecret();
   }
 
   const data = await api("/api/auth", {
@@ -416,6 +417,16 @@ async function auth() {
     : `${data.user.balance.toLocaleString("ru-RU")} фишек`;
   profileChips.textContent = data.user.balance.toLocaleString("ru-RU");
   renderHomeCta();
+}
+
+function adminWebSecret() {
+  if (!ADMIN_MODE) return "";
+  let secret = window.localStorage.getItem(ADMIN_SECRET_STORAGE_KEY) || "";
+  if (!secret) {
+    secret = window.prompt("Введите ADMIN_WEB_SECRET для входа в админку") || "";
+    if (secret) window.localStorage.setItem(ADMIN_SECRET_STORAGE_KEY, secret);
+  }
+  return secret;
 }
 
 async function loadConfig() {

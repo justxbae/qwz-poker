@@ -348,8 +348,12 @@ async function handleApi(req, res, url) {
 
   if (req.method === "POST" && url.pathname === "/api/auth") {
     const body = await readJson(req);
-    const webAdmin = authenticateWebAdmin(body.adminSecret || "");
-    if (webAdmin.ok) {
+    if (Object.hasOwn(body, "adminSecret")) {
+      const webAdmin = authenticateWebAdmin(body.adminSecret || "");
+      if (!webAdmin.ok) {
+        sendJson(res, 401, { error: webAdmin.error });
+        return;
+      }
       const token = randomId("admin_session");
       sessions.set(token, webAdmin.user);
       sessionExpirations.set(token, Date.now() + SESSION_TTL_MS);
