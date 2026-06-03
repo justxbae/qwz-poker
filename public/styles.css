@@ -8072,8 +8072,8 @@ body.lobby-menu-open .bottom-nav {
 .lobby-menu-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 45;
-  background: rgba(0, 0, 0, 0.46);
+  z-index: 70;
+  background: rgba(0, 0, 0, 0.38);
   opacity: 0;
   transition: opacity 180ms ease;
 }
@@ -8084,22 +8084,29 @@ body.lobby-menu-open .lobby-menu-backdrop {
 
 .lobby-menu-sheet {
   position: fixed;
-  left: max(12px, calc(50vw - 220px));
-  right: max(12px, calc(50vw - 220px));
+  left: max(10px, env(safe-area-inset-left));
+  right: max(10px, env(safe-area-inset-right));
   bottom: 0;
-  z-index: 46;
-  max-height: min(72vh, 620px);
-  overflow-y: auto;
-  border-radius: 26px 26px 0 0;
+  z-index: 80;
+  display: block;
+  width: auto;
+  max-width: 520px;
+  max-height: min(82vh, 720px);
+  margin: 0 auto;
+  overflow: auto;
+  border: 0;
+  border-radius: 24px 24px 0 0;
   background: var(--native-surface);
-  padding: 28px 16px calc(18px + env(safe-area-inset-bottom));
-  box-shadow: 0 -22px 70px rgba(0, 0, 0, 0.42);
-  transform: translate3d(0, 105%, 0);
-  transition: transform 220ms cubic-bezier(0.2, 0.86, 0.2, 1);
+  padding: 8px 16px calc(18px + env(safe-area-inset-bottom));
+  box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.38);
+  transform: translateY(calc(102% + var(--sheet-drag-y, 0px)));
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  touch-action: pan-y;
+  overscroll-behavior: contain;
 }
 
 .lobby-menu-sheet.sheet-visible {
-  transform: translate3d(0, 0, 0);
+  transform: translateY(var(--sheet-drag-y, 0px));
 }
 
 .lobby-menu-head {

@@ -263,6 +263,7 @@ async function boot() {
   document.querySelectorAll("[data-cashier-sheet]").forEach((sheet) => {
     wireCashierSheetDrag(sheet);
   });
+  if (lobbyMenuSheet) wireCashierSheetDrag(lobbyMenuSheet, closeLobbyMenu);
   cashierSheetCloseButtons.forEach((button) => {
     button.addEventListener("click", closeCashierSheet);
   });
@@ -1850,7 +1851,7 @@ function closeCashierSheet(options = {}) {
   }
 }
 
-function wireCashierSheetDrag(sheet) {
+function wireCashierSheetDrag(sheet, closeSheet = closeCashierSheet) {
   let startY = 0;
   let dragStartY = 0;
   let dragY = 0;
@@ -1905,7 +1906,7 @@ function wireCashierSheetDrag(sheet) {
     pointerId = null;
     sheet.style.transition = "";
     if (shouldClose) {
-      closeCashierSheet();
+      closeSheet();
       return;
     }
     sheet.style.setProperty("--sheet-drag-y", "0px");
@@ -2808,6 +2809,8 @@ function openLobbyMenu() {
   updateBottomNavIndicator("__menu");
   lobbyMenuBackdrop.hidden = false;
   lobbyMenuSheet.hidden = false;
+  lobbyMenuSheet.classList.add("sheet-open");
+  lobbyMenuSheet.style.setProperty("--sheet-drag-y", "0px");
   document.body.classList.add("lobby-menu-open");
   window.requestAnimationFrame(() => lobbyMenuSheet.classList.add("sheet-visible"));
   updateTelegramBackButton();
@@ -2820,6 +2823,8 @@ function closeLobbyMenu(options = {}) {
   const finish = () => {
     lobbyMenuSheet.hidden = true;
     lobbyMenuBackdrop.hidden = true;
+    lobbyMenuSheet.classList.remove("sheet-open");
+    lobbyMenuSheet.style.removeProperty("--sheet-drag-y");
     lobbyMenuButton?.classList.remove("active");
     updateBottomNavIndicator();
     if (!options.silent) updateTelegramBackButton();
@@ -2836,11 +2841,7 @@ function onLobbyMenuAction(event) {
   closeLobbyMenu({ silent: true });
   if (action === "profile") {
     selectLobbyTab("profile");
-  } else if (action === "deposit") {
-    runAction(() => openCashierSection("deposit"));
-  } else if (action === "withdraw") {
-    runAction(() => openCashierSection("withdraw"));
-  } else if (action === "history") {
+  } else if (action === "details") {
     runAction(() => openCashierSection("history"));
   } else if (action === "support") {
     showStatus("Поддержку подключим отдельным разделом");
