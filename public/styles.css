@@ -7661,10 +7661,10 @@ body:not(.in-game) .lobby-view > * {
 }
 
 body:not(.in-game) .bottom-nav {
-  --nav-count: 3;
+  --nav-count: 4;
   --nav-active-index: 0;
-  left: max(14px, calc(50vw - 204px));
-  width: min(320px, calc(100vw - 96px));
+  left: max(14px, calc(50vw - 215px));
+  width: min(430px, calc(100vw - 28px));
   min-height: 60px;
   gap: 0;
   border: 0;
@@ -7789,11 +7789,7 @@ body:not(.in-game).scroll-bounce-release .lobby-view.active {
 
   body:not(.in-game) .bottom-nav {
     left: 14px;
-    width: calc(100vw - 100px);
-  }
-
-  body:not(.in-game) .profile-nav-fab {
-    right: 14px;
+    width: calc(100vw - 28px);
   }
 }
 
@@ -8063,6 +8059,133 @@ body.cashier-sheet-open [data-cashier-sheet].sheet-open .section-title {
 body.cashier-sheet-open .bottom-nav,
 body.cashier-sheet-open .profile-nav-fab {
   transform: translateY(120%);
+}
+
+body.lobby-menu-open {
+  overflow: hidden;
+}
+
+body.lobby-menu-open .bottom-nav {
+  transform: translateY(120%);
+}
+
+.lobby-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: rgba(0, 0, 0, 0.46);
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+body.lobby-menu-open .lobby-menu-backdrop {
+  opacity: 1;
+}
+
+.lobby-menu-sheet {
+  position: fixed;
+  left: max(12px, calc(50vw - 220px));
+  right: max(12px, calc(50vw - 220px));
+  bottom: 0;
+  z-index: 46;
+  max-height: min(72vh, 620px);
+  overflow-y: auto;
+  border-radius: 26px 26px 0 0;
+  background: var(--native-surface);
+  padding: 28px 16px calc(18px + env(safe-area-inset-bottom));
+  box-shadow: 0 -22px 70px rgba(0, 0, 0, 0.42);
+  transform: translate3d(0, 105%, 0);
+  transition: transform 220ms cubic-bezier(0.2, 0.86, 0.2, 1);
+}
+
+.lobby-menu-sheet.sheet-visible {
+  transform: translate3d(0, 0, 0);
+}
+
+.lobby-menu-head {
+  display: grid;
+  gap: 4px;
+  padding: 8px 4px 14px;
+}
+
+.lobby-menu-head p {
+  margin: 0;
+  color: var(--native-blue);
+  font-size: 12px;
+  font-weight: 760;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lobby-menu-head h2 {
+  margin: 0;
+  color: var(--native-text);
+  font-size: 30px;
+  line-height: 1.05;
+}
+
+.lobby-menu-list {
+  overflow: hidden;
+  border-radius: var(--native-group-radius);
+  background: var(--native-surface-elevated);
+}
+
+.lobby-menu-list button {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  min-height: 68px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--native-text);
+  padding: 10px 14px;
+  text-align: left;
+  transform: none;
+}
+
+.lobby-menu-list button + button {
+  border-top: 1px solid var(--native-divider);
+}
+
+.lobby-menu-list button:active {
+  background: rgba(118, 137, 155, 0.12);
+}
+
+.lobby-menu-list strong {
+  display: block;
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+.lobby-menu-list small {
+  display: block;
+  margin-top: 3px;
+  color: var(--native-muted);
+  font-size: 13px;
+  font-weight: 560;
+}
+
+.menu-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(42, 171, 238, 0.16);
+  color: var(--native-blue);
+}
+
+.menu-icon svg {
+  width: 23px;
+  height: 23px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 body.buyin-sheet-open .bottom-nav,

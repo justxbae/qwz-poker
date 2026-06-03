@@ -627,14 +627,50 @@
             <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 4.5h8v7a4 4 0 0 1-8 0Z"/><path d="M8 7H5v2a4 4 0 0 0 4 4M16 7h3v2a4 4 0 0 1-4 4M12 15.5V19M8.5 20h7"/></svg></span>
             <span class="nav-label">Турниры</span>
           </button>
+          <button type="button" id="lobbyMenuButton" data-lobby-menu-trigger>
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/></svg></span>
+            <span class="nav-label">Меню</span>
+          </button>
           <button type="button" class="admin-nav-button" data-lobby-tab="admin" hidden>
             <span class="nav-icon nav-admin" aria-hidden="true"></span>
             <span class="nav-label">Админ</span>
           </button>
         </nav>
-        <button type="button" class="profile-nav-fab" data-lobby-tab="profile" aria-label="Профиль">
-          <span class="nav-profile-avatar" id="navProfileAvatar">P</span>
-        </button>
+        <div class="lobby-menu-backdrop" id="lobbyMenuBackdrop" hidden></div>
+        <section class="lobby-menu-sheet" id="lobbyMenuSheet" hidden aria-modal="true" aria-label="Меню">
+          <div class="cashier-sheet-grabber" aria-hidden="true"></div>
+          <header class="lobby-menu-head">
+            <p>QWZ Poker</p>
+            <h2>Меню</h2>
+          </header>
+          <div class="lobby-menu-list">
+            <button type="button" data-menu-action="profile">
+              <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg></span>
+              <span><strong>Профиль</strong><small>уровень, статистика и статус</small></span>
+              <span class="tg-chevron">›</span>
+            </button>
+            <button type="button" data-menu-action="deposit">
+              <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+              <span><strong>Депозит</strong><small>пополнить баланс</small></span>
+              <span class="tg-chevron">›</span>
+            </button>
+            <button type="button" data-menu-action="withdraw">
+              <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></span>
+              <span><strong>Вывод</strong><small>заявка на выплату</small></span>
+              <span class="tg-chevron">›</span>
+            </button>
+            <button type="button" data-menu-action="history">
+              <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 5h14v16l-3-2-3 2-3-2-3 2Z"/><path d="M8 9h8M8 13h8"/></svg></span>
+              <span><strong>История</strong><small>платежи и операции</small></span>
+              <span class="tg-chevron">›</span>
+            </button>
+            <button type="button" data-menu-action="support">
+              <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 1 16 0v5a2 2 0 0 1-2 2h-3"/><path d="M9 19h3"/></svg></span>
+              <span><strong>Поддержка</strong><small>вопросы по игре и оплате</small></span>
+              <span class="tg-chevron">›</span>
+            </button>
+          </div>
+        </section>
       </section>
     </main>
 

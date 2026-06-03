@@ -80,7 +80,6 @@ const cashierPayButton = document.querySelector("#cashierPayButton");
 const cashierHistory = document.querySelector("#cashierHistory");
 const cashierStatus = document.querySelector("#cashierStatus");
 const profileAvatar = document.querySelector("#profileAvatar");
-const navProfileAvatar = document.querySelector("#navProfileAvatar");
 const profileName = document.querySelector("#profileName");
 const profileUsername = document.querySelector("#profileUsername");
 const profileBalance = document.querySelector("#profileBalance");
@@ -175,6 +174,9 @@ const observerBanner = document.querySelector("#observerBanner");
 const observerHint = document.querySelector("#observerHint");
 const observerSitButton = document.querySelector("#observerSitButton");
 const menuButton = document.querySelector("#menuButton");
+const lobbyMenuButton = document.querySelector("#lobbyMenuButton");
+const lobbyMenuSheet = document.querySelector("#lobbyMenuSheet");
+const lobbyMenuBackdrop = document.querySelector("#lobbyMenuBackdrop");
 const sideMenu = document.querySelector("#sideMenu");
 const closeMenuButton = document.querySelector("#closeMenuButton");
 const sitOutPopover = document.querySelector("#sitOutPopover");
@@ -297,6 +299,9 @@ async function boot() {
       selectLobbyTab(button.dataset.lobbyTab);
     });
   });
+  lobbyMenuButton?.addEventListener("click", openLobbyMenu);
+  lobbyMenuBackdrop?.addEventListener("click", closeLobbyMenu);
+  lobbyMenuSheet?.addEventListener("click", onLobbyMenuAction);
   if (DEV_MODE) {
     addTestPlayerButton.addEventListener("click", () => runAction(addTestPlayer));
     autoActButton.addEventListener("click", () => runAction(autoAct));
@@ -384,7 +389,6 @@ async function auth() {
   cashierBalance.textContent = data.user.balance.toLocaleString("ru-RU");
   renderAvatar(lobbyAvatar, data.user);
   renderAvatar(profileAvatar, data.user);
-  renderAvatar(navProfileAvatar, data.user);
   profileName.textContent = data.user.name;
   profileUsername.textContent = data.user.username ? `@${data.user.username}` : `id ${data.user.id}`;
   profileBalance.textContent = state.gameMode === "cash"
@@ -780,6 +784,10 @@ async function handleTelegramBack() {
     hideBuyInOverlay();
     return;
   }
+  if (lobbyMenuSheet && !lobbyMenuSheet.hidden) {
+    closeLobbyMenu();
+    return;
+  }
   if (!sideMenu.hidden) {
     closeMenu();
     return;
@@ -804,6 +812,7 @@ async function handleTelegramBack() {
 function updateTelegramBackButton() {
   const shouldShow = !buyInOverlay.hidden
     || Boolean(cashierState.sheet)
+    || Boolean(lobbyMenuSheet && !lobbyMenuSheet.hidden)
     || !sideMenu.hidden
     || !infoDrawer.hidden
     || !sitOutPopover.hidden
@@ -1252,7 +1261,6 @@ function renderProfile(profileData) {
 
   renderAvatar(profileAvatar, user);
   renderAvatar(lobbyAvatar, user);
-  renderAvatar(navProfileAvatar, user);
 
   renderProfileSessions(profileData.activeTables || []);
 }
@@ -1732,7 +1740,9 @@ function syncLimitSelection() {
 }
 
 function selectLobbyTab(tab, options = {}) {
+  closeLobbyMenu({ silent: true });
   if (cashierState.sheet) closeCashierSheet({ silent: true });
+  lobbyMenuButton?.classList.remove("active");
   const tabChanged = currentLobbyTab !== tab;
   currentLobbyTab = tab;
   updateBottomNavIndicator(tab);
@@ -1763,8 +1773,11 @@ function selectLobbyTab(tab, options = {}) {
 function updateBottomNavIndicator(tab = currentLobbyTab) {
   const nav = document.querySelector(".bottom-nav");
   if (!nav) return;
-  const visibleButtons = [...nav.querySelectorAll("[data-lobby-tab]")].filter((button) => !button.hidden);
-  const index = visibleButtons.findIndex((button) => button.dataset.lobbyTab === tab);
+  const visibleButtons = [...nav.querySelectorAll("button")].filter((button) => !button.hidden);
+  const index = visibleButtons.findIndex((button) => {
+    if (tab === "__menu") return button.hasAttribute("data-lobby-menu-trigger");
+    return button.dataset.lobbyTab === tab;
+  });
   nav.style.setProperty("--nav-count", String(Math.max(1, visibleButtons.length)));
   nav.style.setProperty("--nav-active-index", String(Math.max(0, index)));
   nav.classList.toggle("has-active-tab", index >= 0);
@@ -2769,6 +2782,10 @@ function renderBotControls(table) {
 }
 
 function openMenu() {
+  if (!state.currentTableId && currentTable.hidden) {
+    openLobbyMenu();
+    return;
+  }
   haptic("light");
   sideMenu.hidden = false;
   inviteButton.hidden = !state.currentTableId;
@@ -2780,6 +2797,55 @@ function openMenu() {
 function closeMenu() {
   sideMenu.hidden = true;
   updateTelegramBackButton();
+}
+
+function openLobbyMenu() {
+  if (!lobbyMenuSheet || !lobbyMenuBackdrop) return;
+  haptic("light");
+  closeCashierSheet({ silent: true });
+  lobbyMenuButton?.classList.add("active", "nav-pressed");
+  window.setTimeout(() => lobbyMenuButton?.classList.remove("nav-pressed"), 360);
+  updateBottomNavIndicator("__menu");
+  lobbyMenuBackdrop.hidden = false;
+  lobbyMenuSheet.hidden = false;
+  document.body.classList.add("lobby-menu-open");
+  window.requestAnimationFrame(() => lobbyMenuSheet.classList.add("sheet-visible"));
+  updateTelegramBackButton();
+}
+
+function closeLobbyMenu(options = {}) {
+  if (!lobbyMenuSheet || !lobbyMenuBackdrop || lobbyMenuSheet.hidden) return;
+  lobbyMenuSheet.classList.remove("sheet-visible");
+  document.body.classList.remove("lobby-menu-open");
+  const finish = () => {
+    lobbyMenuSheet.hidden = true;
+    lobbyMenuBackdrop.hidden = true;
+    lobbyMenuButton?.classList.remove("active");
+    updateBottomNavIndicator();
+    if (!options.silent) updateTelegramBackButton();
+  };
+  if (options.silent) finish();
+  else window.setTimeout(finish, 180);
+}
+
+function onLobbyMenuAction(event) {
+  const button = event.target.closest("[data-menu-action]");
+  if (!button) return;
+
+  const action = button.dataset.menuAction;
+  closeLobbyMenu({ silent: true });
+  if (action === "profile") {
+    selectLobbyTab("profile");
+  } else if (action === "deposit") {
+    runAction(() => openCashierSection("deposit"));
+  } else if (action === "withdraw") {
+    runAction(() => openCashierSection("withdraw"));
+  } else if (action === "history") {
+    runAction(() => openCashierSection("history"));
+  } else if (action === "support") {
+    showStatus("Поддержку подключим отдельным разделом");
+    updateTelegramBackButton();
+  }
 }
 
 async function inviteToTable() {
