@@ -1150,6 +1150,48 @@ export async function dashboardStats() {
   };
 }
 
+export async function listUsers(limit = 100) {
+  if (!pool) return null;
+  const normalizedLimit = Math.max(1, Math.min(500, Math.round(Number(limit) || 100)));
+  const result = await query(`
+    select
+      ui.provider_user_id as id,
+      au.display_name as name,
+      au.username,
+      au.photo_url,
+      au.created_at,
+      au.updated_at,
+      coalesce(w.balance, 0)::bigint as balance,
+      coalesce(w.cash_usdt_micros, 0)::bigint as cash_balance_micros,
+      coalesce(ss.stack, 0)::bigint as saved_stack,
+      (select count(*)::int from ledger_entries le where le.app_user_id = au.id) as ledger_count
+    from user_identities ui
+    join app_users au on au.id = ui.app_user_id
+    left join wallets w on w.app_user_id = au.id
+    left join saved_stacks ss on ss.app_user_id = au.id
+    where ui.provider = 'telegram'
+    order by greatest(
+      au.updated_at,
+      coalesce(w.updated_at, au.updated_at),
+      coalesce(ss.updated_at, au.updated_at)
+    ) desc
+    limit $1
+  `, [normalizedLimit]);
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    name: row.name || "unknown",
+    username: row.username || "",
+    photoUrl: row.photo_url || "",
+    balance: Number(row.balance || 0),
+    cashBalanceMicros: Number(row.cash_balance_micros || 0),
+    savedStack: Number(row.saved_stack || 0),
+    ledgerCount: Number(row.ledger_count || 0),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  }));
+}
+
 async function ensureIdentity(provider, providerUserId) {
   const providerId = String(providerUserId);
   const existing = await query(

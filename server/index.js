@@ -51,6 +51,7 @@ import {
   listLedger as dbListLedger,
   listTournamentRegistrations as dbListTournamentRegistrations,
   listHandHistories as dbListHandHistories,
+  listUsers as dbListUsers,
   listPaymentOrders as dbListPaymentOrders,
   listPendingCryptoPaymentOrders as dbListPendingCryptoPaymentOrders,
   listWithdrawalOrders as dbListWithdrawalOrders,
@@ -1033,6 +1034,7 @@ async function adminDashboardView() {
   const recentWithdrawals = await dbListWithdrawalOrders(30);
   const recentEvents = await dbListAdminEvents(20);
   const recentHands = await dbListHandHistories(20);
+  const recentUsers = await adminUsersList(100);
   const memoryHandHistoryCount = recentHandHistories.length;
   const memoryHandHistoryRakeTotal = recentHandHistories.reduce((sum, hand) => sum + Number(hand.rake || 0), 0);
 
@@ -1091,6 +1093,7 @@ async function adminDashboardView() {
       ]
     },
     recentFundMovements: recentFundMovements(20),
+    recentUsers,
     recentHands: recentHands || recentHandHistories.slice(0, 20),
     recentPayments: recentPayments || [...starOrders.values(), ...cryptoOrders.values()]
       .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
@@ -1099,6 +1102,57 @@ async function adminDashboardView() {
       .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
       .slice(0, 30),
     recentEvents: recentEvents || adminEvents.slice(0, 20)
+  };
+}
+
+async function adminUsersList(limit = 100) {
+  const tableStacks = activeTableStacksByUser();
+  const dbUsers = await dbListUsers(limit);
+  if (dbUsers) {
+    return dbUsers.map((user) => enrichAdminUserListItem(user, tableStacks));
+  }
+
+  const ids = [...new Set([
+    ...userProfiles.keys(),
+    ...wallets.keys(),
+    ...cashWallets.keys(),
+    ...savedStacks.keys(),
+    ...transactions.keys(),
+    ...cashTransactions.keys()
+  ])].slice(0, limit);
+
+  return ids.map((id) => enrichAdminUserListItem({
+    id,
+    name: userProfiles.get(id)?.name || "unknown",
+    username: userProfiles.get(id)?.username || "",
+    photoUrl: userProfiles.get(id)?.photoUrl || "",
+    balance: getWalletLocal(id),
+    cashBalanceMicros: getCashWalletLocal(id),
+    savedStack: savedStacks.get(id) || 0,
+    ledgerCount: (transactions.get(id)?.length || 0) + (cashTransactions.get(id)?.length || 0),
+    updatedAt: new Date().toISOString()
+  }, tableStacks));
+}
+
+function activeTableStacksByUser() {
+  const stacks = new Map();
+  for (const table of tables.values()) {
+    for (const seat of table.seats) {
+      const userId = String(seat.user?.id || seat.userId || "");
+      if (!userId) continue;
+      stacks.set(userId, (stacks.get(userId) || 0) + Number(seat.stack || 0));
+    }
+  }
+  return stacks;
+}
+
+function enrichAdminUserListItem(user, tableStacks) {
+  const tableStack = Number(tableStacks.get(String(user.id)) || 0);
+  return {
+    ...user,
+    tableStack,
+    totalBankroll: Number(user.balance || 0) + Number(user.savedStack || 0) + tableStack,
+    displayName: user.username ? `@${user.username}` : user.name || user.id
   };
 }
 

@@ -8590,12 +8590,12 @@ html.admin-mode body:not(.in-game) .admin-sidebar {
   z-index: 3;
   display: grid;
   gap: 16px;
-  min-height: calc(100vh - 48px);
+  min-height: auto;
   align-content: start;
-  border: 1px solid rgba(122, 162, 194, 0.12);
-  border-radius: 22px;
-  background: #1d2a37;
-  padding: 24px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
   box-shadow: none;
 }
 
@@ -8640,7 +8640,7 @@ html.admin-mode body:not(.in-game) .admin-tabs {
   border: 0;
   border-radius: 18px;
   background: transparent;
-  padding: 0 24px;
+  padding: 0;
 }
 
 html.admin-mode body:not(.in-game) .admin-tabs button {
@@ -8657,7 +8657,7 @@ html.admin-mode body:not(.in-game) .admin-tabs button {
 }
 
 html.admin-mode body:not(.in-game) .admin-tabs button.active {
-  background: rgba(42, 171, 238, 0.18);
+  background: rgba(42, 171, 238, 0.28);
   color: #fff;
 }
 
@@ -8675,6 +8675,10 @@ html.admin-mode body:not(.in-game) .admin-panel.active[data-admin-panel="overvie
 html.admin-mode body:not(.in-game) .admin-panel.active[data-admin-panel="users"],
 html.admin-mode body:not(.in-game) .admin-panel.active[data-admin-panel="finance"] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+html.admin-mode body:not(.in-game) .admin-users-card {
+  grid-column: 1 / -1;
 }
 
 html.admin-mode body:not(.in-game) .admin-panel.active[data-admin-panel="finance"] .lobby-card:last-child {
@@ -8808,6 +8812,75 @@ html.admin-mode body:not(.in-game) .admin-settings-list {
   background: #18232f;
 }
 
+.admin-users-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(520px, calc(100vh - 300px));
+  margin-top: 16px;
+  overflow: auto;
+}
+
+.admin-user-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(180px, auto);
+  gap: 12px;
+  align-items: center;
+  min-height: 68px;
+  border: 1px solid rgba(122, 162, 194, 0.1);
+  border-radius: 14px;
+  background: #18232f;
+  color: #fff;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.admin-user-row:hover {
+  background: #223141;
+}
+
+.admin-user-avatar {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #33435a;
+  color: #fff;
+  font-weight: 760;
+  background-position: center;
+  background-size: cover;
+}
+
+.admin-user-main,
+.admin-user-money {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-user-main strong,
+.admin-user-money strong {
+  overflow: hidden;
+  color: #f4f7fb;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-user-main small,
+.admin-user-money small {
+  overflow: hidden;
+  color: #93a2b1;
+  font-size: 12px;
+  font-weight: 560;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-user-money {
+  text-align: right;
+}
+
 @media (max-width: 1120px) {
   html.admin-mode body:not(.in-game) .admin-shell {
     grid-template-columns: 240px minmax(0, 1fr);
@@ -8868,5 +8941,14 @@ html.admin-mode body:not(.in-game) .admin-settings-list {
   html.admin-mode body:not(.in-game) .admin-health-strip,
   html.admin-mode body:not(.in-game) .admin-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-user-row {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+
+  .admin-user-money {
+    grid-column: 2;
+    text-align: left;
   }
 }

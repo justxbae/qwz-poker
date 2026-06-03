@@ -106,6 +106,8 @@ const adminSummary = document.querySelector("#adminSummary");
 const adminHealthStrip = document.querySelector("#adminHealthStrip");
 const adminLookupForm = document.querySelector("#adminLookupForm");
 const adminUserId = document.querySelector("#adminUserId");
+const adminUsersCount = document.querySelector("#adminUsersCount");
+const adminUsersList = document.querySelector("#adminUsersList");
 const adminStatus = document.querySelector("#adminStatus");
 const adminPlayerCard = document.querySelector("#adminPlayerCard");
 const adminPlayerName = document.querySelector("#adminPlayerName");
@@ -1394,12 +1396,59 @@ function renderAdminDashboard(admin) {
   }));
 
   renderAdminPayments(admin?.recentPayments || []);
+  renderAdminUsers(admin?.recentUsers || []);
   renderAdminWithdrawals(admin?.recentWithdrawals || []);
   renderAdminFundMovements(admin?.recentFundMovements || []);
   renderAdminHands(admin?.recentHands || []);
   renderAdminRiskSignals({ diagnostics, database, stats, reconciliation });
   renderAdminSettings({ diagnostics, database, roles, stats, notes: admin?.audit?.notes || [] });
   renderAdminEvents(admin?.recentEvents || []);
+}
+
+function renderAdminUsers(users) {
+  if (!adminUsersList) return;
+  if (adminUsersCount) adminUsersCount.textContent = `${formatNumber(users.length)} пользователей`;
+  adminUsersList.replaceChildren();
+  if (!users.length) {
+    const empty = document.createElement("div");
+    empty.className = "cashier-empty";
+    empty.textContent = "Пользователей пока нет";
+    adminUsersList.append(empty);
+    return;
+  }
+
+  for (const user of users) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "admin-user-row";
+    row.innerHTML = `
+      <span class="admin-user-avatar"></span>
+      <span class="admin-user-main">
+        <strong></strong>
+        <small></small>
+      </span>
+      <span class="admin-user-money">
+        <strong></strong>
+        <small></small>
+      </span>
+    `;
+    renderAvatar(row.querySelector(".admin-user-avatar"), {
+      name: user.name || user.displayName || "P",
+      photoUrl: user.photoUrl || ""
+    });
+    row.querySelector(".admin-user-main strong").textContent = user.displayName || user.name || "unknown";
+    row.querySelector(".admin-user-main small").textContent = [
+      `ID ${user.id}`,
+      user.ledgerCount ? `${formatNumber(user.ledgerCount)} операций` : "операций нет"
+    ].join(" · ");
+    row.querySelector(".admin-user-money strong").textContent = `${formatChips(user.balance || 0)} chips`;
+    row.querySelector(".admin-user-money small").textContent = `${formatUsdt(user.cashBalanceMicros || 0)} USDT · за столами ${formatChips(user.tableStack || 0)}`;
+    row.addEventListener("click", () => {
+      adminUserId.value = user.id;
+      runAction(() => loadAdminPlayer(user.id));
+    });
+    adminUsersList.append(row);
+  }
 }
 
 function renderAdminHealthStrip({ diagnostics, database, memory, stats, reconciliation }) {
