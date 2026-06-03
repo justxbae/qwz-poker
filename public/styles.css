@@ -2544,6 +2544,16 @@ body.in-game .game-toolbar [data-panel-tab="waitlist"] {
   animation: cardDeal 480ms cubic-bezier(0.2, 0.78, 0.26, 1) both;
 }
 
+.card.best-card {
+  border-color: rgba(255, 213, 112, 0.92);
+  box-shadow:
+    0 0 0 2px rgba(255, 213, 112, 0.18),
+    0 0 18px rgba(255, 213, 112, 0.38),
+    0 7px 18px rgba(0, 0, 0, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+  animation: bestCardGlow 1500ms ease-in-out infinite alternate;
+}
+
 .card.red {
   color: #c83232;
 }
@@ -2652,6 +2662,46 @@ body.in-game .game-toolbar [data-panel-tab="waitlist"] {
   font-weight: 700;
   text-align: center;
   transform: translateX(-50%);
+}
+
+.viewer-hand-badge {
+  position: absolute;
+  left: 22px;
+  bottom: 118px;
+  z-index: 8;
+  display: grid;
+  gap: 2px;
+  min-width: 132px;
+  border: 1px solid rgba(255, 213, 112, 0.2);
+  border-radius: 14px;
+  background: rgba(10, 13, 16, 0.78);
+  padding: 8px 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(8px);
+}
+
+.viewer-hand-badge span {
+  color: rgba(232, 255, 241, 0.58);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.viewer-hand-badge strong {
+  color: #fff1b8;
+  font-size: 14px;
+  line-height: 1.1;
+}
+
+.viewer-made-hand-active .board::after {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  z-index: 1;
+  border-radius: 50%;
+  box-shadow: inset 0 0 52px rgba(255, 213, 112, 0.12), 0 0 32px rgba(255, 213, 112, 0.08);
+  pointer-events: none;
+  animation: handAura 1900ms ease-in-out infinite alternate;
 }
 
 .betting-actions {
@@ -3098,6 +3148,26 @@ body.in-game .game-toolbar [data-panel-tab="waitlist"] {
     0 0 0 1px rgba(255, 213, 112, 0.72),
     0 0 24px rgba(255, 213, 112, 0.32),
     0 10px 22px rgba(0, 0, 0, 0.28);
+}
+
+.seat.winner .seat-cards .card {
+  transform: translateY(-4px) scale(1.06);
+}
+
+.seat.winner-paid .seat-plate {
+  animation: winnerPlatePaid 900ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+
+.seat-hand-label {
+  margin-top: 4px;
+  border-radius: 999px;
+  background: rgba(255, 213, 112, 0.16);
+  color: #fff1b8;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 4px 6px;
+  white-space: nowrap;
 }
 
 .seat[data-badges=""]::before {
@@ -3568,6 +3638,55 @@ body:not(.in-game) .table-item span {
   color: #eaf7ff;
   font-size: 14px;
   font-weight: 650;
+}
+
+.poker-hands-guide {
+  display: grid;
+  gap: 8px;
+}
+
+.poker-hand-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  border: 1px solid rgba(122, 162, 194, 0.12);
+  border-radius: 14px;
+  background: rgba(32, 43, 54, 0.72);
+  padding: 10px;
+}
+
+.poker-hand-row b {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(42, 171, 238, 0.18);
+  color: #8ed8ff;
+  font-size: 12px;
+}
+
+.poker-hand-row div {
+  display: grid;
+  gap: 3px;
+}
+
+.poker-hand-row strong {
+  color: #fff;
+  font-size: 15px;
+}
+
+.poker-hand-row span {
+  color: #d7ffe6;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.poker-hand-row small {
+  color: rgba(244, 247, 251, 0.58);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .close-button {
@@ -4056,23 +4175,31 @@ body.in-game .game-screen {
 
 .pot-chip-stack[data-chip-theme="blue"],
 .seat[data-chip-theme="blue"] .chip-stack,
-.chip-collect[data-chip-theme="blue"] {
+.chip-collect[data-chip-theme="blue"],
+.chip-payout[data-chip-theme="blue"] {
   --chip-main: #2850d8;
   --chip-side: #17328d;
 }
 
 .pot-chip-stack[data-chip-theme="red"],
 .seat[data-chip-theme="red"] .chip-stack,
-.chip-collect[data-chip-theme="red"] {
+.chip-collect[data-chip-theme="red"],
+.chip-payout[data-chip-theme="red"] {
   --chip-main: #cf3b3e;
   --chip-side: #822226;
 }
 
 .pot-chip-stack[data-chip-theme="green"],
 .seat[data-chip-theme="green"] .chip-stack,
-.chip-collect[data-chip-theme="green"] {
+.chip-collect[data-chip-theme="green"],
+.chip-payout[data-chip-theme="green"] {
   --chip-main: #48af43;
   --chip-side: #2d6f2b;
+}
+
+.chip-payout[data-chip-theme="gold"] {
+  --chip-main: #f7d36c;
+  --chip-side: #8a5e34;
 }
 
 .pot-chip-stack::before,
@@ -4263,17 +4390,13 @@ body.in-game .game-screen {
   transition: opacity 120ms ease;
 }
 
-.chip-collect {
+.chip-collect,
+.chip-payout {
   --delay: 0ms;
   --from-x: 0px;
   --from-y: 0px;
-  --mid-x: 0px;
-  --mid-y: 0px;
   --to-x: 0px;
   --to-y: 0px;
-  --rot-from: 0deg;
-  --rot-mid: 0deg;
-  --rot-to: 0deg;
   position: absolute;
   left: 0;
   top: 0;
@@ -4282,11 +4405,25 @@ body.in-game .game-screen {
   opacity: 1;
   pointer-events: none;
   transform-origin: 50% 80%;
-  animation: chipStackCollect 840ms var(--delay) cubic-bezier(0.22, 0.82, 0.22, 1) both;
   will-change: transform, opacity;
 }
 
-.chip-collect::after {
+.chip-collect {
+  --mid-x: 0px;
+  --mid-y: 0px;
+  --rot-from: 0deg;
+  --rot-mid: 0deg;
+  --rot-to: 0deg;
+  animation: chipStackCollect 840ms var(--delay) cubic-bezier(0.22, 0.82, 0.22, 1) both;
+}
+
+.chip-payout {
+  opacity: 1;
+  animation: chipStackPayout 880ms var(--delay) cubic-bezier(0.18, 0.86, 0.22, 1) both;
+}
+
+.chip-collect::after,
+.chip-payout::after {
   content: "";
   position: absolute;
   left: 10%;
@@ -4302,6 +4439,10 @@ body.in-game .game-screen {
 
 .pot-chip-stack.collect-pop {
   animation: potCollectPop 520ms cubic-bezier(0.18, 0.9, 0.2, 1) both;
+}
+
+.pot-chip-stack.payout-pop {
+  animation: potPayoutPop 620ms cubic-bezier(0.18, 0.9, 0.2, 1) both;
 }
 
 .betting-actions {
@@ -5127,6 +5268,25 @@ body.in-game .betting-actions.amount-open .bet-confirm span {
   }
 }
 
+@keyframes chipStackPayout {
+  0% {
+    opacity: 0;
+    transform: translate3d(var(--from-x), var(--from-y), 0) rotateX(58deg) rotateZ(-8deg) scale(0.7);
+  }
+  16% {
+    opacity: 1;
+    transform: translate3d(var(--from-x), var(--from-y), 0) rotateX(58deg) rotateZ(-8deg) scale(1.08);
+  }
+  78% {
+    opacity: 1;
+    transform: translate3d(var(--to-x), var(--to-y), 0) rotateX(58deg) rotateZ(8deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--to-x), var(--to-y), 0) rotateX(58deg) rotateZ(8deg) scale(0.66);
+  }
+}
+
 @keyframes potCollectPop {
   0% {
     transform: scale(var(--pot-scale, 1));
@@ -5139,6 +5299,51 @@ body.in-game .betting-actions.amount-open .bet-confirm span {
   100% {
     transform: scale(var(--pot-scale, 1));
     filter: brightness(1);
+  }
+}
+
+@keyframes potPayoutPop {
+  0% {
+    transform: scale(var(--pot-scale, 1));
+    opacity: 1;
+  }
+  55% {
+    transform: scale(calc(var(--pot-scale, 1) * 0.86));
+    opacity: 0.48;
+  }
+  100% {
+    transform: scale(var(--pot-scale, 1));
+    opacity: 1;
+  }
+}
+
+@keyframes bestCardGlow {
+  from {
+    filter: brightness(1);
+  }
+  to {
+    filter: brightness(1.08);
+  }
+}
+
+@keyframes handAura {
+  from {
+    opacity: 0.58;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes winnerPlatePaid {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  42% {
+    transform: translateY(-5px) scale(1.04);
+  }
+  100% {
+    transform: translateY(0) scale(1);
   }
 }
 

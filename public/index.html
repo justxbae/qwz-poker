@@ -25,6 +25,7 @@
           <div class="toolbar-spacer"></div>
           <button class="icon-control" data-panel-tab="log" title="История" aria-label="История">♠</button>
           <button class="icon-control" data-panel-tab="info" title="Инфо" aria-label="Инфо">i</button>
+          <button class="icon-control" data-panel-tab="hands" title="Комбинации" aria-label="Комбинации">★</button>
           <button class="icon-control" data-panel-tab="stats" title="Статистика" aria-label="Статистика">◔</button>
           <button class="icon-control" data-panel-tab="waitlist" title="Лист ожидания" aria-label="Лист ожидания">☷</button>
           <button id="sitButton" class="sit-button" hidden>Сесть за стол</button>
@@ -53,6 +54,10 @@
             <div class="pot" id="pot">Банк: 0</div>
           </div>
           <div class="table-details" id="tableDetails">Texas NL · Блайнды 25/50</div>
+          <div class="viewer-hand-badge" id="viewerHandBadge" hidden>
+            <span>Комбинация</span>
+            <strong>Старшая карта</strong>
+          </div>
           <div class="status-line" id="tableStatus">Ожидание игроков</div>
           <div class="seats" id="seats"></div>
         </div>
@@ -749,6 +754,7 @@
       <div class="drawer-tabs">
         <button data-drawer-tab="log" aria-label="История">♠ <span>История</span></button>
         <button data-drawer-tab="info" aria-label="Инфо">i <span>Инфо</span></button>
+        <button data-drawer-tab="hands" aria-label="Комбинации">★ <span>Комбинации</span></button>
         <button data-drawer-tab="stats" aria-label="Статистика">◔ <span>Статистика</span></button>
         <button data-drawer-tab="waitlist" aria-label="Лист ожидания">☷ <span>Лист ожидания</span></button>
         <button class="close-button" id="closeDrawerButton" aria-label="Закрыть панель">×</button>
@@ -758,6 +764,9 @@
       </section>
       <section class="drawer-page" id="drawerInfo" hidden>
         <div class="info-list" id="tableInfo"></div>
+      </section>
+      <section class="drawer-page" id="drawerHands" hidden>
+        <div class="poker-hands-guide" id="pokerHandsGuide"></div>
       </section>
       <section class="drawer-page" id="drawerStats" hidden>
         <div class="stats-table" id="statsTable"></div>

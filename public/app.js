@@ -150,6 +150,7 @@ const pot = document.querySelector("#pot");
 const potChips = document.querySelector("#potChips");
 const blinds = document.querySelector("#blinds");
 const tableDetails = document.querySelector("#tableDetails");
+const viewerHandBadge = document.querySelector("#viewerHandBadge");
 const tableStatus = document.querySelector("#tableStatus");
 const bettingActions = document.querySelector("#bettingActions");
 const preActions = document.querySelector("#preActions");
@@ -214,9 +215,11 @@ const confirmBuyInButton = document.querySelector("#confirmBuyInButton");
 const drawerPages = {
   log: document.querySelector("#drawerLog"),
   info: document.querySelector("#drawerInfo"),
+  hands: document.querySelector("#drawerHands"),
   stats: document.querySelector("#drawerStats"),
   waitlist: document.querySelector("#drawerWaitlist")
 };
+const pokerHandsGuide = document.querySelector("#pokerHandsGuide");
 const tableItemTemplate = document.querySelector("#tableItemTemplate");
 let actionAmountContext = "";
 let overlayFadeTimer = 0;
@@ -231,6 +234,8 @@ let previousSeatCardKeys = new Map();
 let previousSeatBets = new Map();
 let previousSeatFolded = new Map();
 let activeSeatKey = "";
+let viewerActionHapticKey = "";
+let showdownPayoutKey = "";
 let rebuyPromptKey = "";
 let queuedPreAction = "";
 let queuedPreActionKey = "";
@@ -251,6 +256,7 @@ async function boot() {
   tg?.ready();
   tg?.expand();
   setupTelegramControls();
+  renderPokerHandsGuide();
 
   await auth();
   await loadConfig();
@@ -2872,6 +2878,10 @@ function renderCurrentTable(table) {
   potChips.dataset.size = chipSize(table.pot, table.bigBlind);
   potChips.dataset.chipTheme = chipTheme(table.pot, table.bigBlind);
   tableStatus.textContent = formatStatus(table);
+  const viewerSeat = (table.seats || []).find((seat) => seat.userId === state.user?.id);
+  const viewerHand = evaluateVisibleHand([...(viewerSeat?.cards || []), ...(table.communityCards || [])]);
+  renderViewerHandBadge(viewerHand, table);
+  maybeHapticForViewerTurn(table);
   renderBettingActions(table);
   renderPreActions(table);
   renderStartOverlay(table);
@@ -2883,10 +2893,16 @@ function renderCurrentTable(table) {
   renderSeatControls(table);
   renderBotControls(table);
   maybePromptRebuy(table);
+  const winningSeatIds = winningSeatIdSet(table);
+  const boardHighlightCards = highlightedBoardCards(table, viewerHand, winningSeatIds);
   const nextCommunityKey = table.communityCards.join("|");
   const animateCommunity = nextCommunityKey !== communityCardsKey;
   communityCardsKey = nextCommunityKey;
-  communityCards.replaceChildren(...renderCommunityCards(table.communityCards, { animate: animateCommunity }));
+  communityCards.replaceChildren(...renderCommunityCards(table.communityCards, {
+    animate: animateCommunity,
+    highlightCards: boardHighlightCards
+  }));
+  const shouldPayWinners = maybeAnimatePotToWinners(table, winningSeatIds);
   seats.replaceChildren(
     ...table.seats.map((seat, index) => {
       const node = document.createElement("article");
@@ -2894,6 +2910,10 @@ function renderCurrentTable(table) {
       const seatCardKey = `${table.handNumber}:${seat.userId}:${seat.cards.join("|")}`;
       const previousCardKey = previousSeatCardKeys.get(seat.userId) || "";
       const shouldAnimateCards = Boolean(seat.cards.length && seatCardKey !== previousCardKey);
+      const seatHand = evaluateVisibleHand([...(seat.cards || []), ...(table.communityCards || [])]);
+      const highlightCards = seat.userId === state.user?.id || winningSeatIds.has(seat.userId)
+        ? seatHand.cards
+        : [];
       previousSeatCardKeys.set(seat.userId, seatCardKey);
       const previousBet = previousSeatBets.get(seat.userId) || 0;
       const shouldAnimateBet = Boolean(seat.bet && seat.bet !== previousBet);
@@ -2916,7 +2936,9 @@ function renderCurrentTable(table) {
         seat.userId === state.user?.id ? "viewer-seat" : "",
         seat.isAllIn ? "all-in" : "",
         shouldAnimateBet ? "bet-pop" : "",
-        isWinningSeat(table, seat) ? "winner" : ""
+        winningSeatIds.has(seat.userId) ? "winner" : "",
+        winningSeatIds.has(seat.userId) && shouldPayWinners ? "winner-paid" : "",
+        seat.userId === state.user?.id && viewerHand.rank >= 1 ? `viewer-made-hand hand-rank-${viewerHand.rank}` : ""
       ].filter(Boolean).join(" ");
       node.innerHTML = `
         <div class="seat-avatar"></div>
@@ -2929,6 +2951,7 @@ function renderCurrentTable(table) {
           <div class="seat-name"></div>
           <div class="seat-timer"><span></span></div>
           <div class="seat-meta"></div>
+          <div class="seat-hand-label"></div>
         </div>
       `;
       const badges = [
@@ -2944,7 +2967,18 @@ function renderCurrentTable(table) {
       renderAvatar(node.querySelector(".seat-avatar"), seat);
       node.querySelector(".seat-name").textContent = seat.name;
       renderTableValue(node.querySelector(".seat-meta"), table, seat.stack);
-      node.querySelector(".seat-cards").replaceChildren(...renderCards(seat.cards, { animate: shouldAnimateCards }));
+      const handLabel = node.querySelector(".seat-hand-label");
+      if (seat.userId === state.user?.id && viewerHand.label && viewerHand.rank >= 1) {
+        handLabel.textContent = viewerHand.label;
+      } else if (winningSeatIds.has(seat.userId) && seatHand.label) {
+        handLabel.textContent = seatHand.label;
+      } else {
+        handLabel.hidden = true;
+      }
+      node.querySelector(".seat-cards").replaceChildren(...renderCards(seat.cards, {
+        animate: shouldAnimateCards,
+        highlightCards
+      }));
       if (seat.bet) renderTableValue(node.querySelector(".bet-amount"), table, seat.bet);
       node.dataset.badges = badges.join(" ");
       node.dataset.bet = seat.bet ? formatTableAmount(table, seat.bet) : "";
@@ -3137,6 +3171,51 @@ function switchDrawerTab(tab) {
   document.querySelectorAll("[data-drawer-tab]").forEach((button) => {
     button.classList.toggle("active", button.dataset.drawerTab === tab);
   });
+}
+
+function renderPokerHandsGuide() {
+  if (!pokerHandsGuide) return;
+  const hands = [
+    ["Роял-флеш", "A K Q J 10 одной масти", "Самая сильная комбинация."],
+    ["Стрит-флеш", "5 карт подряд одной масти", "Например 9-8-7-6-5 пики."],
+    ["Каре", "4 карты одного ранга", "Например четыре дамы."],
+    ["Фулл-хаус", "Тройка + пара", "Например K-K-K и 7-7."],
+    ["Флеш", "5 карт одной масти", "Порядок карт не важен."],
+    ["Стрит", "5 карт подряд", "Туз может быть A-K-Q-J-10 или A-2-3-4-5."],
+    ["Сет / тройка", "3 карты одного ранга", "Например три девятки."],
+    ["Две пары", "2 пары разных рангов", "Например A-A и 8-8."],
+    ["Пара", "2 карты одного ранга", "Например J-J."],
+    ["Старшая карта", "Когда комбинации нет", "Побеждает самая высокая карта."]
+  ];
+  pokerHandsGuide.replaceChildren(...hands.map(([title, example, text], index) => {
+    const row = document.createElement("div");
+    row.className = "poker-hand-row";
+    row.innerHTML = "<b></b><div><strong></strong><span></span><small></small></div>";
+    row.querySelector("b").textContent = String(index + 1);
+    row.querySelector("strong").textContent = title;
+    row.querySelector("span").textContent = example;
+    row.querySelector("small").textContent = text;
+    return row;
+  }));
+}
+
+function renderViewerHandBadge(hand, table) {
+  if (!viewerHandBadge) return;
+  const active = Boolean(table.viewer?.isSeated && hand && hand.cards.length >= 2 && ["preflop", "flop", "turn", "river", "runout", "showdown"].includes(table.status));
+  viewerHandBadge.hidden = !active;
+  currentTable.classList.toggle("viewer-made-hand-active", active && hand.rank >= 1);
+  if (!active) return;
+  viewerHandBadge.dataset.rank = String(hand.rank || 0);
+  viewerHandBadge.querySelector("strong").textContent = hand.label || "Старшая карта";
+}
+
+function maybeHapticForViewerTurn(table) {
+  const key = table.viewer?.canAct
+    ? `${table.id}:${table.handNumber}:${table.activeSeatIndex}:${table.status}`
+    : "";
+  if (!key || key === viewerActionHapticKey) return;
+  viewerActionHapticKey = key;
+  haptic("medium");
 }
 
 function renderBettingActions(table) {
@@ -3417,8 +3496,180 @@ function renderStats(table) {
   );
 }
 
-function isWinningSeat(table, seat) {
-  return table.status === "showdown" && table.message.includes(`${seat.name} забирает`);
+function winningSeatIdSet(table) {
+  const winnerNames = new Set();
+  const lastHand = (table.handHistory || [])[0];
+  if (table.status === "showdown" && lastHand?.handNumber === table.handNumber) {
+    for (const potItem of lastHand.pots || []) {
+      for (const winner of potItem.winners || []) winnerNames.add(winner);
+    }
+  }
+  if (!winnerNames.size && table.status === "showdown") {
+    for (const seat of table.seats || []) {
+      if (table.message?.includes(`${seat.name} забирает`)) winnerNames.add(seat.name);
+    }
+  }
+  return new Set((table.seats || [])
+    .filter((seat) => winnerNames.has(seat.name))
+    .map((seat) => seat.userId));
+}
+
+function highlightedBoardCards(table, viewerHand, winnerIds) {
+  const boardCards = new Set(table.communityCards || []);
+  const highlighted = new Set();
+  const collect = (cards = []) => {
+    for (const card of cards) {
+      if (boardCards.has(card)) highlighted.add(card);
+    }
+  };
+  if (viewerHand?.rank >= 1) collect(viewerHand.cards);
+  for (const seat of table.seats || []) {
+    if (!winnerIds.has(seat.userId)) continue;
+    const seatHand = evaluateVisibleHand([...(seat.cards || []), ...(table.communityCards || [])]);
+    collect(seatHand.cards);
+  }
+  return [...highlighted];
+}
+
+function maybeAnimatePotToWinners(table, winnerIds) {
+  if (table.status !== "showdown" || !winnerIds.size) return false;
+  const key = `${table.id}:${table.handNumber}:${[...winnerIds].sort().join("|")}:${table.pot}`;
+  if (key === showdownPayoutKey) return false;
+  showdownPayoutKey = key;
+  window.requestAnimationFrame(() => animatePotToWinners(winnerIds));
+  return true;
+}
+
+function animatePotToWinners(winnerIds) {
+  const board = document.querySelector(".board");
+  if (!board || !potChips) return;
+  const boardRect = board.getBoundingClientRect();
+  const potRect = potChips.getBoundingClientRect();
+  const fromX = potRect.left + potRect.width / 2 - boardRect.left;
+  const fromY = potRect.top + potRect.height / 2 - boardRect.top;
+  const winners = [...board.querySelectorAll(".seat.winner")].filter((seat) => winnerIds.has(seat.dataset.userId));
+  winners.forEach((seat, index) => {
+    const rect = seat.getBoundingClientRect();
+    const toX = rect.left + rect.width / 2 - boardRect.left;
+    const toY = rect.top + rect.height / 2 - boardRect.top;
+    const stack = document.createElement("div");
+    stack.className = "chip-stack chip-payout";
+    stack.dataset.chipTheme = "gold";
+    stack.innerHTML = "<i></i><i></i><i></i><i></i><i></i>";
+    stack.style.setProperty("--from-x", `${fromX}px`);
+    stack.style.setProperty("--from-y", `${fromY}px`);
+    stack.style.setProperty("--to-x", `${toX}px`);
+    stack.style.setProperty("--to-y", `${toY}px`);
+    stack.style.setProperty("--delay", `${index * 120}ms`);
+    board.append(stack);
+    window.setTimeout(() => stack.remove(), 1050 + index * 120);
+  });
+  restartAnimation(potChips, "payout-pop");
+}
+
+function evaluateVisibleHand(cards) {
+  const visible = (cards || []).filter((card) => card && card !== "hidden");
+  if (visible.length < 2) return { rank: 0, label: "Старшая карта", cards: visible };
+  if (visible.length < 5) return evaluatePartialHand(visible);
+
+  let best = null;
+  for (const combo of combinations(visible, 5)) {
+    const evaluated = evaluateFiveCards(combo);
+    if (!best || compareHandScore(evaluated.score, best.score) > 0) best = evaluated;
+  }
+  return best || { rank: 0, label: "Старшая карта", cards: visible.slice(0, 5), score: [0] };
+}
+
+function evaluatePartialHand(cards) {
+  const counts = rankCounts(cards);
+  const pairs = [...counts.values()].filter((count) => count >= 2).length;
+  const trips = [...counts.values()].some((count) => count >= 3);
+  if (trips) return { rank: 3, label: "Сет", cards, score: [3] };
+  if (pairs >= 2) return { rank: 2, label: "Две пары", cards, score: [2] };
+  if (pairs === 1) return { rank: 1, label: "Пара", cards, score: [1] };
+  return { rank: 0, label: "Старшая карта", cards, score: [0] };
+}
+
+function evaluateFiveCards(cards) {
+  const values = cards.map(cardRankValue).sort((a, b) => b - a);
+  const suits = cards.map((card) => card[1]);
+  const flush = suits.every((suit) => suit === suits[0]);
+  const straightHigh = straightHighValue(values);
+  const counts = rankCounts(cards);
+  const groups = [...counts.entries()]
+    .map(([rank, count]) => ({ rank, count }))
+    .sort((left, right) => right.count - left.count || right.rank - left.rank);
+
+  if (flush && straightHigh === 14) return handResult(9, "Роял-флеш", cards, [9, 14]);
+  if (flush && straightHigh) return handResult(8, "Стрит-флеш", cards, [8, straightHigh]);
+  if (groups[0].count === 4) return handResult(7, "Каре", cards, [7, groups[0].rank, ...values.filter((value) => value !== groups[0].rank)]);
+  if (groups[0].count === 3 && groups[1]?.count === 2) return handResult(6, "Фулл-хаус", cards, [6, groups[0].rank, groups[1].rank]);
+  if (flush) return handResult(5, "Флеш", cards, [5, ...values]);
+  if (straightHigh) return handResult(4, "Стрит", cards, [4, straightHigh]);
+  if (groups[0].count === 3) return handResult(3, "Сет", cards, [3, groups[0].rank, ...values.filter((value) => value !== groups[0].rank)]);
+  if (groups[0].count === 2 && groups[1]?.count === 2) {
+    const pairRanks = groups.filter((group) => group.count === 2).map((group) => group.rank).sort((a, b) => b - a);
+    return handResult(2, "Две пары", cards, [2, ...pairRanks, ...values.filter((value) => !pairRanks.includes(value))]);
+  }
+  if (groups[0].count === 2) return handResult(1, "Пара", cards, [1, groups[0].rank, ...values.filter((value) => value !== groups[0].rank)]);
+  return handResult(0, `Старшая карта ${rankName(values[0])}`, cards, [0, ...values]);
+}
+
+function handResult(rank, label, cards, score) {
+  return { rank, label, cards, score };
+}
+
+function rankCounts(cards) {
+  const counts = new Map();
+  for (const card of cards) {
+    const value = cardRankValue(card);
+    counts.set(value, (counts.get(value) || 0) + 1);
+  }
+  return counts;
+}
+
+function cardRankValue(card) {
+  return { "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, T: 10, J: 11, Q: 12, K: 13, A: 14 }[card[0]] || 0;
+}
+
+function straightHighValue(values) {
+  const unique = [...new Set(values)].sort((a, b) => b - a);
+  if (unique.includes(14)) unique.push(1);
+  for (let index = 0; index <= unique.length - 5; index += 1) {
+    const run = unique.slice(index, index + 5);
+    if (run.every((value, offset) => offset === 0 || run[offset - 1] - value === 1)) return run[0] === 1 ? 5 : run[0];
+  }
+  return 0;
+}
+
+function compareHandScore(left, right) {
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    const diff = Number(left[index] || 0) - Number(right[index] || 0);
+    if (diff) return diff;
+  }
+  return 0;
+}
+
+function combinations(items, size) {
+  const result = [];
+  const walk = (start, picked) => {
+    if (picked.length === size) {
+      result.push([...picked]);
+      return;
+    }
+    for (let index = start; index <= items.length - (size - picked.length); index += 1) {
+      picked.push(items[index]);
+      walk(index + 1, picked);
+      picked.pop();
+    }
+  };
+  walk(0, []);
+  return result;
+}
+
+function rankName(value) {
+  return { 14: "A", 13: "K", 12: "Q", 11: "J", 10: "10" }[value] || String(value);
 }
 
 function chipSize(amount, bigBlind = 50) {
@@ -3828,12 +4079,14 @@ function renderCards(cards, options = {}) {
     return [];
   }
 
+  const highlightSet = new Set(options.highlightCards || []);
   return cards.map((card, index) => {
     const node = document.createElement("span");
     node.className = [
       "card",
       card === "hidden" ? "hidden" : "",
       card !== "hidden" && isRed(card) ? "red" : "",
+      highlightSet.has(card) ? "best-card" : "",
       options.animate ? "dealt" : ""
     ].filter(Boolean).join(" ");
     if (options.animate) node.style.animationDelay = `${index * 70}ms`;
@@ -3853,6 +4106,7 @@ function renderCards(cards, options = {}) {
 }
 
 function renderCommunityCards(cards, options = {}) {
+  const highlightSet = new Set(options.highlightCards || []);
   return Array.from({ length: 5 }, (_, index) => {
     const slot = document.createElement("span");
     const card = cards[index];
@@ -3860,7 +4114,8 @@ function renderCommunityCards(cards, options = {}) {
     slot.setAttribute("aria-hidden", card ? "false" : "true");
     if (card) {
       slot.replaceChildren(...renderCards([card], {
-        animate: options.animate
+        animate: options.animate,
+        highlightCards: highlightSet.has(card) ? [card] : []
       }));
     }
     return slot;
