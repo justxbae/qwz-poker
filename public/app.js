@@ -5,6 +5,11 @@ const DEV_MODE = params.has("dev1")
   || params.get("dev") === "1"
   || window.localStorage.getItem("qwzDevMode") === "1";
 const ADMIN_MODE = params.get("admin") === "1" || window.location.pathname === "/admin";
+const ADMIN_SECRET_STORAGE_KEY = "qwzAdminWebSecret";
+if (ADMIN_MODE && params.has("key")) {
+  window.localStorage.setItem(ADMIN_SECRET_STORAGE_KEY, params.get("key") || "");
+  window.history.replaceState({}, "", "/admin");
+}
 if ("scrollRestoration" in window.history) {
   window.history.scrollRestoration = "manual";
 }
@@ -381,11 +386,16 @@ async function boot() {
 }
 
 async function auth() {
+  const body = {
+    initData: tg?.initData || ""
+  };
+  if (ADMIN_MODE) {
+    body.adminSecret = window.localStorage.getItem(ADMIN_SECRET_STORAGE_KEY) || "";
+  }
+
   const data = await api("/api/auth", {
     method: "POST",
-    body: {
-      initData: tg?.initData || ""
-    },
+    body,
     auth: false
   });
 

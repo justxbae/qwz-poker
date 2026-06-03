@@ -119,6 +119,8 @@ const ADMIN_OWNER_IDS = parseIdList(process.env.ADMIN_OWNER_IDS || process.env.A
 const ADMIN_FINANCE_IDS = parseIdList(process.env.ADMIN_FINANCE_IDS || "");
 const ADMIN_SUPPORT_IDS = parseIdList(process.env.ADMIN_SUPPORT_IDS || "");
 const ADMIN_RISK_IDS = parseIdList(process.env.ADMIN_RISK_IDS || "");
+const ADMIN_WEB_SECRET = process.env.ADMIN_WEB_SECRET || "";
+const ADMIN_WEB_USER_ID = "web-admin";
 const ADMIN_GRANT_MAX_CHIPS = Number(process.env.ADMIN_GRANT_MAX_CHIPS || 500000);
 const METRICS_TOKEN = process.env.METRICS_TOKEN || "";
 const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
@@ -346,6 +348,16 @@ async function handleApi(req, res, url) {
 
   if (req.method === "POST" && url.pathname === "/api/auth") {
     const body = await readJson(req);
+    const webAdmin = authenticateWebAdmin(body.adminSecret || "");
+    if (webAdmin.ok) {
+      const token = randomId("admin_session");
+      sessions.set(token, webAdmin.user);
+      sessionExpirations.set(token, Date.now() + SESSION_TTL_MS);
+      await stateSetSession(token, webAdmin.user);
+      sendJson(res, 200, { token, user: webAdmin.user });
+      return;
+    }
+
     const auth = authenticateTelegram(body.initData || "");
     if (!auth.ok) {
       sendJson(res, 401, { error: auth.error });
@@ -1447,6 +1459,23 @@ function authenticateTelegram(initData) {
   return { ok: true, user };
 }
 
+function authenticateWebAdmin(secret) {
+  if (!ADMIN_WEB_SECRET) return { ok: false, error: "ADMIN_WEB_SECRET is not configured" };
+  if (String(secret || "") !== ADMIN_WEB_SECRET) return { ok: false, error: "Invalid admin secret" };
+  return {
+    ok: true,
+    user: {
+      id: ADMIN_WEB_USER_ID,
+      name: "Admin",
+      username: "admin",
+      photoUrl: "",
+      balance: 0,
+      cashBalanceMicros: 0,
+      isWebAdmin: true
+    }
+  };
+}
+
 async function normalizeUser(user) {
   const id = String(user.id);
   const normalized = {
@@ -2171,6 +2200,7 @@ function hasAdminRole(userId, role) {
 function adminRolesFor(userId) {
   const id = String(userId || "");
   const roles = [];
+  if (ADMIN_WEB_SECRET && id === ADMIN_WEB_USER_ID) roles.push("owner");
   if (ADMIN_OWNER_IDS.has(id)) roles.push("owner");
   if (ADMIN_USER_IDS.has(id) && !roles.includes("owner")) roles.push("owner");
   if (ADMIN_FINANCE_IDS.has(id)) roles.push("finance");
