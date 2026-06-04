@@ -2666,18 +2666,21 @@ body.in-game .game-toolbar [data-panel-tab="waitlist"] {
 
 .viewer-hand-badge {
   position: absolute;
-  left: 22px;
-  bottom: 118px;
+  left: 50%;
+  bottom: -34px;
   z-index: 8;
-  display: grid;
-  gap: 2px;
-  min-width: 132px;
-  border: 1px solid rgba(255, 213, 112, 0.2);
-  border-radius: 14px;
-  background: rgba(10, 13, 16, 0.78);
-  padding: 8px 10px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  max-width: min(82%, 300px);
+  border: 1px solid rgba(255, 213, 112, 0.16);
+  border-radius: 999px;
+  background: rgba(10, 13, 16, 0.86);
+  padding: 7px 11px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
   backdrop-filter: blur(8px);
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 .viewer-hand-badge span {
@@ -2689,8 +2692,15 @@ body.in-game .game-toolbar [data-panel-tab="waitlist"] {
 
 .viewer-hand-badge strong {
   color: #fff1b8;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viewer-hand-badge:not([hidden]) + .status-line {
+  bottom: -66px;
 }
 
 .viewer-made-hand-active .board::after {
