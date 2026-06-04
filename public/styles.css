@@ -4765,6 +4765,126 @@ body.in-game .seat-count-6.seat-3 .bet-spot {
   top: 76px;
 }
 
+/* Distant table layout inspired by compact mobile poker rooms. */
+body.in-game .board {
+  width: min(78vw, 326px);
+  height: clamp(440px, calc(100dvh - 154px), 600px);
+  min-height: 440px;
+  margin-top: 18px;
+  border: 0;
+  border-radius: 44% / 22%;
+  background:
+    linear-gradient(180deg, rgba(214, 251, 221, 0.8) 0%, rgba(116, 181, 166, 0.84) 43%, rgba(184, 216, 183, 0.82) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.3),
+    inset 0 -58px 84px rgba(41, 75, 73, 0.28),
+    0 0 0 1px rgba(0, 0, 0, 0.34),
+    0 24px 58px rgba(0, 0, 0, 0.56);
+}
+
+body.in-game .board::before {
+  inset: -10px -22px;
+  border: 5px solid rgba(246, 250, 255, 0.86);
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  border-radius: 46% / 24%;
+  box-shadow:
+    0 0 24px rgba(255, 255, 255, 0.18),
+    inset 0 0 20px rgba(255, 255, 255, 0.12);
+}
+
+body.in-game .board::after {
+  top: 66%;
+  color: rgba(19, 51, 54, 0.12);
+  font-size: 22px;
+}
+
+body.in-game .community {
+  top: 45%;
+  width: min(94%, 280px);
+  gap: 5px;
+}
+
+body.in-game .community .board-card-slot {
+  width: 45px;
+}
+
+body.in-game .table-center {
+  top: 34%;
+}
+
+body.in-game .blinds {
+  color: rgba(17, 49, 51, 0.56);
+}
+
+body.in-game .pot {
+  background: rgba(13, 32, 34, 0.66);
+  color: #f8fff9;
+}
+
+body.in-game .table-details {
+  top: 57%;
+  width: min(82%, 250px);
+  border: 1px solid rgba(255, 255, 255, 0.44);
+  border-radius: 999px;
+  background: rgba(20, 90, 86, 0.28);
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 10px;
+  padding: 4px 8px;
+}
+
+body.in-game .seat {
+  width: 72px;
+}
+
+body.in-game .seat-plate {
+  background: rgba(0, 0, 0, 0.82);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.36);
+}
+
+body.in-game .seat-count-1.seat-0,
+body.in-game .seat-count-2.seat-0,
+body.in-game .seat-count-3.seat-0,
+body.in-game .seat-count-4.seat-0,
+body.in-game .seat-count-5.seat-0,
+body.in-game .seat-count-6.seat-0 {
+  top: 101%;
+}
+
+body.in-game .seat-count-6.seat-1 {
+  left: -2%;
+  top: 74%;
+}
+
+body.in-game .seat-count-6.seat-2 {
+  left: -2%;
+  top: 30%;
+}
+
+body.in-game .seat-count-6.seat-3 {
+  top: -1%;
+}
+
+body.in-game .seat-count-6.seat-4 {
+  left: 102%;
+  top: 30%;
+}
+
+body.in-game .seat-count-6.seat-5 {
+  left: 102%;
+  top: 74%;
+}
+
+body.in-game .seat-count-6.seat-1 .bet-spot,
+body.in-game .seat-count-6.seat-2 .bet-spot {
+  left: 150%;
+}
+
+body.in-game .seat-count-6.seat-4 .bet-spot,
+body.in-game .seat-count-6.seat-5 .bet-spot {
+  left: -50%;
+}
+
 @media (max-width: 420px) {
   body.in-game .profile {
     display: none;
@@ -4775,9 +4895,10 @@ body.in-game .seat-count-6.seat-3 .bet-spot {
   }
 
   body.in-game .board {
-    width: min(90vw, 350px);
-    height: clamp(382px, calc(100dvh - 132px), 548px);
-    min-height: 382px;
+    width: min(76vw, 304px);
+    height: clamp(426px, calc(100dvh - 158px), 572px);
+    min-height: 426px;
+    margin-top: 18px;
   }
 
   body.in-game .seat {
@@ -4822,12 +4943,12 @@ body.in-game .seat-count-6.seat-3 .bet-spot {
 
   body.in-game .seat-count-6.seat-1,
   body.in-game .seat-count-6.seat-2 {
-    left: 14%;
+    left: -2%;
   }
 
   body.in-game .seat-count-6.seat-4,
   body.in-game .seat-count-6.seat-5 {
-    left: 86%;
+    left: 102%;
   }
 }
 
