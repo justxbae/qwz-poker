@@ -4925,6 +4925,52 @@ body.in-game .seat-count-6.seat-5 .bet-spot {
   left: -50%;
 }
 
+body.in-game .game-screen.has-actions .board,
+body.in-game .game-screen.has-pre-actions .board,
+body.in-game .game-screen.has-bot-actions .board {
+  height: clamp(390px, calc(100dvh - 226px), 500px);
+  min-height: 390px;
+  margin-top: 8px;
+}
+
+body.in-game .game-screen.has-actions .seat-count-1.seat-0,
+body.in-game .game-screen.has-actions .seat-count-2.seat-0,
+body.in-game .game-screen.has-actions .seat-count-3.seat-0,
+body.in-game .game-screen.has-actions .seat-count-4.seat-0,
+body.in-game .game-screen.has-actions .seat-count-5.seat-0,
+body.in-game .game-screen.has-actions .seat-count-6.seat-0,
+body.in-game .game-screen.has-pre-actions .seat-count-1.seat-0,
+body.in-game .game-screen.has-pre-actions .seat-count-2.seat-0,
+body.in-game .game-screen.has-pre-actions .seat-count-3.seat-0,
+body.in-game .game-screen.has-pre-actions .seat-count-4.seat-0,
+body.in-game .game-screen.has-pre-actions .seat-count-5.seat-0,
+body.in-game .game-screen.has-pre-actions .seat-count-6.seat-0,
+body.in-game .game-screen.has-bot-actions .seat-count-1.seat-0,
+body.in-game .game-screen.has-bot-actions .seat-count-2.seat-0,
+body.in-game .game-screen.has-bot-actions .seat-count-3.seat-0,
+body.in-game .game-screen.has-bot-actions .seat-count-4.seat-0,
+body.in-game .game-screen.has-bot-actions .seat-count-5.seat-0,
+body.in-game .game-screen.has-bot-actions .seat-count-6.seat-0 {
+  top: 92%;
+}
+
+body.in-game .game-screen.has-actions .viewer-hand-badge,
+body.in-game .game-screen.has-pre-actions .viewer-hand-badge,
+body.in-game .game-screen.has-bot-actions .viewer-hand-badge {
+  bottom: -28px;
+}
+
+body.in-game .game-screen.has-actions .status-line,
+body.in-game .game-screen.has-pre-actions .status-line,
+body.in-game .game-screen.has-bot-actions .status-line {
+  bottom: -54px;
+  font-size: 12px;
+}
+
+body.in-game .game-screen[data-table-status="showdown"] .status-line {
+  display: none;
+}
+
 @media (max-width: 420px) {
   body.in-game .profile {
     display: none;
@@ -4939,6 +4985,14 @@ body.in-game .seat-count-6.seat-5 .bet-spot {
     height: clamp(426px, calc(100dvh - 158px), 572px);
     min-height: 426px;
     margin-top: 18px;
+  }
+
+  body.in-game .game-screen.has-actions .board,
+  body.in-game .game-screen.has-pre-actions .board,
+  body.in-game .game-screen.has-bot-actions .board {
+    height: clamp(372px, calc(100dvh - 236px), 476px);
+    min-height: 372px;
+    margin-top: 6px;
   }
 
   body.in-game .seat {

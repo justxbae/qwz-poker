@@ -2863,6 +2863,7 @@ function renderCurrentTable(table) {
   state.currentTable = table;
   currentTable.hidden = false;
   enterGameMode();
+  currentTable.dataset.tableStatus = table.status || "";
   tableCode.textContent = `#${table.id.slice(-8)}`;
   renderLimitValue(blinds, table.smallBlind, table.bigBlind, table.gameMode === "cash");
   tableDetails.textContent = `Texas NL · Блайнды ${formatTableLimit(table)} · #${table.handNumber || 1}`;
