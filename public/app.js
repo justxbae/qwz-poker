@@ -3686,7 +3686,6 @@ function chipTheme(amount, bigBlind = 50) {
   const ratio = amount / Math.max(1, bigBlind);
   if (ratio >= 12) return "blue";
   if (ratio >= 6) return "red";
-  if (ratio >= 2) return "green";
   return "black";
 }
 

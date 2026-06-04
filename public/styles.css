@@ -2515,9 +2515,11 @@ body.in-game .game-toolbar [data-panel-tab="waitlist"] {
 }
 
 .card {
-  display: grid;
-  place-items: center;
-  align-content: space-between;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
   width: 56px;
   aspect-ratio: 2.5 / 3.5;
   border: 1px solid rgba(0, 0, 0, 0.14);
@@ -2533,11 +2535,13 @@ body.in-game .game-toolbar [data-panel-tab="waitlist"] {
 .card-rank {
   font-size: 17px;
   line-height: 1;
+  display: block;
 }
 
 .card-suit {
   font-size: 24px;
   line-height: 1;
+  display: block;
 }
 
 .card.dealt {
@@ -2704,14 +2708,7 @@ body.in-game .game-toolbar [data-panel-tab="waitlist"] {
 }
 
 .viewer-made-hand-active .board::after {
-  content: "";
-  position: absolute;
-  inset: 12px;
-  z-index: 1;
-  border-radius: 50%;
-  box-shadow: inset 0 0 52px rgba(255, 213, 112, 0.12), 0 0 32px rgba(255, 213, 112, 0.08);
-  pointer-events: none;
-  animation: handAura 1900ms ease-in-out infinite alternate;
+  content: "QWZ POKER";
 }
 
 .betting-actions {
@@ -2967,7 +2964,7 @@ body.in-game .game-toolbar [data-panel-tab="waitlist"] {
 }
 
 .seat.active {
-  filter: drop-shadow(0 0 10px rgba(40, 199, 111, 0.58));
+  filter: drop-shadow(0 0 7px rgba(118, 196, 155, 0.26));
 }
 
 .seat.active .seat-avatar {
@@ -4035,10 +4032,10 @@ body:not(.in-game) .table-item span {
 
 @keyframes activeSeatPulse {
   from {
-    box-shadow: 0 0 0 rgba(40, 199, 111, 0);
+    box-shadow: 0 0 0 rgba(142, 216, 255, 0);
   }
   to {
-    box-shadow: 0 0 24px rgba(40, 199, 111, 0.3);
+    box-shadow: 0 0 18px rgba(142, 216, 255, 0.18);
   }
 }
 
@@ -4218,7 +4215,7 @@ body.in-game .game-screen {
   background:
     radial-gradient(circle at 50% 50%, transparent 0 30%, var(--chip-ring) 31% 35%, transparent 36%),
     conic-gradient(from 13deg, var(--chip-ring) 0 10deg, transparent 10deg 50deg, var(--chip-ring) 50deg 62deg, transparent 62deg 112deg, var(--chip-ring) 112deg 124deg, transparent 124deg 178deg, var(--chip-ring) 178deg 190deg, transparent 190deg 242deg, var(--chip-ring) 242deg 254deg, transparent 254deg 308deg, var(--chip-ring) 308deg 320deg, transparent 320deg),
-    radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--chip-main), #fff 16%), var(--chip-main) 58%, var(--chip-side) 100%);
+    radial-gradient(circle at 50% 40%, var(--chip-main), var(--chip-main) 58%, var(--chip-side) 100%);
 }
 
 .pot-chip-stack::before,
