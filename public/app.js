@@ -2411,6 +2411,12 @@ async function joinTable(tableId, buyInAmount = 0) {
       showError("Стол не найден или уже закрыт");
       return;
     }
+    if (table.viewer?.isSeated) {
+      state.currentTableId = table.id;
+      enterGameMode();
+      renderCurrentTable(table);
+      return;
+    }
     if (table.seats.length >= table.maxPlayers && !table.viewer?.isSeated) {
       showError("Стол заполнен");
       return;

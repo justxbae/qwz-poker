@@ -395,7 +395,7 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "GET" && url.pathname === "/api/tables") {
-    sendJson(res, 200, { tables: [...tables.values()].map(publicTable) });
+    sendJson(res, 200, { tables: [...tables.values()].map((table) => publicTable(table, user.id)) });
     return;
   }
 
