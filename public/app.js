@@ -3323,7 +3323,7 @@ function renderStartOverlay(table) {
 }
 
 function renderActionToast(table) {
-  const text = table.message || "";
+  const text = visibleTableMessage(table) || "";
   const shouldToast =
     text &&
     text !== lastToastText &&
@@ -3384,8 +3384,9 @@ function streetOverlayFor(table) {
   if (table.status === "runout") {
     return { title: "All-in", subtitle: "Открываем карты", duration: 760 };
   }
-  if (table.status === "showdown" && table.message) {
-    return { title: "Шоудаун", subtitle: table.message, duration: 980 };
+  const message = visibleTableMessage(table);
+  if (table.status === "showdown" && message) {
+    return { title: "Шоудаун", subtitle: message, duration: 980 };
   }
   return null;
 }
@@ -4052,11 +4053,18 @@ function formatStatus(table) {
     showdown: "Шоудаун"
   }[table.status] || table.status;
 
-  const base = table.message || fallback;
+  const base = visibleTableMessage(table) || fallback;
   if (!table.actionDeadline || table.activeSeatIndex < 0) return base;
 
   const secondsLeft = Math.max(0, Math.ceil((table.actionDeadline - table.now) / 1000));
   return `${base} · ${secondsLeft} сек`;
+}
+
+function visibleTableMessage(table) {
+  const message = String(table.message || "");
+  if (!message) return "";
+  if (/fairness\s*seed|fair\s*hash/i.test(message)) return "";
+  return message;
 }
 
 function maybePromptRebuy(table) {
