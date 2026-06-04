@@ -10318,3 +10318,60 @@ body.in-game .game-screen.has-pre-actions .viewer-hand-badge,
 body.in-game .game-screen.has-bot-actions .viewer-hand-badge {
   top: 69%;
 }
+
+/* Keep the hero player's seat anchored to the lower table edge, not inside the felt. */
+body.in-game .seat-count-1.seat-0,
+body.in-game .seat-count-2.seat-0,
+body.in-game .seat-count-3.seat-0,
+body.in-game .seat-count-4.seat-0,
+body.in-game .seat-count-5.seat-0,
+body.in-game .seat-count-6.seat-0,
+body.in-game .game-screen.has-actions .seat-count-1.seat-0,
+body.in-game .game-screen.has-actions .seat-count-2.seat-0,
+body.in-game .game-screen.has-actions .seat-count-3.seat-0,
+body.in-game .game-screen.has-actions .seat-count-4.seat-0,
+body.in-game .game-screen.has-actions .seat-count-5.seat-0,
+body.in-game .game-screen.has-actions .seat-count-6.seat-0,
+body.in-game .game-screen.has-pre-actions .seat-count-1.seat-0,
+body.in-game .game-screen.has-pre-actions .seat-count-2.seat-0,
+body.in-game .game-screen.has-pre-actions .seat-count-3.seat-0,
+body.in-game .game-screen.has-pre-actions .seat-count-4.seat-0,
+body.in-game .game-screen.has-pre-actions .seat-count-5.seat-0,
+body.in-game .game-screen.has-pre-actions .seat-count-6.seat-0,
+body.in-game .game-screen.has-bot-actions .seat-count-1.seat-0,
+body.in-game .game-screen.has-bot-actions .seat-count-2.seat-0,
+body.in-game .game-screen.has-bot-actions .seat-count-3.seat-0,
+body.in-game .game-screen.has-bot-actions .seat-count-4.seat-0,
+body.in-game .game-screen.has-bot-actions .seat-count-5.seat-0,
+body.in-game .game-screen.has-bot-actions .seat-count-6.seat-0 {
+  top: 90%;
+}
+
+@media (max-height: 720px) {
+  body.in-game .seat-count-1.seat-0,
+  body.in-game .seat-count-2.seat-0,
+  body.in-game .seat-count-3.seat-0,
+  body.in-game .seat-count-4.seat-0,
+  body.in-game .seat-count-5.seat-0,
+  body.in-game .seat-count-6.seat-0,
+  body.in-game .game-screen.has-actions .seat-count-1.seat-0,
+  body.in-game .game-screen.has-actions .seat-count-2.seat-0,
+  body.in-game .game-screen.has-actions .seat-count-3.seat-0,
+  body.in-game .game-screen.has-actions .seat-count-4.seat-0,
+  body.in-game .game-screen.has-actions .seat-count-5.seat-0,
+  body.in-game .game-screen.has-actions .seat-count-6.seat-0,
+  body.in-game .game-screen.has-pre-actions .seat-count-1.seat-0,
+  body.in-game .game-screen.has-pre-actions .seat-count-2.seat-0,
+  body.in-game .game-screen.has-pre-actions .seat-count-3.seat-0,
+  body.in-game .game-screen.has-pre-actions .seat-count-4.seat-0,
+  body.in-game .game-screen.has-pre-actions .seat-count-5.seat-0,
+  body.in-game .game-screen.has-pre-actions .seat-count-6.seat-0,
+  body.in-game .game-screen.has-bot-actions .seat-count-1.seat-0,
+  body.in-game .game-screen.has-bot-actions .seat-count-2.seat-0,
+  body.in-game .game-screen.has-bot-actions .seat-count-3.seat-0,
+  body.in-game .game-screen.has-bot-actions .seat-count-4.seat-0,
+  body.in-game .game-screen.has-bot-actions .seat-count-5.seat-0,
+  body.in-game .game-screen.has-bot-actions .seat-count-6.seat-0 {
+    top: 88%;
+  }
+}
