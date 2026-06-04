@@ -4774,7 +4774,7 @@ body.in-game .board {
   border: 0;
   border-radius: 44% / 22%;
   background:
-    linear-gradient(180deg, rgba(214, 251, 221, 0.8) 0%, rgba(116, 181, 166, 0.84) 43%, rgba(184, 216, 183, 0.82) 100%);
+    linear-gradient(180deg, rgba(188, 220, 231, 0.9) 0%, rgba(93, 151, 171, 0.88) 43%, rgba(142, 180, 194, 0.84) 100%);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.3),
     inset 0 -58px 84px rgba(41, 75, 73, 0.28),
@@ -4795,7 +4795,7 @@ body.in-game .board::before {
 
 body.in-game .board::after {
   top: 66%;
-  color: rgba(19, 51, 54, 0.12);
+  color: rgba(18, 48, 62, 0.13);
   font-size: 22px;
 }
 
@@ -4810,15 +4810,15 @@ body.in-game .community .board-card-slot {
 }
 
 body.in-game .table-center {
-  top: 34%;
+  top: 30.5%;
 }
 
 body.in-game .blinds {
-  color: rgba(17, 49, 51, 0.56);
+  color: rgba(17, 43, 58, 0.62);
 }
 
 body.in-game .pot {
-  background: rgba(13, 32, 34, 0.66);
+  background: rgba(13, 27, 42, 0.68);
   color: #f8fff9;
 }
 
@@ -4840,6 +4840,46 @@ body.in-game .seat {
 body.in-game .seat-plate {
   background: rgba(0, 0, 0, 0.82);
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.36);
+}
+
+body.in-game .seat-cards {
+  top: -3px;
+  right: -18px;
+  z-index: 0;
+  gap: 0;
+  transform: rotate(-10deg);
+}
+
+body.in-game .seat-avatar {
+  position: relative;
+  z-index: 3;
+}
+
+body.in-game .seat-cards .card {
+  width: 26px;
+  transform-origin: 50% 100%;
+}
+
+body.in-game .seat-cards .card + .card {
+  margin-left: -13px;
+  transform: rotate(12deg) translateY(2px);
+}
+
+body.in-game .seat.viewer-seat .seat-cards {
+  top: -2px;
+  right: -72px;
+  z-index: 5;
+  gap: 5px;
+  transform: rotate(-3deg);
+}
+
+body.in-game .seat.viewer-seat .seat-cards .card {
+  width: 36px;
+}
+
+body.in-game .seat.viewer-seat .seat-cards .card + .card {
+  margin-left: 0;
+  transform: rotate(5deg) translateY(2px);
 }
 
 body.in-game .seat-count-1.seat-0,
@@ -4925,20 +4965,24 @@ body.in-game .seat-count-6.seat-5 .bet-spot {
   }
 
   body.in-game .seat-cards {
+    top: -4px;
     right: -18px;
     left: auto;
+    z-index: 0;
   }
 
   body.in-game .seat-cards .card {
-    width: 22px;
+    width: 24px;
   }
 
   body.in-game .seat.viewer-seat .seat-cards {
-    right: -40px;
+    top: -2px;
+    right: -68px;
+    z-index: 5;
   }
 
   body.in-game .seat.viewer-seat .seat-cards .card {
-    width: 31px;
+    width: 34px;
   }
 
   body.in-game .seat-count-6.seat-1,
