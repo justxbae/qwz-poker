@@ -2944,6 +2944,7 @@ function renderCurrentTable(table) {
       node.innerHTML = `
         <div class="seat-avatar"></div>
         <div class="seat-cards"></div>
+        <div class="seat-action-label"></div>
         <div class="bet-spot">
           <div class="chip-stack" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
           <span class="bet-amount"></span>
@@ -2961,13 +2962,15 @@ function renderCurrentTable(table) {
         index === table.bigBlindIndex ? "BB" : "",
         seat.isAllIn ? "All-in" : "",
         seat.sitOutNextHand ? "Away next" : "",
-        seat.sittingOut ? sittingOutLabel(seat) : "",
-        index === table.activeSeatIndex ? "Ход" : "",
-        seat.folded ? "Fold" : ""
+        seat.sittingOut ? sittingOutLabel(seat) : ""
       ].filter(Boolean);
       renderAvatar(node.querySelector(".seat-avatar"), seat);
       node.querySelector(".seat-name").textContent = seat.name;
       renderTableValue(node.querySelector(".seat-meta"), table, seat.stack);
+      const actionLabel = lastSeatActionLabel(table, seat);
+      const actionLabelNode = node.querySelector(".seat-action-label");
+      actionLabelNode.textContent = actionLabel;
+      actionLabelNode.hidden = !actionLabel;
       const handLabel = node.querySelector(".seat-hand-label");
       if (seat.userId === state.user?.id && viewerHand.label && viewerHand.rank >= 1) {
         handLabel.textContent = viewerHand.label;
@@ -3025,6 +3028,33 @@ function renderSeatControls(table) {
   buyInButton.disabled = !table.viewer?.canBuyIn;
   quickBuyInButton.disabled = !table.viewer?.canBuyIn;
   quickBuyInButton.hidden = !isSeated;
+}
+
+function lastSeatActionLabel(table, seat) {
+  const name = String(seat?.name || "");
+  if (!name || !Array.isArray(table?.actionLog)) return "";
+  const currentHand = Number(table.handNumber || 0);
+  const last = table.actionLog
+    .slice()
+    .reverse()
+    .find((item) => {
+      if (Number(item.handNumber || 0) !== currentHand) return false;
+      return String(item.text || "").startsWith(`${name}:`);
+    });
+  if (!last) return "";
+  return compactActionLabel(last.text);
+}
+
+function compactActionLabel(text) {
+  const value = String(text || "").toLowerCase();
+  if (value.includes("auto-fold")) return "Фолд";
+  if (value.includes("fold")) return "Фолд";
+  if (value.includes("all-in")) return "All-in";
+  if (value.includes("raise")) return "Рейз";
+  if (value.includes("bet")) return "Ставка";
+  if (value.includes("call")) return "Колл";
+  if (value.includes("check")) return "Чек";
+  return "";
 }
 
 function renderBotControls(table) {
@@ -4065,6 +4095,7 @@ function visibleTableMessage(table) {
   const message = String(table.message || "");
   if (!message) return "";
   if (/fairness\s*seed|fair\s*hash/i.test(message)) return "";
+  if (/ходит$/i.test(message.trim())) return "";
   return message;
 }
 

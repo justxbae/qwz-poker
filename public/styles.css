@@ -9540,3 +9540,304 @@ body.in-game .seat-count-6.seat-3 {
     margin-bottom: -110px;
   }
 }
+
+/* Final game-table geometry pass: responsive scale presets, stable seats, no duplicated turn text. */
+body.in-game .game-screen {
+  --table-scale: 1.03;
+  grid-template-rows: 44px auto;
+  gap: 2px;
+  align-content: start;
+}
+
+body.in-game .game-toolbar {
+  width: min(520px, calc(100vw - 40px));
+  min-height: 44px;
+  margin: 0 auto;
+}
+
+body.in-game .game-toolbar .icon-control {
+  width: 44px;
+  min-height: 44px;
+  border-radius: 12px;
+}
+
+body.in-game .board,
+body.in-game .game-screen.has-actions .board,
+body.in-game .game-screen.has-pre-actions .board,
+body.in-game .game-screen.has-bot-actions .board {
+  width: 326px;
+  height: 560px;
+  min-height: 560px;
+  max-height: 560px;
+  margin: 2px auto -18px;
+  transform: scale(var(--table-scale));
+  transform-origin: top center;
+}
+
+body.in-game .community {
+  top: 42%;
+}
+
+body.in-game .table-center {
+  top: 27.5%;
+}
+
+body.in-game .table-details {
+  top: 55%;
+}
+
+body.in-game .board::after {
+  top: 63%;
+}
+
+body.in-game .viewer-hand-badge,
+body.in-game .game-screen.has-actions .viewer-hand-badge,
+body.in-game .game-screen.has-pre-actions .viewer-hand-badge,
+body.in-game .game-screen.has-bot-actions .viewer-hand-badge {
+  top: 68%;
+  bottom: auto;
+  z-index: 9;
+  max-width: 220px;
+  border-color: rgba(255, 213, 112, 0.2);
+  padding: 5px 11px;
+}
+
+body.in-game .viewer-hand-badge span {
+  display: none;
+}
+
+body.in-game .viewer-hand-badge strong {
+  color: #fff1b8;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+body.in-game .status-line,
+body.in-game .game-screen.has-actions .status-line,
+body.in-game .game-screen.has-pre-actions .status-line,
+body.in-game .game-screen.has-bot-actions .status-line {
+  display: none;
+}
+
+body.in-game .seat {
+  width: 72px;
+}
+
+body.in-game .seat-action-label {
+  position: absolute;
+  top: 34px;
+  left: -16px;
+  z-index: 15;
+  border-radius: 999px;
+  background: rgba(8, 13, 18, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(232, 255, 241, 0.92);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  padding: 4px 6px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+body.in-game .seat-action-label[hidden] {
+  display: none;
+}
+
+body.in-game .seat-cards {
+  top: -5px;
+  right: -18px;
+  z-index: 0;
+}
+
+body.in-game .seat.viewer-seat .seat-cards {
+  top: -4px;
+  right: -76px;
+  z-index: 6;
+}
+
+body.in-game .seat.viewer-seat .seat-cards .card {
+  width: 38px;
+}
+
+body.in-game .seat-count-1.seat-0,
+body.in-game .seat-count-2.seat-0,
+body.in-game .seat-count-3.seat-0,
+body.in-game .seat-count-4.seat-0,
+body.in-game .seat-count-5.seat-0,
+body.in-game .seat-count-6.seat-0,
+body.in-game .game-screen.has-actions .seat-count-1.seat-0,
+body.in-game .game-screen.has-actions .seat-count-2.seat-0,
+body.in-game .game-screen.has-actions .seat-count-3.seat-0,
+body.in-game .game-screen.has-actions .seat-count-4.seat-0,
+body.in-game .game-screen.has-actions .seat-count-5.seat-0,
+body.in-game .game-screen.has-actions .seat-count-6.seat-0,
+body.in-game .game-screen.has-pre-actions .seat-count-1.seat-0,
+body.in-game .game-screen.has-pre-actions .seat-count-2.seat-0,
+body.in-game .game-screen.has-pre-actions .seat-count-3.seat-0,
+body.in-game .game-screen.has-pre-actions .seat-count-4.seat-0,
+body.in-game .game-screen.has-pre-actions .seat-count-5.seat-0,
+body.in-game .game-screen.has-pre-actions .seat-count-6.seat-0,
+body.in-game .game-screen.has-bot-actions .seat-count-1.seat-0,
+body.in-game .game-screen.has-bot-actions .seat-count-2.seat-0,
+body.in-game .game-screen.has-bot-actions .seat-count-3.seat-0,
+body.in-game .game-screen.has-bot-actions .seat-count-4.seat-0,
+body.in-game .game-screen.has-bot-actions .seat-count-5.seat-0,
+body.in-game .game-screen.has-bot-actions .seat-count-6.seat-0 {
+  left: 50%;
+  top: 92%;
+}
+
+body.in-game .seat-count-6.seat-1 {
+  left: 8%;
+  top: 74%;
+}
+
+body.in-game .seat-count-6.seat-2 {
+  left: 8%;
+  top: 31%;
+}
+
+body.in-game .seat-count-6.seat-3 {
+  left: 50%;
+  top: 3%;
+}
+
+body.in-game .seat-count-6.seat-4 {
+  left: 92%;
+  top: 31%;
+}
+
+body.in-game .seat-count-6.seat-5 {
+  left: 92%;
+  top: 74%;
+}
+
+body.in-game .seat-count-5.seat-1,
+body.in-game .seat-count-4.seat-1 {
+  left: 8%;
+}
+
+body.in-game .seat-count-5.seat-4,
+body.in-game .seat-count-4.seat-3 {
+  left: 92%;
+}
+
+body.in-game .seat-count-5.seat-2,
+body.in-game .seat-count-6.seat-2 {
+  top: 31%;
+}
+
+body.in-game .seat-count-5.seat-3,
+body.in-game .seat-count-6.seat-4 {
+  top: 31%;
+}
+
+body.in-game .seat-count-3.seat-1 {
+  left: 9%;
+}
+
+body.in-game .seat-count-3.seat-2 {
+  left: 91%;
+}
+
+body.in-game .seat-count-6.seat-1 .seat-action-label,
+body.in-game .seat-count-6.seat-2 .seat-action-label,
+body.in-game .seat-count-5.seat-1 .seat-action-label,
+body.in-game .seat-count-5.seat-2 .seat-action-label,
+body.in-game .seat-count-4.seat-1 .seat-action-label,
+body.in-game .seat-count-3.seat-1 .seat-action-label {
+  left: 28px;
+}
+
+body.in-game .seat-count-6.seat-4 .seat-cards,
+body.in-game .seat-count-6.seat-5 .seat-cards,
+body.in-game .seat-count-5.seat-3 .seat-cards,
+body.in-game .seat-count-5.seat-4 .seat-cards,
+body.in-game .seat-count-4.seat-3 .seat-cards,
+body.in-game .seat-count-3.seat-2 .seat-cards {
+  right: auto;
+  left: -18px;
+  transform: rotate(10deg);
+}
+
+body.in-game .seat-count-6.seat-4 .seat-cards .card + .card,
+body.in-game .seat-count-6.seat-5 .seat-cards .card + .card,
+body.in-game .seat-count-5.seat-3 .seat-cards .card + .card,
+body.in-game .seat-count-5.seat-4 .seat-cards .card + .card,
+body.in-game .seat-count-4.seat-3 .seat-cards .card + .card,
+body.in-game .seat-count-3.seat-2 .seat-cards .card + .card {
+  transform: rotate(-12deg) translateY(2px);
+}
+
+@media (min-height: 840px) and (min-width: 390px) {
+  body.in-game .game-screen {
+    --table-scale: 1.12;
+  }
+
+  body.in-game .board,
+  body.in-game .game-screen.has-actions .board,
+  body.in-game .game-screen.has-pre-actions .board,
+  body.in-game .game-screen.has-bot-actions .board {
+    margin-top: 8px;
+    margin-bottom: 36px;
+  }
+}
+
+@media (max-height: 790px) {
+  body.in-game .game-screen {
+    --table-scale: 0.93;
+    grid-template-rows: 40px auto;
+  }
+
+  body.in-game .game-toolbar .icon-control {
+    width: 40px;
+    min-height: 40px;
+  }
+
+  body.in-game .board,
+  body.in-game .game-screen.has-actions .board,
+  body.in-game .game-screen.has-pre-actions .board,
+  body.in-game .game-screen.has-bot-actions .board {
+    margin-top: -2px;
+    margin-bottom: -28px;
+  }
+}
+
+@media (max-height: 720px) {
+  body.in-game .game-screen {
+    --table-scale: 0.82;
+    grid-template-rows: 38px auto;
+  }
+
+  body.in-game .game-toolbar {
+    width: min(500px, calc(100vw - 32px));
+  }
+
+  body.in-game .game-toolbar .icon-control {
+    width: 38px;
+    min-height: 38px;
+  }
+
+  body.in-game .board,
+  body.in-game .game-screen.has-actions .board,
+  body.in-game .game-screen.has-pre-actions .board,
+  body.in-game .game-screen.has-bot-actions .board {
+    margin-top: -6px;
+    margin-bottom: -92px;
+  }
+}
+
+@media (max-height: 660px) {
+  body.in-game .game-screen {
+    --table-scale: 0.74;
+  }
+
+  body.in-game .board,
+  body.in-game .game-screen.has-actions .board,
+  body.in-game .game-screen.has-pre-actions .board,
+  body.in-game .game-screen.has-bot-actions .board {
+    margin-bottom: -136px;
+  }
+}
