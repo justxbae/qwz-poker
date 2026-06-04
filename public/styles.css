@@ -9543,7 +9543,7 @@ body.in-game .seat-count-6.seat-3 {
 
 /* Final game-table geometry pass: responsive scale presets, stable seats, no duplicated turn text. */
 body.in-game .game-screen {
-  --table-scale: 1.03;
+  --table-scale: 1.08;
   grid-template-rows: 44px auto;
   gap: 2px;
   align-content: start;
@@ -9565,10 +9565,10 @@ body.in-game .board,
 body.in-game .game-screen.has-actions .board,
 body.in-game .game-screen.has-pre-actions .board,
 body.in-game .game-screen.has-bot-actions .board {
-  width: 326px;
-  height: 560px;
-  min-height: 560px;
-  max-height: 560px;
+  width: 354px;
+  height: 610px;
+  min-height: 610px;
+  max-height: 610px;
   margin: 2px auto -18px;
   transform: scale(var(--table-scale));
   transform-origin: top center;
@@ -9781,7 +9781,7 @@ body.in-game .seat-count-3.seat-2 .seat-cards .card + .card {
 
 @media (min-height: 840px) and (min-width: 390px) {
   body.in-game .game-screen {
-    --table-scale: 1.12;
+    --table-scale: 1.24;
   }
 
   body.in-game .board,
@@ -9789,13 +9789,26 @@ body.in-game .seat-count-3.seat-2 .seat-cards .card + .card {
   body.in-game .game-screen.has-pre-actions .board,
   body.in-game .game-screen.has-bot-actions .board {
     margin-top: 8px;
-    margin-bottom: 36px;
+    margin-bottom: 108px;
+  }
+}
+
+@media (min-height: 920px) and (min-width: 390px) {
+  body.in-game .game-screen {
+    --table-scale: 1.31;
+  }
+
+  body.in-game .board,
+  body.in-game .game-screen.has-actions .board,
+  body.in-game .game-screen.has-pre-actions .board,
+  body.in-game .game-screen.has-bot-actions .board {
+    margin-bottom: 148px;
   }
 }
 
 @media (max-height: 790px) {
   body.in-game .game-screen {
-    --table-scale: 0.93;
+    --table-scale: 0.98;
     grid-template-rows: 40px auto;
   }
 
@@ -9815,7 +9828,7 @@ body.in-game .seat-count-3.seat-2 .seat-cards .card + .card {
 
 @media (max-height: 720px) {
   body.in-game .game-screen {
-    --table-scale: 0.82;
+    --table-scale: 0.86;
     grid-template-rows: 38px auto;
   }
 
@@ -9839,7 +9852,7 @@ body.in-game .seat-count-3.seat-2 .seat-cards .card + .card {
 
 @media (max-height: 660px) {
   body.in-game .game-screen {
-    --table-scale: 0.74;
+    --table-scale: 0.76;
   }
 
   body.in-game .board,

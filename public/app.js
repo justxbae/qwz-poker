@@ -3033,6 +3033,8 @@ function renderSeatControls(table) {
 function lastSeatActionLabel(table, seat) {
   const name = String(seat?.name || "");
   if (!name || !Array.isArray(table?.actionLog)) return "";
+  const activeHandStatuses = new Set(["preflop", "flop", "turn", "river", "runout", "showdown"]);
+  if (!activeHandStatuses.has(table?.status) || !seat?.cards?.length) return "";
   const currentHand = Number(table.handNumber || 0);
   const last = table.actionLog
     .slice()
