@@ -815,6 +815,10 @@ function getScrollY() {
 }
 
 async function handleTelegramBack() {
+  if (pendingBetAction) {
+    closeAmountPanel();
+    return;
+  }
   if (cashierState.sheet) {
     closeCashierSheet();
     return;
@@ -849,7 +853,8 @@ async function handleTelegramBack() {
 }
 
 function updateTelegramBackButton() {
-  const shouldShow = !buyInOverlay.hidden
+  const shouldShow = Boolean(pendingBetAction)
+    || !buyInOverlay.hidden
     || Boolean(cashierState.sheet)
     || Boolean(lobbyMenuSheet && !lobbyMenuSheet.hidden)
     || !sideMenu.hidden
@@ -2732,6 +2737,10 @@ async function standFromTable() {
 
 async function sitAtTable() {
   if (!state.currentTableId) return;
+  if (!state.currentTable?.viewer?.isSeated) {
+    await joinTable(state.currentTableId);
+    return;
+  }
   const data = await api(`/api/tables/${state.currentTableId}/join`, { method: "POST" });
   closeMenu();
   renderCurrentTable(data.table);
@@ -4050,11 +4059,13 @@ function openAmountPanel(action) {
   pendingBetAction = action;
   bettingActions.classList.add("amount-open");
   updateAmountPanel(action);
+  updateTelegramBackButton();
 }
 
 function closeAmountPanel() {
   pendingBetAction = "";
   bettingActions.classList.remove("amount-open");
+  updateTelegramBackButton();
 }
 
 function updateAmountPanel(action) {
