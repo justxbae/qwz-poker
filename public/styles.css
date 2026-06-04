@@ -9651,6 +9651,14 @@ body.in-game .seat-cards {
   z-index: 0;
 }
 
+body.in-game .seat:not(.viewer-seat) .seat-cards .card.hidden {
+  display: none;
+}
+
+body.in-game .seat:not(.viewer-seat) .seat-cards:not(:has(.card.hidden)) {
+  z-index: 5;
+}
+
 body.in-game .seat.viewer-seat .seat-cards {
   top: -4px;
   right: -76px;
