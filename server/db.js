@@ -1112,6 +1112,7 @@ export async function dashboardStats() {
   const result = await query(`
     select
       (select count(*)::int from user_identities where provider = 'telegram') as players,
+      (select count(*)::int from player_profiles) as player_profile_count,
       (select coalesce(sum(balance), 0)::bigint from wallets) as wallet_total,
       (select coalesce(sum(stack), 0)::bigint from saved_stacks) as saved_stack_total,
       (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'credit') as ledger_credit_total,
@@ -1120,6 +1121,8 @@ export async function dashboardStats() {
       (select coalesce(sum(amount), 0)::bigint from platform_ledger_entries where type = 'debit') as platform_ledger_debit_total,
       (select count(*)::int from hand_histories) as hand_history_count,
       (select coalesce(sum(rake), 0)::bigint from hand_histories) as hand_history_rake_total,
+      (select count(*)::int from hand_actions) as hand_action_count,
+      (select count(*)::int from hand_results) as hand_result_count,
       (select count(*)::int from payment_orders where status = 'paid' and method = 'stars') as paid_stars,
       (select count(*)::int from payment_orders where status = 'pending' and method = 'stars') as pending_stars,
       (select count(*)::int from withdrawal_orders where status in ('pending', 'manual_review')) as pending_withdrawals,
@@ -1127,10 +1130,21 @@ export async function dashboardStats() {
       (select coalesce(sum(chips), 0)::bigint from payment_orders where status = 'paid' and method = 'stars') as paid_stars_chips_total,
       (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'credit' and category = 'deposit_stars') as deposit_stars_ledger_total,
       (select count(*)::int from idempotency_keys where expires_at > now()) as idempotency_key_count,
-      (select count(*)::int from active_table_snapshots) as active_table_snapshot_count
+      (select count(*)::int from active_table_snapshots) as active_table_snapshot_count,
+      (select count(*)::int from rating_seasons) as rating_season_count,
+      (select count(*)::int from rating_entries) as rating_entry_count,
+      (select count(*)::int from achievement_definitions) as achievement_definition_count,
+      (select count(*)::int from user_achievements) as user_achievement_count,
+      (select count(*)::int from battle_pass_seasons) as battle_pass_season_count,
+      (select count(*)::int from bonus_grants) as bonus_grant_count,
+      (select count(*)::int from referrals) as referral_count,
+      (select count(*)::int from risk_flags where status in ('open', 'review')) as open_risk_flag_count,
+      (select count(*)::int from device_sessions) as device_session_count,
+      (select count(*)::int from admin_audit_logs) as admin_audit_log_count
   `);
   return {
     players: Number(result.rows[0].players || 0),
+    playerProfileCount: Number(result.rows[0].player_profile_count || 0),
     walletTotal: Number(result.rows[0].wallet_total || 0),
     savedStackTotal: Number(result.rows[0].saved_stack_total || 0),
     ledgerCreditTotal: Number(result.rows[0].ledger_credit_total || 0),
@@ -1139,6 +1153,8 @@ export async function dashboardStats() {
     platformLedgerDebitTotal: Number(result.rows[0].platform_ledger_debit_total || 0),
     handHistoryCount: Number(result.rows[0].hand_history_count || 0),
     handHistoryRakeTotal: Number(result.rows[0].hand_history_rake_total || 0),
+    handActionCount: Number(result.rows[0].hand_action_count || 0),
+    handResultCount: Number(result.rows[0].hand_result_count || 0),
     paidStars: Number(result.rows[0].paid_stars || 0),
     pendingStars: Number(result.rows[0].pending_stars || 0),
     pendingWithdrawals: Number(result.rows[0].pending_withdrawals || 0),
@@ -1146,7 +1162,17 @@ export async function dashboardStats() {
     paidStarsChipsTotal: Number(result.rows[0].paid_stars_chips_total || 0),
     depositStarsLedgerTotal: Number(result.rows[0].deposit_stars_ledger_total || 0),
     idempotencyKeyCount: Number(result.rows[0].idempotency_key_count || 0),
-    activeTableSnapshotCount: Number(result.rows[0].active_table_snapshot_count || 0)
+    activeTableSnapshotCount: Number(result.rows[0].active_table_snapshot_count || 0),
+    ratingSeasonCount: Number(result.rows[0].rating_season_count || 0),
+    ratingEntryCount: Number(result.rows[0].rating_entry_count || 0),
+    achievementDefinitionCount: Number(result.rows[0].achievement_definition_count || 0),
+    userAchievementCount: Number(result.rows[0].user_achievement_count || 0),
+    battlePassSeasonCount: Number(result.rows[0].battle_pass_season_count || 0),
+    bonusGrantCount: Number(result.rows[0].bonus_grant_count || 0),
+    referralCount: Number(result.rows[0].referral_count || 0),
+    openRiskFlagCount: Number(result.rows[0].open_risk_flag_count || 0),
+    deviceSessionCount: Number(result.rows[0].device_session_count || 0),
+    adminAuditLogCount: Number(result.rows[0].admin_audit_log_count || 0)
   };
 }
 
@@ -1163,11 +1189,18 @@ export async function listUsers(limit = 100) {
       au.updated_at,
       coalesce(w.balance, 0)::bigint as balance,
       coalesce(w.cash_usdt_micros, 0)::bigint as cash_balance_micros,
+      coalesce(w.bonus_usdt_micros, 0)::bigint as bonus_usdt_micros,
+      coalesce(w.locked_usdt_micros, 0)::bigint as locked_usdt_micros,
+      coalesce(pp.cash_level, 1)::int as cash_level,
+      coalesce(pp.cash_xp, 0)::bigint as cash_xp,
+      coalesce(pp.cash_status, 'Новичок') as cash_status,
+      coalesce(pp.rating_points, 0)::bigint as rating_points,
       coalesce(ss.stack, 0)::bigint as saved_stack,
       (select count(*)::int from ledger_entries le where le.app_user_id = au.id) as ledger_count
     from user_identities ui
     join app_users au on au.id = ui.app_user_id
     left join wallets w on w.app_user_id = au.id
+    left join player_profiles pp on pp.app_user_id = au.id
     left join saved_stacks ss on ss.app_user_id = au.id
     where ui.provider = 'telegram'
     order by greatest(
@@ -1185,6 +1218,12 @@ export async function listUsers(limit = 100) {
     photoUrl: row.photo_url || "",
     balance: Number(row.balance || 0),
     cashBalanceMicros: Number(row.cash_balance_micros || 0),
+    bonusUsdtMicros: Number(row.bonus_usdt_micros || 0),
+    lockedUsdtMicros: Number(row.locked_usdt_micros || 0),
+    cashLevel: Number(row.cash_level || 1),
+    cashXp: Number(row.cash_xp || 0),
+    cashStatus: row.cash_status || "Новичок",
+    ratingPoints: Number(row.rating_points || 0),
     savedStack: Number(row.saved_stack || 0),
     ledgerCount: Number(row.ledger_count || 0),
     createdAt: row.created_at,
@@ -1208,6 +1247,7 @@ async function ensureIdentity(provider, providerUserId) {
     on conflict (provider, provider_user_id) do nothing
   `, [provider, providerId, appUserId]);
   await query("insert into wallets (app_user_id, balance) values ($1, 0) on conflict do nothing", [appUserId]);
+  await query("insert into player_profiles (app_user_id) values ($1) on conflict do nothing", [appUserId]);
 
   const finalIdentity = await query(
     "select app_user_id from user_identities where provider = $1 and provider_user_id = $2",
@@ -1249,9 +1289,34 @@ async function migrate() {
       app_user_id text primary key references app_users(id) on delete cascade,
       balance bigint not null default 0 check (balance >= 0),
       cash_usdt_micros bigint not null default 0 check (cash_usdt_micros >= 0),
+      bonus_usdt_micros bigint not null default 0 check (bonus_usdt_micros >= 0),
+      locked_usdt_micros bigint not null default 0 check (locked_usdt_micros >= 0),
+      withdrawable_usdt_micros bigint not null default 0 check (withdrawable_usdt_micros >= 0),
       updated_at timestamptz not null default now()
     );
     alter table wallets add column if not exists cash_usdt_micros bigint not null default 0 check (cash_usdt_micros >= 0);
+    alter table wallets add column if not exists bonus_usdt_micros bigint not null default 0 check (bonus_usdt_micros >= 0);
+    alter table wallets add column if not exists locked_usdt_micros bigint not null default 0 check (locked_usdt_micros >= 0);
+    alter table wallets add column if not exists withdrawable_usdt_micros bigint not null default 0 check (withdrawable_usdt_micros >= 0);
+
+    create table if not exists player_profiles (
+      app_user_id text primary key references app_users(id) on delete cascade,
+      cash_level integer not null default 1 check (cash_level >= 1),
+      cash_xp bigint not null default 0 check (cash_xp >= 0),
+      cash_status text not null default 'Новичок',
+      rating_points bigint not null default 0,
+      rating_tier text not null default 'Unranked',
+      rating_season_id text not null default '',
+      hands_played integer not null default 0 check (hands_played >= 0),
+      cash_hands_played integer not null default 0 check (cash_hands_played >= 0),
+      rating_hands_played integer not null default 0 check (rating_hands_played >= 0),
+      tournaments_played integer not null default 0 check (tournaments_played >= 0),
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_player_profiles_rating on player_profiles(rating_season_id, rating_points desc);
+    create index if not exists idx_player_profiles_cash_level on player_profiles(cash_level desc, cash_xp desc);
 
     create table if not exists saved_stacks (
       app_user_id text primary key references app_users(id) on delete cascade,
@@ -1303,6 +1368,45 @@ async function migrate() {
     create index if not exists idx_fund_movements_app_user_created on fund_movements(app_user_id, created_at desc);
     create index if not exists idx_fund_movements_category_created on fund_movements(category, created_at desc);
 
+    create table if not exists poker_tables (
+      id text primary key,
+      table_name text not null default '',
+      game_type text not null default 'texas_holdem',
+      game_mode text not null default 'rating' check (game_mode in ('cash', 'rating', 'tournament', 'private')),
+      currency text not null default 'PLAY_CHIPS',
+      small_blind bigint not null default 0 check (small_blind >= 0),
+      big_blind bigint not null default 0 check (big_blind >= 0),
+      min_buy_in bigint not null default 0 check (min_buy_in >= 0),
+      max_buy_in bigint not null default 0 check (max_buy_in >= 0),
+      max_players integer not null default 6 check (max_players between 2 and 9),
+      rake_percent numeric(5, 2) not null default 0 check (rake_percent >= 0),
+      rake_cap bigint not null default 0 check (rake_cap >= 0),
+      status text not null default 'waiting' check (status in ('waiting', 'active', 'paused', 'closed')),
+      is_private boolean not null default false,
+      raw jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_poker_tables_mode_limit on poker_tables(game_mode, small_blind, big_blind);
+    create index if not exists idx_poker_tables_status_updated on poker_tables(status, updated_at desc);
+
+    create table if not exists table_seats (
+      table_id text not null references poker_tables(id) on delete cascade,
+      seat_number integer not null check (seat_number >= 0),
+      app_user_id text references app_users(id) on delete set null,
+      status text not null default 'empty' check (status in ('empty', 'reserved', 'active', 'folded', 'sitting_out', 'all_in', 'left')),
+      stack_amount bigint not null default 0 check (stack_amount >= 0),
+      current_bet bigint not null default 0 check (current_bet >= 0),
+      last_action text not null default '',
+      raw jsonb not null default '{}'::jsonb,
+      seated_at timestamptz,
+      updated_at timestamptz not null default now(),
+      primary key (table_id, seat_number)
+    );
+
+    create index if not exists idx_table_seats_user on table_seats(app_user_id, updated_at desc) where app_user_id is not null;
+
     create table if not exists tournament_registrations (
       tournament_id text not null,
       app_user_id text not null references app_users(id) on delete cascade,
@@ -1339,6 +1443,48 @@ async function migrate() {
     alter table hand_histories add column if not exists fairness_proof jsonb not null default '{}'::jsonb;
     create index if not exists idx_hand_histories_finished on hand_histories(finished_at desc);
     create index if not exists idx_hand_histories_table_hand on hand_histories(table_id, hand_number desc);
+
+    create table if not exists hand_actions (
+      id text primary key,
+      hand_id text not null references hand_histories(id) on delete cascade,
+      table_id text not null,
+      app_user_id text references app_users(id) on delete set null,
+      provider text not null default 'telegram',
+      provider_user_id text not null default '',
+      seat_number integer not null default -1,
+      street text not null default 'preflop',
+      action text not null,
+      amount bigint not null default 0 check (amount >= 0),
+      stack_before bigint,
+      stack_after bigint,
+      pot_after bigint,
+      sequence integer not null default 0,
+      raw jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_hand_actions_hand_sequence on hand_actions(hand_id, sequence asc, created_at asc);
+    create index if not exists idx_hand_actions_user_created on hand_actions(app_user_id, created_at desc) where app_user_id is not null;
+
+    create table if not exists hand_results (
+      id text primary key,
+      hand_id text not null references hand_histories(id) on delete cascade,
+      table_id text not null,
+      app_user_id text references app_users(id) on delete set null,
+      provider text not null default 'telegram',
+      provider_user_id text not null default '',
+      seat_number integer not null default -1,
+      hand_name text not null default '',
+      cards jsonb not null default '[]'::jsonb,
+      win_amount bigint not null default 0 check (win_amount >= 0),
+      rake_amount bigint not null default 0 check (rake_amount >= 0),
+      is_winner boolean not null default false,
+      raw jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_hand_results_hand on hand_results(hand_id, is_winner desc);
+    create index if not exists idx_hand_results_user_created on hand_results(app_user_id, created_at desc) where app_user_id is not null;
 
     create table if not exists platform_ledger_entries (
       id text primary key,
@@ -1415,6 +1561,170 @@ async function migrate() {
     create index if not exists idx_withdrawal_orders_status_created on withdrawal_orders(status, created_at desc);
     create unique index if not exists idx_withdrawal_orders_idempotency_key on withdrawal_orders(idempotency_key) where idempotency_key is not null;
 
+    create table if not exists rating_seasons (
+      id text primary key,
+      title text not null,
+      status text not null default 'draft' check (status in ('draft', 'active', 'settling', 'finished', 'cancelled')),
+      starts_at timestamptz not null,
+      ends_at timestamptz not null,
+      freeroll_title text not null default '',
+      freeroll_prize_pool_usdt_micros bigint not null default 0 check (freeroll_prize_pool_usdt_micros >= 0),
+      rules jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_rating_seasons_status_dates on rating_seasons(status, starts_at, ends_at);
+
+    create table if not exists rating_entries (
+      id text primary key,
+      season_id text not null references rating_seasons(id) on delete cascade,
+      app_user_id text not null references app_users(id) on delete cascade,
+      provider text not null default 'telegram',
+      provider_user_id text not null default '',
+      type text not null default 'game',
+      points_delta bigint not null default 0,
+      points_after bigint not null default 0,
+      source_id text not null default '',
+      meta jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_rating_entries_season_user on rating_entries(season_id, app_user_id, created_at desc);
+    create index if not exists idx_rating_entries_leaderboard on rating_entries(season_id, points_after desc, created_at desc);
+
+    create table if not exists achievement_definitions (
+      id text primary key,
+      category text not null default 'general',
+      code text not null unique,
+      title text not null,
+      description text not null default '',
+      reward_type text not null default 'none',
+      reward_amount bigint not null default 0 check (reward_amount >= 0),
+      is_hidden boolean not null default false,
+      is_active boolean not null default true,
+      rules jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_achievement_definitions_active on achievement_definitions(is_active, category);
+
+    create table if not exists user_achievements (
+      app_user_id text not null references app_users(id) on delete cascade,
+      achievement_id text not null references achievement_definitions(id) on delete cascade,
+      progress bigint not null default 0 check (progress >= 0),
+      status text not null default 'in_progress' check (status in ('in_progress', 'completed', 'claimed')),
+      completed_at timestamptz,
+      claimed_at timestamptz,
+      meta jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      primary key (app_user_id, achievement_id)
+    );
+
+    create index if not exists idx_user_achievements_status on user_achievements(status, updated_at desc);
+
+    create table if not exists battle_pass_seasons (
+      id text primary key,
+      title text not null,
+      status text not null default 'draft' check (status in ('draft', 'active', 'finished', 'cancelled')),
+      price_usdt_micros bigint not null default 0 check (price_usdt_micros >= 0),
+      starts_at timestamptz not null,
+      ends_at timestamptz not null,
+      rewards jsonb not null default '[]'::jsonb,
+      rules jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_battle_pass_seasons_status_dates on battle_pass_seasons(status, starts_at, ends_at);
+
+    create table if not exists battle_pass_progress (
+      season_id text not null references battle_pass_seasons(id) on delete cascade,
+      app_user_id text not null references app_users(id) on delete cascade,
+      xp bigint not null default 0 check (xp >= 0),
+      premium_unlocked boolean not null default false,
+      claimed_rewards jsonb not null default '[]'::jsonb,
+      updated_at timestamptz not null default now(),
+      primary key (season_id, app_user_id)
+    );
+
+    create index if not exists idx_battle_pass_progress_user on battle_pass_progress(app_user_id, updated_at desc);
+
+    create table if not exists bonus_grants (
+      id text primary key,
+      app_user_id text not null references app_users(id) on delete cascade,
+      provider text not null default 'telegram',
+      provider_user_id text not null default '',
+      bonus_type text not null,
+      status text not null default 'pending' check (status in ('pending', 'active', 'completed', 'expired', 'cancelled')),
+      amount_usdt_micros bigint not null default 0 check (amount_usdt_micros >= 0),
+      rating_chips bigint not null default 0 check (rating_chips >= 0),
+      wagering_required bigint not null default 0 check (wagering_required >= 0),
+      wagering_done bigint not null default 0 check (wagering_done >= 0),
+      source_id text not null default '',
+      expires_at timestamptz,
+      meta jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_bonus_grants_user_status on bonus_grants(app_user_id, status, created_at desc);
+
+    create table if not exists referrals (
+      id text primary key,
+      referrer_app_user_id text not null references app_users(id) on delete cascade,
+      referred_app_user_id text not null references app_users(id) on delete cascade,
+      code text not null default '',
+      source text not null default '',
+      status text not null default 'registered' check (status in ('registered', 'qualified', 'blocked', 'paid')),
+      qualified_at timestamptz,
+      paid_at timestamptz,
+      meta jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now(),
+      unique (referred_app_user_id)
+    );
+
+    create index if not exists idx_referrals_referrer_created on referrals(referrer_app_user_id, created_at desc);
+    create index if not exists idx_referrals_code on referrals(code) where code <> '';
+
+    create table if not exists risk_flags (
+      id text primary key,
+      app_user_id text references app_users(id) on delete set null,
+      provider text not null default 'telegram',
+      provider_user_id text not null default '',
+      flag_type text not null,
+      severity text not null default 'medium' check (severity in ('low', 'medium', 'high', 'critical')),
+      status text not null default 'open' check (status in ('open', 'review', 'resolved', 'dismissed')),
+      reason text not null default '',
+      source_id text not null default '',
+      meta jsonb not null default '{}'::jsonb,
+      reviewed_by text not null default '',
+      reviewed_at timestamptz,
+      created_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_risk_flags_status_severity on risk_flags(status, severity, created_at desc);
+    create index if not exists idx_risk_flags_user on risk_flags(app_user_id, created_at desc) where app_user_id is not null;
+
+    create table if not exists device_sessions (
+      id text primary key,
+      app_user_id text references app_users(id) on delete cascade,
+      provider text not null default 'telegram',
+      provider_user_id text not null default '',
+      ip_hash text not null default '',
+      user_agent text not null default '',
+      platform text not null default '',
+      device_id_hash text not null default '',
+      first_seen_at timestamptz not null default now(),
+      last_seen_at timestamptz not null default now(),
+      meta jsonb not null default '{}'::jsonb
+    );
+
+    create index if not exists idx_device_sessions_user_seen on device_sessions(app_user_id, last_seen_at desc) where app_user_id is not null;
+    create index if not exists idx_device_sessions_ip_hash on device_sessions(ip_hash, last_seen_at desc) where ip_hash <> '';
+
     create table if not exists idempotency_keys (
       key text primary key,
       scope text not null,
@@ -1458,6 +1768,24 @@ async function migrate() {
     );
 
     create index if not exists idx_admin_events_created on admin_events(created_at desc);
+
+    create table if not exists admin_audit_logs (
+      id text primary key,
+      actor_provider text not null default 'telegram',
+      actor_provider_user_id text not null default '',
+      actor_role text not null default '',
+      action text not null,
+      target_type text not null default '',
+      target_id text not null default '',
+      result text not null default 'ok' check (result in ('ok', 'failed', 'denied', 'manual_review')),
+      reason text not null default '',
+      ip_hash text not null default '',
+      meta jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_admin_audit_logs_actor_created on admin_audit_logs(actor_provider_user_id, created_at desc);
+    create index if not exists idx_admin_audit_logs_action_created on admin_audit_logs(action, created_at desc);
     `);
     await client.query("commit");
   } catch (error) {

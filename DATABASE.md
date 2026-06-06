@@ -14,17 +14,37 @@ Persisted in PostgreSQL:
 - `app_users` - internal project users.
 - `user_identities` - provider identities, currently Telegram. This keeps the schema ready for another messenger later.
 - `wallets` - current QWZ chips wallet balance.
+- `wallets.cash_usdt_micros` - real-money USDT balance stored in micros.
+- `wallets.bonus_usdt_micros` - bonus USDT bucket, separated from withdrawable money.
+- `wallets.locked_usdt_micros` - held funds for withdrawals, disputes, or manual review.
+- `wallets.withdrawable_usdt_micros` - future withdrawable accounting bucket.
+- `player_profiles` - cash level/status, XP, rating points, and profile counters.
 - `ledger_entries` - immutable wallet movement history.
 - `platform_ledger_entries` - immutable project-side ledger for rake, future tournament fees, withdrawals, bonuses, reversals, and manual review adjustments.
 - `saved_stacks` - saved stack after leaving a table.
+- `poker_tables` - canonical table catalogue for cash, rating, tournaments, and private games.
+- `table_seats` - canonical table seat state for future table-state persistence.
 - `payment_orders` - Stars orders and payment statuses.
 - `payment_orders` also stores prepared TON/USDT order metadata: method, asset, network, expected crypto amount, external provider id, expiration.
 - `idempotency_keys` - dedupe cache for money endpoints, so retries and double taps return the same response instead of charging twice.
 - `fund_movements` - movement of chips between wallet, table, saved stack, tournament escrow, and reserves.
 - `tournament_registrations` - active and cancelled tournament registrations.
 - `hand_histories` - completed hand summaries, board, pots, seats, rake, and fairness proof.
+- `hand_actions` - normalized per-hand action history for replay, analytics, and anti-fraud.
+- `hand_results` - normalized winners, combinations, win amounts, and rake per player.
+- `rating_seasons` - seasons for the Rating mode.
+- `rating_entries` - immutable rating point movements by season and source.
+- `achievement_definitions` - achievement catalogue.
+- `user_achievements` - player achievement progress and claim status.
+- `battle_pass_seasons` - future seasonal Battle Pass configuration.
+- `battle_pass_progress` - player XP/reward progress for Battle Pass seasons.
+- `bonus_grants` - bonuses, wagering requirements, expiration, and status.
+- `referrals` - referral attribution and qualification status.
+- `risk_flags` - anti-fraud flags for multi-accounting, chip dumping, payment anomalies, and manual review.
+- `device_sessions` - device/IP/user-agent signals for risk analysis.
 - `active_table_snapshots` - latest JSON snapshot of each open table for restart recovery.
 - `admin_events` - admin and audit log events.
+- `admin_audit_logs` - structured audit trail for future web-admin actions.
 
 Persisted in Redis when `REDIS_URL` is configured:
 
