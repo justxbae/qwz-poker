@@ -1049,7 +1049,7 @@ async function handleAdminApi(req, res, url, adminUser) {
   const withdrawalActionMatch = url.pathname.match(/^\/api\/admin\/withdrawals\/([^/]+)\/(approve|reject)$/);
 
   if (req.method === "GET" && url.pathname === "/api/admin") {
-    sendJson(res, 200, { admin: await adminDashboardView() });
+    sendJson(res, 200, { admin: await adminDashboardView({ analyticsDays: url.searchParams.get("days") }) });
     return;
   }
 
@@ -1108,11 +1108,11 @@ async function handleAdminApi(req, res, url, adminUser) {
   sendJson(res, 404, { error: "Admin endpoint not found" });
 }
 
-async function adminDashboardView() {
+async function adminDashboardView(options = {}) {
   const diagnostics = await healthSnapshot();
   const players = [...new Set([...wallets.keys(), ...userProfiles.keys(), ...transactions.keys()])];
   const dbStats = await dbDashboardStats();
-  const analytics = await analyticsDashboard(7);
+  const analytics = await analyticsDashboard(options.analyticsDays || 7);
   const walletTotal = dbStats ? dbStats.walletTotal : [...wallets.values()].reduce((sum, value) => sum + Number(value || 0), 0);
   const tableStackTotal = [...tables.values()].reduce((sum, table) => (
     sum + table.seats.reduce((seatSum, seat) => seatSum + Number(seat.stack || 0), 0)
