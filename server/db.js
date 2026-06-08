@@ -1107,6 +1107,149 @@ export async function listAdminEvents(limit = 20) {
   }));
 }
 
+export async function recordAnalyticsEvent(event = {}) {
+  if (!pool) return null;
+  const provider = event.provider || "telegram";
+  const providerUserId = event.userId ? String(event.userId) : "";
+  const appUserId = providerUserId ? await ensureIdentity(provider, providerUserId) : null;
+  const amount = Math.round(Number(event.amount || 0));
+  await query(`
+    insert into analytics_events (
+      id, event_name, category, app_user_id, provider, provider_user_id,
+      session_id, source, amount, asset, context_id, meta
+    )
+    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)
+  `, [
+    event.id || id("analytics"),
+    normalizeLedgerCategory(event.name || event.eventName),
+    normalizeLedgerCategory(event.category || "product"),
+    appUserId,
+    provider,
+    providerUserId,
+    String(event.sessionId || ""),
+    normalizeLedgerCategory(event.source || "server"),
+    Number.isFinite(amount) ? amount : 0,
+    String(event.asset || ""),
+    String(event.contextId || ""),
+    JSON.stringify(event.meta || {})
+  ]);
+  return true;
+}
+
+export async function analyticsOverview(days = 7) {
+  if (!pool) return null;
+  const windowDays = Math.max(1, Math.min(90, Math.round(Number(days) || 7)));
+  const [summary, daily, events] = await Promise.all([
+    query(`
+      select
+        count(*)::int as total_events,
+        count(distinct app_user_id) filter (where app_user_id is not null)::int as unique_users,
+        count(*) filter (where event_name = 'app_open')::int as app_opens,
+        count(distinct app_user_id) filter (where event_name = 'app_open' and app_user_id is not null)::int as app_open_users,
+        count(*) filter (where event_name = 'cashier_open')::int as cashier_opens,
+        count(distinct app_user_id) filter (where event_name = 'cashier_open' and app_user_id is not null)::int as cashier_users,
+        count(*) filter (where event_name = 'deposit_order_created')::int as deposit_orders,
+        count(distinct app_user_id) filter (where event_name = 'deposit_order_created' and app_user_id is not null)::int as deposit_order_users,
+        count(*) filter (where event_name = 'deposit_paid')::int as paid_deposits,
+        count(distinct app_user_id) filter (where event_name = 'deposit_paid' and app_user_id is not null)::int as paying_users,
+        coalesce(sum(amount) filter (where event_name = 'deposit_paid'), 0)::bigint as paid_deposit_amount,
+        count(*) filter (where event_name = 'withdrawal_requested')::int as withdrawal_requests,
+        coalesce(sum(amount) filter (where event_name = 'withdrawal_requested'), 0)::bigint as withdrawal_amount,
+        count(*) filter (where event_name = 'table_join')::int as table_joins,
+        count(distinct app_user_id) filter (where event_name = 'table_join' and app_user_id is not null)::int as table_join_users,
+        count(*) filter (where event_name = 'table_leave')::int as table_leaves,
+        count(*) filter (where event_name = 'poker_action')::int as poker_actions,
+        count(*) filter (where event_name = 'hand_completed')::int as hands_completed,
+        coalesce(sum(amount) filter (where event_name = 'hand_completed'), 0)::bigint as rake_amount,
+        count(*) filter (where event_name = 'tournament_register')::int as tournament_registers,
+        count(*) filter (where event_name = 'tournament_cancel')::int as tournament_cancels
+      from analytics_events
+      where created_at >= now() - ($1::int * interval '1 day')
+    `, [windowDays]),
+    query(`
+      select
+        date_trunc('day', created_at)::date as day,
+        count(*)::int as events,
+        count(distinct app_user_id) filter (where app_user_id is not null)::int as users,
+        count(*) filter (where event_name = 'app_open')::int as app_opens,
+        count(*) filter (where event_name = 'deposit_order_created')::int as deposit_orders,
+        count(*) filter (where event_name = 'deposit_paid')::int as paid_deposits,
+        coalesce(sum(amount) filter (where event_name = 'deposit_paid'), 0)::bigint as deposit_amount,
+        count(*) filter (where event_name = 'table_join')::int as table_joins,
+        count(*) filter (where event_name = 'hand_completed')::int as hands_completed,
+        coalesce(sum(amount) filter (where event_name = 'hand_completed'), 0)::bigint as rake_amount
+      from analytics_events
+      where created_at >= now() - ($1::int * interval '1 day')
+      group by 1
+      order by 1 desc
+    `, [windowDays]),
+    query(`
+      select event_name as name, category, count(*)::int as count,
+             count(distinct app_user_id) filter (where app_user_id is not null)::int as users,
+             coalesce(sum(amount), 0)::bigint as amount
+      from analytics_events
+      where created_at >= now() - ($1::int * interval '1 day')
+      group by event_name, category
+      order by count desc, event_name asc
+      limit 30
+    `, [windowDays])
+  ]);
+
+  const row = summary.rows[0] || {};
+  const numbers = {
+    totalEvents: Number(row.total_events || 0),
+    uniqueUsers: Number(row.unique_users || 0),
+    appOpens: Number(row.app_opens || 0),
+    appOpenUsers: Number(row.app_open_users || 0),
+    cashierOpens: Number(row.cashier_opens || 0),
+    cashierUsers: Number(row.cashier_users || 0),
+    depositOrders: Number(row.deposit_orders || 0),
+    depositOrderUsers: Number(row.deposit_order_users || 0),
+    paidDeposits: Number(row.paid_deposits || 0),
+    payingUsers: Number(row.paying_users || 0),
+    paidDepositAmount: Number(row.paid_deposit_amount || 0),
+    withdrawalRequests: Number(row.withdrawal_requests || 0),
+    withdrawalAmount: Number(row.withdrawal_amount || 0),
+    tableJoins: Number(row.table_joins || 0),
+    tableJoinUsers: Number(row.table_join_users || 0),
+    tableLeaves: Number(row.table_leaves || 0),
+    pokerActions: Number(row.poker_actions || 0),
+    handsCompleted: Number(row.hands_completed || 0),
+    rakeAmount: Number(row.rake_amount || 0),
+    tournamentRegisters: Number(row.tournament_registers || 0),
+    tournamentCancels: Number(row.tournament_cancels || 0)
+  };
+  return {
+    days: windowDays,
+    ...numbers,
+    conversion: {
+      openToCashier: ratio(numbers.cashierUsers, numbers.appOpenUsers),
+      cashierToOrder: ratio(numbers.depositOrderUsers, numbers.cashierUsers),
+      orderToPaid: ratio(numbers.payingUsers, numbers.depositOrderUsers),
+      openToTable: ratio(numbers.tableJoinUsers, numbers.appOpenUsers)
+    },
+    daily: daily.rows.map((item) => ({
+      day: item.day,
+      events: Number(item.events || 0),
+      users: Number(item.users || 0),
+      appOpens: Number(item.app_opens || 0),
+      depositOrders: Number(item.deposit_orders || 0),
+      paidDeposits: Number(item.paid_deposits || 0),
+      depositAmount: Number(item.deposit_amount || 0),
+      tableJoins: Number(item.table_joins || 0),
+      handsCompleted: Number(item.hands_completed || 0),
+      rakeAmount: Number(item.rake_amount || 0)
+    })),
+    events: events.rows.map((item) => ({
+      name: item.name,
+      category: item.category,
+      count: Number(item.count || 0),
+      users: Number(item.users || 0),
+      amount: Number(item.amount || 0)
+    }))
+  };
+}
+
 export async function dashboardStats() {
   if (!pool) return null;
   const result = await query(`
@@ -1140,7 +1283,8 @@ export async function dashboardStats() {
       (select count(*)::int from referrals) as referral_count,
       (select count(*)::int from risk_flags where status in ('open', 'review')) as open_risk_flag_count,
       (select count(*)::int from device_sessions) as device_session_count,
-      (select count(*)::int from admin_audit_logs) as admin_audit_log_count
+      (select count(*)::int from admin_audit_logs) as admin_audit_log_count,
+      (select count(*)::int from analytics_events) as analytics_event_count
   `);
   return {
     players: Number(result.rows[0].players || 0),
@@ -1172,7 +1316,8 @@ export async function dashboardStats() {
     referralCount: Number(result.rows[0].referral_count || 0),
     openRiskFlagCount: Number(result.rows[0].open_risk_flag_count || 0),
     deviceSessionCount: Number(result.rows[0].device_session_count || 0),
-    adminAuditLogCount: Number(result.rows[0].admin_audit_log_count || 0)
+    adminAuditLogCount: Number(result.rows[0].admin_audit_log_count || 0),
+    analyticsEventCount: Number(result.rows[0].analytics_event_count || 0)
   };
 }
 
@@ -1786,6 +1931,27 @@ async function migrate() {
 
     create index if not exists idx_admin_audit_logs_actor_created on admin_audit_logs(actor_provider_user_id, created_at desc);
     create index if not exists idx_admin_audit_logs_action_created on admin_audit_logs(action, created_at desc);
+
+    create table if not exists analytics_events (
+      id text primary key,
+      event_name text not null,
+      category text not null default 'product',
+      app_user_id text references app_users(id) on delete set null,
+      provider text not null default 'telegram',
+      provider_user_id text not null default '',
+      session_id text not null default '',
+      source text not null default 'server',
+      amount bigint not null default 0,
+      asset text not null default '',
+      context_id text not null default '',
+      meta jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_analytics_events_created on analytics_events(created_at desc);
+    create index if not exists idx_analytics_events_name_created on analytics_events(event_name, created_at desc);
+    create index if not exists idx_analytics_events_user_created on analytics_events(app_user_id, created_at desc) where app_user_id is not null;
+    create index if not exists idx_analytics_events_context on analytics_events(context_id, created_at desc) where context_id <> '';
     `);
     await client.query("commit");
   } catch (error) {
@@ -1862,4 +2028,10 @@ function normalizeIdempotencyKey(key) {
 
 function id(prefix) {
   return `${prefix}_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+}
+
+function ratio(numerator, denominator) {
+  const top = Number(numerator || 0);
+  const bottom = Number(denominator || 0);
+  return bottom > 0 ? Number((top / bottom).toFixed(4)) : 0;
 }

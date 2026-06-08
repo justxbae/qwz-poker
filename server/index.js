@@ -34,6 +34,7 @@ import {
   completePaymentOrder as dbCompletePaymentOrder,
   createPaymentOrder as dbCreatePaymentOrder,
   createWithdrawalOrder as dbCreateWithdrawalOrder,
+  analyticsOverview as dbAnalyticsOverview,
   dashboardStats as dbDashboardStats,
   databaseHealth as dbDatabaseHealth,
   databaseEnabled,
@@ -56,6 +57,7 @@ import {
   listPendingCryptoPaymentOrders as dbListPendingCryptoPaymentOrders,
   listWithdrawalOrders as dbListWithdrawalOrders,
   markPaymentOrderPaid as dbMarkPaymentOrderPaid,
+  recordAnalyticsEvent as dbRecordAnalyticsEvent,
   recordAdminEvent as dbRecordAdminEvent,
   recordFundMovement as dbRecordFundMovement,
   recordHandHistory as dbRecordHandHistory,
@@ -161,6 +163,7 @@ const starOrders = new Map();
 const cryptoOrders = new Map();
 const withdrawalOrders = new Map();
 const adminEvents = [];
+const analyticsEvents = [];
 const loggedAppOpens = new Set();
 const persistedHandIds = new Set();
 const recentHandHistories = [];
@@ -376,6 +379,14 @@ async function handleApi(req, res, url) {
     await stateSetSession(token, user);
     if (!loggedAppOpens.has(user.id)) {
       loggedAppOpens.add(user.id);
+      await trackAnalytics("app_open", {
+        user,
+        category: "acquisition",
+        meta: {
+          cashBalanceMicros: user.cashBalanceMicros || 0,
+          playBalance: user.balance || 0
+        }
+      });
       notifyAdmin("open", "Игрок открыл Mini App", {
         user,
         lines: [
@@ -405,6 +416,7 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "GET" && url.pathname === "/api/cashier") {
+    await trackAnalytics("cashier_open", { user, category: "payments" });
     sendJson(res, 200, { cashier: await cashierView(user) });
     return;
   }
@@ -530,6 +542,14 @@ async function handleApi(req, res, url) {
         externalId: order.externalId || order.id,
         raw: { invoiceUrl: invoiceLink, provider: "telegram" }
       });
+      await trackAnalytics("deposit_order_created", {
+        user,
+        category: "payments",
+        amount: quote.cashUsdtMicros,
+        asset: "USDT",
+        contextId: order.id,
+        meta: { method: "stars", stars: quote.stars }
+      });
       return { order: cryptoOrderView(order), cashier: await cashierView(user) };
     });
     return;
@@ -573,6 +593,20 @@ async function handleApi(req, res, url) {
       };
       cryptoOrders.set(orderId, order);
       await dbCreatePaymentOrder(order);
+      await trackAnalytics("deposit_order_created", {
+        user,
+        category: "payments",
+        amount: quote.cashUsdtMicros,
+        asset: "USDT",
+        contextId: order.id,
+        meta: {
+          method: quote.method,
+          asset: quote.asset,
+          network: quote.network,
+          cryptoAmount: quote.cryptoAmount,
+          stars: quote.stars || 0
+        }
+      });
 
       if (quote.method === "stars") {
         const invoiceLink = await createTelegramStarsInvoiceLink({
@@ -702,6 +736,14 @@ async function handleApi(req, res, url) {
     await sendIdempotentJson(req, res, user, "cashier_withdraw", async (idempotencyKey) => {
       const body = await readJson(req);
       const result = await createWithdrawalRequest(user, body, idempotencyKey);
+      await trackAnalytics("withdrawal_requested", {
+        user,
+        category: "payments",
+        amount: Number(result.order?.chips || 0),
+        asset: "PLAY_CHIPS",
+        contextId: result.order?.id || "",
+        meta: { method: result.order?.method || body.method || "" }
+      });
       return { withdrawal: result.order, cashier: await cashierView(user) };
     });
     return;
@@ -716,6 +758,20 @@ async function handleApi(req, res, url) {
       joinTable(table, user);
       tables.set(table.id, table);
       await persistActiveTableSnapshot(table);
+      await trackAnalytics("table_join", {
+        user,
+        category: "gameplay",
+        amount: table.seats[0]?.stack || 0,
+        asset: table.gameMode === "cash" ? "USDT" : "PLAY_CHIPS",
+        contextId: table.id,
+        meta: {
+          tableName: table.name,
+          gameMode: table.gameMode,
+          privateTable: true,
+          smallBlind: table.smallBlind,
+          bigBlind: table.bigBlind
+        }
+      });
       notifyAdmin("table_create", "Создан приватный стол", {
         user,
         lines: [
@@ -754,6 +810,20 @@ async function handleApi(req, res, url) {
         maybeStartHand(table);
         await persistActiveTableSnapshot(table);
         if (!wasSeated) {
+          await trackAnalytics("table_join", {
+            user,
+            category: "gameplay",
+            amount: table.seats.find((seat) => seat.userId === user.id)?.stack || 0,
+            asset: table.gameMode === "cash" ? "USDT" : "PLAY_CHIPS",
+            contextId: table.id,
+            meta: {
+              tableName: table.name,
+              gameMode: table.gameMode,
+              smallBlind: table.smallBlind,
+              bigBlind: table.bigBlind,
+              players: table.seats.length
+            }
+          });
           notifyAdmin("table_join", "Игрок сел за стол", {
             user,
             lines: [
@@ -788,6 +858,14 @@ async function handleApi(req, res, url) {
           `Баланс: ${formatAvailableBalance(user, table)}`
         ]
       });
+      await trackAnalytics("table_leave", {
+        user,
+        category: "gameplay",
+        amount: result.stack || 0,
+        asset: table.gameMode === "cash" ? "USDT" : "PLAY_CHIPS",
+        contextId: table.id,
+        meta: { tableName: table.name, gameMode: table.gameMode, returnToWallet: true }
+      });
       sendJson(res, 200, { ok: true, balance: user.balance });
       return;
     }
@@ -810,6 +888,14 @@ async function handleApi(req, res, url) {
           `${table.gameMode === "cash" ? "Возврат" : "Сохраненный стек"}: ${formatTableAmount(table, result.stack)}`,
           `Баланс: ${formatAvailableBalance(user, table)}`
         ]
+      });
+      await trackAnalytics("table_leave", {
+        user,
+        category: "gameplay",
+        amount: result.stack || 0,
+        asset: table.gameMode === "cash" ? "USDT" : "PLAY_CHIPS",
+        contextId: table.id,
+        meta: { tableName: table.name, gameMode: table.gameMode, standOnly: true }
       });
       sendJson(res, 200, { table: result.tableEmpty && table.isPrivate ? null : tableView(table, user), balance: user.balance });
       return;
@@ -869,6 +955,14 @@ async function handleApi(req, res, url) {
               `Баланс: ${formatAvailableBalance(user, table)}`
             ]
           });
+          await trackAnalytics("table_rebuy", {
+            user,
+            category: "gameplay",
+            amount: actualAmount,
+            asset: table.gameMode === "cash" ? "USDT" : "PLAY_CHIPS",
+            contextId: table.id,
+            meta: { tableName: table.name, gameMode: table.gameMode }
+          });
         }
         maybeStartHand(table);
         await persistActiveTableSnapshot(table);
@@ -897,6 +991,19 @@ async function handleApi(req, res, url) {
       act(table, user, body);
       await persistCompletedHands(table);
       await persistActiveTableSnapshot(table);
+      await trackAnalytics("poker_action", {
+        user,
+        category: "gameplay",
+        amount: Number(body.amount || 0),
+        asset: table.gameMode === "cash" ? "USDT" : "PLAY_CHIPS",
+        contextId: table.id,
+        meta: {
+          action: body.action || "",
+          tableName: table.name,
+          gameMode: table.gameMode,
+          handNumber: table.handNumber
+        }
+      });
       sendJson(res, 200, { table: tableView(table, user) });
       return;
     }
@@ -1005,6 +1112,7 @@ async function adminDashboardView() {
   const diagnostics = await healthSnapshot();
   const players = [...new Set([...wallets.keys(), ...userProfiles.keys(), ...transactions.keys()])];
   const dbStats = await dbDashboardStats();
+  const analytics = await analyticsDashboard(7);
   const walletTotal = dbStats ? dbStats.walletTotal : [...wallets.values()].reduce((sum, value) => sum + Number(value || 0), 0);
   const tableStackTotal = [...tables.values()].reduce((sum, table) => (
     sum + table.seats.reduce((seatSum, seat) => seatSum + Number(seat.stack || 0), 0)
@@ -1069,8 +1177,10 @@ async function adminDashboardView() {
       pendingWithdrawals: dbStats ? dbStats.pendingWithdrawals : [...withdrawalOrders.values()].filter((order) => ["pending", "manual_review"].includes(order.status)).length,
       pendingWithdrawalChipsTotal: dbStats ? dbStats.pendingWithdrawalChipsTotal : [...withdrawalOrders.values()]
         .filter((order) => ["pending", "manual_review"].includes(order.status))
-        .reduce((sum, order) => sum + Number(order.chips || 0), 0)
+        .reduce((sum, order) => sum + Number(order.chips || 0), 0),
+      analyticsEvents: dbStats ? dbStats.analyticsEventCount : analytics.totalEvents
     },
+    analytics,
     adminRoles: adminRoleSummary(),
     diagnostics,
     audit: {
@@ -1102,6 +1212,95 @@ async function adminDashboardView() {
       .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
       .slice(0, 30),
     recentEvents: recentEvents || adminEvents.slice(0, 20)
+  };
+}
+
+async function trackAnalytics(eventName, options = {}) {
+  const event = {
+    id: randomId("analytics"),
+    name: eventName,
+    category: options.category || "product",
+    userId: options.user?.id || options.userId || "",
+    provider: options.provider || "telegram",
+    sessionId: options.sessionId || "",
+    source: options.source || "server",
+    amount: Number(options.amount || 0),
+    asset: options.asset || "",
+    contextId: options.contextId || "",
+    meta: options.meta || {},
+    createdAt: new Date().toISOString()
+  };
+  analyticsEvents.unshift(event);
+  analyticsEvents.splice(1000);
+  try {
+    await dbRecordAnalyticsEvent(event);
+  } catch (error) {
+    console.error("Analytics event failed:", error.message);
+  }
+}
+
+async function analyticsDashboard(days = 7) {
+  const dbAnalytics = await dbAnalyticsOverview(days);
+  if (dbAnalytics) return dbAnalytics;
+  const cutoff = Date.now() - Math.max(1, Number(days || 7)) * 24 * 60 * 60 * 1000;
+  const events = analyticsEvents.filter((event) => new Date(event.createdAt).getTime() >= cutoff);
+  const byName = new Map();
+  const usersByEvent = new Map();
+  const uniqueUsers = new Set();
+  const addUser = (name, userId) => {
+    if (!userId) return;
+    uniqueUsers.add(userId);
+    if (!usersByEvent.has(name)) usersByEvent.set(name, new Set());
+    usersByEvent.get(name).add(userId);
+  };
+  for (const event of events) {
+    const current = byName.get(event.name) || { name: event.name, category: event.category, count: 0, amount: 0 };
+    current.count += 1;
+    current.amount += Number(event.amount || 0);
+    byName.set(event.name, current);
+    addUser(event.name, event.userId);
+  }
+  const count = (name) => byName.get(name)?.count || 0;
+  const amount = (name) => byName.get(name)?.amount || 0;
+  const userCount = (name) => usersByEvent.get(name)?.size || 0;
+  const appOpenUsers = userCount("app_open");
+  const cashierUsers = userCount("cashier_open");
+  const depositOrderUsers = userCount("deposit_order_created");
+  const tableJoinUsers = userCount("table_join");
+  return {
+    days: Number(days || 7),
+    totalEvents: events.length,
+    uniqueUsers: uniqueUsers.size,
+    appOpens: count("app_open"),
+    appOpenUsers,
+    cashierOpens: count("cashier_open"),
+    cashierUsers,
+    depositOrders: count("deposit_order_created"),
+    depositOrderUsers,
+    paidDeposits: count("deposit_paid"),
+    payingUsers: userCount("deposit_paid"),
+    paidDepositAmount: amount("deposit_paid"),
+    withdrawalRequests: count("withdrawal_requested"),
+    withdrawalAmount: amount("withdrawal_requested"),
+    tableJoins: count("table_join"),
+    tableJoinUsers,
+    tableLeaves: count("table_leave"),
+    pokerActions: count("poker_action"),
+    handsCompleted: count("hand_completed"),
+    rakeAmount: amount("hand_completed"),
+    tournamentRegisters: count("tournament_register"),
+    tournamentCancels: count("tournament_cancel"),
+    conversion: {
+      openToCashier: metricRatio(cashierUsers, appOpenUsers),
+      cashierToOrder: metricRatio(depositOrderUsers, cashierUsers),
+      orderToPaid: metricRatio(userCount("deposit_paid"), depositOrderUsers),
+      openToTable: metricRatio(tableJoinUsers, appOpenUsers)
+    },
+    daily: [],
+    events: [...byName.values()].map((event) => ({
+      ...event,
+      users: userCount(event.name)
+    })).sort((a, b) => b.count - a.count).slice(0, 30)
   };
 }
 
@@ -1334,6 +1533,22 @@ async function persistCompletedHands(table) {
 
     try {
       await dbRecordHandHistory(table, hand);
+      await trackAnalytics("hand_completed", {
+        category: "gameplay",
+        amount: Number(hand.rake || 0),
+        asset: table.gameMode === "cash" ? "USDT" : "PLAY_CHIPS",
+        contextId: hand.id,
+        meta: {
+          tableId: table.id,
+          tableName: table.name,
+          gameMode: table.gameMode,
+          handNumber: hand.handNumber,
+          smallBlind: table.smallBlind,
+          bigBlind: table.bigBlind,
+          players: Array.isArray(hand.seats) ? hand.seats.length : 0,
+          potTotal: Array.isArray(hand.pots) ? hand.pots.reduce((sum, pot) => sum + Number(pot.amount || 0), 0) : 0
+        }
+      });
       if (Number(hand.rake || 0) > 0) {
         await dbRecordPlatformLedgerEntry({
           type: "credit",
@@ -1879,6 +2094,19 @@ async function registerTournament(tournament, user) {
       `Баланс: ${formatNumber(user.balance)} chips`
     ]
   });
+  await trackAnalytics("tournament_register", {
+    user,
+    category: "tournament",
+    amount: totalCost,
+    asset: "PLAY_CHIPS",
+    contextId: tournament.id,
+    meta: {
+      title: tournament.title,
+      buyIn: tournament.buyIn,
+      fee: tournament.fee,
+      participants: tournament.registrations.size
+    }
+  });
 }
 
 async function cancelTournamentRegistration(tournament, user) {
@@ -1918,6 +2146,14 @@ async function cancelTournamentRegistration(tournament, user) {
       `Возврат: ${formatNumber(totalCost)} chips`,
       `Баланс: ${formatNumber(user.balance)} chips`
     ]
+  });
+  await trackAnalytics("tournament_cancel", {
+    user,
+    category: "tournament",
+    amount: totalCost,
+    asset: "PLAY_CHIPS",
+    contextId: tournament.id,
+    meta: { title: tournament.title }
   });
 }
 
@@ -2746,6 +2982,19 @@ async function handleAdminPaymentAction({ admin, paymentId, action, reason = "" 
   };
   cryptoOrders.set(order.id, paidOrder);
   setCashWalletBalanceLocal(order.userId, balance);
+  await trackAnalytics("deposit_paid", {
+    userId: order.userId,
+    category: "payments",
+    amount: order.cashUsdtMicros,
+    asset: "USDT",
+    contextId: order.id,
+    meta: {
+      method: order.method,
+      manualApproval: true,
+      adminId: adminProfile.id,
+      reason: normalizedReason
+    }
+  });
   notifyAdmin("payment_approved", "Админ подтвердил платеж", {
     user: { id: order.userId, name: order.userName, username: order.username },
     lines: [
@@ -2806,6 +3055,18 @@ async function processSuccessfulStarPayment(payment) {
   order.telegramPaymentChargeId = payment.telegram_payment_charge_id || "";
   starOrders.set(order.id, order);
   setWalletBalanceLocal(order.userId, balance);
+  await trackAnalytics("deposit_paid", {
+    userId: order.userId,
+    category: "payments",
+    amount: order.cashUsdtMicros,
+    asset: "USDT",
+    contextId: order.id,
+    meta: {
+      method: "stars",
+      stars: order.stars,
+      telegramPaymentChargeId: order.telegramPaymentChargeId || ""
+    }
+  });
   notifyAdmin("stars_paid", "Оплачено Stars-пополнение", {
     user: { id: order.userId, name: order.userName, username: order.username },
     lines: [
@@ -2908,6 +3169,20 @@ async function handleCryptoWebhook(event) {
   const paidOrder = { ...order, status: "paid", externalId, txHash, paidAt: new Date().toISOString() };
   cryptoOrders.set(order.id, paidOrder);
   setCashWalletBalanceLocal(order.userId, balance);
+  await trackAnalytics("deposit_paid", {
+    userId: order.userId,
+    category: "payments",
+    amount: order.cashUsdtMicros,
+    asset: "USDT",
+    contextId: order.id,
+    meta: {
+      method: order.method,
+      asset: order.asset,
+      network: order.network,
+      paidAmount: paidAmount || order.cryptoAmount,
+      txHash: txHash || externalId || ""
+    }
+  });
   notifyAdmin("crypto_paid", "Оплачено crypto-пополнение", {
     user: { id: order.userId, name: order.userName, username: order.username },
     lines: [
@@ -3499,6 +3774,12 @@ function ensureCryptoPaymentMethodEnabled(method) {
     error.status = 409;
     throw error;
   }
+}
+
+function metricRatio(numerator, denominator) {
+  const top = Number(numerator || 0);
+  const bottom = Number(denominator || 0);
+  return bottom > 0 ? Number((top / bottom).toFixed(4)) : 0;
 }
 
 function cryptoOrderView(order) {

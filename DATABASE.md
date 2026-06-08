@@ -45,6 +45,7 @@ Persisted in PostgreSQL:
 - `active_table_snapshots` - latest JSON snapshot of each open table for restart recovery.
 - `admin_events` - admin and audit log events.
 - `admin_audit_logs` - structured audit trail for future web-admin actions.
+- `analytics_events` - server-side product and business events: app opens, cashier opens, deposit attempts, paid deposits, table joins/leaves, hands, rake, tournaments, and withdrawals.
 
 Persisted in Redis when `REDIS_URL` is configured:
 
@@ -112,6 +113,27 @@ The server periodically compares:
 - paid Stars order chips against `deposit_stars` ledger credits.
 
 If drift is detected, the app writes an admin event and sends a Telegram admin alert when `ADMIN_CHAT_ID` is configured. This is an alert-only control: it does not silently edit balances.
+
+## Product analytics
+
+The first analytics layer is intentionally built into the backend and PostgreSQL instead of a separate microservice. This keeps MVP telemetry reliable and auditable without adding another moving part.
+
+Tracked server-side events include:
+
+- `app_open`
+- `cashier_open`
+- `deposit_order_created`
+- `deposit_paid`
+- `withdrawal_requested`
+- `table_join`
+- `table_leave`
+- `table_rebuy`
+- `poker_action`
+- `hand_completed`
+- `tournament_register`
+- `tournament_cancel`
+
+The admin dashboard aggregates a 7-day funnel: opened app -> opened cashier -> created deposit order -> paid deposit -> joined table, plus hands, actions, deposit amount, and table activity. If traffic grows, `analytics_events` can be streamed into ClickHouse/BigQuery/Amplitude without changing the product event names.
 
 ## Sessions
 

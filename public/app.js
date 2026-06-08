@@ -1352,6 +1352,8 @@ function selectAdminPanel(panel) {
 
 function renderAdminDashboard(admin) {
   const stats = admin?.stats || {};
+  const analytics = admin?.analytics || {};
+  const conversion = analytics.conversion || {};
   const diagnostics = admin?.diagnostics || {};
   const database = diagnostics.database || {};
   const memory = diagnostics.memory || {};
@@ -1397,7 +1399,20 @@ function renderAdminDashboard(admin) {
     ["Stars paid", stats.paidStars || 0],
     ["Stars pending", stats.pendingStars || 0],
     ["Withdrawals", stats.pendingWithdrawals || 0],
-    ["Withdrawal hold", formatChips(stats.pendingWithdrawalChipsTotal || 0)]
+    ["Withdrawal hold", formatChips(stats.pendingWithdrawalChipsTotal || 0)],
+    ["Analytics events", analytics.totalEvents || stats.analyticsEvents || 0],
+    ["Open users 7d", analytics.appOpenUsers || 0],
+    ["Cashier users 7d", analytics.cashierUsers || 0],
+    ["Deposit orders", analytics.depositOrders || 0],
+    ["Paid deposits", analytics.paidDeposits || 0],
+    ["Deposit amount", `${formatUsdt(analytics.paidDepositAmount || 0)} USDT`],
+    ["Table joins", analytics.tableJoins || 0],
+    ["Hands 7d", analytics.handsCompleted || 0],
+    ["Actions 7d", analytics.pokerActions || 0],
+    ["Open → cashier", formatPercent(conversion.openToCashier || 0)],
+    ["Cashier → order", formatPercent(conversion.cashierToOrder || 0)],
+    ["Order → paid", formatPercent(conversion.orderToPaid || 0)],
+    ["Open → table", formatPercent(conversion.openToTable || 0)]
   ].map(([label, value]) => {
     const item = document.createElement("div");
     item.innerHTML = "<span></span><strong></strong>";
@@ -3825,6 +3840,13 @@ function formatUsdt(value) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
+}
+
+function formatPercent(value) {
+  return `${(Number(value || 0) * 100).toLocaleString("ru-RU", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1
+  })}%`;
 }
 
 function formatModeAmount(value, cashMode) {
