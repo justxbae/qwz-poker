@@ -1425,16 +1425,17 @@ function renderAdminOverview({ admin, stats, analytics, conversion, diagnostics,
   toolbar.innerHTML = `
     <div>
       <p class="eyebrow">Reports</p>
-      <h2>Операционный отчёт</h2>
-      <span>Период: ${periodLabel}. Деньги, игроки, конверсия, игра и риск.</span>
+      <h2>Метрики проекта</h2>
+      <span>Период: ${periodLabel}. Управление воронкой, деньгами, игрой и рисками.</span>
     </div>
     <div class="admin-report-controls">
       <div class="admin-period-toggle" role="group" aria-label="Период аналитики"></div>
-      <div class="admin-metric-switches" aria-label="Показатели отчёта">
-        <label><input type="checkbox" checked /> Деньги</label>
-        <label><input type="checkbox" checked /> Игроки</label>
-        <label><input type="checkbox" checked /> Игра</label>
-        <label><input type="checkbox" checked /> Риски</label>
+      <div class="admin-report-tabs" role="group" aria-label="Раздел отчёта">
+        <button type="button" class="active" data-admin-report-filter="all">Сводка</button>
+        <button type="button" data-admin-report-filter="acquisition">Воронка</button>
+        <button type="button" data-admin-report-filter="finance">Финансы</button>
+        <button type="button" data-admin-report-filter="gameplay">Игра</button>
+        <button type="button" data-admin-report-filter="risk">Риски</button>
       </div>
     </div>
   `;
@@ -1442,7 +1443,8 @@ function renderAdminOverview({ admin, stats, analytics, conversion, diagnostics,
   [
     [1, "24h"],
     [7, "7d"],
-    [30, "30d"]
+    [30, "30d"],
+    [90, "90d"]
   ].forEach(([value, label]) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -1456,49 +1458,70 @@ function renderAdminOverview({ admin, stats, analytics, conversion, diagnostics,
     periodToggle.append(button);
   });
 
+  const arpu = ratioValue(analytics.paidDepositAmount || 0, analytics.appOpenUsers || 0);
+  const arppu = ratioValue(analytics.paidDepositAmount || 0, analytics.payingUsers || 0);
+  const averageDeposit = ratioValue(analytics.paidDepositAmount || 0, analytics.paidDeposits || 0);
+  const withdrawalRatio = ratioValue(analytics.withdrawalAmount || 0, analytics.paidDepositAmount || 0);
+  const tableOccupancy = ratioValue(stats.activeTables || 0, stats.openTables || 0);
+  const depositConversion = conversion.orderToPaid || 0;
+  const cashierConversion = conversion.openToCashier || 0;
+
   const kpis = document.createElement("section");
   kpis.className = "admin-report-kpis";
   [
     {
-      label: "Открыли app",
-      value: formatNumber(analytics.appOpenUsers || 0),
-      meta: `${formatNumber(analytics.appOpens || 0)} визитов`,
+      label: "DAU / WAU / MAU",
+      value: `${formatNumber(analytics.dau || 0)} / ${formatNumber(analytics.wau || 0)} / ${formatNumber(analytics.mau || 0)}`,
+      meta: `${formatNumber(analytics.appOpens || 0)} визитов за период`,
       tone: "primary"
     },
     {
-      label: "Депозиты",
+      label: "Депозитная выручка",
       value: `${formatUsdt(analytics.paidDepositAmount || 0)} USDT`,
-      meta: `${formatNumber(analytics.paidDeposits || 0)} paid / ${formatNumber(analytics.depositOrders || 0)} orders`,
+      meta: `${formatNumber(analytics.paidDeposits || 0)} оплат · avg ${formatUsdt(averageDeposit)} USDT`,
       tone: Number(analytics.paidDeposits || 0) > 0 ? "success" : "neutral"
     },
     {
-      label: "Руки",
-      value: formatNumber(analytics.handsCompleted || 0),
-      meta: `${formatNumber(analytics.tableJoins || 0)} входов за стол`,
+      label: "FTD",
+      value: formatNumber(analytics.firstDepositUsers || 0),
+      meta: `первых депозитов · CR ${formatPercent(depositConversion)}`,
       tone: "primary"
     },
     {
-      label: "Рейк",
-      value: formatChips(stats.handHistoryRakeTotal || stats.rakeCollectedTotal || 0),
-      meta: "накоплено по истории рук",
+      label: "ARPU / ARPPU",
+      value: `${formatUsdt(arpu)} / ${formatUsdt(arppu)}`,
+      meta: "USDT на активного / платящего",
       tone: "success"
     },
     {
-      label: "Выводы hold",
-      value: formatNumber(stats.pendingWithdrawals || 0),
-      meta: `${formatUsdt(stats.pendingWithdrawalUsdtTotal || 0)} USDT / ${formatChips(stats.pendingWithdrawalChipsTotal || 0)} chips`,
+      label: "Игровая активность",
+      value: formatNumber(analytics.handsCompleted || 0),
+      meta: `${formatNumber(analytics.tableJoins || 0)} входов · occupancy ${formatPercent(tableOccupancy)}`,
+      tone: "primary"
+    },
+    {
+      label: "Выводы",
+      value: `${formatUsdt(analytics.withdrawalAmount || 0)} USDT`,
+      meta: `${formatNumber(stats.pendingWithdrawals || 0)} pending · ratio ${formatPercent(withdrawalRatio)}`,
       tone: Number(stats.pendingWithdrawals || 0) > 0 ? "warning" : "neutral"
     },
     {
-      label: "Drift",
+      label: "Hidden fee",
+      value: `${formatUsdt(stats.approvedWithdrawalFeeUsdtTotal || 0)} USDT`,
+      meta: "доход на выводах",
+      tone: "success"
+    },
+    {
+      label: "Balance drift",
       value: formatChips(reconciliation.walletLedgerDrift || 0),
-      meta: "кошелек против ledger",
+      meta: "кошелёк против ledger",
       tone: Number(reconciliation.walletLedgerDrift || 0) === 0 ? "success" : "danger"
     }
   ].forEach((item) => kpis.append(adminKpiCard(item)));
 
   const reportGrid = document.createElement("section");
   reportGrid.className = "admin-report-grid";
+  reportGrid.dataset.reportSection = "acquisition";
   reportGrid.append(adminDailyChartCard(analytics));
   reportGrid.append(adminFunnelCard(analytics, conversion));
 
@@ -1516,9 +1539,12 @@ function renderAdminOverview({ admin, stats, analytics, conversion, diagnostics,
   ];
   const productRows = [
     ["Players", formatNumber(stats.players || 0), "Все Telegram users"],
-    ["Open users", formatNumber(analytics.appOpenUsers || 0), `За ${periodLabel}`],
-    ["Cashier users", formatNumber(analytics.cashierUsers || 0), formatPercent(conversion.openToCashier || 0)],
-    ["Paying users", formatNumber(analytics.payingUsers || 0), formatPercent(conversion.orderToPaid || 0)],
+    ["Open users", formatNumber(analytics.appOpenUsers || 0), `${formatNumber(analytics.appOpens || 0)} визитов`],
+    ["Cashier users", formatNumber(analytics.cashierUsers || 0), `open → cashier ${formatPercent(cashierConversion)}`],
+    ["Paying users", formatNumber(analytics.payingUsers || 0), `order → paid ${formatPercent(depositConversion)}`],
+    ["FTD", formatNumber(analytics.firstDepositUsers || 0), "первые депозиты"],
+    ["ARPU", `${formatUsdt(arpu)} USDT`, "депозиты / активные"],
+    ["ARPPU", `${formatUsdt(arppu)} USDT`, "депозиты / платящие"],
     ["Active tables", formatNumber(stats.activeTables || 0), "Сейчас"],
     ["Hands", formatNumber(analytics.handsCompleted || 0), `За ${periodLabel}`],
     ["Poker actions", formatNumber(analytics.pokerActions || 0), "Clicks/actions"],
@@ -1537,12 +1563,24 @@ function renderAdminOverview({ admin, stats, analytics, conversion, diagnostics,
 
   const tables = document.createElement("section");
   tables.className = "admin-report-tables";
-  tables.append(adminReportTable("Финансы", "cash / ledger / withdrawal", financeRows));
-  tables.append(adminReportTable("Продукт", "воронка / активность / игра", productRows));
-  tables.append(adminReportTable("Контроль", "health / drift / risk", riskRows));
+  tables.append(adminReportTable("Финансы", "cash / ledger / withdrawal", financeRows, "finance"));
+  tables.append(adminReportTable("Продукт", "воронка / активность / игра", productRows, "gameplay"));
+  tables.append(adminReportTable("Контроль", "health / drift / risk", riskRows, "risk"));
 
-  sections.replaceChildren(toolbar, kpis, reportGrid, tables);
+  const kpiWrap = document.createElement("section");
+  kpiWrap.className = "admin-report-section";
+  kpiWrap.dataset.reportSection = "all";
+  kpiWrap.append(kpis);
+
+  sections.replaceChildren(toolbar, kpiWrap, reportGrid, tables);
   adminSummary.replaceChildren(sections);
+  wireAdminReportFilters(sections);
+}
+
+function ratioValue(numerator, denominator) {
+  const bottom = Number(denominator || 0);
+  if (!bottom) return 0;
+  return Number(numerator || 0) / bottom;
 }
 
 function adminKpiCard(item) {
@@ -1555,9 +1593,10 @@ function adminKpiCard(item) {
   return card;
 }
 
-function adminReportTable(title, subtitle, rows) {
+function adminReportTable(title, subtitle, rows, section = "all") {
   const card = document.createElement("section");
   card.className = "admin-report-table";
+  card.dataset.reportSection = section;
   card.innerHTML = `
     <div class="admin-section-header">
       <div>
@@ -1572,7 +1611,7 @@ function adminReportTable(title, subtitle, rows) {
     const row = document.createElement("div");
     row.className = "admin-report-row";
     row.innerHTML = `
-      <label><input type="checkbox" checked /> <span></span></label>
+      <span></span>
       <strong></strong>
       <small></small>
     `;
@@ -1582,6 +1621,21 @@ function adminReportTable(title, subtitle, rows) {
     body.append(row);
   });
   return card;
+}
+
+function wireAdminReportFilters(root) {
+  const buttons = [...root.querySelectorAll("[data-admin-report-filter]")];
+  const sections = [...root.querySelectorAll("[data-report-section]")];
+  buttons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const filter = button.dataset.adminReportFilter;
+      buttons.forEach((item) => item.classList.toggle("active", item === button));
+      sections.forEach((section) => {
+        const sectionName = section.dataset.reportSection;
+        section.hidden = filter !== "all" && sectionName !== filter && sectionName !== "all";
+      });
+    });
+  });
 }
 
 function adminFunnelCard(analytics, conversion) {
@@ -1627,14 +1681,22 @@ function adminDailyChartCard(analytics) {
   const card = document.createElement("section");
   card.className = "admin-dashboard-card admin-chart-card";
   const daily = [...(analytics.daily || [])].reverse();
-  const maxValue = Math.max(1, ...daily.map((item) => Number(item.events || 0)));
+  const maxValue = Math.max(1, ...daily.flatMap((item) => [
+    Number(item.appOpens || 0),
+    Number(item.handsCompleted || 0),
+    Number(item.paidDeposits || 0)
+  ]));
   card.innerHTML = `
     <div class="admin-section-header">
       <div>
         <p class="eyebrow">Trend</p>
-        <h3>Активность по дням</h3>
+        <h3>Динамика по дням</h3>
       </div>
-      <span>events / hands / deposits</span>
+      <span class="admin-chart-legend">
+        <i class="visits"></i> визиты
+        <i class="hands"></i> руки
+        <i class="deposits"></i> депозиты
+      </span>
     </div>
     <div class="admin-chart-bars"></div>
   `;
@@ -1649,14 +1711,20 @@ function adminDailyChartCard(analytics) {
   daily.forEach((item) => {
     const bar = document.createElement("div");
     bar.className = "admin-chart-bar";
-    const height = Math.max(8, Math.round((Number(item.events || 0) / maxValue) * 100));
+    const appHeight = Math.max(4, Math.round((Number(item.appOpens || 0) / maxValue) * 100));
+    const handsHeight = Math.max(4, Math.round((Number(item.handsCompleted || 0) / maxValue) * 100));
+    const depositHeight = Math.max(4, Math.round((Number(item.paidDeposits || 0) / maxValue) * 100));
     const dayLabel = new Date(item.day).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
     bar.innerHTML = `
-      <span>${formatNumber(item.events || 0)}</span>
-      <i style="height:${height}%"></i>
+      <span>${formatNumber(item.users || 0)}</span>
+      <div class="admin-chart-stack">
+        <i class="visits" style="height:${appHeight}%"></i>
+        <i class="hands" style="height:${handsHeight}%"></i>
+        <i class="deposits" style="height:${depositHeight}%"></i>
+      </div>
       <small>${dayLabel}</small>
     `;
-    bar.title = `${dayLabel}: ${formatNumber(item.events || 0)} events, ${formatNumber(item.handsCompleted || 0)} hands, ${formatNumber(item.paidDeposits || 0)} deposits`;
+    bar.title = `${dayLabel}: ${formatNumber(item.appOpens || 0)} visits, ${formatNumber(item.handsCompleted || 0)} hands, ${formatNumber(item.paidDeposits || 0)} deposits`;
     chart.append(bar);
   });
   return card;

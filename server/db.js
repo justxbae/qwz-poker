@@ -1287,6 +1287,15 @@ export async function analyticsOverview(days = 7) {
       select
         count(*)::int as total_events,
         count(distinct app_user_id) filter (where app_user_id is not null)::int as unique_users,
+        (select count(distinct app_user_id)::int from analytics_events where event_name = 'app_open' and app_user_id is not null and created_at >= now() - interval '1 day') as dau,
+        (select count(distinct app_user_id)::int from analytics_events where event_name = 'app_open' and app_user_id is not null and created_at >= now() - interval '7 day') as wau,
+        (select count(distinct app_user_id)::int from analytics_events where event_name = 'app_open' and app_user_id is not null and created_at >= now() - interval '30 day') as mau,
+        (select count(*)::int from (
+          select app_user_id, min(created_at) as first_paid_at
+          from analytics_events
+          where event_name = 'deposit_paid' and app_user_id is not null
+          group by app_user_id
+        ) first_deposits where first_paid_at >= now() - ($1::int * interval '1 day')) as first_deposit_users,
         count(*) filter (where event_name = 'app_open')::int as app_opens,
         count(distinct app_user_id) filter (where event_name = 'app_open' and app_user_id is not null)::int as app_open_users,
         count(*) filter (where event_name = 'cashier_open')::int as cashier_opens,
@@ -1300,6 +1309,8 @@ export async function analyticsOverview(days = 7) {
         coalesce(sum(amount) filter (where event_name = 'withdrawal_requested'), 0)::bigint as withdrawal_amount,
         count(*) filter (where event_name = 'withdrawal_approved')::int as withdrawal_approved,
         count(*) filter (where event_name = 'withdrawal_rejected')::int as withdrawal_rejected,
+        coalesce(sum(amount) filter (where event_name = 'withdrawal_approved'), 0)::bigint as withdrawal_approved_amount,
+        coalesce(sum(amount) filter (where event_name = 'withdrawal_rejected'), 0)::bigint as withdrawal_rejected_amount,
         count(*) filter (where event_name = 'table_join')::int as table_joins,
         count(distinct app_user_id) filter (where event_name = 'table_join' and app_user_id is not null)::int as table_join_users,
         count(*) filter (where event_name = 'table_leave')::int as table_leaves,
@@ -1344,6 +1355,10 @@ export async function analyticsOverview(days = 7) {
   const numbers = {
     totalEvents: Number(row.total_events || 0),
     uniqueUsers: Number(row.unique_users || 0),
+    dau: Number(row.dau || 0),
+    wau: Number(row.wau || 0),
+    mau: Number(row.mau || 0),
+    firstDepositUsers: Number(row.first_deposit_users || 0),
     appOpens: Number(row.app_opens || 0),
     appOpenUsers: Number(row.app_open_users || 0),
     cashierOpens: Number(row.cashier_opens || 0),
@@ -1357,6 +1372,8 @@ export async function analyticsOverview(days = 7) {
     withdrawalAmount: Number(row.withdrawal_amount || 0),
     withdrawalApproved: Number(row.withdrawal_approved || 0),
     withdrawalRejected: Number(row.withdrawal_rejected || 0),
+    withdrawalApprovedAmount: Number(row.withdrawal_approved_amount || 0),
+    withdrawalRejectedAmount: Number(row.withdrawal_rejected_amount || 0),
     tableJoins: Number(row.table_joins || 0),
     tableJoinUsers: Number(row.table_join_users || 0),
     tableLeaves: Number(row.table_leaves || 0),

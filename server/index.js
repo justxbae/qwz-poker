@@ -380,16 +380,16 @@ async function handleApi(req, res, url) {
     sessions.set(token, user);
     sessionExpirations.set(token, Date.now() + SESSION_TTL_MS);
     await stateSetSession(token, user);
+    await trackAnalytics("app_open", {
+      user,
+      category: "acquisition",
+      meta: {
+        cashBalanceMicros: user.cashBalanceMicros || 0,
+        playBalance: user.balance || 0
+      }
+    });
     if (!loggedAppOpens.has(user.id)) {
       loggedAppOpens.add(user.id);
-      await trackAnalytics("app_open", {
-        user,
-        category: "acquisition",
-        meta: {
-          cashBalanceMicros: user.cashBalanceMicros || 0,
-          playBalance: user.balance || 0
-        }
-      });
       notifyAdmin("open", "Игрок открыл Mini App", {
         user,
         lines: [
@@ -1265,6 +1265,7 @@ async function analyticsDashboard(days = 7) {
   if (dbAnalytics) return dbAnalytics;
   const cutoff = Date.now() - Math.max(1, Number(days || 7)) * 24 * 60 * 60 * 1000;
   const events = analyticsEvents.filter((event) => new Date(event.createdAt).getTime() >= cutoff);
+  const now = Date.now();
   const byName = new Map();
   const usersByEvent = new Map();
   const uniqueUsers = new Set();
@@ -1288,10 +1289,25 @@ async function analyticsDashboard(days = 7) {
   const cashierUsers = userCount("cashier_open");
   const depositOrderUsers = userCount("deposit_order_created");
   const tableJoinUsers = userCount("table_join");
+  const activeUsersSince = (ms) => new Set(analyticsEvents
+    .filter((event) => event.name === "app_open" && event.userId && new Date(event.createdAt).getTime() >= now - ms)
+    .map((event) => event.userId)).size;
+  const firstPaidByUser = new Map();
+  for (const event of analyticsEvents) {
+    if (event.name !== "deposit_paid" || !event.userId) continue;
+    const at = new Date(event.createdAt).getTime();
+    const current = firstPaidByUser.get(event.userId);
+    if (!current || at < current) firstPaidByUser.set(event.userId, at);
+  }
+  const firstDepositUsers = [...firstPaidByUser.values()].filter((at) => at >= cutoff).length;
   return {
     days: Number(days || 7),
     totalEvents: events.length,
     uniqueUsers: uniqueUsers.size,
+    dau: activeUsersSince(24 * 60 * 60 * 1000),
+    wau: activeUsersSince(7 * 24 * 60 * 60 * 1000),
+    mau: activeUsersSince(30 * 24 * 60 * 60 * 1000),
+    firstDepositUsers,
     appOpens: count("app_open"),
     appOpenUsers,
     cashierOpens: count("cashier_open"),
@@ -1305,6 +1321,8 @@ async function analyticsDashboard(days = 7) {
     withdrawalAmount: amount("withdrawal_requested"),
     withdrawalApproved: count("withdrawal_approved"),
     withdrawalRejected: count("withdrawal_rejected"),
+    withdrawalApprovedAmount: amount("withdrawal_approved"),
+    withdrawalRejectedAmount: amount("withdrawal_rejected"),
     tableJoins: count("table_join"),
     tableJoinUsers,
     tableLeaves: count("table_leave"),

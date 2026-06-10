@@ -9260,17 +9260,17 @@ html.admin-mode body:not(.in-game) .admin-report-controls {
   justify-items: end;
 }
 
-html.admin-mode body:not(.in-game) .admin-metric-switches {
+html.admin-mode body:not(.in-game) .admin-report-tabs {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
 }
 
-html.admin-mode body:not(.in-game) .admin-metric-switches label {
+html.admin-mode body:not(.in-game) .admin-report-tabs button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   min-height: 30px;
   border: 1px solid rgba(122, 162, 194, 0.15);
   border-radius: 6px;
@@ -9281,9 +9281,10 @@ html.admin-mode body:not(.in-game) .admin-metric-switches label {
   font-weight: 700;
 }
 
-html.admin-mode body:not(.in-game) .admin-metric-switches input,
-html.admin-mode body:not(.in-game) .admin-report-row input {
-  accent-color: #2aabee;
+html.admin-mode body:not(.in-game) .admin-report-tabs button.active {
+  border-color: rgba(42, 171, 238, 0.55);
+  background: #213a4f;
+  color: #fff;
 }
 
 html.admin-mode body:not(.in-game) .admin-report-kpis {
@@ -9336,9 +9337,12 @@ html.admin-mode body:not(.in-game) .admin-report-row:last-child {
 }
 
 html.admin-mode body:not(.in-game) .admin-report-row label {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+  color: #dce7f1;
+  font-size: 13px;
+  font-weight: 760;
+}
+
+html.admin-mode body:not(.in-game) .admin-report-row > span {
   color: #dce7f1;
   font-size: 13px;
   font-weight: 760;
@@ -9563,12 +9567,49 @@ html.admin-mode body:not(.in-game) .admin-chart-bar small {
   font-weight: 760;
 }
 
-html.admin-mode body:not(.in-game) .admin-chart-bar i {
+html.admin-mode body:not(.in-game) .admin-chart-legend {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+html.admin-mode body:not(.in-game) .admin-chart-legend i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+html.admin-mode body:not(.in-game) .admin-chart-stack {
+  display: grid;
+  grid-template-columns: repeat(3, 9px);
+  align-items: end;
+  justify-content: center;
+  min-height: 120px;
+  gap: 5px;
+}
+
+html.admin-mode body:not(.in-game) .admin-chart-stack i {
   display: block;
   width: 100%;
   min-height: 8px;
   border-radius: 999px 999px 4px 4px;
+}
+
+html.admin-mode body:not(.in-game) .admin-chart-stack i.visits,
+html.admin-mode body:not(.in-game) .admin-chart-legend i.visits {
   background: #2aabee;
+}
+
+html.admin-mode body:not(.in-game) .admin-chart-stack i.hands,
+html.admin-mode body:not(.in-game) .admin-chart-legend i.hands {
+  background: #6ee795;
+}
+
+html.admin-mode body:not(.in-game) .admin-chart-stack i.deposits,
+html.admin-mode body:not(.in-game) .admin-chart-legend i.deposits {
+  background: #ffd05c;
 }
 
 html.admin-mode body:not(.in-game) .admin-metric-group {
@@ -9816,7 +9857,7 @@ html.admin-mode body:not(.in-game) .admin-settings-list {
   }
 
   html.admin-mode body:not(.in-game) .admin-report-controls,
-  html.admin-mode body:not(.in-game) .admin-metric-switches {
+  html.admin-mode body:not(.in-game) .admin-report-tabs {
     justify-items: stretch;
     justify-content: flex-start;
   }
