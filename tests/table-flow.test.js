@@ -68,6 +68,12 @@ test("table auto-starts, accepts custom raise, and pays the pot at showdown", as
     const dashboard = (await request("/api/admin", { token: auth.token })).admin;
     assert.equal(dashboard.stats.handHistoryCount, 1);
     assert.ok(dashboard.recentHands.some((hand) => hand.handNumber === table.handNumber));
+
+    const profile = (await request("/api/profile", { token: auth.token })).profile;
+    assert.equal(profile.profile.handsPlayed, 1);
+    assert.equal(profile.profile.ratingHandsPlayed, 1);
+    assert.equal(profile.profile.ratingPoints, 10);
+    assert.equal(profile.profile.cashLevel, 1);
   } finally {
     server.kill();
   }

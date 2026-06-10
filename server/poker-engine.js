@@ -785,6 +785,7 @@ function recordHandHistory(table, { pots, rake = 0 }) {
     seats: [...table.seats, ...(table.departedContributions || [])]
       .filter((seat) => seat.cards.length > 0)
       .map((seat) => ({
+        userId: seat.userId || "",
         name: seat.name,
         cards: seat.folded ? ["hidden", "hidden"] : [...seat.cards],
         folded: seat.folded,

@@ -156,7 +156,7 @@
               <div class="home-identity">
                 <strong id="lobbyName">Игрок</strong>
                 <span id="lobbyUsername">@player</span>
-                <small class="player-rank">Новичок · Уровень 1</small>
+                <small class="player-rank" id="lobbyRank">Новичок · Уровень 1</small>
               </div>
               <button type="button" class="home-profile-link" data-lobby-tab="profile" aria-label="Открыть профиль">›</button>
             </div>
@@ -463,15 +463,30 @@
           <section class="lobby-card">
             <div class="section-title">
               <div>
-                <p class="eyebrow">Игра</p>
-                <h2>Активность</h2>
+                <p class="eyebrow">Cash profile</p>
+                <h2 id="profileCashTitle">Новичок · Уровень 1</h2>
               </div>
-              <span>cash</span>
+              <span id="profileCashXpLabel">0 / 120 XP</span>
+            </div>
+            <div class="profile-progress" aria-label="Прогресс уровня"><span id="profileCashProgress"></span></div>
+            <div class="stats-cards">
+              <div><span>Cash рук</span><strong id="profileCashHands">0</strong></div>
+              <div><span>Всего рук</span><strong id="profileHands">0</strong></div>
+              <div><span>Статус</span><strong id="profileStatus">В лобби</strong></div>
+            </div>
+          </section>
+          <section class="lobby-card">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Рейтинговый режим</p>
+                <h2 id="profileRatingTitle">Unranked</h2>
+              </div>
+              <span id="profileRatingPoints">0 pts</span>
             </div>
             <div class="stats-cards">
-              <div><span>Раздач</span><strong id="profileHands">0</strong></div>
+              <div><span>Рейтинговых рук</span><strong id="profileRatingHands">0</strong></div>
               <div><span>Столов</span><strong id="profileTables">0</strong></div>
-              <div><span>Статус</span><strong id="profileStatus">В лобби</strong></div>
+              <div><span>Сезон</span><strong id="profileRatingSeason">—</strong></div>
             </div>
           </section>
           <section class="lobby-card">

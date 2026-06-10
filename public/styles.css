@@ -1935,6 +1935,23 @@ body:not(.in-game) .admin-view {
   right: 14px;
 }
 
+.profile-progress {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(143, 160, 176, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(143, 160, 176, 0.08);
+}
+
+.profile-progress span {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--tg-accent);
+  transition: width 260ms ease;
+}
+
 .stats-cards {
   display: grid;
   grid-template-columns: 1fr;

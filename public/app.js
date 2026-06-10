@@ -46,6 +46,7 @@ const lobbyUsername = document.querySelector("#lobbyUsername");
 const lobbyBalance = document.querySelector("#lobbyBalance");
 const lobbyTableStack = document.querySelector("#lobbyTableStack");
 const lobbyActiveTables = document.querySelector("#lobbyActiveTables");
+const lobbyRank = document.querySelector("#lobbyRank");
 const homeActivityText = document.querySelector("#homeActivityText");
 const homeSessionPill = document.querySelector("#homeSessionPill");
 const homeScreenInstallButton = document.querySelector("#homeScreenInstallButton");
@@ -92,6 +93,14 @@ const profileName = document.querySelector("#profileName");
 const profileUsername = document.querySelector("#profileUsername");
 const profileBalance = document.querySelector("#profileBalance");
 const profileHands = document.querySelector("#profileHands");
+const profileCashTitle = document.querySelector("#profileCashTitle");
+const profileCashXpLabel = document.querySelector("#profileCashXpLabel");
+const profileCashProgress = document.querySelector("#profileCashProgress");
+const profileCashHands = document.querySelector("#profileCashHands");
+const profileRatingTitle = document.querySelector("#profileRatingTitle");
+const profileRatingPoints = document.querySelector("#profileRatingPoints");
+const profileRatingHands = document.querySelector("#profileRatingHands");
+const profileRatingSeason = document.querySelector("#profileRatingSeason");
 const profileTables = document.querySelector("#profileTables");
 const profileChips = document.querySelector("#profileChips");
 const profileTableStack = document.querySelector("#profileTableStack");
@@ -1283,8 +1292,13 @@ async function loadProfile() {
 
 function renderProfile(profileData) {
   const user = profileData.user || {};
+  const profile = profileData.profile || {};
   profileName.textContent = user.name || "Игрок";
   profileUsername.textContent = user.username ? `@${user.username}` : `id ${user.id || ""}`;
+  const cashLevel = Number(profile.cashLevel || 1);
+  const cashStatus = profile.cashStatus || "Новичок";
+  const cashRankText = `${cashStatus} · Уровень ${cashLevel}`;
+  if (lobbyRank) lobbyRank.textContent = cashRankText;
   profileBalance.replaceChildren(`${formatUsdt(profileData.cashBalanceMicros || 0)} `, createTetherMark(), ` · ${formatChips(profileData.balance)} фишек`);
   profileChips.textContent = formatChips(profileData.balance);
   profileTableStack.replaceChildren(`${formatUsdt(profileData.cashTableStackMicros || 0)} `, createTetherMark());
@@ -1298,7 +1312,15 @@ function renderProfile(profileData) {
     homeSessionPill.textContent = profileData.activeTableCount ? "активно" : "нет активных";
     homeSessionPill.dataset.status = profileData.activeTableCount ? "active" : "idle";
   }
-  profileHands.textContent = String(profileData.handsPlayed || 0);
+  if (profileCashTitle) profileCashTitle.textContent = cashRankText;
+  if (profileCashXpLabel) profileCashXpLabel.textContent = `${formatNumber(profile.cashXpCurrent || 0)} / ${formatNumber(profile.cashXpRequired || 120)} XP`;
+  if (profileCashProgress) profileCashProgress.style.width = `${Math.max(0, Math.min(100, Number(profile.cashXpProgress || 0) * 100))}%`;
+  if (profileCashHands) profileCashHands.textContent = formatNumber(profile.cashHandsPlayed || 0);
+  if (profileRatingTitle) profileRatingTitle.textContent = profile.ratingTier || "Unranked";
+  if (profileRatingPoints) profileRatingPoints.textContent = `${formatNumber(profile.ratingPoints || 0)} pts`;
+  if (profileRatingHands) profileRatingHands.textContent = formatNumber(profile.ratingHandsPlayed || 0);
+  if (profileRatingSeason) profileRatingSeason.textContent = profile.ratingSeasonId || "текущий";
+  profileHands.textContent = formatNumber(profileData.handsPlayed || profile.handsPlayed || 0);
   profileTables.textContent = String(profileData.activeTableCount || 0);
   profileStatus.textContent = profileData.activeTableCount ? "В игре" : "В лобби";
   profileSessionBadge.textContent = profileData.activeTableCount

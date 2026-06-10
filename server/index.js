@@ -41,6 +41,7 @@ import {
   deleteActiveTableSnapshot as dbDeleteActiveTableSnapshot,
   getCashWallet as dbGetCashWallet,
   getPaymentOrder as dbGetPaymentOrder,
+  getPlayerProfile as dbGetPlayerProfile,
   getIdempotencyResult as dbGetIdempotencyResult,
   getSavedStack as dbGetSavedStack,
   getWithdrawalOrder as dbGetWithdrawalOrder,
@@ -61,6 +62,7 @@ import {
   recordAdminEvent as dbRecordAdminEvent,
   recordFundMovement as dbRecordFundMovement,
   recordHandHistory as dbRecordHandHistory,
+  recordProfileHandProgress as dbRecordProfileHandProgress,
   recordPlatformLedgerEntry as dbRecordPlatformLedgerEntry,
   reviewWithdrawalOrder as dbReviewWithdrawalOrder,
   registerTournament as dbRegisterTournament,
@@ -1533,6 +1535,17 @@ async function persistCompletedHands(table) {
 
     try {
       await dbRecordHandHistory(table, hand);
+      const progressUserIds = Array.isArray(hand.seats)
+        ? hand.seats.map((seat) => seat.userId).filter(Boolean)
+        : [];
+      if (progressUserIds.length) {
+        updateMemoryProfileProgress(progressUserIds, table.gameMode);
+        await dbRecordProfileHandProgress({
+          providerUserIds: progressUserIds,
+          gameMode: table.gameMode,
+          handId: hand.id
+        });
+      }
       await trackAnalytics("hand_completed", {
         category: "gameplay",
         amount: Number(hand.rake || 0),
@@ -1757,16 +1770,19 @@ async function normalizeUser(user) {
     username: user.username || "",
     photoUrl: user.photo_url || "",
     balance: 0,
-    cashBalanceMicros: 0
+    cashBalanceMicros: 0,
+    profile: defaultPlayerProfile()
   };
   await upsertTelegramUser(normalized);
   normalized.balance = await getWallet(id);
   normalized.cashBalanceMicros = await getCashWallet(id);
+  normalized.profile = await getProfileForUser(normalized);
   userProfiles.set(id, normalized);
   return normalized;
 }
 
 async function profileView(user) {
+  const profile = await getProfileForUser(user);
   const activeTables = [...tables.values()]
     .map((table) => {
       const seat = table.seats.find((candidate) => candidate.userId === user.id);
@@ -1788,7 +1804,6 @@ async function profileView(user) {
     .filter(Boolean);
   const tableStack = activeTables.filter((table) => table.gameMode !== "cash").reduce((sum, table) => sum + table.stack, 0);
   const cashTableStackMicros = activeTables.filter((table) => table.gameMode === "cash").reduce((sum, table) => sum + table.stack, 0);
-  const handsPlayed = activeTables.reduce((sum, table) => sum + table.handNumber, 0);
 
   return {
     user: {
@@ -1805,8 +1820,105 @@ async function profileView(user) {
     cashTableStackMicros,
     activeTables,
     activeTableCount: activeTables.length,
-    handsPlayed
+    handsPlayed: profile.handsPlayed || 0,
+    profile
   };
+}
+
+async function getProfileForUser(user) {
+  const dbProfile = await dbGetPlayerProfile(user.id);
+  if (dbProfile) {
+    user.profile = dbProfile;
+    return dbProfile;
+  }
+  user.profile = user.profile || defaultPlayerProfile();
+  return user.profile;
+}
+
+function defaultPlayerProfile() {
+  return {
+    cashLevel: 1,
+    cashXp: 0,
+    cashStatus: "Новичок",
+    cashXpCurrent: 0,
+    cashXpRequired: 120,
+    cashXpProgress: 0,
+    ratingPoints: 0,
+    ratingTier: "Unranked",
+    ratingSeasonId: "",
+    handsPlayed: 0,
+    cashHandsPlayed: 0,
+    ratingHandsPlayed: 0,
+    tournamentsPlayed: 0
+  };
+}
+
+function updateMemoryProfileProgress(userIds, gameMode) {
+  const cashMode = gameMode === "cash";
+  for (const id of [...new Set(userIds.map(String).filter(Boolean))]) {
+    const profileUser = userProfiles.get(id);
+    if (!profileUser) continue;
+    const profile = profileUser.profile || defaultPlayerProfile();
+    profile.handsPlayed += 1;
+    if (cashMode) {
+      profile.cashHandsPlayed += 1;
+      profile.cashXp += 20;
+      profile.cashLevel = memoryCashLevel(profile.cashXp);
+      profile.cashStatus = memoryCashStatus(profile.cashLevel);
+      Object.assign(profile, memoryCashProgress(profile.cashXp, profile.cashLevel));
+    } else {
+      profile.ratingHandsPlayed += 1;
+      profile.ratingPoints += 10;
+      profile.ratingTier = memoryRatingTier(profile.ratingPoints);
+    }
+    profileUser.profile = profile;
+  }
+}
+
+function memoryCashLevel(xp) {
+  const value = Math.max(0, Number(xp || 0));
+  if (value >= 6000) return 8;
+  if (value >= 4000) return 7;
+  if (value >= 2600) return 6;
+  if (value >= 1600) return 5;
+  if (value >= 900) return 4;
+  if (value >= 400) return 3;
+  if (value >= 120) return 2;
+  return 1;
+}
+
+function memoryCashProgress(xp, level = memoryCashLevel(xp)) {
+  const thresholds = [0, 120, 400, 900, 1600, 2600, 4000, 6000, 8500];
+  const currentLevel = Math.max(1, Math.min(thresholds.length - 1, Number(level || 1)));
+  const start = thresholds[currentLevel - 1] || 0;
+  const next = thresholds[currentLevel] || start + 3000;
+  const current = Math.max(0, Number(xp || 0) - start);
+  const required = Math.max(1, next - start);
+  return {
+    cashXpCurrent: current,
+    cashXpRequired: required,
+    cashXpProgress: Math.max(0, Math.min(1, Number((current / required).toFixed(4))))
+  };
+}
+
+function memoryCashStatus(level) {
+  const value = Number(level || 1);
+  if (value >= 8) return "High Roller";
+  if (value >= 6) return "Regular";
+  if (value >= 4) return "Grinder";
+  if (value >= 2) return "Игрок";
+  return "Новичок";
+}
+
+function memoryRatingTier(points) {
+  const value = Number(points || 0);
+  if (value >= 5000) return "Legend";
+  if (value >= 2500) return "Diamond";
+  if (value >= 1200) return "Platinum";
+  if (value >= 600) return "Gold";
+  if (value >= 250) return "Silver";
+  if (value >= 50) return "Bronze";
+  return "Unranked";
 }
 
 async function cashierView(user) {

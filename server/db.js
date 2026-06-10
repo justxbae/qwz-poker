@@ -367,6 +367,88 @@ export async function recordHandHistory(table, hand) {
   return true;
 }
 
+export async function getPlayerProfile(providerUserId, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  await query("insert into player_profiles (app_user_id) values ($1) on conflict do nothing", [appUserId]);
+  const result = await query(`
+    select cash_level, cash_xp, cash_status, rating_points, rating_tier, rating_season_id,
+           hands_played, cash_hands_played, rating_hands_played, tournaments_played
+    from player_profiles
+    where app_user_id = $1
+  `, [appUserId]);
+  return normalizePlayerProfileRow(result.rows[0]);
+}
+
+export async function recordProfileHandProgress({
+  providerUserIds = [],
+  provider = "telegram",
+  gameMode = "play",
+  handId = ""
+} = {}) {
+  if (!pool) return null;
+  const uniqueIds = [...new Set(providerUserIds.map(String).filter(Boolean))];
+  if (!uniqueIds.length) return [];
+  const cashMode = gameMode === "cash";
+  const changes = [];
+  for (const providerUserId of uniqueIds) {
+    const appUserId = await ensureIdentity(provider, providerUserId);
+    await query("insert into player_profiles (app_user_id) values ($1) on conflict do nothing", [appUserId]);
+    const progressKey = String(handId || "");
+    if (progressKey) {
+      const mark = await query(`
+        insert into profile_hand_progress (hand_id, app_user_id, game_mode)
+        values ($1, $2, $3)
+        on conflict do nothing
+        returning hand_id
+      `, [progressKey, appUserId, cashMode ? "cash" : "play"]);
+      if (!mark.rowCount) continue;
+    }
+    const currentResult = await query(`
+      select cash_xp, rating_points, cash_hands_played, rating_hands_played
+      from player_profiles
+      where app_user_id = $1
+      for update
+    `, [appUserId]);
+    const current = currentResult.rows[0] || {};
+    const nextCashXp = Number(current.cash_xp || 0) + (cashMode ? 20 : 0);
+    const nextRatingPoints = Number(current.rating_points || 0) + (cashMode ? 0 : 10);
+    const nextCashLevel = profileCashLevel(nextCashXp);
+    const nextCashStatus = profileCashStatus(nextCashLevel);
+    const nextRatingTier = profileRatingTier(nextRatingPoints);
+    const updated = await query(`
+      update player_profiles
+      set cash_xp = $2,
+          cash_level = $3,
+          cash_status = $4,
+          rating_points = $5,
+          rating_tier = $6,
+          hands_played = hands_played + 1,
+          cash_hands_played = cash_hands_played + $7,
+          rating_hands_played = rating_hands_played + $8,
+          updated_at = now()
+      where app_user_id = $1
+      returning cash_level, cash_xp, cash_status, rating_points, rating_tier, rating_season_id,
+                hands_played, cash_hands_played, rating_hands_played, tournaments_played
+    `, [
+      appUserId,
+      nextCashXp,
+      nextCashLevel,
+      nextCashStatus,
+      nextRatingPoints,
+      nextRatingTier,
+      cashMode ? 1 : 0,
+      cashMode ? 0 : 1
+    ]);
+    changes.push({
+      providerUserId,
+      handId,
+      profile: normalizePlayerProfileRow(updated.rows[0])
+    });
+  }
+  return changes;
+}
+
 export async function recordPlatformLedgerEntry(entry) {
   if (!pool) return null;
   const amount = Math.max(0, Math.round(Number(entry.amount) || 0));
@@ -1463,6 +1545,15 @@ async function migrate() {
     create index if not exists idx_player_profiles_rating on player_profiles(rating_season_id, rating_points desc);
     create index if not exists idx_player_profiles_cash_level on player_profiles(cash_level desc, cash_xp desc);
 
+    create table if not exists profile_hand_progress (
+      hand_id text not null,
+      app_user_id text not null references app_users(id) on delete cascade,
+      game_mode text not null default 'play',
+      created_at timestamptz not null default now(),
+      primary key (hand_id, app_user_id)
+    );
+    create index if not exists idx_profile_hand_progress_user_created on profile_hand_progress(app_user_id, created_at desc);
+
     create table if not exists saved_stacks (
       app_user_id text primary key references app_users(id) on delete cascade,
       stack bigint not null default 0 check (stack >= 0),
@@ -2024,6 +2115,73 @@ function normalizeLedgerCategory(category) {
 
 function normalizeIdempotencyKey(key) {
   return String(key || "").trim().replace(/\s+/g, "_").slice(0, 240);
+}
+
+function normalizePlayerProfileRow(row = {}) {
+  const cashXp = Number(row.cash_xp || 0);
+  const ratingPoints = Number(row.rating_points || 0);
+  const cashLevel = Number(row.cash_level || profileCashLevel(cashXp));
+  return {
+    cashLevel,
+    cashXp,
+    cashStatus: row.cash_status || profileCashStatus(cashLevel),
+    cashXpCurrent: profileCashLevelProgress(cashXp, cashLevel).current,
+    cashXpRequired: profileCashLevelProgress(cashXp, cashLevel).required,
+    cashXpProgress: profileCashLevelProgress(cashXp, cashLevel).progress,
+    ratingPoints,
+    ratingTier: row.rating_tier || profileRatingTier(ratingPoints),
+    ratingSeasonId: row.rating_season_id || "",
+    handsPlayed: Number(row.hands_played || 0),
+    cashHandsPlayed: Number(row.cash_hands_played || 0),
+    ratingHandsPlayed: Number(row.rating_hands_played || 0),
+    tournamentsPlayed: Number(row.tournaments_played || 0)
+  };
+}
+
+function profileCashLevel(xp) {
+  const value = Math.max(0, Number(xp || 0));
+  if (value >= 6000) return 8;
+  if (value >= 4000) return 7;
+  if (value >= 2600) return 6;
+  if (value >= 1600) return 5;
+  if (value >= 900) return 4;
+  if (value >= 400) return 3;
+  if (value >= 120) return 2;
+  return 1;
+}
+
+function profileCashLevelProgress(xp, level = profileCashLevel(xp)) {
+  const thresholds = [0, 120, 400, 900, 1600, 2600, 4000, 6000, 8500];
+  const currentLevel = Math.max(1, Math.min(thresholds.length - 1, Number(level || 1)));
+  const start = thresholds[currentLevel - 1] || 0;
+  const next = thresholds[currentLevel] || start + 3000;
+  const current = Math.max(0, Number(xp || 0) - start);
+  const required = Math.max(1, next - start);
+  return {
+    current,
+    required,
+    progress: Math.max(0, Math.min(1, Number((current / required).toFixed(4))))
+  };
+}
+
+function profileCashStatus(level) {
+  const value = Number(level || 1);
+  if (value >= 8) return "High Roller";
+  if (value >= 6) return "Regular";
+  if (value >= 4) return "Grinder";
+  if (value >= 2) return "Игрок";
+  return "Новичок";
+}
+
+function profileRatingTier(points) {
+  const value = Number(points || 0);
+  if (value >= 5000) return "Legend";
+  if (value >= 2500) return "Diamond";
+  if (value >= 1200) return "Platinum";
+  if (value >= 600) return "Gold";
+  if (value >= 250) return "Silver";
+  if (value >= 50) return "Bronze";
+  return "Unranked";
 }
 
 function id(prefix) {
