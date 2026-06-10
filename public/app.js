@@ -1389,7 +1389,11 @@ function renderAdminDashboard(admin) {
       ? `System ok · uptime ${formatDuration(diagnostics.uptimeSeconds || 0)}`
       : "System requires attention";
   }
-  adminBankrollTotal.textContent = formatChips(stats.bankrollTotal || 0);
+  if (adminBankrollTotal) {
+    adminBankrollTotal.textContent = Number(stats.cashWalletTotal || 0) > 0
+      ? `${formatUsdt(stats.cashWalletTotal)} USDT`
+      : formatChips(stats.bankrollTotal || 0);
+  }
   renderAdminHealthStrip({
     diagnostics,
     database,
@@ -1414,17 +1418,25 @@ function renderAdminOverview({ admin, stats, analytics, conversion, diagnostics,
   const days = Number(analytics.days || adminAnalyticsDays || 7);
   const periodLabel = days === 1 ? "24 часа" : `${days} дней`;
   const sections = document.createElement("div");
-  sections.className = "admin-dashboard";
+  sections.className = "admin-report-dashboard";
 
   const toolbar = document.createElement("section");
-  toolbar.className = "admin-dashboard-toolbar";
+  toolbar.className = "admin-report-toolbar";
   toolbar.innerHTML = `
     <div>
-      <p class="eyebrow">Dashboard</p>
-      <h2>Ключевые метрики</h2>
-      <span>Период: ${periodLabel}. Деньги, воронка, игра и риски в одном месте.</span>
+      <p class="eyebrow">Reports</p>
+      <h2>Операционный отчёт</h2>
+      <span>Период: ${periodLabel}. Деньги, игроки, конверсия, игра и риск.</span>
     </div>
-    <div class="admin-period-toggle" role="group" aria-label="Период аналитики"></div>
+    <div class="admin-report-controls">
+      <div class="admin-period-toggle" role="group" aria-label="Период аналитики"></div>
+      <div class="admin-metric-switches" aria-label="Показатели отчёта">
+        <label><input type="checkbox" checked /> Деньги</label>
+        <label><input type="checkbox" checked /> Игроки</label>
+        <label><input type="checkbox" checked /> Игра</label>
+        <label><input type="checkbox" checked /> Риски</label>
+      </div>
+    </div>
   `;
   const periodToggle = toolbar.querySelector(".admin-period-toggle");
   [
@@ -1445,22 +1457,22 @@ function renderAdminOverview({ admin, stats, analytics, conversion, diagnostics,
   });
 
   const kpis = document.createElement("section");
-  kpis.className = "admin-kpi-grid";
+  kpis.className = "admin-report-kpis";
   [
     {
-      label: "Игроки в воронке",
+      label: "Открыли app",
       value: formatNumber(analytics.appOpenUsers || 0),
-      meta: `открыли mini-app за ${periodLabel}`,
+      meta: `${formatNumber(analytics.appOpens || 0)} визитов`,
       tone: "primary"
     },
     {
-      label: "Пополнения",
+      label: "Депозиты",
       value: `${formatUsdt(analytics.paidDepositAmount || 0)} USDT`,
-      meta: `${formatNumber(analytics.paidDeposits || 0)} успешных платежей`,
+      meta: `${formatNumber(analytics.paidDeposits || 0)} paid / ${formatNumber(analytics.depositOrders || 0)} orders`,
       tone: Number(analytics.paidDeposits || 0) > 0 ? "success" : "neutral"
     },
     {
-      label: "Игра",
+      label: "Руки",
       value: formatNumber(analytics.handsCompleted || 0),
       meta: `${formatNumber(analytics.tableJoins || 0)} входов за стол`,
       tone: "primary"
@@ -1472,9 +1484,9 @@ function renderAdminOverview({ admin, stats, analytics, conversion, diagnostics,
       tone: "success"
     },
     {
-      label: "Выводы",
+      label: "Выводы hold",
       value: formatNumber(stats.pendingWithdrawals || 0),
-      meta: `${formatChips(stats.pendingWithdrawalChipsTotal || 0)} на hold`,
+      meta: `${formatUsdt(stats.pendingWithdrawalUsdtTotal || 0)} USDT / ${formatChips(stats.pendingWithdrawalChipsTotal || 0)} chips`,
       tone: Number(stats.pendingWithdrawals || 0) > 0 ? "warning" : "neutral"
     },
     {
@@ -1485,39 +1497,51 @@ function renderAdminOverview({ admin, stats, analytics, conversion, diagnostics,
     }
   ].forEach((item) => kpis.append(adminKpiCard(item)));
 
-  const split = document.createElement("section");
-  split.className = "admin-split-grid";
-  split.append(adminFunnelCard(analytics, conversion));
-  split.append(adminDailyChartCard(analytics));
+  const reportGrid = document.createElement("section");
+  reportGrid.className = "admin-report-grid";
+  reportGrid.append(adminDailyChartCard(analytics));
+  reportGrid.append(adminFunnelCard(analytics, conversion));
 
-  const operations = document.createElement("section");
-  operations.className = "admin-split-grid";
-  operations.append(adminMetricGroup("Финансы", "bankroll / ledger / платежи", [
-    ["Банкролл игроков", `${formatChips(stats.bankrollTotal || 0)} chips`],
-    ["Кошельки", `${formatChips(stats.walletTotal || 0)} chips`],
-    ["За столами", `${formatChips(stats.tableStackTotal || 0)} chips`],
-    ["Ledger net", `${formatChips(stats.ledgerNetTotal || 0)} chips`],
-    ["Stars pending", formatNumber(stats.pendingStars || 0)],
-    ["Payment events", formatNumber(analytics.depositOrders || 0)]
-  ]));
-  operations.append(adminMetricGroup("Операции", "продукт / игра / система", [
-    ["Всего игроков", formatNumber(stats.players || 0)],
-    ["Активных столов", formatNumber(stats.activeTables || 0)],
-    ["Столов всего", formatNumber(stats.openTables || 0)],
-    ["Poker actions", formatNumber(analytics.pokerActions || 0)],
-    ["Analytics events", formatNumber(analytics.totalEvents || stats.analyticsEvents || 0)],
-    ["Idempotency keys", formatNumber(stats.idempotencyKeyCount || 0)]
-  ]));
-  operations.append(adminMetricGroup("Health", "то, что нельзя пропускать", [
-    ["API", diagnostics.ok ? "online" : "attention"],
-    ["Database", database.enabled ? `${database.ok ? "ok" : "fail"} · ${database.mode}` : "memory"],
-    ["Uptime", formatDuration(diagnostics.uptimeSeconds || 0)],
-    ["Heap", memory.heapUsedMb ? `${memory.heapUsedMb}/${memory.heapTotalMb} MB` : "n/a"],
-    ["Stars drift", formatChips(reconciliation.starsDepositDrift || 0)],
-    ["Hand history", formatNumber(stats.handHistoryCount || 0)]
-  ]));
+  const financeRows = [
+    ["Cash USDT wallet", `${formatUsdt(stats.cashWalletTotal || 0)} USDT`, "Деньги пользователей в cash-режиме"],
+    ["Locked withdrawal", `${formatUsdt(stats.lockedUsdtTotal || 0)} USDT`, "Заморожено под заявки на вывод"],
+    ["Approved payout", `${formatUsdt(stats.approvedWithdrawalPayoutUsdtTotal || 0)} USDT`, "Выплачено по подтвержденным заявкам"],
+    ["Hidden fee income", `${formatUsdt(stats.approvedWithdrawalFeeUsdtTotal || 0)} USDT`, "Комиссия/спред, остающийся проекту"],
+    ["Withdrawal approved", formatNumber(analytics.withdrawalApproved || 0), `Запросов: ${formatNumber(analytics.withdrawalRequests || 0)}`],
+    ["Withdrawal rejected", formatNumber(analytics.withdrawalRejected || 0), "Отклоненные заявки"],
+    ["Play chips wallet", `${formatChips(stats.walletTotal || 0)} chips`, "Рейтинговые/игровые фишки"],
+    ["Table stacks", `${formatChips(stats.tableStackTotal || 0)} chips`, "Сейчас за столами"],
+    ["Ledger net", `${formatChips(stats.ledgerNetTotal || 0)} chips`, "credit - debit"],
+    ["Platform ledger", `${formatChips(stats.platformLedgerNetTotal || 0)}`, "Доходы/резервы платформы"]
+  ];
+  const productRows = [
+    ["Players", formatNumber(stats.players || 0), "Все Telegram users"],
+    ["Open users", formatNumber(analytics.appOpenUsers || 0), `За ${periodLabel}`],
+    ["Cashier users", formatNumber(analytics.cashierUsers || 0), formatPercent(conversion.openToCashier || 0)],
+    ["Paying users", formatNumber(analytics.payingUsers || 0), formatPercent(conversion.orderToPaid || 0)],
+    ["Active tables", formatNumber(stats.activeTables || 0), "Сейчас"],
+    ["Hands", formatNumber(analytics.handsCompleted || 0), `За ${periodLabel}`],
+    ["Poker actions", formatNumber(analytics.pokerActions || 0), "Clicks/actions"],
+    ["Analytics events", formatNumber(analytics.totalEvents || stats.analyticsEvents || 0), "Все события"]
+  ];
+  const riskRows = [
+    ["API", diagnostics.ok ? "online" : "attention", diagnostics.ok ? "OK" : "Проверить"],
+    ["Database", database.enabled ? `${database.ok ? "ok" : "fail"} · ${database.mode}` : "memory", "Production без memory"],
+    ["Wallet drift", formatChips(reconciliation.walletLedgerDrift || 0), "Должен быть 0"],
+    ["Stars drift", formatChips(reconciliation.starsDepositDrift || 0), "Должен быть 0"],
+    ["Pending withdrawals", formatNumber(stats.pendingWithdrawals || 0), "Очередь finance"],
+    ["Idempotency keys", formatNumber(stats.idempotencyKeyCount || 0), "Защита дублей"],
+    ["Hand history", formatNumber(stats.handHistoryCount || 0), "Раздачи в базе"],
+    ["Heap", memory.heapUsedMb ? `${memory.heapUsedMb}/${memory.heapTotalMb} MB` : "n/a", "Node memory"]
+  ];
 
-  sections.replaceChildren(toolbar, kpis, split, operations);
+  const tables = document.createElement("section");
+  tables.className = "admin-report-tables";
+  tables.append(adminReportTable("Финансы", "cash / ledger / withdrawal", financeRows));
+  tables.append(adminReportTable("Продукт", "воронка / активность / игра", productRows));
+  tables.append(adminReportTable("Контроль", "health / drift / risk", riskRows));
+
+  sections.replaceChildren(toolbar, kpis, reportGrid, tables);
   adminSummary.replaceChildren(sections);
 }
 
@@ -1528,6 +1552,35 @@ function adminKpiCard(item) {
   card.querySelector("span").textContent = item.label;
   card.querySelector("strong").textContent = item.value;
   card.querySelector("small").textContent = item.meta;
+  return card;
+}
+
+function adminReportTable(title, subtitle, rows) {
+  const card = document.createElement("section");
+  card.className = "admin-report-table";
+  card.innerHTML = `
+    <div class="admin-section-header">
+      <div>
+        <p class="eyebrow">${subtitle}</p>
+        <h3>${title}</h3>
+      </div>
+    </div>
+    <div class="admin-report-table-body"></div>
+  `;
+  const body = card.querySelector(".admin-report-table-body");
+  rows.forEach(([name, value, note]) => {
+    const row = document.createElement("div");
+    row.className = "admin-report-row";
+    row.innerHTML = `
+      <label><input type="checkbox" checked /> <span></span></label>
+      <strong></strong>
+      <small></small>
+    `;
+    row.querySelector("span").textContent = name;
+    row.querySelector("strong").textContent = value;
+    row.querySelector("small").textContent = note;
+    body.append(row);
+  });
   return card;
 }
 
@@ -1945,13 +1998,26 @@ function renderAdminWithdrawals(withdrawals) {
     row.className = `cashier-transaction admin-payment-row ${withdrawal.status === "approved" ? "credit" : "debit"}`;
     const main = document.createElement("div");
     const title = document.createElement("strong");
-    title.textContent = `${withdrawal.method?.toUpperCase?.() || withdrawal.method} · ${formatChips(withdrawal.chips)} chips`;
+    const cashMode = Number(withdrawal.grossUsdtMicros || 0) > 0 || withdrawal.asset === "USDT";
+    title.textContent = cashMode
+      ? `${withdrawal.method?.toUpperCase?.() || withdrawal.method} · ${formatUsdt(withdrawal.grossUsdtMicros || 0)} USDT`
+      : `${withdrawal.method?.toUpperCase?.() || withdrawal.method} · ${formatChips(withdrawal.chips)} chips`;
     const meta = document.createElement("span");
+    const financeMeta = cashMode
+      ? [
+          `hold ${formatUsdt(withdrawal.grossUsdtMicros || 0)} USDT`,
+          `hidden fee ${formatUsdt(withdrawal.feeUsdtMicros || 0)} USDT`,
+          `net payout ${formatUsdt(withdrawal.payoutUsdtMicros || 0)} USDT`
+        ]
+      : [
+          `fee ${formatChips(withdrawal.feeChips || 0)}`,
+          `payout ${formatChips(withdrawal.payoutChips || 0)}`
+        ];
     meta.textContent = [
       withdrawal.userName || withdrawal.username || withdrawal.userId,
-      `fee ${formatChips(withdrawal.feeChips || 0)}`,
-      `payout ${formatChips(withdrawal.payoutChips || 0)}`,
-      formatDateTime(withdrawal.createdAt)
+      ...financeMeta,
+      formatDateTime(withdrawal.createdAt),
+      withdrawal.id
     ].filter(Boolean).join(" · ");
     main.append(title, meta);
 

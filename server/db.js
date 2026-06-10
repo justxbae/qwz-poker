@@ -926,30 +926,44 @@ export async function createWithdrawalOrder(order, provider = "telegram") {
     if (existing.rowCount) return { order: withdrawalRow(existing.rows[0]), idempotentReplay: true };
   }
 
-  const chips = Math.max(0, Math.round(Number(order.chips) || 0));
+  const grossUsdtMicros = Math.max(0, Math.round(Number(order.grossUsdtMicros || order.cashUsdtMicros) || 0));
+  const feeUsdtMicros = Math.max(0, Math.round(Number(order.feeUsdtMicros) || 0));
+  const payoutUsdtMicros = Math.max(0, Math.round(Number(order.payoutUsdtMicros) || Math.max(0, grossUsdtMicros - feeUsdtMicros)));
+  const cashMode = grossUsdtMicros > 0;
+  const chips = Math.max(cashMode ? 1 : 0, Math.round(Number(order.chips) || 0));
   const feeChips = Math.max(0, Math.round(Number(order.feeChips) || 0));
   const payoutChips = Math.max(0, chips - feeChips);
   const client = await pool.connect();
 
   try {
     await client.query("begin");
-    await client.query("insert into wallets (app_user_id, balance) values ($1, 0) on conflict do nothing", [appUserId]);
-    const wallet = await client.query("select balance from wallets where app_user_id = $1 for update", [appUserId]);
-    const before = Number(wallet.rows[0]?.balance || 0);
-    const after = before - chips;
+    await client.query("insert into wallets (app_user_id, balance, cash_usdt_micros, locked_usdt_micros) values ($1, 0, 0, 0) on conflict do nothing", [appUserId]);
+    const wallet = await client.query("select balance, cash_usdt_micros, locked_usdt_micros from wallets where app_user_id = $1 for update", [appUserId]);
+    const before = cashMode ? Number(wallet.rows[0]?.cash_usdt_micros || 0) : Number(wallet.rows[0]?.balance || 0);
+    const amount = cashMode ? grossUsdtMicros : chips;
+    const after = before - amount;
     if (after < 0) {
-      const error = new Error(`Недостаточно chips. Баланс игрока: ${before.toLocaleString("ru-RU")}`);
+      const error = new Error(cashMode ? "Недостаточно USDT на балансе" : `Недостаточно chips. Баланс игрока: ${before.toLocaleString("ru-RU")}`);
       error.status = 409;
       throw error;
     }
 
-    await client.query("update wallets set balance = $2, updated_at = now() where app_user_id = $1", [appUserId, after]);
+    if (cashMode) {
+      const lockedBefore = Number(wallet.rows[0]?.locked_usdt_micros || 0);
+      await client.query(
+        "update wallets set cash_usdt_micros = $2, locked_usdt_micros = $3, updated_at = now() where app_user_id = $1",
+        [appUserId, after, lockedBefore + grossUsdtMicros]
+      );
+    } else {
+      await client.query("update wallets set balance = $2, updated_at = now() where app_user_id = $1", [appUserId, after]);
+    }
     await client.query(`
       insert into withdrawal_orders (
         id, app_user_id, provider, provider_user_id, method, status,
-        chips, fee_chips, payout_chips, destination, idempotency_key, raw
+        chips, fee_chips, payout_chips, gross_usdt_micros, fee_usdt_micros, payout_usdt_micros,
+        asset, balance_bucket, destination, idempotency_key, raw
       )
-      values ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11::jsonb)
+      values ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb)
     `, [
       order.id,
       appUserId,
@@ -959,24 +973,34 @@ export async function createWithdrawalOrder(order, provider = "telegram") {
       chips,
       feeChips,
       payoutChips,
+      grossUsdtMicros,
+      feeUsdtMicros,
+      payoutUsdtMicros,
+      order.asset || (cashMode ? "USDT" : "PLAY_CHIPS"),
+      order.balanceBucket || (cashMode ? "cash_usdt" : "play"),
       order.destination || "",
       idempotencyKey || null,
       JSON.stringify(order)
     ]);
     await client.query(`
       insert into ledger_entries (
-        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after, idempotency_key
+        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after,
+        idempotency_key, asset, balance_bucket
       )
-      values ($1, $2, $3, $4, 'debit', 'withdrawal_hold', 'Заявка на вывод', $5, $6, $7, $8)
+      values ($1, $2, $3, $4, 'debit', 'withdrawal_hold', 'Заявка на вывод', $5, $6, $7, $8, $9, $10)
     `, [
       id("ledger"),
       appUserId,
       provider,
       String(order.userId),
-      chips,
-      `${order.method} · payout ${payoutChips} · fee ${feeChips} · order ${order.id}`,
+      amount,
+      cashMode
+        ? `${order.method} · payout ${payoutUsdtMicros} · fee ${feeUsdtMicros} · order ${order.id}`
+        : `${order.method} · payout ${payoutChips} · fee ${feeChips} · order ${order.id}`,
       after,
-      `withdrawal:${order.id}:hold`
+      `withdrawal:${order.id}:hold`,
+      cashMode ? "USDT" : "PLAY_CHIPS",
+      cashMode ? "cash_usdt" : "play"
     ]);
     await client.query("commit");
     return {
@@ -1019,28 +1043,65 @@ export async function reviewWithdrawalOrder(orderId, review) {
     }
 
     let balance = null;
+    const cashMode = Number(order.grossUsdtMicros || 0) > 0;
     if (action === "reject") {
-      await client.query("insert into wallets (app_user_id, balance) values ($1, 0) on conflict do nothing", [row.app_user_id]);
-      const wallet = await client.query("select balance from wallets where app_user_id = $1 for update", [row.app_user_id]);
-      const before = Number(wallet.rows[0]?.balance || 0);
-      balance = before + order.chips;
-      await client.query("update wallets set balance = $2, updated_at = now() where app_user_id = $1", [row.app_user_id, balance]);
+      await client.query("insert into wallets (app_user_id, balance, cash_usdt_micros, locked_usdt_micros) values ($1, 0, 0, 0) on conflict do nothing", [row.app_user_id]);
+      const wallet = await client.query("select balance, cash_usdt_micros, locked_usdt_micros from wallets where app_user_id = $1 for update", [row.app_user_id]);
+      if (cashMode) {
+        const beforeCash = Number(wallet.rows[0]?.cash_usdt_micros || 0);
+        const beforeLocked = Number(wallet.rows[0]?.locked_usdt_micros || 0);
+        balance = beforeCash + order.grossUsdtMicros;
+        await client.query(
+          "update wallets set cash_usdt_micros = $2, locked_usdt_micros = $3, updated_at = now() where app_user_id = $1",
+          [row.app_user_id, balance, Math.max(0, beforeLocked - order.grossUsdtMicros)]
+        );
+      } else {
+        const before = Number(wallet.rows[0]?.balance || 0);
+        balance = before + order.chips;
+        await client.query("update wallets set balance = $2, updated_at = now() where app_user_id = $1", [row.app_user_id, balance]);
+      }
       await client.query(`
         insert into ledger_entries (
-          id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after, idempotency_key
+          id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after,
+          idempotency_key, asset, balance_bucket
         )
-        values ($1, $2, $3, $4, 'credit', 'withdrawal_refund', 'Возврат заявки на вывод', $5, $6, $7, $8)
+        values ($1, $2, $3, $4, 'credit', 'withdrawal_refund', 'Возврат заявки на вывод', $5, $6, $7, $8, $9, $10)
         on conflict do nothing
       `, [
         id("ledger"),
         row.app_user_id,
         row.provider,
         row.provider_user_id,
-        order.chips,
+        cashMode ? order.grossUsdtMicros : order.chips,
         `${review.reason || "manual_reject"} · order ${order.id}`,
         balance,
-        `withdrawal:${order.id}:refund`
+        `withdrawal:${order.id}:refund`,
+        cashMode ? "USDT" : "PLAY_CHIPS",
+        cashMode ? "cash_usdt" : "play"
       ]);
+    } else if (cashMode) {
+      await client.query("insert into wallets (app_user_id, balance, cash_usdt_micros, locked_usdt_micros) values ($1, 0, 0, 0) on conflict do nothing", [row.app_user_id]);
+      const wallet = await client.query("select locked_usdt_micros from wallets where app_user_id = $1 for update", [row.app_user_id]);
+      const beforeLocked = Number(wallet.rows[0]?.locked_usdt_micros || 0);
+      await client.query(
+        "update wallets set locked_usdt_micros = $2, updated_at = now() where app_user_id = $1",
+        [row.app_user_id, Math.max(0, beforeLocked - order.grossUsdtMicros)]
+      );
+      if (order.feeUsdtMicros > 0) {
+        await client.query(`
+          insert into platform_ledger_entries (
+            id, type, category, title, amount, context_id, meta, idempotency_key
+          )
+          values ($1, 'credit', 'withdrawal_fee', 'Withdrawal hidden fee', $2, $3, $4, $5)
+          on conflict do nothing
+        `, [
+          id("platform"),
+          order.feeUsdtMicros,
+          order.id,
+          `${order.method} · gross ${order.grossUsdtMicros} · payout ${order.payoutUsdtMicros}`,
+          `withdrawal:${order.id}:fee`
+        ]);
+      }
     }
 
     await client.query(`
@@ -1237,6 +1298,8 @@ export async function analyticsOverview(days = 7) {
         coalesce(sum(amount) filter (where event_name = 'deposit_paid'), 0)::bigint as paid_deposit_amount,
         count(*) filter (where event_name = 'withdrawal_requested')::int as withdrawal_requests,
         coalesce(sum(amount) filter (where event_name = 'withdrawal_requested'), 0)::bigint as withdrawal_amount,
+        count(*) filter (where event_name = 'withdrawal_approved')::int as withdrawal_approved,
+        count(*) filter (where event_name = 'withdrawal_rejected')::int as withdrawal_rejected,
         count(*) filter (where event_name = 'table_join')::int as table_joins,
         count(distinct app_user_id) filter (where event_name = 'table_join' and app_user_id is not null)::int as table_join_users,
         count(*) filter (where event_name = 'table_leave')::int as table_leaves,
@@ -1292,6 +1355,8 @@ export async function analyticsOverview(days = 7) {
     paidDepositAmount: Number(row.paid_deposit_amount || 0),
     withdrawalRequests: Number(row.withdrawal_requests || 0),
     withdrawalAmount: Number(row.withdrawal_amount || 0),
+    withdrawalApproved: Number(row.withdrawal_approved || 0),
+    withdrawalRejected: Number(row.withdrawal_rejected || 0),
     tableJoins: Number(row.table_joins || 0),
     tableJoinUsers: Number(row.table_join_users || 0),
     tableLeaves: Number(row.table_leaves || 0),
@@ -1352,6 +1417,11 @@ export async function dashboardStats() {
       (select count(*)::int from payment_orders where status = 'pending' and method = 'stars') as pending_stars,
       (select count(*)::int from withdrawal_orders where status in ('pending', 'manual_review')) as pending_withdrawals,
       (select coalesce(sum(chips), 0)::bigint from withdrawal_orders where status in ('pending', 'manual_review')) as pending_withdrawal_chips_total,
+      (select coalesce(sum(gross_usdt_micros), 0)::bigint from withdrawal_orders where status in ('pending', 'manual_review')) as pending_withdrawal_usdt_total,
+      (select coalesce(sum(fee_usdt_micros), 0)::bigint from withdrawal_orders where status = 'approved') as approved_withdrawal_fee_usdt_total,
+      (select coalesce(sum(payout_usdt_micros), 0)::bigint from withdrawal_orders where status = 'approved') as approved_withdrawal_payout_usdt_total,
+      (select coalesce(sum(cash_usdt_micros), 0)::bigint from wallets) as cash_wallet_total,
+      (select coalesce(sum(locked_usdt_micros), 0)::bigint from wallets) as locked_usdt_total,
       (select coalesce(sum(chips), 0)::bigint from payment_orders where status = 'paid' and method = 'stars') as paid_stars_chips_total,
       (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'credit' and category = 'deposit_stars') as deposit_stars_ledger_total,
       (select count(*)::int from idempotency_keys where expires_at > now()) as idempotency_key_count,
@@ -1385,6 +1455,11 @@ export async function dashboardStats() {
     pendingStars: Number(result.rows[0].pending_stars || 0),
     pendingWithdrawals: Number(result.rows[0].pending_withdrawals || 0),
     pendingWithdrawalChipsTotal: Number(result.rows[0].pending_withdrawal_chips_total || 0),
+    pendingWithdrawalUsdtTotal: Number(result.rows[0].pending_withdrawal_usdt_total || 0),
+    approvedWithdrawalFeeUsdtTotal: Number(result.rows[0].approved_withdrawal_fee_usdt_total || 0),
+    approvedWithdrawalPayoutUsdtTotal: Number(result.rows[0].approved_withdrawal_payout_usdt_total || 0),
+    cashWalletTotal: Number(result.rows[0].cash_wallet_total || 0),
+    lockedUsdtTotal: Number(result.rows[0].locked_usdt_total || 0),
     paidStarsChipsTotal: Number(result.rows[0].paid_stars_chips_total || 0),
     depositStarsLedgerTotal: Number(result.rows[0].deposit_stars_ledger_total || 0),
     idempotencyKeyCount: Number(result.rows[0].idempotency_key_count || 0),
@@ -1784,6 +1859,11 @@ async function migrate() {
       chips bigint not null check (chips > 0),
       fee_chips bigint not null default 0 check (fee_chips >= 0),
       payout_chips bigint not null default 0 check (payout_chips >= 0),
+      gross_usdt_micros bigint not null default 0 check (gross_usdt_micros >= 0),
+      fee_usdt_micros bigint not null default 0 check (fee_usdt_micros >= 0),
+      payout_usdt_micros bigint not null default 0 check (payout_usdt_micros >= 0),
+      asset text not null default 'PLAY_CHIPS',
+      balance_bucket text not null default 'play',
       destination text not null default '',
       admin_reason text not null default '',
       reviewed_by_provider_user_id text not null default '',
@@ -1795,6 +1875,11 @@ async function migrate() {
 
     create index if not exists idx_withdrawal_orders_app_user_created on withdrawal_orders(app_user_id, created_at desc);
     create index if not exists idx_withdrawal_orders_status_created on withdrawal_orders(status, created_at desc);
+    alter table withdrawal_orders add column if not exists gross_usdt_micros bigint not null default 0 check (gross_usdt_micros >= 0);
+    alter table withdrawal_orders add column if not exists fee_usdt_micros bigint not null default 0 check (fee_usdt_micros >= 0);
+    alter table withdrawal_orders add column if not exists payout_usdt_micros bigint not null default 0 check (payout_usdt_micros >= 0);
+    alter table withdrawal_orders add column if not exists asset text not null default 'PLAY_CHIPS';
+    alter table withdrawal_orders add column if not exists balance_bucket text not null default 'play';
     create unique index if not exists idx_withdrawal_orders_idempotency_key on withdrawal_orders(idempotency_key) where idempotency_key is not null;
 
     create table if not exists rating_seasons (
@@ -2096,6 +2181,11 @@ function withdrawalRow(row) {
     chips: Number(row.chips || 0),
     feeChips: Number(row.fee_chips || 0),
     payoutChips: Number(row.payout_chips || 0),
+    grossUsdtMicros: Number(row.gross_usdt_micros || 0),
+    feeUsdtMicros: Number(row.fee_usdt_micros || 0),
+    payoutUsdtMicros: Number(row.payout_usdt_micros || 0),
+    asset: row.asset || "PLAY_CHIPS",
+    balanceBucket: row.balance_bucket || "play",
     destination: row.destination || "",
     adminReason: row.admin_reason || "",
     reviewedBy: row.reviewed_by_provider_user_id || "",

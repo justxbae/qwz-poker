@@ -57,9 +57,22 @@ export const ECONOMY = {
   withdrawals: {
     enabled: false,
     minimumUsdtMicros: toUsdtMicros(10),
+    maximumUsdtMicros: toUsdtMicros(5000),
     methods: [
-      { id: "ton", title: "TON", feePercent: 0.03 },
-      { id: "usdt", title: "USDT", feePercent: 0.04 }
+      {
+        id: "ton",
+        title: "TON",
+        feePercent: 0.025,
+        networkFeeUsdtMicros: toUsdtMicros(0.15),
+        hiddenSpreadPercent: 0.01
+      },
+      {
+        id: "usdt",
+        title: "USDT TRC20",
+        feePercent: 0.035,
+        networkFeeUsdtMicros: toUsdtMicros(1),
+        hiddenSpreadPercent: 0.015
+      }
     ]
   },
   marketingReservePercent: 0.25,
@@ -197,6 +210,65 @@ export function quoteCashDeposit({ usdtAmount = 0, method = "stars" } = {}) {
 }
 
 export const quoteCryptoDeposit = quoteCashDeposit;
+
+export function quoteWithdrawal({ usdtAmount = 0, amount = 0, method = "ton", destination = "" } = {}) {
+  const settings = ECONOMY.withdrawals;
+  const methodId = String(method || "ton").toLowerCase().replace(/[^a-z0-9_:-]/g, "_");
+  const methodSettings = settings.methods.find((item) => item.id === methodId);
+  if (!methodSettings) {
+    const error = new Error("Метод вывода не поддерживается");
+    error.status = 400;
+    throw error;
+  }
+
+  const requested = usdtAmount || amount;
+  const grossUsdtMicros = toUsdtMicros(requested);
+  if (grossUsdtMicros < settings.minimumUsdtMicros) {
+    const error = new Error(`Минимальный вывод: ${formatUsdtMicros(settings.minimumUsdtMicros)} USDT`);
+    error.status = 400;
+    throw error;
+  }
+  if (grossUsdtMicros > settings.maximumUsdtMicros) {
+    const error = new Error(`Максимальный вывод за заявку: ${formatUsdtMicros(settings.maximumUsdtMicros)} USDT`);
+    error.status = 400;
+    throw error;
+  }
+
+  const feePercent = Number(methodSettings.feePercent || 0);
+  const hiddenSpreadPercent = Number(methodSettings.hiddenSpreadPercent || 0);
+  const networkFeeUsdtMicros = Math.max(0, Math.round(Number(methodSettings.networkFeeUsdtMicros || 0)));
+  const percentFeeUsdtMicros = Math.ceil(grossUsdtMicros * feePercent);
+  const hiddenSpreadUsdtMicros = Math.ceil(grossUsdtMicros * hiddenSpreadPercent);
+  const feeUsdtMicros = Math.min(grossUsdtMicros, percentFeeUsdtMicros + networkFeeUsdtMicros + hiddenSpreadUsdtMicros);
+  const payoutUsdtMicros = Math.max(0, grossUsdtMicros - feeUsdtMicros);
+  const destinationValue = String(destination || "").trim();
+  if (destinationValue.length < 4) {
+    const error = new Error("Укажите реквизиты/адрес для вывода");
+    error.status = 400;
+    throw error;
+  }
+  if (destinationValue.length > 240) {
+    const error = new Error("Реквизиты вывода слишком длинные");
+    error.status = 400;
+    throw error;
+  }
+
+  return {
+    method: methodId,
+    title: methodSettings.title,
+    asset: ASSETS.CASH,
+    balanceBucket: BALANCE_BUCKETS.CASH,
+    grossUsdtMicros,
+    feeUsdtMicros,
+    payoutUsdtMicros,
+    percentFeeUsdtMicros,
+    networkFeeUsdtMicros,
+    hiddenSpreadUsdtMicros,
+    feePercent,
+    hiddenSpreadPercent,
+    destination: destinationValue
+  };
+}
 
 export function toUsdtMicros(value) {
   return Math.max(0, Math.round(Number(value || 0) * USDT_SCALE));

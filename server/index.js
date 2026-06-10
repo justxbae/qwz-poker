@@ -16,7 +16,8 @@ import {
   formatUsdtMicros,
   playSettings,
   quoteCashDeposit,
-  quoteDeposit
+  quoteDeposit,
+  quoteWithdrawal as quoteCashWithdrawal
 } from "./economy.js";
 import {
   createCryptoBotInvoice,
@@ -741,10 +742,14 @@ async function handleApi(req, res, url) {
       await trackAnalytics("withdrawal_requested", {
         user,
         category: "payments",
-        amount: Number(result.order?.chips || 0),
-        asset: "PLAY_CHIPS",
+        amount: Number(result.order?.grossUsdtMicros || result.order?.chips || 0),
+        asset: result.order?.asset || "PLAY_CHIPS",
         contextId: result.order?.id || "",
-        meta: { method: result.order?.method || body.method || "" }
+        meta: {
+          method: result.order?.method || body.method || "",
+          payoutUsdtMicros: result.order?.payoutUsdtMicros || 0,
+          feeUsdtMicros: result.order?.feeUsdtMicros || 0
+        }
       });
       return { withdrawal: result.order, cashier: await cashierView(user) };
     });
@@ -1116,6 +1121,11 @@ async function adminDashboardView(options = {}) {
   const dbStats = await dbDashboardStats();
   const analytics = await analyticsDashboard(options.analyticsDays || 7);
   const walletTotal = dbStats ? dbStats.walletTotal : [...wallets.values()].reduce((sum, value) => sum + Number(value || 0), 0);
+  const cashWalletTotal = dbStats ? dbStats.cashWalletTotal : [...cashWallets.values()].reduce((sum, value) => sum + Number(value || 0), 0);
+  const pendingWithdrawalUsdtTotal = dbStats ? dbStats.pendingWithdrawalUsdtTotal : [...withdrawalOrders.values()]
+    .filter((order) => ["pending", "manual_review"].includes(order.status))
+    .reduce((sum, order) => sum + Number(order.grossUsdtMicros || 0), 0);
+  const lockedUsdtTotal = dbStats ? dbStats.lockedUsdtTotal : pendingWithdrawalUsdtTotal;
   const tableStackTotal = [...tables.values()].reduce((sum, table) => (
     sum + table.seats.reduce((seatSum, seat) => seatSum + Number(seat.stack || 0), 0)
   ), 0);
@@ -1167,6 +1177,14 @@ async function adminDashboardView(options = {}) {
       platformLedgerCreditTotal: dbStats ? dbStats.platformLedgerCreditTotal : 0,
       platformLedgerDebitTotal: dbStats ? dbStats.platformLedgerDebitTotal : 0,
       platformLedgerNetTotal: dbStats ? dbStats.platformLedgerCreditTotal - dbStats.platformLedgerDebitTotal : 0,
+      cashWalletTotal,
+      lockedUsdtTotal,
+      approvedWithdrawalFeeUsdtTotal: dbStats ? dbStats.approvedWithdrawalFeeUsdtTotal : [...withdrawalOrders.values()]
+        .filter((order) => order.status === "approved")
+        .reduce((sum, order) => sum + Number(order.feeUsdtMicros || 0), 0),
+      approvedWithdrawalPayoutUsdtTotal: dbStats ? dbStats.approvedWithdrawalPayoutUsdtTotal : [...withdrawalOrders.values()]
+        .filter((order) => order.status === "approved")
+        .reduce((sum, order) => sum + Number(order.payoutUsdtMicros || 0), 0),
       paidStarsChipsTotal,
       depositStarsLedgerTotal,
       idempotencyKeyCount: dbStats ? dbStats.idempotencyKeyCount : apiIdempotencyResults.size,
@@ -1180,6 +1198,7 @@ async function adminDashboardView(options = {}) {
       pendingWithdrawalChipsTotal: dbStats ? dbStats.pendingWithdrawalChipsTotal : [...withdrawalOrders.values()]
         .filter((order) => ["pending", "manual_review"].includes(order.status))
         .reduce((sum, order) => sum + Number(order.chips || 0), 0),
+      pendingWithdrawalUsdtTotal,
       analyticsEvents: dbStats ? dbStats.analyticsEventCount : analytics.totalEvents
     },
     analytics,
@@ -1284,6 +1303,8 @@ async function analyticsDashboard(days = 7) {
     paidDepositAmount: amount("deposit_paid"),
     withdrawalRequests: count("withdrawal_requested"),
     withdrawalAmount: amount("withdrawal_requested"),
+    withdrawalApproved: count("withdrawal_approved"),
+    withdrawalRejected: count("withdrawal_rejected"),
     tableJoins: count("table_join"),
     tableJoinUsers,
     tableLeaves: count("table_leave"),
@@ -2836,9 +2857,14 @@ async function createWithdrawalRequest(user, body = {}, idempotencyKey = "") {
     userName: user.name,
     username: user.username,
     method: quote.method,
-    chips: quote.chips,
-    feeChips: quote.feeChips,
-    payoutChips: quote.payoutChips,
+    chips: quote.chips || 0,
+    feeChips: quote.feeChips || 0,
+    payoutChips: quote.payoutChips || 0,
+    grossUsdtMicros: quote.grossUsdtMicros || 0,
+    feeUsdtMicros: quote.feeUsdtMicros || 0,
+    payoutUsdtMicros: quote.payoutUsdtMicros || 0,
+    asset: quote.asset || ASSETS.PLAY,
+    balanceBucket: quote.balanceBucket || BALANCE_BUCKETS.PLAY,
     destination: quote.destination,
     status: "pending",
     idempotencyKey,
@@ -2847,9 +2873,13 @@ async function createWithdrawalRequest(user, body = {}, idempotencyKey = "") {
 
   const dbResult = await dbCreateWithdrawalOrder(order);
   if (dbResult?.order) {
-    setWalletBalanceLocal(user.id, dbResult.balance ?? user.balance);
+    if (order.grossUsdtMicros > 0) {
+      setCashWalletBalanceLocal(user.id, dbResult.balance ?? user.cashBalanceMicros);
+    } else {
+      setWalletBalanceLocal(user.id, dbResult.balance ?? user.balance);
+    }
     withdrawalOrders.set(dbResult.order.id, dbResult.order);
-    notifyWithdrawalCreated(user, dbResult.order, dbResult.balance ?? user.balance);
+    notifyWithdrawalCreated(user, dbResult.order, dbResult.balance ?? (order.grossUsdtMicros > 0 ? user.cashBalanceMicros : user.balance));
     return { order: dbResult.order, balance: dbResult.balance };
   }
 
@@ -2861,20 +2891,25 @@ async function createWithdrawalRequest(user, body = {}, idempotencyKey = "") {
     };
   }
 
-  const before = await getWallet(user.id);
-  if (before < quote.chips) {
-    const error = new Error(`Недостаточно chips. Баланс игрока: ${formatNumber(before)}`);
+  const cashMode = Number(quote.grossUsdtMicros || 0) > 0;
+  const before = cashMode ? await getCashWallet(user.id) : await getWallet(user.id);
+  const holdAmount = cashMode ? quote.grossUsdtMicros : quote.chips;
+  if (before < holdAmount) {
+    const error = new Error(cashMode ? `Недостаточно USDT. Баланс игрока: ${formatUsdtMicros(before)}` : `Недостаточно chips. Баланс игрока: ${formatNumber(before)}`);
     error.status = 409;
     throw error;
   }
-  const balance = await recordTransaction(user, {
+  const transaction = {
     type: "debit",
     category: "withdrawal_hold",
     title: "Заявка на вывод",
-    amount: quote.chips,
-    meta: `${quote.method} · payout ${quote.payoutChips} · fee ${quote.feeChips} · ${quote.destination}`,
+    amount: holdAmount,
+    meta: cashMode
+      ? `${quote.method} · payout ${quote.payoutUsdtMicros} · fee ${quote.feeUsdtMicros} · ${quote.destination}`
+      : `${quote.method} · payout ${quote.payoutChips} · fee ${quote.feeChips} · ${quote.destination}`,
     idempotencyKey: `withdrawal:${order.id}:hold`
-  });
+  };
+  const balance = cashMode ? await recordCashTransaction(user, transaction) : await recordTransaction(user, transaction);
   withdrawalOrders.set(order.id, order);
   if (idempotencyKey) idempotencyResults.set(idempotencyKey, order);
   notifyWithdrawalCreated(user, order, balance);
@@ -2904,9 +2939,26 @@ async function handleAdminWithdrawalAction({ admin, withdrawalId, action, reason
   if (dbResult?.order) {
     withdrawalOrders.set(dbResult.order.id, dbResult.order);
     if (dbResult.balance !== null && dbResult.balance !== undefined) {
-      setWalletBalanceLocal(dbResult.order.userId, dbResult.balance);
+      if (Number(dbResult.order.grossUsdtMicros || 0) > 0) {
+        setCashWalletBalanceLocal(dbResult.order.userId, dbResult.balance);
+      } else {
+        setWalletBalanceLocal(dbResult.order.userId, dbResult.balance);
+      }
     }
     notifyWithdrawalReviewed(adminProfile, dbResult.order, normalizedReason);
+    await trackAnalytics(`withdrawal_${dbResult.order.status}`, {
+      userId: dbResult.order.userId,
+      category: "payments",
+      amount: Number(dbResult.order.grossUsdtMicros || dbResult.order.chips || 0),
+      asset: dbResult.order.asset || "PLAY_CHIPS",
+      contextId: dbResult.order.id,
+      meta: {
+        adminId: adminProfile.id,
+        reason: normalizedReason,
+        payoutUsdtMicros: dbResult.order.payoutUsdtMicros || 0,
+        feeUsdtMicros: dbResult.order.feeUsdtMicros || 0
+      }
+    });
     return dbResult;
   }
 
@@ -2921,16 +2973,32 @@ async function handleAdminWithdrawalAction({ admin, withdrawalId, action, reason
   withdrawalOrders.set(order.id, reviewed);
   let balance = null;
   if (action === "reject") {
-    balance = await recordTransaction({ id: order.userId }, {
+    const cashMode = Number(order.grossUsdtMicros || 0) > 0;
+    const refundAmount = cashMode ? order.grossUsdtMicros : order.chips;
+    const refund = {
       type: "credit",
       category: "withdrawal_refund",
       title: "Возврат заявки на вывод",
-      amount: order.chips,
+      amount: refundAmount,
       meta: `${normalizedReason} · order ${order.id}`,
       idempotencyKey: `withdrawal:${order.id}:refund`
-    });
+    };
+    balance = cashMode ? await recordCashTransaction({ id: order.userId }, refund) : await recordTransaction({ id: order.userId }, refund);
   }
   notifyWithdrawalReviewed(adminProfile, reviewed, normalizedReason);
+  await trackAnalytics(`withdrawal_${reviewed.status}`, {
+    userId: reviewed.userId,
+    category: "payments",
+    amount: Number(reviewed.grossUsdtMicros || reviewed.chips || 0),
+    asset: reviewed.asset || "PLAY_CHIPS",
+    contextId: reviewed.id,
+    meta: {
+      adminId: adminProfile.id,
+      reason: normalizedReason,
+      payoutUsdtMicros: reviewed.payoutUsdtMicros || 0,
+      feeUsdtMicros: reviewed.feeUsdtMicros || 0
+    }
+  });
   return { order: reviewed, balance };
 }
 
@@ -2939,15 +3007,23 @@ async function withdrawalOrderFromId(orderId) {
 }
 
 function quoteWithdrawal(body = {}) {
+  if (body.usdtAmount !== undefined || body.amountUsdt !== undefined || body.currency === "USDT") {
+    return quoteCashWithdrawal({
+      usdtAmount: body.usdtAmount ?? body.amountUsdt ?? body.amount,
+      method: body.method || "ton",
+      destination: body.destination
+    });
+  }
+
   const chips = parsePositiveChips(body.chips || body.amount);
   const method = normalizeWithdrawalMethod(body.method || "ton");
-  const settings = ECONOMY.withdrawals;
-  if (chips < settings.minimumChips) {
-    const error = new Error(`Минимальный вывод: ${formatNumber(settings.minimumChips)} chips`);
+  const minimumChips = Math.max(1, Math.round(Number(ECONOMY.withdrawals.minimumChips || 0) || ECONOMY.withdrawals.minimumUsdtMicros / 100));
+  if (chips < minimumChips) {
+    const error = new Error(`Минимальный вывод: ${formatNumber(minimumChips)} chips`);
     error.status = 400;
     throw error;
   }
-  const methodSettings = settings.methods.find((item) => item.id === method);
+  const methodSettings = ECONOMY.withdrawals.methods.find((item) => item.id === method);
   const feeChips = Math.ceil(chips * Number(methodSettings?.feePercent || 0));
   const destination = String(body.destination || "").trim();
   if (destination.length < 4) {
@@ -2965,6 +3041,8 @@ function quoteWithdrawal(body = {}) {
     chips,
     feeChips,
     payoutChips: Math.max(0, chips - feeChips),
+    asset: ASSETS.PLAY,
+    balanceBucket: BALANCE_BUCKETS.PLAY,
     destination
   };
 }
@@ -2983,36 +3061,42 @@ function normalizeWithdrawalMethod(method) {
 function withdrawalSettings() {
   return {
     enabled: REAL_MONEY_ENABLED && process.env.WITHDRAWALS_ENABLED === "true",
-    minimumChips: ECONOMY.withdrawals.minimumChips,
+    minimumUsdtMicros: ECONOMY.withdrawals.minimumUsdtMicros,
+    maximumUsdtMicros: ECONOMY.withdrawals.maximumUsdtMicros,
     methods: ECONOMY.withdrawals.methods.map((method) => ({
       ...method,
+      feePercent: undefined,
+      hiddenSpreadPercent: undefined,
+      networkFeeUsdtMicros: undefined,
       enabled: REAL_MONEY_ENABLED && process.env.WITHDRAWALS_ENABLED === "true"
     }))
   };
 }
 
 function notifyWithdrawalCreated(user, order, balance) {
+  const cashMode = Number(order.grossUsdtMicros || 0) > 0;
   notifyAdmin("withdrawal_request", "Создана заявка на вывод", {
     user,
     lines: [
       `Order: ${order.id}`,
       `Метод: ${order.method}`,
-      `Hold: ${formatNumber(order.chips)} chips`,
-      `Комиссия: ${formatNumber(order.feeChips)} chips`,
-      `К выплате: ${formatNumber(order.payoutChips)} chips`,
-      `Баланс: ${formatNumber(balance)} chips`
+      cashMode ? `Hold: ${formatUsdtMicros(order.grossUsdtMicros)} USDT` : `Hold: ${formatNumber(order.chips)} chips`,
+      cashMode ? `Скрытая комиссия: ${formatUsdtMicros(order.feeUsdtMicros)} USDT` : `Комиссия: ${formatNumber(order.feeChips)} chips`,
+      cashMode ? `К выплате: ${formatUsdtMicros(order.payoutUsdtMicros)} USDT` : `К выплате: ${formatNumber(order.payoutChips)} chips`,
+      cashMode ? `Баланс: ${formatUsdtMicros(balance)} USDT` : `Баланс: ${formatNumber(balance)} chips`
     ]
   });
 }
 
 function notifyWithdrawalReviewed(admin, order, reason) {
+  const cashMode = Number(order.grossUsdtMicros || 0) > 0;
   notifyAdmin(`withdrawal_${order.status}`, order.status === "approved" ? "Вывод подтвержден" : "Вывод отклонен", {
     user: { id: order.userId, name: order.userName, username: order.username },
     lines: [
       `Админ: ${formatUser(admin)}`,
       `Order: ${order.id}`,
       `Метод: ${order.method}`,
-      `Сумма: ${formatNumber(order.chips)} chips`,
+      cashMode ? `Сумма: ${formatUsdtMicros(order.grossUsdtMicros)} USDT` : `Сумма: ${formatNumber(order.chips)} chips`,
       `Статус: ${order.status}`,
       `Причина: ${reason}`
     ]
