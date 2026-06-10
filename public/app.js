@@ -407,7 +407,9 @@ async function boot() {
 
 async function auth() {
   const body = {
-    initData: tg?.initData || ""
+    initData: tg?.initData || "",
+    platform: tg?.platform || "",
+    colorScheme: tg?.colorScheme || ""
   };
   if (ADMIN_MODE) {
     body.adminSecret = adminWebSecret();
@@ -1513,9 +1515,9 @@ function renderAdminOverview({ admin, stats, analytics, conversion, diagnostics,
     },
     {
       label: "Balance drift",
-      value: formatChips(reconciliation.walletLedgerDrift || 0),
-      meta: "кошелёк против ledger",
-      tone: Number(reconciliation.walletLedgerDrift || 0) === 0 ? "success" : "danger"
+      value: `${formatChips(reconciliation.walletLedgerDrift || 0)} / ${formatUsdt(reconciliation.cashWalletLedgerDrift || 0)}`,
+      meta: "play chips / USDT ledger drift",
+      tone: Number(reconciliation.walletLedgerDrift || 0) === 0 && Number(reconciliation.cashWalletLedgerDrift || 0) === 0 ? "success" : "danger"
     }
   ].forEach((item) => kpis.append(adminKpiCard(item)));
 
@@ -1533,6 +1535,7 @@ function renderAdminOverview({ admin, stats, analytics, conversion, diagnostics,
     ["Withdrawal approved", formatNumber(analytics.withdrawalApproved || 0), `Запросов: ${formatNumber(analytics.withdrawalRequests || 0)}`],
     ["Withdrawal rejected", formatNumber(analytics.withdrawalRejected || 0), "Отклоненные заявки"],
     ["Play chips wallet", `${formatChips(stats.walletTotal || 0)} chips`, "Рейтинговые/игровые фишки"],
+    ["Cash ledger net", `${formatUsdt((stats.cashLedgerCreditTotal || 0) - (stats.cashLedgerDebitTotal || 0))} USDT`, "credit - debit по USDT"],
     ["Table stacks", `${formatChips(stats.tableStackTotal || 0)} chips`, "Сейчас за столами"],
     ["Ledger net", `${formatChips(stats.ledgerNetTotal || 0)} chips`, "credit - debit"],
     ["Platform ledger", `${formatChips(stats.platformLedgerNetTotal || 0)}`, "Доходы/резервы платформы"]
@@ -1554,6 +1557,7 @@ function renderAdminOverview({ admin, stats, analytics, conversion, diagnostics,
     ["API", diagnostics.ok ? "online" : "attention", diagnostics.ok ? "OK" : "Проверить"],
     ["Database", database.enabled ? `${database.ok ? "ok" : "fail"} · ${database.mode}` : "memory", "Production без memory"],
     ["Wallet drift", formatChips(reconciliation.walletLedgerDrift || 0), "Должен быть 0"],
+    ["Cash drift", `${formatUsdt(reconciliation.cashWalletLedgerDrift || 0)} USDT`, "Должен быть 0"],
     ["Stars drift", formatChips(reconciliation.starsDepositDrift || 0), "Должен быть 0"],
     ["Pending withdrawals", formatNumber(stats.pendingWithdrawals || 0), "Очередь finance"],
     ["Idempotency keys", formatNumber(stats.idempotencyKeyCount || 0), "Защита дублей"],

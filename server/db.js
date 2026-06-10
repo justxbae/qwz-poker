@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 let pool = null;
 
@@ -1175,7 +1175,7 @@ export async function getIdempotencyResult(key) {
   const normalized = normalizeIdempotencyKey(key);
   if (!normalized) return null;
   const result = await query(`
-    select response_status as "status", response_body as "body", created_at as "createdAt"
+    select request_hash as "requestHash", response_status as "status", response_body as "body", created_at as "createdAt"
     from idempotency_keys
     where key = $1 and expires_at > now()
   `, [normalized]);
@@ -1193,9 +1193,12 @@ export async function saveIdempotencyResult(record) {
     )
     values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, now() + ($9::text)::interval)
     on conflict (key) do update
-    set response_status = excluded.response_status,
+    set request_hash = excluded.request_hash,
+        response_status = excluded.response_status,
         response_body = excluded.response_body,
         expires_at = excluded.expires_at
+    where idempotency_keys.request_hash = excluded.request_hash
+       or idempotency_keys.request_hash = ''
   `, [
     key,
     normalizeLedgerCategory(record.scope || "api"),
@@ -1224,6 +1227,136 @@ export async function recordAdminEvent(event) {
     event.user?.id ? String(event.user.id) : "",
     JSON.stringify(event.lines || [])
   ]);
+}
+
+export async function recordAdminAuditLog(audit = {}) {
+  if (!pool) return null;
+  await query(`
+    insert into admin_audit_logs (
+      id, actor_provider, actor_provider_user_id, actor_role, action,
+      target_type, target_id, result, reason, ip_hash, meta
+    )
+    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
+  `, [
+    audit.id || id("audit"),
+    audit.actorProvider || "telegram",
+    String(audit.actorProviderUserId || audit.actorId || ""),
+    String(audit.actorRole || ""),
+    normalizeLedgerCategory(audit.action || "admin_action"),
+    normalizeLedgerCategory(audit.targetType || ""),
+    String(audit.targetId || ""),
+    normalizeAdminAuditResult(audit.result || "ok"),
+    String(audit.reason || "").slice(0, 1000),
+    String(audit.ipHash || "").slice(0, 160),
+    JSON.stringify(audit.meta || {})
+  ]);
+  return true;
+}
+
+export async function listAdminAuditLogs(limit = 50) {
+  if (!pool) return null;
+  const normalizedLimit = Math.max(1, Math.min(200, Math.round(Number(limit) || 50)));
+  const result = await query(`
+    select id,
+           actor_provider as "actorProvider",
+           actor_provider_user_id as "actorProviderUserId",
+           actor_role as "actorRole",
+           action,
+           target_type as "targetType",
+           target_id as "targetId",
+           result,
+           reason,
+           ip_hash as "ipHash",
+           meta,
+           created_at as "createdAt"
+    from admin_audit_logs
+    order by created_at desc
+    limit $1
+  `, [normalizedLimit]);
+  return result.rows;
+}
+
+export async function recordDeviceSession(providerUserId, session = {}, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const ipHash = String(session.ipHash || "").slice(0, 160);
+  const userAgent = String(session.userAgent || "").slice(0, 600);
+  const platform = String(session.platform || "").slice(0, 80);
+  const deviceIdHash = String(session.deviceIdHash || "").slice(0, 160);
+  const stableId = session.id || deterministicId("device", [
+    provider,
+    appUserId,
+    ipHash,
+    createHash("sha256").update(userAgent).digest("hex"),
+    platform,
+    deviceIdHash
+  ].join(":"));
+
+  const result = await query(`
+    insert into device_sessions (
+      id, app_user_id, provider, provider_user_id, ip_hash, user_agent,
+      platform, device_id_hash, meta, first_seen_at, last_seen_at
+    )
+    values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, now(), now())
+    on conflict (id) do update
+    set last_seen_at = now(),
+        ip_hash = excluded.ip_hash,
+        user_agent = excluded.user_agent,
+        platform = excluded.platform,
+        device_id_hash = excluded.device_id_hash,
+        meta = device_sessions.meta || excluded.meta
+    returning id, first_seen_at as "firstSeenAt", last_seen_at as "lastSeenAt"
+  `, [
+    stableId,
+    appUserId,
+    provider,
+    String(providerUserId),
+    ipHash,
+    userAgent,
+    platform,
+    deviceIdHash,
+    JSON.stringify(session.meta || {})
+  ]);
+  return result.rows[0] || null;
+}
+
+export async function recordRiskFlag(flag = {}) {
+  if (!pool) return null;
+  const provider = flag.provider || "telegram";
+  const providerUserId = flag.userId ? String(flag.userId) : "";
+  const appUserId = providerUserId ? await ensureIdentity(provider, providerUserId) : null;
+  const sourceId = String(flag.sourceId || "").slice(0, 240);
+  if (sourceId) {
+    const existing = await query(`
+      select id
+      from risk_flags
+      where source_id = $1
+        and flag_type = $2
+        and status in ('open', 'review')
+      limit 1
+    `, [sourceId, normalizeLedgerCategory(flag.type || "risk")]);
+    if (existing.rowCount) return { id: existing.rows[0].id, duplicate: true };
+  }
+
+  const result = await query(`
+    insert into risk_flags (
+      id, app_user_id, provider, provider_user_id, flag_type,
+      severity, status, reason, source_id, meta
+    )
+    values ($1, $2, $3, $4, $5, $6, 'open', $7, $8, $9::jsonb)
+    returning id
+  `, [
+    flag.id || id("risk"),
+    appUserId,
+    provider,
+    providerUserId,
+    normalizeLedgerCategory(flag.type || "risk"),
+    normalizeRiskSeverity(flag.severity || "medium"),
+    String(flag.reason || "").slice(0, 1000),
+    sourceId,
+    JSON.stringify(flag.meta || {})
+  ]);
+  return { id: result.rows[0]?.id || null };
 }
 
 export async function listAdminEvents(limit = 20) {
@@ -1422,8 +1555,10 @@ export async function dashboardStats() {
       (select count(*)::int from player_profiles) as player_profile_count,
       (select coalesce(sum(balance), 0)::bigint from wallets) as wallet_total,
       (select coalesce(sum(stack), 0)::bigint from saved_stacks) as saved_stack_total,
-      (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'credit') as ledger_credit_total,
-      (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'debit') as ledger_debit_total,
+      (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'credit' and balance_bucket = 'play') as ledger_credit_total,
+      (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'debit' and balance_bucket = 'play') as ledger_debit_total,
+      (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'credit' and balance_bucket = 'cash_usdt') as cash_ledger_credit_total,
+      (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'debit' and balance_bucket = 'cash_usdt') as cash_ledger_debit_total,
       (select coalesce(sum(amount), 0)::bigint from platform_ledger_entries where type = 'credit') as platform_ledger_credit_total,
       (select coalesce(sum(amount), 0)::bigint from platform_ledger_entries where type = 'debit') as platform_ledger_debit_total,
       (select count(*)::int from hand_histories) as hand_history_count,
@@ -1462,6 +1597,8 @@ export async function dashboardStats() {
     savedStackTotal: Number(result.rows[0].saved_stack_total || 0),
     ledgerCreditTotal: Number(result.rows[0].ledger_credit_total || 0),
     ledgerDebitTotal: Number(result.rows[0].ledger_debit_total || 0),
+    cashLedgerCreditTotal: Number(result.rows[0].cash_ledger_credit_total || 0),
+    cashLedgerDebitTotal: Number(result.rows[0].cash_ledger_debit_total || 0),
     platformLedgerCreditTotal: Number(result.rows[0].platform_ledger_credit_total || 0),
     platformLedgerDebitTotal: Number(result.rows[0].platform_ledger_debit_total || 0),
     handHistoryCount: Number(result.rows[0].hand_history_count || 0),
@@ -2214,6 +2351,18 @@ function withdrawalRow(row) {
 
 function query(sql, params = []) {
   return pool.query(sql, params);
+}
+
+function deterministicId(prefix, value) {
+  return `${prefix}_${createHash("sha256").update(String(value || "")).digest("hex").slice(0, 32)}`;
+}
+
+function normalizeAdminAuditResult(result) {
+  return ["ok", "failed", "denied", "manual_review"].includes(result) ? result : "ok";
+}
+
+function normalizeRiskSeverity(severity) {
+  return ["low", "medium", "high", "critical"].includes(severity) ? severity : "medium";
 }
 
 function normalizeLedgerCategory(category) {

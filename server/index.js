@@ -1,4 +1,4 @@
-import { createHmac, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
@@ -60,11 +60,14 @@ import {
   listWithdrawalOrders as dbListWithdrawalOrders,
   markPaymentOrderPaid as dbMarkPaymentOrderPaid,
   recordAnalyticsEvent as dbRecordAnalyticsEvent,
+  recordAdminAuditLog as dbRecordAdminAuditLog,
   recordAdminEvent as dbRecordAdminEvent,
+  recordDeviceSession as dbRecordDeviceSession,
   recordFundMovement as dbRecordFundMovement,
   recordHandHistory as dbRecordHandHistory,
   recordProfileHandProgress as dbRecordProfileHandProgress,
   recordPlatformLedgerEntry as dbRecordPlatformLedgerEntry,
+  recordRiskFlag as dbRecordRiskFlag,
   reviewWithdrawalOrder as dbReviewWithdrawalOrder,
   registerTournament as dbRegisterTournament,
   saveIdempotencyResult as dbSaveIdempotencyResult,
@@ -173,6 +176,9 @@ const recentHandHistories = [];
 const idempotencyResults = new Map();
 const apiIdempotencyResults = new Map();
 const pendingIdempotencyResults = new Map();
+const adminAuditLogs = [];
+const deviceSessions = new Map();
+const riskFlags = [];
 const DEFAULT_STACK = 0;
 const DEFAULT_WALLET = 0;
 const RECONCILIATION_INTERVAL_MS = Number(process.env.RECONCILIATION_INTERVAL_MS || 15 * 60 * 1000);
@@ -365,6 +371,16 @@ async function handleApi(req, res, url) {
       sessions.set(token, webAdmin.user);
       sessionExpirations.set(token, Date.now() + SESSION_TTL_MS);
       await stateSetSession(token, webAdmin.user);
+      await recordDeviceSessionForRequest(req, webAdmin.user, body);
+      await recordAdminAudit({
+        req,
+        admin: webAdmin.user,
+        action: "admin_login",
+        targetType: "admin_session",
+        targetId: token,
+        result: "ok",
+        meta: { source: "web_admin" }
+      });
       sendJson(res, 200, { token, user: webAdmin.user });
       return;
     }
@@ -380,6 +396,7 @@ async function handleApi(req, res, url) {
     sessions.set(token, user);
     sessionExpirations.set(token, Date.now() + SESSION_TTL_MS);
     await stateSetSession(token, user);
+    await recordDeviceSessionForRequest(req, user, body);
     await trackAnalytics("app_open", {
       user,
       category: "acquisition",
@@ -1076,6 +1093,21 @@ async function handleAdminApi(req, res, url, adminUser) {
       reason: body.reason,
       requestId: body.requestId || req.headers["x-idempotency-key"] || ""
     });
+    await recordAdminAudit({
+      req,
+      admin: adminUser,
+      action: `wallet_${result.type}`,
+      targetType: "user",
+      targetId: result.targetId,
+      result: "ok",
+      reason: result.reason,
+      meta: {
+        amount: result.amount,
+        before: result.before,
+        balance: result.balance,
+        requestId: result.requestId || ""
+      }
+    });
     sendJson(res, 200, { player: await adminPlayerView(result.targetId), adjustment: result });
     return;
   }
@@ -1090,6 +1122,16 @@ async function handleAdminApi(req, res, url, adminUser) {
         paymentId,
         action,
         reason: body.reason || ""
+      });
+      await recordAdminAudit({
+        req,
+        admin: adminUser,
+        action: `payment_${action}`,
+        targetType: "payment_order",
+        targetId: paymentId,
+        result: action === "reject" ? "failed" : "ok",
+        reason: body.reason || "",
+        meta: { status: result.status || "" }
       });
       return { payment: result, admin: await adminDashboardView() };
     });
@@ -1106,6 +1148,16 @@ async function handleAdminApi(req, res, url, adminUser) {
         withdrawalId,
         action,
         reason: body.reason || ""
+      });
+      await recordAdminAudit({
+        req,
+        admin: adminUser,
+        action: `withdrawal_${action}`,
+        targetType: "withdrawal_order",
+        targetId: withdrawalId,
+        result: action === "reject" ? "failed" : "ok",
+        reason: body.reason || "",
+        meta: { status: result.order?.status || result.status || "" }
       });
       return { withdrawal: result.order || result, admin: await adminDashboardView() };
     });
@@ -1126,9 +1178,9 @@ async function adminDashboardView(options = {}) {
     .filter((order) => ["pending", "manual_review"].includes(order.status))
     .reduce((sum, order) => sum + Number(order.grossUsdtMicros || 0), 0);
   const lockedUsdtTotal = dbStats ? dbStats.lockedUsdtTotal : pendingWithdrawalUsdtTotal;
-  const tableStackTotal = [...tables.values()].reduce((sum, table) => (
-    sum + table.seats.reduce((seatSum, seat) => seatSum + Number(seat.stack || 0), 0)
-  ), 0);
+  const tableStacks = activeTableStackTotals();
+  const tableStackTotal = tableStacks.play;
+  const cashTableStackTotal = tableStacks.cash;
   const savedStackTotal = dbStats ? dbStats.savedStackTotal : [...savedStacks.values()].reduce((sum, value) => sum + Number(value || 0), 0);
   const tournamentEscrowTotal = tournamentEscrow();
   const tournamentPrizePoolTotal = tournamentPrizePool();
@@ -1136,6 +1188,8 @@ async function adminDashboardView(options = {}) {
   const rakeCollectedTotal = [...tables.values()].reduce((sum, table) => sum + Number(table.rakeCollected || 0), 0);
   const ledgerCreditTotal = dbStats ? dbStats.ledgerCreditTotal : memoryLedgerTotal("credit");
   const ledgerDebitTotal = dbStats ? dbStats.ledgerDebitTotal : memoryLedgerTotal("debit");
+  const cashLedgerCreditTotal = dbStats ? dbStats.cashLedgerCreditTotal : memoryCashLedgerTotal("credit");
+  const cashLedgerDebitTotal = dbStats ? dbStats.cashLedgerDebitTotal : memoryCashLedgerTotal("debit");
   const paidStarsChipsTotal = dbStats ? dbStats.paidStarsChipsTotal : [...starOrders.values()]
     .filter((order) => order.status === "paid")
     .reduce((sum, order) => sum + Number(order.chips || 0), 0);
@@ -1145,6 +1199,9 @@ async function adminDashboardView(options = {}) {
     walletTotal,
     ledgerCreditTotal,
     ledgerDebitTotal,
+    cashWalletTotal,
+    cashLedgerCreditTotal,
+    cashLedgerDebitTotal,
     paidStarsChipsTotal,
     depositStarsLedgerTotal
   });
@@ -1174,10 +1231,14 @@ async function adminDashboardView(options = {}) {
       ledgerCreditTotal,
       ledgerDebitTotal,
       ledgerNetTotal: ledgerCreditTotal - ledgerDebitTotal,
+      cashLedgerCreditTotal,
+      cashLedgerDebitTotal,
+      cashLedgerNetTotal: cashLedgerCreditTotal - cashLedgerDebitTotal,
       platformLedgerCreditTotal: dbStats ? dbStats.platformLedgerCreditTotal : 0,
       platformLedgerDebitTotal: dbStats ? dbStats.platformLedgerDebitTotal : 0,
       platformLedgerNetTotal: dbStats ? dbStats.platformLedgerCreditTotal - dbStats.platformLedgerDebitTotal : 0,
       cashWalletTotal,
+      cashTableStackTotal,
       lockedUsdtTotal,
       approvedWithdrawalFeeUsdtTotal: dbStats ? dbStats.approvedWithdrawalFeeUsdtTotal : [...withdrawalOrders.values()]
         .filter((order) => order.status === "approved")
@@ -1216,10 +1277,17 @@ async function adminDashboardView(options = {}) {
       ledgerCreditTotal,
       ledgerDebitTotal,
       ledgerNetTotal: ledgerCreditTotal - ledgerDebitTotal,
+      cashWalletTotal,
+      cashTableStackTotal,
+      lockedUsdtTotal,
+      cashLedgerCreditTotal,
+      cashLedgerDebitTotal,
+      cashLedgerNetTotal: cashLedgerCreditTotal - cashLedgerDebitTotal,
       reconciliation,
       notes: [
         "playerFundsTotal = wallets + active table stacks + saved stacks + tournament escrow",
-        "walletLedgerDrift must stay at 0: walletTotal should match ledger credits minus debits",
+        "walletLedgerDrift must stay at 0: play walletTotal should match play ledger credits minus debits",
+        "cashWalletLedgerDrift must stay at 0: cash wallet should match cash ledger credits minus debits",
         "starsDepositDrift must stay at 0: paid Stars orders should match deposit_stars ledger credits"
       ]
     },
@@ -1386,6 +1454,18 @@ function activeTableStacksByUser() {
   return stacks;
 }
 
+function activeTableStackTotals() {
+  return [...tables.values()].reduce((result, table) => {
+    const stack = table.seats.reduce((sum, seat) => sum + Number(seat.stack || 0), 0);
+    if (table.gameMode === "cash") {
+      result.cash += stack;
+    } else {
+      result.play += stack;
+    }
+    return result;
+  }, { play: 0, cash: 0 });
+}
+
 function enrichAdminUserListItem(user, tableStacks) {
   const tableStack = Number(tableStacks.get(String(user.id)) || 0);
   return {
@@ -1430,20 +1510,34 @@ function memoryLedgerCategoryTotal(type, category) {
   ), 0);
 }
 
+function memoryCashLedgerTotal(type) {
+  return [...cashTransactions.values()].reduce((sum, history) => (
+    sum + history
+      .filter((entry) => entry.type === type)
+      .reduce((entrySum, entry) => entrySum + Number(entry.amount || 0), 0)
+  ), 0);
+}
+
 function buildReconciliationAudit({
   walletTotal,
   ledgerCreditTotal,
   ledgerDebitTotal,
+  cashWalletTotal = 0,
+  cashLedgerCreditTotal = 0,
+  cashLedgerDebitTotal = 0,
   paidStarsChipsTotal,
   depositStarsLedgerTotal
 }) {
   const ledgerNetTotal = Number(ledgerCreditTotal || 0) - Number(ledgerDebitTotal || 0);
+  const cashLedgerNetTotal = Number(cashLedgerCreditTotal || 0) - Number(cashLedgerDebitTotal || 0);
   const walletLedgerDrift = Number(walletTotal || 0) - ledgerNetTotal;
+  const cashWalletLedgerDrift = Number(cashWalletTotal || 0) - cashLedgerNetTotal;
   const starsDepositDrift = Number(paidStarsChipsTotal || 0) - Number(depositStarsLedgerTotal || 0);
-  const maxDrift = Math.max(Math.abs(walletLedgerDrift), Math.abs(starsDepositDrift));
+  const maxDrift = Math.max(Math.abs(walletLedgerDrift), Math.abs(cashWalletLedgerDrift), Math.abs(starsDepositDrift));
   return {
     ok: maxDrift < RECONCILIATION_DRIFT_ALERT_CHIPS,
     walletLedgerDrift,
+    cashWalletLedgerDrift,
     starsDepositDrift,
     maxDrift,
     checkedAt: new Date().toISOString()
@@ -1460,6 +1554,7 @@ async function runReconciliationCheck(reason = "manual") {
 
   const alertKey = [
     reconciliation.walletLedgerDrift,
+    reconciliation.cashWalletLedgerDrift,
     reconciliation.starsDepositDrift
   ].join(":");
   if (alertKey === lastReconciliationAlertKey) return reconciliation;
@@ -1469,9 +1564,12 @@ async function runReconciliationCheck(reason = "manual") {
     lines: [
       `Причина проверки: ${reason}`,
       `Wallet/Ledger drift: ${formatNumber(reconciliation.walletLedgerDrift)} chips`,
+      `Cash/Ledger drift: ${formatUsdtMicros(reconciliation.cashWalletLedgerDrift || 0)} USDT`,
       `Stars paid/Ledger drift: ${formatNumber(reconciliation.starsDepositDrift)} chips`,
       `Wallet total: ${formatNumber(dashboard.stats.walletTotal)} chips`,
       `Ledger net: ${formatNumber(dashboard.stats.ledgerNetTotal)} chips`,
+      `Cash wallet total: ${formatUsdtMicros(dashboard.stats.cashWalletTotal || 0)} USDT`,
+      `Cash ledger net: ${formatUsdtMicros(dashboard.stats.cashLedgerNetTotal || 0)} USDT`,
       `Paid Stars chips: ${formatNumber(dashboard.stats.paidStarsChipsTotal)} chips`,
       `Ledger deposit_stars: ${formatNumber(dashboard.stats.depositStarsLedgerTotal)} chips`
     ]
@@ -2833,7 +2931,8 @@ async function adjustWalletManually({ admin, targetId, type, amount, reason, req
     category: normalizedType === "grant" ? "admin_grant" : "admin_deduct",
     title,
     amount: normalizedAmount,
-    meta: `${normalizedReason} · admin ${adminProfile.id}`
+    meta: `${normalizedReason} · admin ${adminProfile.id}`,
+    idempotencyKey
   });
 
   notifyAdmin(normalizedType, title, {
@@ -3268,7 +3367,7 @@ async function processSuccessfulStarPayment(payment) {
   order.paidAt = new Date().toISOString();
   order.telegramPaymentChargeId = payment.telegram_payment_charge_id || "";
   starOrders.set(order.id, order);
-  setWalletBalanceLocal(order.userId, balance);
+  setCashWalletBalanceLocal(order.userId, balance);
   await trackAnalytics("deposit_paid", {
     userId: order.userId,
     category: "payments",
@@ -3334,6 +3433,21 @@ async function handleCryptoWebhook(event) {
       externalId,
       raw: { cryptoWebhook: normalizedEvent.raw || event, reason: "underpaid" }
     });
+    const reviewOrder = { ...order, status: "manual_review", externalId, txHash };
+    cryptoOrders.set(order.id, reviewOrder);
+    await trackAnalytics("deposit_manual_review", {
+      userId: order.userId,
+      category: "payments",
+      amount: order.cashUsdtMicros,
+      asset: "USDT",
+      contextId: order.id,
+      meta: {
+        method: order.method,
+        expectedAmount,
+        paidAmount,
+        reason: "underpaid"
+      }
+    });
     notifyAdmin("crypto_manual_review", "Crypto-платеж требует проверки", {
       user: { id: order.userId, name: order.userName, username: order.username },
       lines: [
@@ -3354,6 +3468,21 @@ async function handleCryptoWebhook(event) {
       externalId,
       raw: { cryptoWebhook: normalizedEvent.raw || event }
     });
+    const patchedOrder = { ...order, status: mappedStatus, externalId, txHash };
+    cryptoOrders.set(order.id, patchedOrder);
+    if (mappedStatus !== "pending") {
+      await trackAnalytics(`deposit_${mappedStatus}`, {
+        userId: order.userId,
+        category: "payments",
+        amount: order.cashUsdtMicros,
+        asset: "USDT",
+        contextId: order.id,
+        meta: {
+          method: order.method,
+          providerStatus: normalizedEvent.status || ""
+        }
+      });
+    }
     return;
   }
 
@@ -3528,7 +3657,7 @@ async function orderFromPayload(payload) {
 }
 
 async function callTelegram(method, payload) {
-  const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
+  const response = await fetch(`${TELEGRAM_API_BASE}/bot${BOT_TOKEN}/${method}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload)
@@ -3588,6 +3717,107 @@ function notifyAdmin(type, title, { user, lines = [] } = {}) {
   }).catch((error) => {
     console.error("Admin log failed:", error.message);
   });
+}
+
+async function recordDeviceSessionForRequest(req, user, body = {}) {
+  if (!user?.id) return;
+  const ipHash = requestIpHash(req);
+  const userAgent = requestUserAgent(req);
+  const platform = String(body.platform || req.headers["sec-ch-ua-platform"] || "").slice(0, 80);
+  const deviceIdHash = hashSensitive([
+    user.id,
+    ipHash,
+    userAgent,
+    platform
+  ].join(":"));
+  const session = {
+    ipHash,
+    userAgent,
+    platform,
+    deviceIdHash,
+    meta: {
+      colorScheme: body.colorScheme || "",
+      source: user.isWebAdmin ? "admin" : "miniapp"
+    }
+  };
+  deviceSessions.set(`${user.id}:${deviceIdHash}`, {
+    userId: user.id,
+    ...session,
+    lastSeenAt: new Date().toISOString()
+  });
+  try {
+    await dbRecordDeviceSession(user.id, session, user.isWebAdmin ? "web" : "telegram");
+  } catch (error) {
+    console.error("Device session failed:", error.message);
+  }
+}
+
+async function recordAdminAudit({ req, admin, action, targetType = "", targetId = "", result = "ok", reason = "", meta = {} } = {}) {
+  const audit = {
+    id: randomId("audit"),
+    actorProvider: admin?.isWebAdmin ? "web" : "telegram",
+    actorProviderUserId: admin?.id || "system",
+    actorRole: adminRolesFor(admin?.id || "").join(",") || (admin?.isWebAdmin ? "web-admin" : ""),
+    action,
+    targetType,
+    targetId,
+    result,
+    reason,
+    ipHash: req ? requestIpHash(req) : "",
+    meta,
+    createdAt: new Date().toISOString()
+  };
+  adminAuditLogs.unshift(audit);
+  adminAuditLogs.splice(200);
+  try {
+    await dbRecordAdminAuditLog(audit);
+  } catch (error) {
+    console.error("Admin audit failed:", error.message);
+  }
+}
+
+async function recordRiskFlag(flag = {}) {
+  const entry = {
+    id: flag.id || randomId("risk"),
+    userId: flag.userId || "",
+    type: flag.type || "risk",
+    severity: flag.severity || "medium",
+    reason: flag.reason || "",
+    sourceId: flag.sourceId || "",
+    meta: flag.meta || {},
+    createdAt: new Date().toISOString()
+  };
+  riskFlags.unshift(entry);
+  riskFlags.splice(200);
+  try {
+    await dbRecordRiskFlag(entry);
+  } catch (error) {
+    console.error("Risk flag failed:", error.message);
+  }
+}
+
+function requestIpHash(req) {
+  const forwarded = Array.isArray(req.headers["x-forwarded-for"])
+    ? req.headers["x-forwarded-for"][0]
+    : req.headers["x-forwarded-for"];
+  const ip = String(
+    forwarded?.split(",")[0]
+      || req.headers["cf-connecting-ip"]
+      || req.headers["x-real-ip"]
+      || req.socket?.remoteAddress
+      || ""
+  ).trim();
+  return ip ? hashSensitive(ip) : "";
+}
+
+function requestUserAgent(req) {
+  const value = req.headers["user-agent"];
+  return String(Array.isArray(value) ? value[0] : value || "").slice(0, 600);
+}
+
+function hashSensitive(value) {
+  const secret = process.env.DEVICE_HASH_SECRET || BOT_TOKEN || "dev-secret";
+  return createHmac("sha256", secret).update(String(value || "")).digest("hex");
 }
 
 function formatUser(user) {
@@ -3664,9 +3894,11 @@ async function readJson(req) {
 }
 
 async function readRawBody(req) {
+  if (Object.hasOwn(req, "__qwzRawBody")) return req.__qwzRawBody;
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
-  return Buffer.concat(chunks).toString("utf8");
+  req.__qwzRawBody = Buffer.concat(chunks).toString("utf8");
+  return req.__qwzRawBody;
 }
 
 function sendJson(res, status, payload) {
@@ -3695,14 +3927,24 @@ async function sendIdempotentJson(req, res, user, scope, handler) {
     return;
   }
 
+  const requestHash = await requestBodyHash(req);
   const cached = await getApiIdempotencyResult(key);
   if (cached) {
+    if (cached.requestHash && requestHash && cached.requestHash !== requestHash) {
+      sendJson(res, 409, { error: "Idempotency key already used with a different request body" });
+      return;
+    }
     sendJson(res, Number(cached.status || 200), cached.body || {});
     return;
   }
 
   if (pendingIdempotencyResults.has(key)) {
-    const replay = await pendingIdempotencyResults.get(key);
+    const pending = pendingIdempotencyResults.get(key);
+    if (pending.requestHash && requestHash && pending.requestHash !== requestHash) {
+      sendJson(res, 409, { error: "Idempotency key is already processing a different request body" });
+      return;
+    }
+    const replay = await pending.promise;
     sendJson(res, replay.status, replay.body);
     return;
   }
@@ -3713,13 +3955,14 @@ async function sendIdempotentJson(req, res, user, scope, handler) {
       key,
       scope,
       userId: user?.id || "",
+      requestHash,
       status: result.status,
       body: result.body
     });
     return result;
   })();
 
-  pendingIdempotencyResults.set(key, promise);
+  pendingIdempotencyResults.set(key, { requestHash, promise });
   try {
     const result = await promise;
     sendJson(res, result.status, result.body);
@@ -3773,6 +4016,9 @@ function buildPrometheusMetrics(health, stats = null) {
     "# HELP qwz_wallet_ledger_drift_chips Difference between wallet total and ledger net.",
     "# TYPE qwz_wallet_ledger_drift_chips gauge",
     `qwz_wallet_ledger_drift_chips ${reconciliation.walletLedgerDrift}`,
+    "# HELP qwz_cash_wallet_ledger_drift_micros Difference between cash USDT wallet total and cash ledger net in micro-USDT.",
+    "# TYPE qwz_cash_wallet_ledger_drift_micros gauge",
+    `qwz_cash_wallet_ledger_drift_micros ${reconciliation.cashWalletLedgerDrift}`,
     "# HELP qwz_stars_deposit_drift_chips Difference between paid Stars chips and ledger deposits.",
     "# TYPE qwz_stars_deposit_drift_chips gauge",
     `qwz_stars_deposit_drift_chips ${reconciliation.starsDepositDrift}`,
@@ -3799,12 +4045,21 @@ function buildMetricsReconciliation(stats) {
   const walletTotal = Number(stats?.walletTotal || 0);
   const ledgerCreditTotal = Number(stats?.ledgerCreditTotal || 0);
   const ledgerDebitTotal = Number(stats?.ledgerDebitTotal || 0);
+  const cashWalletTotal = Number(stats?.cashWalletTotal || 0);
+  const cashLedgerCreditTotal = Number(stats?.cashLedgerCreditTotal || 0);
+  const cashLedgerDebitTotal = Number(stats?.cashLedgerDebitTotal || 0);
   const paidStarsChipsTotal = Number(stats?.paidStarsChipsTotal || 0);
   const depositStarsLedgerTotal = Number(stats?.depositStarsLedgerTotal || 0);
   return {
     walletLedgerDrift: walletTotal - (ledgerCreditTotal - ledgerDebitTotal),
+    cashWalletLedgerDrift: cashWalletTotal - (cashLedgerCreditTotal - cashLedgerDebitTotal),
     starsDepositDrift: paidStarsChipsTotal - depositStarsLedgerTotal
   };
+}
+
+async function requestBodyHash(req) {
+  const raw = await readRawBody(req);
+  return createHash("sha256").update(raw || "").digest("hex");
 }
 
 function escapePrometheusLabelValue(value) {
@@ -3835,6 +4090,7 @@ async function getApiIdempotencyResult(key) {
 async function saveApiIdempotencyResult(record) {
   await dbSaveIdempotencyResult(record);
   apiIdempotencyResults.set(record.key, {
+    requestHash: record.requestHash || "",
     status: record.status,
     body: record.body,
     createdAt: new Date().toISOString(),

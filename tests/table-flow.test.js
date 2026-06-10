@@ -461,6 +461,41 @@ test("idempotency key prevents duplicated wallet money operations", async () => 
   }
 });
 
+test("idempotency key rejects a different request body", async () => {
+  const server = await startServer();
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+
+    const cashier = (await request("/api/cashier/demo-topup", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "same-key-different-body",
+      body: { rubAmount: 100 }
+    })).cashier;
+    assert.equal(cashier.balance, 5000);
+
+    await assert.rejects(
+      request("/api/cashier/demo-topup", {
+        method: "POST",
+        token: auth.token,
+        idempotencyKey: "same-key-different-body",
+        body: { rubAmount: 200 }
+      }),
+      /Idempotency key already used with a different request body/
+    );
+
+    const replay = (await request("/api/cashier/demo-topup", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "same-key-different-body",
+      body: { rubAmount: 100 }
+    })).cashier;
+    assert.equal(replay.balance, 5000);
+  } finally {
+    server.kill();
+  }
+});
+
 test("crypto deposit order can be created but does not credit chips before confirmation", async () => {
   const server = await startServer({
     REAL_MONEY_ENABLED: "true",
@@ -677,6 +712,10 @@ test("Stars, Crypto Bot, and xRocket deposit rails create invoices and credit ca
     paidCashier = (await request("/api/cashier", { token: auth.token })).cashier;
     assert.equal(paidCashier.balance, 75_000_000);
     assert.equal(paidCashier.transactions[0].category, "deposit_xrocket");
+
+    const profile = (await request("/api/profile", { token: auth.token })).profile;
+    assert.equal(profile.cashBalanceMicros, 75_000_000);
+    assert.equal(profile.balance, 0);
   } finally {
     await Promise.all([
       telegramApi.close(),
