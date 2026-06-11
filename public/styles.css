@@ -8622,6 +8622,106 @@ body:not(.in-game) .training-switcher .game-mode-switch .tether-mark {
   height: 17px;
 }
 
+body:not(.in-game) .progression-card {
+  display: grid;
+  gap: 12px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: var(--native-group-radius);
+  background: var(--tg-surface);
+  padding: 14px;
+}
+
+body:not(.in-game) .progression-card .section-title {
+  margin: 0;
+}
+
+body:not(.in-game) .progression-card .section-title h2 {
+  font-size: 19px;
+}
+
+.progression-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.progression-summary > div {
+  min-width: 0;
+  border-radius: 12px;
+  background: var(--native-control);
+  padding: 10px;
+}
+
+.progression-summary span,
+.leaderboard-row small {
+  display: block;
+  color: var(--tg-hint);
+  font-size: 11px;
+  font-weight: 560;
+}
+
+.progression-summary strong {
+  display: block;
+  overflow: hidden;
+  color: var(--tg-text);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaderboard-list {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--tg-separator);
+}
+
+.leaderboard-row,
+.leaderboard-empty {
+  min-height: 42px;
+  background: var(--native-control);
+  color: var(--tg-text);
+}
+
+.leaderboard-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.leaderboard-rank {
+  color: var(--tg-link);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.leaderboard-player {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaderboard-row strong {
+  font-size: 13px;
+}
+
+.leaderboard-empty {
+  display: grid;
+  place-items: center start;
+  padding: 10px;
+  color: var(--tg-hint);
+  font-size: 13px;
+  font-weight: 560;
+}
+
 body:not(.in-game) .home-games {
   margin-top: 0;
   border: 1px solid var(--tg-separator);

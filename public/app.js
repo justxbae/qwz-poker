@@ -23,6 +23,7 @@ const state = {
   currentTableId: "",
   currentTable: null,
   config: null,
+  progression: null,
   gameMode: "play",
   selectedSmallBlind: 25,
   tables: [],
@@ -52,6 +53,11 @@ const homeSessionPill = document.querySelector("#homeSessionPill");
 const homeScreenInstallButton = document.querySelector("#homeScreenInstallButton");
 const homeScreenInstallStatus = document.querySelector("#homeScreenInstallStatus");
 const homeOfferMeta = document.querySelector("#homeOfferMeta");
+const homeRatingLeague = document.querySelector("#homeRatingLeague");
+const homeRatingPoints = document.querySelector("#homeRatingPoints");
+const homeCashClub = document.querySelector("#homeCashClub");
+const ratingLeaderboardMeta = document.querySelector("#ratingLeaderboardMeta");
+const ratingLeaderboardList = document.querySelector("#ratingLeaderboardList");
 const quickPlayHint = document.querySelector("#quickPlayHint");
 const homeGamesTitle = document.querySelector("#homeGamesTitle");
 const homeTableList = document.querySelector("#homeTableList");
@@ -510,16 +516,16 @@ function renderModeBalance() {
 function renderModeContext() {
   const cashMode = state.gameMode === "cash";
   if (modeBanner) {
-    if (modeBannerKicker) modeBannerKicker.textContent = cashMode ? "USDT" : "Без вывода";
+    if (modeBannerKicker) modeBannerKicker.textContent = cashMode ? "USDT" : "Рейтинг";
     if (modeBannerTitle) {
       if (cashMode) modeBannerTitle.replaceChildren("Денежная игра ", createTetherMark());
-      else modeBannerTitle.textContent = "Игровые фишки";
+      else modeBannerTitle.textContent = "Рейтинговый режим";
     }
     modeBanner.dataset.mode = cashMode ? "cash" : "play";
   }
-  if (homeGamesTitle) homeGamesTitle.textContent = cashMode ? "Cash-столы" : "Игровые столы";
-  if (publicGamesTitle) publicGamesTitle.textContent = cashMode ? "Cash-столы" : "Игровые столы";
-  if (privateGamesTitle) privateGamesTitle.textContent = cashMode ? "Приватные cash-столы" : "Приватные столы";
+  if (homeGamesTitle) homeGamesTitle.textContent = cashMode ? "Cash-столы" : "Рейтинговые столы";
+  if (publicGamesTitle) publicGamesTitle.textContent = cashMode ? "Cash-столы" : "Рейтинговые столы";
+  if (privateGamesTitle) privateGamesTitle.textContent = cashMode ? "Приватные cash-столы" : "Приватные рейтинговые столы";
   if (walletWithdrawButton) walletWithdrawButton.disabled = !cashMode;
 }
 
@@ -1290,6 +1296,19 @@ async function loadProfile() {
   if (!state.token) return;
   const data = await api("/api/profile");
   renderProfile(data.profile);
+  await loadProgression();
+}
+
+async function loadProgression() {
+  if (!state.token) return;
+  try {
+    const data = await api("/api/progression");
+    state.progression = data.progression || null;
+    renderProgression(state.progression);
+  } catch (error) {
+    console.warn("progression unavailable", error);
+    renderProgression(null);
+  }
 }
 
 function renderProfile(profileData) {
@@ -1299,7 +1318,9 @@ function renderProfile(profileData) {
   profileUsername.textContent = user.username ? `@${user.username}` : `id ${user.id || ""}`;
   const cashLevel = Number(profile.cashLevel || 1);
   const cashStatus = profile.cashStatus || "Новичок";
-  const cashRankText = `${cashStatus} · Уровень ${cashLevel}`;
+  const ratingLeagueText = profile.ratingLeague || profile.ratingTier || "Bronze";
+  const ratingPointsText = `${formatNumber(profile.ratingPoints || 1000)} RP`;
+  const cashRankText = `${cashStatus} · Cash Club`;
   if (lobbyRank) lobbyRank.textContent = cashRankText;
   profileBalance.replaceChildren(`${formatUsdt(profileData.cashBalanceMicros || 0)} `, createTetherMark(), ` · ${formatChips(profileData.balance)} фишек`);
   profileChips.textContent = formatChips(profileData.balance);
@@ -1315,11 +1336,11 @@ function renderProfile(profileData) {
     homeSessionPill.dataset.status = profileData.activeTableCount ? "active" : "idle";
   }
   if (profileCashTitle) profileCashTitle.textContent = cashRankText;
-  if (profileCashXpLabel) profileCashXpLabel.textContent = `${formatNumber(profile.cashXpCurrent || 0)} / ${formatNumber(profile.cashXpRequired || 120)} XP`;
+  if (profileCashXpLabel) profileCashXpLabel.textContent = `${formatNumber(profile.cashClubPoints || profile.cashXpCurrent || 0)} pts · рейк ${formatUsdt(profile.cashRakeContributed || 0)}`;
   if (profileCashProgress) profileCashProgress.style.width = `${Math.max(0, Math.min(100, Number(profile.cashXpProgress || 0) * 100))}%`;
   if (profileCashHands) profileCashHands.textContent = formatNumber(profile.cashHandsPlayed || 0);
-  if (profileRatingTitle) profileRatingTitle.textContent = profile.ratingTier || "Unranked";
-  if (profileRatingPoints) profileRatingPoints.textContent = `${formatNumber(profile.ratingPoints || 0)} pts`;
+  if (profileRatingTitle) profileRatingTitle.textContent = ratingLeagueText;
+  if (profileRatingPoints) profileRatingPoints.textContent = ratingPointsText;
   if (profileRatingHands) profileRatingHands.textContent = formatNumber(profile.ratingHandsPlayed || 0);
   if (profileRatingSeason) profileRatingSeason.textContent = profile.ratingSeasonId || "текущий";
   profileHands.textContent = formatNumber(profileData.handsPlayed || profile.handsPlayed || 0);
@@ -1333,6 +1354,44 @@ function renderProfile(profileData) {
   renderAvatar(lobbyAvatar, user);
 
   renderProfileSessions(profileData.activeTables || []);
+}
+
+function renderProgression(progression) {
+  const profile = progression?.profile || {};
+  const rating = progression?.rating || {};
+  const cashClub = progression?.cashClub?.current || {};
+  const league = profile.ratingLeague || profile.ratingTier || "Bronze";
+  const ratingPoints = Number(profile.ratingPoints || rating.startingRp || 1000);
+  if (homeRatingLeague) homeRatingLeague.textContent = league;
+  if (homeRatingPoints) homeRatingPoints.textContent = formatNumber(ratingPoints);
+  if (homeCashClub) homeCashClub.textContent = cashClub.title || profile.cashClubStatus || "Starter";
+
+  const rows = Array.isArray(rating.leaderboard) ? rating.leaderboard.slice(0, 5) : [];
+  if (ratingLeaderboardMeta) {
+    ratingLeaderboardMeta.textContent = rows.length
+      ? `${rows.length} ${plural(rows.length, "игрок", "игрока", "игроков")}`
+      : "сезон открыт";
+  }
+  if (!ratingLeaderboardList) return;
+  ratingLeaderboardList.replaceChildren();
+  if (!rows.length) {
+    const empty = document.createElement("div");
+    empty.className = "leaderboard-empty";
+    empty.textContent = "Сыграйте рейтинговую раздачу, чтобы попасть в таблицу.";
+    ratingLeaderboardList.append(empty);
+    return;
+  }
+  rows.forEach((row, index) => {
+    const item = document.createElement("div");
+    item.className = "leaderboard-row";
+    item.innerHTML = `
+      <span class="leaderboard-rank">#${row.rank || index + 1}</span>
+      <span class="leaderboard-player">${escapeHtml(row.name || row.username || "Игрок")}</span>
+      <strong>${formatNumber(row.ratingPoints || 0)} RP</strong>
+      <small>${row.eligible ? "в зачёте" : "калибровка"}</small>
+    `;
+    ratingLeaderboardList.append(item);
+  });
 }
 
 function renderProfileSessions(activeTables) {
