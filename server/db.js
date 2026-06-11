@@ -930,7 +930,7 @@ export async function createWithdrawalOrder(order, provider = "telegram") {
   const feeUsdtMicros = Math.max(0, Math.round(Number(order.feeUsdtMicros) || 0));
   const payoutUsdtMicros = Math.max(0, Math.round(Number(order.payoutUsdtMicros) || Math.max(0, grossUsdtMicros - feeUsdtMicros)));
   const cashMode = grossUsdtMicros > 0;
-  const chips = Math.max(cashMode ? 1 : 0, Math.round(Number(order.chips) || 0));
+  const chips = Math.max(0, Math.round(Number(order.chips) || 0));
   const feeChips = Math.max(0, Math.round(Number(order.feeChips) || 0));
   const payoutChips = Math.max(0, chips - feeChips);
   const client = await pool.connect();
@@ -1271,6 +1271,29 @@ export async function listAdminAuditLogs(limit = 50) {
            created_at as "createdAt"
     from admin_audit_logs
     order by created_at desc
+    limit $1
+  `, [normalizedLimit]);
+  return result.rows;
+}
+
+export async function listRiskFlags(limit = 50) {
+  if (!pool) return null;
+  const normalizedLimit = Math.max(1, Math.min(200, Math.round(Number(limit) || 50)));
+  const result = await query(`
+    select rf.id,
+           rf.provider_user_id as "userId",
+           au.display_name as "userName",
+           au.username,
+           rf.flag_type as "type",
+           rf.severity,
+           rf.status,
+           rf.reason,
+           rf.source_id as "sourceId",
+           rf.meta,
+           rf.created_at as "createdAt"
+    from risk_flags rf
+    left join app_users au on au.id = rf.app_user_id
+    order by rf.created_at desc
     limit $1
   `, [normalizedLimit]);
   return result.rows;
@@ -2010,7 +2033,7 @@ async function migrate() {
       provider_user_id text not null,
       method text not null,
       status text not null check (status in ('pending', 'manual_review', 'approved', 'rejected', 'cancelled', 'failed')),
-      chips bigint not null check (chips > 0),
+      chips bigint not null default 0 check (chips >= 0),
       fee_chips bigint not null default 0 check (fee_chips >= 0),
       payout_chips bigint not null default 0 check (payout_chips >= 0),
       gross_usdt_micros bigint not null default 0 check (gross_usdt_micros >= 0),
@@ -2027,6 +2050,9 @@ async function migrate() {
       reviewed_at timestamptz
     );
 
+    alter table withdrawal_orders drop constraint if exists withdrawal_orders_chips_check;
+    alter table withdrawal_orders alter column chips set default 0;
+    alter table withdrawal_orders add constraint withdrawal_orders_chips_check check (chips >= 0);
     create index if not exists idx_withdrawal_orders_app_user_created on withdrawal_orders(app_user_id, created_at desc);
     create index if not exists idx_withdrawal_orders_status_created on withdrawal_orders(status, created_at desc);
     alter table withdrawal_orders add column if not exists gross_usdt_micros bigint not null default 0 check (gross_usdt_micros >= 0);

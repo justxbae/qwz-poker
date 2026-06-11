@@ -57,6 +57,8 @@ import {
   listUsers as dbListUsers,
   listPaymentOrders as dbListPaymentOrders,
   listPendingCryptoPaymentOrders as dbListPendingCryptoPaymentOrders,
+  listAdminAuditLogs as dbListAdminAuditLogs,
+  listRiskFlags as dbListRiskFlags,
   listWithdrawalOrders as dbListWithdrawalOrders,
   markPaymentOrderPaid as dbMarkPaymentOrderPaid,
   recordAnalyticsEvent as dbRecordAnalyticsEvent,
@@ -170,6 +172,7 @@ const cryptoOrders = new Map();
 const withdrawalOrders = new Map();
 const adminEvents = [];
 const analyticsEvents = [];
+const platformLedgerEntries = [];
 const loggedAppOpens = new Set();
 const persistedHandIds = new Set();
 const recentHandHistories = [];
@@ -184,6 +187,8 @@ const DEFAULT_WALLET = 0;
 const RECONCILIATION_INTERVAL_MS = Number(process.env.RECONCILIATION_INTERVAL_MS || 15 * 60 * 1000);
 const RECONCILIATION_DRIFT_ALERT_CHIPS = Number(process.env.RECONCILIATION_DRIFT_ALERT_CHIPS || 1);
 const SESSION_TTL_MS = Number(process.env.SESSION_TTL_SECONDS || 24 * 60 * 60) * 1000;
+const RISK_LARGE_WITHDRAWAL_USDT_MICROS = Math.max(0, Math.round(Number(process.env.RISK_LARGE_WITHDRAWAL_USDT || 1000) * 1_000_000));
+const RISK_LARGE_ADMIN_ADJUST_CHIPS = Math.max(0, Math.round(Number(process.env.RISK_LARGE_ADMIN_ADJUST_CHIPS || ADMIN_GRANT_MAX_CHIPS / 2)));
 let lastReconciliationAlertKey = "";
 
 seedPublicTables();
@@ -1210,6 +1215,8 @@ async function adminDashboardView(options = {}) {
   const recentPayments = await dbListPaymentOrders(30);
   const recentWithdrawals = await dbListWithdrawalOrders(30);
   const recentEvents = await dbListAdminEvents(20);
+  const recentAdminAudit = await dbListAdminAuditLogs(50);
+  const recentRiskFlags = await dbListRiskFlags(50);
   const recentHands = await dbListHandHistories(20);
   const recentUsers = await adminUsersList(100);
   const memoryHandHistoryCount = recentHandHistories.length;
@@ -1234,9 +1241,11 @@ async function adminDashboardView(options = {}) {
       cashLedgerCreditTotal,
       cashLedgerDebitTotal,
       cashLedgerNetTotal: cashLedgerCreditTotal - cashLedgerDebitTotal,
-      platformLedgerCreditTotal: dbStats ? dbStats.platformLedgerCreditTotal : 0,
-      platformLedgerDebitTotal: dbStats ? dbStats.platformLedgerDebitTotal : 0,
-      platformLedgerNetTotal: dbStats ? dbStats.platformLedgerCreditTotal - dbStats.platformLedgerDebitTotal : 0,
+      platformLedgerCreditTotal: dbStats ? dbStats.platformLedgerCreditTotal : memoryPlatformLedgerTotal("credit"),
+      platformLedgerDebitTotal: dbStats ? dbStats.platformLedgerDebitTotal : memoryPlatformLedgerTotal("debit"),
+      platformLedgerNetTotal: dbStats
+        ? dbStats.platformLedgerCreditTotal - dbStats.platformLedgerDebitTotal
+        : memoryPlatformLedgerTotal("credit") - memoryPlatformLedgerTotal("debit"),
       cashWalletTotal,
       cashTableStackTotal,
       lockedUsdtTotal,
@@ -1300,7 +1309,9 @@ async function adminDashboardView(options = {}) {
     recentWithdrawals: recentWithdrawals || [...withdrawalOrders.values()]
       .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
       .slice(0, 30),
-    recentEvents: recentEvents || adminEvents.slice(0, 20)
+    recentEvents: recentEvents || adminEvents.slice(0, 20),
+    recentAdminAudit: recentAdminAudit || adminAuditLogs.slice(0, 50),
+    recentRiskFlags: recentRiskFlags || riskFlags.slice(0, 50)
   };
 }
 
@@ -1326,6 +1337,34 @@ async function trackAnalytics(eventName, options = {}) {
   } catch (error) {
     console.error("Analytics event failed:", error.message);
   }
+}
+
+async function recordPlatformLedger(entry = {}) {
+  const amount = Math.max(0, Math.round(Number(entry.amount || 0)));
+  if (amount <= 0) return null;
+  const idempotencyKey = String(entry.idempotencyKey || "");
+  if (idempotencyKey && platformLedgerEntries.some((item) => item.idempotencyKey === idempotencyKey)) {
+    return { idempotentReplay: true };
+  }
+  const normalized = {
+    id: entry.id || randomId("platform"),
+    type: entry.type === "debit" ? "debit" : "credit",
+    category: normalizeLedgerCategory(entry.category || "platform"),
+    title: entry.title || "Platform ledger entry",
+    amount,
+    contextId: entry.contextId || "",
+    meta: entry.meta || "",
+    idempotencyKey,
+    createdAt: new Date().toISOString()
+  };
+  platformLedgerEntries.unshift(normalized);
+  platformLedgerEntries.splice(500);
+  try {
+    await dbRecordPlatformLedgerEntry(normalized);
+  } catch (error) {
+    console.error("Platform ledger failed:", error.message);
+  }
+  return normalized;
 }
 
 async function analyticsDashboard(days = 7) {
@@ -1518,6 +1557,12 @@ function memoryCashLedgerTotal(type) {
   ), 0);
 }
 
+function memoryPlatformLedgerTotal(type) {
+  return platformLedgerEntries
+    .filter((entry) => entry.type === type)
+    .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+}
+
 function buildReconciliationAudit({
   walletTotal,
   ledgerCreditTotal,
@@ -1700,7 +1745,7 @@ async function persistCompletedHands(table) {
         }
       });
       if (Number(hand.rake || 0) > 0) {
-        await dbRecordPlatformLedgerEntry({
+        await recordPlatformLedger({
           type: "credit",
           category: "rake_cash",
           title: "Cash game rake",
@@ -2957,6 +3002,20 @@ async function adjustWalletManually({ admin, targetId, type, amount, reason, req
     requestId: requestId || ""
   };
   if (idempotencyKey) idempotencyResults.set(idempotencyKey, result);
+  if (normalizedType === "grant" && normalizedAmount >= RISK_LARGE_ADMIN_ADJUST_CHIPS) {
+    await recordRiskFlag({
+      userId: normalizedTargetId,
+      type: "large_admin_grant",
+      severity: normalizedAmount >= ADMIN_GRANT_MAX_CHIPS ? "high" : "medium",
+      reason: `Large manual grant: ${formatNumber(normalizedAmount)} chips`,
+      sourceId: idempotencyKey || `admin-grant:${adminProfile.id}:${normalizedTargetId}:${Date.now()}`,
+      meta: {
+        adminId: adminProfile.id,
+        amount: normalizedAmount,
+        reason: normalizedReason
+      }
+    });
+  }
   return result;
 }
 
@@ -2997,13 +3056,17 @@ async function createWithdrawalRequest(user, body = {}, idempotencyKey = "") {
     }
     withdrawalOrders.set(dbResult.order.id, dbResult.order);
     notifyWithdrawalCreated(user, dbResult.order, dbResult.balance ?? (order.grossUsdtMicros > 0 ? user.cashBalanceMicros : user.balance));
+    await maybeFlagWithdrawalRisk(user, dbResult.order);
     return { order: dbResult.order, balance: dbResult.balance };
   }
 
   if (idempotencyKey && idempotencyResults.has(idempotencyKey)) {
+    const replay = idempotencyResults.get(idempotencyKey);
     return {
-      order: idempotencyResults.get(idempotencyKey),
-      balance: getWalletLocal(user.id),
+      order: replay.order || replay,
+      balance: replay.balance ?? (Number(replay.order?.grossUsdtMicros || replay.grossUsdtMicros || 0) > 0
+        ? getCashWalletLocal(user.id)
+        : getWalletLocal(user.id)),
       idempotentReplay: true
     };
   }
@@ -3028,9 +3091,29 @@ async function createWithdrawalRequest(user, body = {}, idempotencyKey = "") {
   };
   const balance = cashMode ? await recordCashTransaction(user, transaction) : await recordTransaction(user, transaction);
   withdrawalOrders.set(order.id, order);
-  if (idempotencyKey) idempotencyResults.set(idempotencyKey, order);
+  if (idempotencyKey) idempotencyResults.set(idempotencyKey, { order, balance });
   notifyWithdrawalCreated(user, order, balance);
+  await maybeFlagWithdrawalRisk(user, order);
   return { order, balance };
+}
+
+async function maybeFlagWithdrawalRisk(user, order) {
+  const grossUsdtMicros = Number(order.grossUsdtMicros || 0);
+  if (grossUsdtMicros <= 0 || grossUsdtMicros < RISK_LARGE_WITHDRAWAL_USDT_MICROS) return;
+  await recordRiskFlag({
+    userId: order.userId || user.id,
+    type: "large_withdrawal",
+    severity: grossUsdtMicros >= RISK_LARGE_WITHDRAWAL_USDT_MICROS * 5 ? "high" : "medium",
+    reason: `Large withdrawal request: ${formatUsdtMicros(grossUsdtMicros)} USDT`,
+    sourceId: order.id,
+    meta: {
+      method: order.method,
+      destination: order.destination ? hashSensitive(order.destination) : "",
+      grossUsdtMicros,
+      payoutUsdtMicros: order.payoutUsdtMicros || 0,
+      feeUsdtMicros: order.feeUsdtMicros || 0
+    }
+  });
 }
 
 async function handleAdminWithdrawalAction({ admin, withdrawalId, action, reason = "" }) {
@@ -3101,6 +3184,16 @@ async function handleAdminWithdrawalAction({ admin, withdrawalId, action, reason
       idempotencyKey: `withdrawal:${order.id}:refund`
     };
     balance = cashMode ? await recordCashTransaction({ id: order.userId }, refund) : await recordTransaction({ id: order.userId }, refund);
+  } else if (Number(order.grossUsdtMicros || 0) > 0 && Number(order.feeUsdtMicros || 0) > 0) {
+    await recordPlatformLedger({
+      type: "credit",
+      category: "withdrawal_fee",
+      title: "Withdrawal hidden fee",
+      amount: order.feeUsdtMicros,
+      contextId: order.id,
+      meta: `${order.method} · gross ${order.grossUsdtMicros} · payout ${order.payoutUsdtMicros}`,
+      idempotencyKey: `withdrawal:${order.id}:fee`
+    });
   }
   notifyWithdrawalReviewed(adminProfile, reviewed, normalizedReason);
   await trackAnalytics(`withdrawal_${reviewed.status}`, {

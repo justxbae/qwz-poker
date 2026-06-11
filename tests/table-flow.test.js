@@ -808,6 +808,101 @@ test("withdrawals stay disabled until the payout rail is connected", async () =>
   }
 });
 
+test("cash withdrawal hold, reject refund, and approve fee accounting stay balanced", async () => {
+  const server = await startServer({
+    ADMIN_USER_IDS: "dev-user",
+    REAL_MONEY_ENABLED: "true",
+    WITHDRAWALS_ENABLED: "true",
+    TON_PAYMENTS_ENABLED: "true",
+    TON_RECEIVER_ADDRESS: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+    TON_USDT_RATE: "250",
+    RISK_LARGE_WITHDRAWAL_USDT: "10"
+  });
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    const depositOrder = (await request("/api/cashier/crypto-order", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "withdrawal-lifecycle-deposit",
+      body: { method: "ton", usdtAmount: 50 }
+    })).order;
+
+    await request(`/api/admin/payments/${depositOrder.id}/approve`, {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "withdrawal-lifecycle-deposit-approve",
+      body: { reason: "test_deposit" }
+    });
+
+    let cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.balance, 50_000_000);
+    assert.equal(cashier.withdrawals.enabled, true);
+
+    const rejectedWithdrawal = (await request("/api/cashier/withdraw", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "withdrawal-lifecycle-reject",
+      body: { currency: "USDT", method: "ton", usdtAmount: 20, destination: "UQB-test-wallet-1" }
+    })).withdrawal;
+
+    assert.equal(rejectedWithdrawal.status, "pending");
+    assert.equal(rejectedWithdrawal.chips, 0);
+    assert.equal(rejectedWithdrawal.grossUsdtMicros, 20_000_000);
+    assert.equal(rejectedWithdrawal.feeUsdtMicros, 850_000);
+
+    cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.balance, 30_000_000);
+
+    await request(`/api/admin/withdrawals/${rejectedWithdrawal.id}/reject`, {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "withdrawal-lifecycle-reject-review",
+      body: { reason: "test_reject" }
+    });
+
+    cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.balance, 50_000_000);
+
+    const approvedWithdrawal = (await request("/api/cashier/withdraw", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "withdrawal-lifecycle-approve",
+      body: { currency: "USDT", method: "ton", usdtAmount: 20, destination: "UQB-test-wallet-2" }
+    })).withdrawal;
+
+    await request(`/api/admin/withdrawals/${approvedWithdrawal.id}/approve`, {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "withdrawal-lifecycle-approve-review",
+      body: { reason: "test_approve" }
+    });
+
+    cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.balance, 30_000_000);
+
+    const dashboard = (await request("/api/admin", { token: auth.token })).admin;
+    assert.equal(dashboard.stats.pendingWithdrawals, 0);
+    assert.equal(dashboard.stats.approvedWithdrawalFeeUsdtTotal, 850_000);
+    assert.equal(dashboard.stats.platformLedgerNetTotal, 850_000);
+    assert.equal(dashboard.audit.reconciliation.cashWalletLedgerDrift, 0);
+    assert.ok(dashboard.recentRiskFlags.some((flag) => flag.type === "large_withdrawal"));
+    assert.ok(dashboard.recentAdminAudit.some((entry) => entry.action === "withdrawal_approve"));
+    assert.ok(dashboard.recentAdminAudit.some((entry) => entry.action === "withdrawal_reject"));
+
+    await assert.rejects(
+      request(`/api/admin/withdrawals/${approvedWithdrawal.id}/approve`, {
+        method: "POST",
+        token: auth.token,
+        idempotencyKey: "withdrawal-lifecycle-double-approve",
+        body: { reason: "double_approve" }
+      }),
+      /Заявка уже в статусе approved/
+    );
+  } finally {
+    server.kill();
+  }
+});
+
 test("admin telegram commands grant and deduct wallet chips", async () => {
   const server = await startServer({ ADMIN_USER_IDS: "777" });
   try {
