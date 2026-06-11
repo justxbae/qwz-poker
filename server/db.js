@@ -1,4 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
+import {
+  RATING,
+  cashClubPointsFromRake,
+  cashClubProgress,
+  cashClubStatus,
+  nextRatingPoints,
+  ratingDeltaForHand,
+  ratingLeague
+} from "./economy.js";
 
 let pool = null;
 
@@ -373,6 +382,10 @@ export async function getPlayerProfile(providerUserId, provider = "telegram") {
   await query("insert into player_profiles (app_user_id) values ($1) on conflict do nothing", [appUserId]);
   const result = await query(`
     select cash_level, cash_xp, cash_status, rating_points, rating_tier, rating_season_id,
+           cash_club_points, cash_rake_contributed, rating_peak_points, rating_active_days,
+           tournament_entries, tournament_itm, tournament_final_tables, tournament_wins,
+           tournament_fees_paid, tournament_prize_won,
+           sng_played, sng_wins, sng_fees_paid, sng_prize_won,
            hands_played, cash_hands_played, rating_hands_played, tournaments_played
     from player_profiles
     where app_user_id = $1
@@ -384,12 +397,22 @@ export async function recordProfileHandProgress({
   providerUserIds = [],
   provider = "telegram",
   gameMode = "play",
-  handId = ""
+  handId = "",
+  hand = null,
+  table = null
 } = {}) {
   if (!pool) return null;
   const uniqueIds = [...new Set(providerUserIds.map(String).filter(Boolean))];
   if (!uniqueIds.length) return [];
   const cashMode = gameMode === "cash";
+  const ratingEligible = !cashMode && !Boolean(table?.isPrivate) && gameMode !== "private";
+  const seasonId = activeRatingSeasonId();
+  const handSeats = Array.isArray(hand?.seats) ? hand.seats : [];
+  const seatByUserId = new Map(handSeats.map((seat) => [String(seat.userId || ""), seat]));
+  const activePlayers = handSeats.filter((seat) => seat.userId).length;
+  const rakeShare = cashMode && activePlayers > 0
+    ? Math.floor(Number(hand?.rake || 0) / activePlayers)
+    : 0;
   const changes = [];
   for (const providerUserId of uniqueIds) {
     const appUserId = await ensureIdentity(provider, providerUserId);
@@ -404,45 +427,104 @@ export async function recordProfileHandProgress({
       `, [progressKey, appUserId, cashMode ? "cash" : "play"]);
       if (!mark.rowCount) continue;
     }
+    const seatResult = seatByUserId.get(String(providerUserId)) || {};
+    const ratingDelta = ratingEligible ? ratingDeltaForHand({
+      profit: Number(seatResult.profit || 0),
+      bigBlind: Number(table?.bigBlind || 0),
+      isPrivate: Boolean(table?.isPrivate),
+      activePlayers
+    }) : 0;
+    const clubPointsDelta = cashMode ? cashClubPointsFromRake(rakeShare) : 0;
     const currentResult = await query(`
-      select cash_xp, rating_points, cash_hands_played, rating_hands_played
+      select cash_xp, cash_club_points, cash_rake_contributed, rating_points, rating_peak_points,
+             cash_hands_played, rating_hands_played
       from player_profiles
       where app_user_id = $1
       for update
     `, [appUserId]);
     const current = currentResult.rows[0] || {};
-    const nextCashXp = Number(current.cash_xp || 0) + (cashMode ? 20 : 0);
-    const nextRatingPoints = Number(current.rating_points || 0) + (cashMode ? 0 : 10);
-    const nextCashLevel = profileCashLevel(nextCashXp);
-    const nextCashStatus = profileCashStatus(nextCashLevel);
-    const nextRatingTier = profileRatingTier(nextRatingPoints);
+    const currentClubPoints = Number(current.cash_club_points ?? current.cash_xp ?? 0);
+    const nextClubPoints = currentClubPoints + clubPointsDelta;
+    const clubStatus = cashClubStatus(nextClubPoints);
+    const nextRatingPointsValue = cashMode
+      ? Number(current.rating_points || RATING.seasonStartingRp)
+      : nextRatingPoints(Number(current.rating_points || RATING.seasonStartingRp), ratingDelta);
+    const nextRatingPeak = Math.max(Number(current.rating_peak_points || 0), nextRatingPointsValue);
+    const nextRatingTier = ratingLeague(nextRatingPointsValue).title;
     const updated = await query(`
       update player_profiles
       set cash_xp = $2,
+          cash_club_points = $2,
           cash_level = $3,
           cash_status = $4,
-          rating_points = $5,
-          rating_tier = $6,
+          cash_rake_contributed = cash_rake_contributed + $5,
+          rating_points = $6,
+          rating_peak_points = $7,
+          rating_tier = $8,
+          rating_season_id = case when $9 <> '' then $9 else rating_season_id end,
+          rating_active_days = rating_active_days + case
+            when $10::boolean and not exists (
+              select 1 from profile_hand_progress php
+              where php.app_user_id = player_profiles.app_user_id
+                and php.game_mode = 'play'
+                and php.created_at::date = now()::date
+                and php.hand_id <> $11
+            ) then 1 else 0 end,
           hands_played = hands_played + 1,
-          cash_hands_played = cash_hands_played + $7,
-          rating_hands_played = rating_hands_played + $8,
+          cash_hands_played = cash_hands_played + $12,
+          rating_hands_played = rating_hands_played + $13,
           updated_at = now()
       where app_user_id = $1
       returning cash_level, cash_xp, cash_status, rating_points, rating_tier, rating_season_id,
+                cash_club_points, cash_rake_contributed, rating_peak_points, rating_active_days,
+                tournament_entries, tournament_itm, tournament_final_tables, tournament_wins,
+                tournament_fees_paid, tournament_prize_won,
+                sng_played, sng_wins, sng_fees_paid, sng_prize_won,
                 hands_played, cash_hands_played, rating_hands_played, tournaments_played
     `, [
       appUserId,
-      nextCashXp,
-      nextCashLevel,
-      nextCashStatus,
-      nextRatingPoints,
+      nextClubPoints,
+      profileCashLevel(nextClubPoints),
+      clubStatus.title,
+      cashMode ? rakeShare : 0,
+      nextRatingPointsValue,
+      nextRatingPeak,
       nextRatingTier,
+      ratingEligible ? seasonId : "",
+      ratingEligible,
+      progressKey,
       cashMode ? 1 : 0,
-      cashMode ? 0 : 1
+      ratingEligible ? 1 : 0
     ]);
+    if (ratingEligible && ratingDelta !== 0) {
+      await query(`
+        insert into rating_entries (
+          id, season_id, app_user_id, provider, provider_user_id, type,
+          points_delta, points_after, source_id, meta
+        )
+        values ($1, $2, $3, $4, $5, 'hand', $6, $7, $8, $9::jsonb)
+      `, [
+        id("rating"),
+        seasonId,
+        appUserId,
+        provider,
+        String(providerUserId),
+        ratingDelta,
+        nextRatingPointsValue,
+        progressKey,
+        JSON.stringify({
+          profit: Number(seatResult.profit || 0),
+          bigBlind: Number(table?.bigBlind || 0),
+          activePlayers,
+          tableId: table?.id || ""
+        })
+      ]);
+    }
     changes.push({
       providerUserId,
       handId,
+      ratingDelta,
+      clubPointsDelta,
       profile: normalizePlayerProfileRow(updated.rows[0])
     });
   }
@@ -645,6 +727,14 @@ export async function registerTournament(providerUserId, tournament, provider = 
           registered_at = now(),
           cancelled_at = null
     `, [tournament.id, appUserId, provider, String(providerUserId), buyIn, fee]);
+    await client.query(`
+      update player_profiles
+      set tournaments_played = tournaments_played + 1,
+          tournament_entries = tournament_entries + 1,
+          tournament_fees_paid = tournament_fees_paid + $2,
+          updated_at = now()
+      where app_user_id = $1
+    `, [appUserId, fee]);
     await client.query("commit");
     return { balance: after, alreadyRegistered: false };
   } catch (error) {
@@ -686,6 +776,14 @@ export async function cancelTournamentRegistration(providerUserId, tournament, p
       set status = 'cancelled', cancelled_at = now()
       where tournament_id = $1 and app_user_id = $2
     `, [tournament.id, appUserId]);
+    await client.query(`
+      update player_profiles
+      set tournaments_played = greatest(0, tournaments_played - 1),
+          tournament_entries = greatest(0, tournament_entries - 1),
+          tournament_fees_paid = greatest(0, tournament_fees_paid - $2),
+          updated_at = now()
+      where app_user_id = $1
+    `, [appUserId, Number(registration.rows[0].fee || 0)]);
     await client.query(`
       insert into ledger_entries (
         id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after
@@ -1710,6 +1808,45 @@ export async function listUsers(limit = 100) {
   }));
 }
 
+export async function listRatingLeaderboard({ seasonId = activeRatingSeasonId(), limit = 50 } = {}) {
+  if (!pool) return null;
+  const normalizedLimit = Math.max(1, Math.min(200, Math.round(Number(limit) || 50)));
+  const result = await query(`
+    select
+      ui.provider_user_id as id,
+      au.display_name as name,
+      au.username,
+      au.photo_url as "photoUrl",
+      pp.rating_points as "ratingPoints",
+      pp.rating_peak_points as "ratingPeakPoints",
+      pp.rating_tier as "ratingTier",
+      pp.rating_hands_played as "ratingHandsPlayed",
+      pp.rating_active_days as "ratingActiveDays",
+      pp.updated_at as "updatedAt"
+    from player_profiles pp
+    join app_users au on au.id = pp.app_user_id
+    join user_identities ui on ui.app_user_id = au.id and ui.provider = 'telegram'
+    where pp.rating_season_id = $1 or pp.rating_hands_played > 0
+    order by pp.rating_points desc, pp.rating_hands_played desc, pp.updated_at asc
+    limit $2
+  `, [seasonId, normalizedLimit]);
+  return result.rows.map((row, index) => ({
+    rank: index + 1,
+    id: row.id,
+    name: row.name || "Player",
+    username: row.username || "",
+    photoUrl: row.photoUrl || "",
+    ratingPoints: Number(row.ratingPoints || RATING.seasonStartingRp),
+    ratingPeakPoints: Number(row.ratingPeakPoints || RATING.seasonStartingRp),
+    ratingTier: row.ratingTier || ratingLeague(row.ratingPoints).title,
+    ratingHandsPlayed: Number(row.ratingHandsPlayed || 0),
+    ratingActiveDays: Number(row.ratingActiveDays || 0),
+    eligible: Number(row.ratingHandsPlayed || 0) >= RATING.minActiveHandsForLeaderboard
+      && Number(row.ratingActiveDays || 0) >= RATING.minActiveDaysForLeaderboard,
+    updatedAt: row.updatedAt
+  }));
+}
+
 async function ensureIdentity(provider, providerUserId) {
   const providerId = String(providerUserId);
   const existing = await query(
@@ -1783,19 +1920,61 @@ async function migrate() {
       cash_level integer not null default 1 check (cash_level >= 1),
       cash_xp bigint not null default 0 check (cash_xp >= 0),
       cash_status text not null default 'Новичок',
-      rating_points bigint not null default 0,
-      rating_tier text not null default 'Unranked',
+      cash_club_points bigint not null default 0 check (cash_club_points >= 0),
+      cash_rake_contributed bigint not null default 0 check (cash_rake_contributed >= 0),
+      rating_points bigint not null default 1000,
+      rating_peak_points bigint not null default 1000,
+      rating_tier text not null default 'Bronze',
       rating_season_id text not null default '',
+      rating_active_days integer not null default 0 check (rating_active_days >= 0),
       hands_played integer not null default 0 check (hands_played >= 0),
       cash_hands_played integer not null default 0 check (cash_hands_played >= 0),
       rating_hands_played integer not null default 0 check (rating_hands_played >= 0),
       tournaments_played integer not null default 0 check (tournaments_played >= 0),
+      tournament_entries integer not null default 0 check (tournament_entries >= 0),
+      tournament_itm integer not null default 0 check (tournament_itm >= 0),
+      tournament_final_tables integer not null default 0 check (tournament_final_tables >= 0),
+      tournament_wins integer not null default 0 check (tournament_wins >= 0),
+      tournament_fees_paid bigint not null default 0 check (tournament_fees_paid >= 0),
+      tournament_prize_won bigint not null default 0 check (tournament_prize_won >= 0),
+      sng_played integer not null default 0 check (sng_played >= 0),
+      sng_wins integer not null default 0 check (sng_wins >= 0),
+      sng_fees_paid bigint not null default 0 check (sng_fees_paid >= 0),
+      sng_prize_won bigint not null default 0 check (sng_prize_won >= 0),
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
     );
 
+    alter table player_profiles add column if not exists cash_club_points bigint not null default 0 check (cash_club_points >= 0);
+    alter table player_profiles add column if not exists cash_rake_contributed bigint not null default 0 check (cash_rake_contributed >= 0);
+    alter table player_profiles add column if not exists rating_peak_points bigint not null default 1000;
+    alter table player_profiles add column if not exists rating_active_days integer not null default 0 check (rating_active_days >= 0);
+    alter table player_profiles add column if not exists tournament_entries integer not null default 0 check (tournament_entries >= 0);
+    alter table player_profiles add column if not exists tournament_itm integer not null default 0 check (tournament_itm >= 0);
+    alter table player_profiles add column if not exists tournament_final_tables integer not null default 0 check (tournament_final_tables >= 0);
+    alter table player_profiles add column if not exists tournament_wins integer not null default 0 check (tournament_wins >= 0);
+    alter table player_profiles add column if not exists tournament_fees_paid bigint not null default 0 check (tournament_fees_paid >= 0);
+    alter table player_profiles add column if not exists tournament_prize_won bigint not null default 0 check (tournament_prize_won >= 0);
+    alter table player_profiles add column if not exists sng_played integer not null default 0 check (sng_played >= 0);
+    alter table player_profiles add column if not exists sng_wins integer not null default 0 check (sng_wins >= 0);
+    alter table player_profiles add column if not exists sng_fees_paid bigint not null default 0 check (sng_fees_paid >= 0);
+    alter table player_profiles add column if not exists sng_prize_won bigint not null default 0 check (sng_prize_won >= 0);
+    alter table player_profiles alter column rating_points set default 1000;
+    alter table player_profiles alter column rating_peak_points set default 1000;
+    alter table player_profiles alter column rating_tier set default 'Bronze';
+    alter table player_profiles alter column cash_club_points set default 0;
+    alter table player_profiles alter column cash_rake_contributed set default 0;
+    update player_profiles
+    set cash_club_points = greatest(cash_club_points, cash_xp),
+        rating_points = case when rating_points = 0 and rating_hands_played = 0 then 1000 else rating_points end,
+        rating_peak_points = greatest(rating_peak_points, rating_points, 1000),
+        rating_tier = case
+          when rating_tier in ('', 'Unranked') and rating_points >= 0 then 'Bronze'
+          else rating_tier
+        end;
     create index if not exists idx_player_profiles_rating on player_profiles(rating_season_id, rating_points desc);
     create index if not exists idx_player_profiles_cash_level on player_profiles(cash_level desc, cash_xp desc);
+    create index if not exists idx_player_profiles_cash_club on player_profiles(cash_club_points desc, cash_rake_contributed desc);
 
     create table if not exists profile_hand_progress (
       hand_id text not null,
@@ -2400,24 +2579,54 @@ function normalizeIdempotencyKey(key) {
 }
 
 function normalizePlayerProfileRow(row = {}) {
-  const cashXp = Number(row.cash_xp || 0);
-  const ratingPoints = Number(row.rating_points || 0);
-  const cashLevel = Number(row.cash_level || profileCashLevel(cashXp));
+  const cashClubPoints = Number(row.cash_club_points ?? row.cash_xp ?? 0);
+  const ratingPoints = Number(row.rating_points ?? RATING.seasonStartingRp);
+  const clubStatus = cashClubStatus(cashClubPoints);
+  const clubProgress = cashClubProgress(cashClubPoints);
+  const cashLevel = Number(row.cash_level || profileCashLevel(cashClubPoints));
+  const league = ratingLeague(ratingPoints);
   return {
     cashLevel,
-    cashXp,
-    cashStatus: row.cash_status || profileCashStatus(cashLevel),
-    cashXpCurrent: profileCashLevelProgress(cashXp, cashLevel).current,
-    cashXpRequired: profileCashLevelProgress(cashXp, cashLevel).required,
-    cashXpProgress: profileCashLevelProgress(cashXp, cashLevel).progress,
+    cashXp: cashClubPoints,
+    cashClubPoints,
+    cashRakeContributed: Number(row.cash_rake_contributed || 0),
+    cashStatus: row.cash_status || clubStatus.title,
+    cashClubStatus: clubStatus.title,
+    cashClubId: clubStatus.id,
+    cashRakebackPercent: clubStatus.rakebackPercent,
+    cashXpCurrent: clubProgress.current,
+    cashXpRequired: clubProgress.required,
+    cashXpProgress: clubProgress.progress,
+    cashClubNextStatus: clubProgress.nextStatus?.title || "",
     ratingPoints,
-    ratingTier: row.rating_tier || profileRatingTier(ratingPoints),
+    ratingTier: row.rating_tier || league.title,
+    ratingLeague: league.title,
+    ratingLeagueId: league.id,
+    ratingPeakPoints: Number(row.rating_peak_points || ratingPoints),
     ratingSeasonId: row.rating_season_id || "",
+    ratingActiveDays: Number(row.rating_active_days || 0),
     handsPlayed: Number(row.hands_played || 0),
     cashHandsPlayed: Number(row.cash_hands_played || 0),
     ratingHandsPlayed: Number(row.rating_hands_played || 0),
-    tournamentsPlayed: Number(row.tournaments_played || 0)
+    tournamentsPlayed: Number(row.tournaments_played || row.tournament_entries || 0),
+    tournamentEntries: Number(row.tournament_entries || row.tournaments_played || 0),
+    tournamentItm: Number(row.tournament_itm || 0),
+    tournamentFinalTables: Number(row.tournament_final_tables || 0),
+    tournamentWins: Number(row.tournament_wins || 0),
+    tournamentFeesPaid: Number(row.tournament_fees_paid || 0),
+    tournamentPrizeWon: Number(row.tournament_prize_won || 0),
+    sngPlayed: Number(row.sng_played || 0),
+    sngWins: Number(row.sng_wins || 0),
+    sngFeesPaid: Number(row.sng_fees_paid || 0),
+    sngPrizeWon: Number(row.sng_prize_won || 0)
   };
+}
+
+function activeRatingSeasonId() {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  return `rating-${year}-${month}`;
 }
 
 function profileCashLevel(xp) {
@@ -2456,14 +2665,7 @@ function profileCashStatus(level) {
 }
 
 function profileRatingTier(points) {
-  const value = Number(points || 0);
-  if (value >= 5000) return "Legend";
-  if (value >= 2500) return "Diamond";
-  if (value >= 1200) return "Platinum";
-  if (value >= 600) return "Gold";
-  if (value >= 250) return "Silver";
-  if (value >= 50) return "Bronze";
-  return "Unranked";
+  return ratingLeague(points).title;
 }
 
 function id(prefix) {

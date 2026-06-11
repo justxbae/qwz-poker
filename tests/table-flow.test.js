@@ -71,9 +71,14 @@ test("table auto-starts, accepts custom raise, and pays the pot at showdown", as
 
     const profile = (await request("/api/profile", { token: auth.token })).profile;
     assert.equal(profile.profile.handsPlayed, 1);
-    assert.equal(profile.profile.ratingHandsPlayed, 1);
-    assert.equal(profile.profile.ratingPoints, 10);
+    assert.equal(profile.profile.ratingHandsPlayed, 0);
+    assert.equal(profile.profile.ratingPoints, 1000);
     assert.equal(profile.profile.cashLevel, 1);
+
+    const progression = (await request("/api/progression", { token: auth.token })).progression;
+    assert.equal(progression.rating.startingRp, 1000);
+    assert.equal(progression.rating.minActiveHandsForLeaderboard, 100);
+    assert.equal(progression.cashClub.current.points, 0);
   } finally {
     server.kill();
   }

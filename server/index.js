@@ -9,15 +9,23 @@ import {
   ASSETS,
   BALANCE_BUCKETS,
   CASH_TABLE_LIMITS,
+  CASH_CLUB,
   ECONOMY,
   PLAY_TABLE_LIMITS,
+  RATING,
+  cashClubPointsFromRake,
+  cashClubProgress,
+  cashClubStatus,
   cashSettings,
   depositSettings,
   formatUsdtMicros,
   playSettings,
   quoteCashDeposit,
   quoteDeposit,
-  quoteWithdrawal as quoteCashWithdrawal
+  quoteWithdrawal as quoteCashWithdrawal,
+  ratingDeltaForHand,
+  ratingLeague,
+  nextRatingPoints
 } from "./economy.js";
 import {
   createCryptoBotInvoice,
@@ -57,6 +65,7 @@ import {
   listUsers as dbListUsers,
   listPaymentOrders as dbListPaymentOrders,
   listPendingCryptoPaymentOrders as dbListPendingCryptoPaymentOrders,
+  listRatingLeaderboard as dbListRatingLeaderboard,
   listAdminAuditLogs as dbListAdminAuditLogs,
   listRiskFlags as dbListRiskFlags,
   listWithdrawalOrders as dbListWithdrawalOrders,
@@ -437,6 +446,11 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/profile") {
     sendJson(res, 200, { profile: await profileView(user) });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/progression") {
+    sendJson(res, 200, { progression: await progressionView(user) });
     return;
   }
 
@@ -1721,11 +1735,13 @@ async function persistCompletedHands(table) {
         ? hand.seats.map((seat) => seat.userId).filter(Boolean)
         : [];
       if (progressUserIds.length) {
-        updateMemoryProfileProgress(progressUserIds, table.gameMode);
+        updateMemoryProfileProgress(progressUserIds, table.gameMode, hand, table);
         await dbRecordProfileHandProgress({
           providerUserIds: progressUserIds,
           gameMode: table.gameMode,
-          handId: hand.id
+          handId: hand.id,
+          hand,
+          table
         });
       }
       await trackAnalytics("hand_completed", {
@@ -2017,26 +2033,148 @@ async function getProfileForUser(user) {
   return user.profile;
 }
 
-function defaultPlayerProfile() {
+async function progressionView(user) {
+  const profile = await getProfileForUser(user);
+  const seasonId = activeRatingSeasonId();
+  const dbLeaderboard = await dbListRatingLeaderboard({ seasonId, limit: 50 });
   return {
-    cashLevel: 1,
-    cashXp: 0,
-    cashStatus: "Новичок",
-    cashXpCurrent: 0,
-    cashXpRequired: 120,
-    cashXpProgress: 0,
-    ratingPoints: 0,
-    ratingTier: "Unranked",
-    ratingSeasonId: "",
-    handsPlayed: 0,
-    cashHandsPlayed: 0,
-    ratingHandsPlayed: 0,
-    tournamentsPlayed: 0
+    profile,
+    rating: {
+      seasonId,
+      mode: "rating",
+      currency: ASSETS.PLAY,
+      startingRp: RATING.seasonStartingRp,
+      minRp: RATING.minRp,
+      maxHandDelta: RATING.maxHandDelta,
+      minActiveHandsForLeaderboard: RATING.minActiveHandsForLeaderboard,
+      minActiveDaysForLeaderboard: RATING.minActiveDaysForLeaderboard,
+      leagues: RATING.leagues,
+      leaderboard: dbLeaderboard || memoryRatingLeaderboard(50)
+    },
+    cashClub: {
+      mode: "cash",
+      currency: ASSETS.CASH,
+      pointsRule: "points are earned from contributed rake and fees, not from deposits",
+      statuses: cashClubStatusesView(),
+      current: {
+        id: profile.cashClubId,
+        title: profile.cashClubStatus,
+        points: profile.cashClubPoints,
+        rakeContributed: profile.cashRakeContributed,
+        rakebackPercent: profile.cashRakebackPercent,
+        nextStatus: profile.cashClubNextStatus,
+        progress: profile.cashXpProgress
+      }
+    },
+    tournaments: {
+      mode: "scheduled",
+      stats: {
+        entries: profile.tournamentEntries,
+        itm: profile.tournamentItm,
+        finalTables: profile.tournamentFinalTables,
+        wins: profile.tournamentWins,
+        feesPaid: profile.tournamentFeesPaid,
+        prizeWon: profile.tournamentPrizeWon
+      }
+    },
+    sitAndGo: {
+      mode: "sit_and_go",
+      status: "planned",
+      stats: {
+        played: profile.sngPlayed,
+        wins: profile.sngWins,
+        feesPaid: profile.sngFeesPaid,
+        prizeWon: profile.sngPrizeWon
+      }
+    }
   };
 }
 
-function updateMemoryProfileProgress(userIds, gameMode) {
+function cashClubStatusesView() {
+  return CASH_CLUB.statuses.map((status) => ({
+    id: status.id,
+    title: status.title,
+    min: status.min,
+    rakebackPercent: status.rakebackPercent
+  }));
+}
+
+function memoryRatingLeaderboard(limit = 50) {
+  const rows = [...userProfiles.entries()]
+    .map(([id, user]) => {
+      const profile = user.profile || defaultPlayerProfile();
+      return {
+        id,
+        name: user.name || "Player",
+        username: user.username || "",
+        photoUrl: user.photoUrl || "",
+        ratingPoints: Number(profile.ratingPoints || RATING.seasonStartingRp),
+        ratingPeakPoints: Number(profile.ratingPeakPoints || RATING.seasonStartingRp),
+        ratingTier: profile.ratingTier || ratingLeague(profile.ratingPoints).title,
+        ratingHandsPlayed: Number(profile.ratingHandsPlayed || 0),
+        ratingActiveDays: Number(profile.ratingActiveDays || 0),
+        updatedAt: new Date().toISOString()
+      };
+    })
+    .filter((row) => row.ratingHandsPlayed > 0)
+    .sort((a, b) => b.ratingPoints - a.ratingPoints || b.ratingHandsPlayed - a.ratingHandsPlayed)
+    .slice(0, limit);
+  return rows.map((row, index) => ({
+    ...row,
+    rank: index + 1,
+    eligible: row.ratingHandsPlayed >= RATING.minActiveHandsForLeaderboard
+      && row.ratingActiveDays >= RATING.minActiveDaysForLeaderboard
+  }));
+}
+
+function defaultPlayerProfile() {
+  const clubStatus = cashClubStatus(0);
+  const clubProgress = cashClubProgress(0);
+  const league = ratingLeague(RATING.seasonStartingRp);
+  return {
+    cashLevel: 1,
+    cashXp: 0,
+    cashClubPoints: 0,
+    cashRakeContributed: 0,
+    cashStatus: clubStatus.title,
+    cashClubStatus: clubStatus.title,
+    cashClubId: clubStatus.id,
+    cashRakebackPercent: clubStatus.rakebackPercent,
+    cashXpCurrent: clubProgress.current,
+    cashXpRequired: clubProgress.required,
+    cashXpProgress: clubProgress.progress,
+    cashClubNextStatus: clubProgress.nextStatus?.title || "",
+    ratingPoints: RATING.seasonStartingRp,
+    ratingTier: league.title,
+    ratingLeague: league.title,
+    ratingLeagueId: league.id,
+    ratingPeakPoints: RATING.seasonStartingRp,
+    ratingSeasonId: activeRatingSeasonId(),
+    ratingActiveDays: 0,
+    handsPlayed: 0,
+    cashHandsPlayed: 0,
+    ratingHandsPlayed: 0,
+    tournamentsPlayed: 0,
+    tournamentEntries: 0,
+    tournamentItm: 0,
+    tournamentFinalTables: 0,
+    tournamentWins: 0,
+    tournamentFeesPaid: 0,
+    tournamentPrizeWon: 0,
+    sngPlayed: 0,
+    sngWins: 0,
+    sngFeesPaid: 0,
+    sngPrizeWon: 0
+  };
+}
+
+function updateMemoryProfileProgress(userIds, gameMode, hand = null, table = null) {
   const cashMode = gameMode === "cash";
+  const ratingEligible = !cashMode && !Boolean(table?.isPrivate) && gameMode !== "private";
+  const handSeats = Array.isArray(hand?.seats) ? hand.seats : [];
+  const seatByUserId = new Map(handSeats.map((seat) => [String(seat.userId || ""), seat]));
+  const activePlayers = handSeats.filter((seat) => seat.userId).length;
+  const rakeShare = cashMode && activePlayers > 0 ? Math.floor(Number(hand?.rake || 0) / activePlayers) : 0;
   for (const id of [...new Set(userIds.map(String).filter(Boolean))]) {
     const profileUser = userProfiles.get(id);
     if (!profileUser) continue;
@@ -2044,17 +2182,45 @@ function updateMemoryProfileProgress(userIds, gameMode) {
     profile.handsPlayed += 1;
     if (cashMode) {
       profile.cashHandsPlayed += 1;
-      profile.cashXp += 20;
-      profile.cashLevel = memoryCashLevel(profile.cashXp);
-      profile.cashStatus = memoryCashStatus(profile.cashLevel);
-      Object.assign(profile, memoryCashProgress(profile.cashXp, profile.cashLevel));
-    } else {
+      const clubPointsDelta = cashClubPointsFromRake(rakeShare);
+      profile.cashClubPoints = Number(profile.cashClubPoints ?? profile.cashXp ?? 0) + clubPointsDelta;
+      profile.cashXp = profile.cashClubPoints;
+      profile.cashRakeContributed = Number(profile.cashRakeContributed || 0) + rakeShare;
+      const status = cashClubStatus(profile.cashClubPoints);
+      const progress = cashClubProgress(profile.cashClubPoints);
+      profile.cashLevel = memoryCashLevel(profile.cashClubPoints);
+      profile.cashStatus = status.title;
+      profile.cashClubStatus = status.title;
+      profile.cashClubId = status.id;
+      profile.cashRakebackPercent = status.rakebackPercent;
+      profile.cashXpCurrent = progress.current;
+      profile.cashXpRequired = progress.required;
+      profile.cashXpProgress = progress.progress;
+      profile.cashClubNextStatus = progress.nextStatus?.title || "";
+    } else if (ratingEligible) {
       profile.ratingHandsPlayed += 1;
-      profile.ratingPoints += 10;
-      profile.ratingTier = memoryRatingTier(profile.ratingPoints);
+      const seatResult = seatByUserId.get(id) || {};
+      const delta = ratingDeltaForHand({
+        profit: Number(seatResult.profit || 0),
+        bigBlind: Number(table?.bigBlind || 0),
+        isPrivate: Boolean(table?.isPrivate),
+        activePlayers
+      });
+      profile.ratingPoints = nextRatingPoints(profile.ratingPoints, delta);
+      profile.ratingPeakPoints = Math.max(Number(profile.ratingPeakPoints || 0), profile.ratingPoints);
+      profile.ratingSeasonId = activeRatingSeasonId();
+      const league = ratingLeague(profile.ratingPoints);
+      profile.ratingTier = league.title;
+      profile.ratingLeague = league.title;
+      profile.ratingLeagueId = league.id;
     }
     profileUser.profile = profile;
   }
+}
+
+function activeRatingSeasonId() {
+  const now = new Date();
+  return `rating-${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function memoryCashLevel(xp) {
@@ -2371,6 +2537,7 @@ async function registerTournament(tournament, user) {
     username: user.username,
     registeredAt
   });
+  applyMemoryTournamentRegistration(user, tournament, "register");
   await recordFundMovement(user, {
     category: "wallet_to_tournament_escrow",
     from: "wallet",
@@ -2425,6 +2592,7 @@ async function cancelTournamentRegistration(tournament, user) {
     });
   }
   tournament.registrations.delete(user.id);
+  applyMemoryTournamentRegistration(user, tournament, "cancel");
   await recordFundMovement(user, {
     category: "tournament_escrow_to_wallet",
     from: "tournament_escrow",
@@ -2449,6 +2617,21 @@ async function cancelTournamentRegistration(tournament, user) {
     contextId: tournament.id,
     meta: { title: tournament.title }
   });
+}
+
+function applyMemoryTournamentRegistration(user, tournament, action) {
+  const profileUser = userProfiles.get(String(user.id));
+  if (!profileUser) return;
+  const profile = profileUser.profile || defaultPlayerProfile();
+  const sign = action === "cancel" ? -1 : 1;
+  profile.tournamentsPlayed = Math.max(0, Number(profile.tournamentsPlayed || 0) + sign);
+  profile.tournamentEntries = Math.max(0, Number(profile.tournamentEntries || 0) + sign);
+  profile.tournamentFeesPaid = Math.max(0, Number(profile.tournamentFeesPaid || 0) + sign * Number(tournament.fee || 0));
+  if (tournament.type === "sit_and_go" || tournament.type === "sng") {
+    profile.sngPlayed = Math.max(0, Number(profile.sngPlayed || 0) + sign);
+    profile.sngFeesPaid = Math.max(0, Number(profile.sngFeesPaid || 0) + sign * Number(tournament.fee || 0));
+  }
+  profileUser.profile = profile;
 }
 
 async function getSavedStack(user) {

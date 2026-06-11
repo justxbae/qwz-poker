@@ -79,6 +79,41 @@ export const ECONOMY = {
   riskReservePercent: 0.1
 };
 
+export const RATING = {
+  seasonStartingRp: 1000,
+  minRp: 0,
+  tableMultiplier: 1,
+  maxHandDelta: 25,
+  minActiveHandsForLeaderboard: 100,
+  minActiveDaysForLeaderboard: 5,
+  leagues: [
+    { id: "bronze", title: "Bronze", min: 0 },
+    { id: "silver", title: "Silver", min: 1200 },
+    { id: "gold", title: "Gold", min: 1600 },
+    { id: "platinum", title: "Platinum", min: 2200 },
+    { id: "diamond", title: "Diamond", min: 3000 },
+    { id: "legend", title: "Legend", min: 4200 }
+  ]
+};
+
+export const CASH_CLUB = {
+  pointsPerUsdtRake: 100,
+  statuses: [
+    { id: "starter", title: "Starter Club", min: 0, rakebackPercent: 0 },
+    { id: "bronze", title: "Bronze Club", min: 100, rakebackPercent: 0.02 },
+    { id: "silver", title: "Silver Club", min: 500, rakebackPercent: 0.04 },
+    { id: "gold", title: "Gold Club", min: 1500, rakebackPercent: 0.06 },
+    { id: "platinum", title: "Platinum Club", min: 4000, rakebackPercent: 0.08 },
+    { id: "diamond", title: "Diamond Club", min: 10000, rakebackPercent: 0.1 }
+  ]
+};
+
+export const TOURNAMENT_PROFILE = {
+  feePointsPerUsdt: 100,
+  itmBadgeMin: 1,
+  finalTablePlayers: 9
+};
+
 export function depositSettings({ realMoneyEnabled = true } = {}) {
   const starsEnabled = realMoneyEnabled && Boolean(process.env.BOT_TOKEN);
   const cryptoBotEnabled = realMoneyEnabled && Boolean(process.env.CRYPTOBOT_API_KEY || process.env.CRYPTO_PROVIDER_API_KEY);
@@ -299,6 +334,58 @@ export function calculateRake({ pot, bigBlind, boardCards = 0 }) {
   if (!ECONOMY.rake.enabled || pot <= 0) return 0;
   if (ECONOMY.rake.noFlopNoDrop && boardCards < 3) return 0;
   return Math.min(Math.floor(pot * ECONOMY.rake.percent), rakeCap(bigBlind));
+}
+
+export function ratingLeague(points) {
+  const value = Math.max(0, Math.round(Number(points || 0)));
+  return [...RATING.leagues].reverse().find((league) => value >= league.min) || RATING.leagues[0];
+}
+
+export function ratingDeltaForHand({ profit = 0, bigBlind = 1, isPrivate = false, activePlayers = 0 } = {}) {
+  if (isPrivate || Number(activePlayers || 0) < 2) return 0;
+  const blind = Math.max(1, Math.round(Number(bigBlind || 1)));
+  const resultBb = Number(profit || 0) / blind;
+  if (!Number.isFinite(resultBb) || resultBb === 0) return 0;
+  const raw = resultBb * RATING.tableMultiplier;
+  return Math.max(-RATING.maxHandDelta, Math.min(RATING.maxHandDelta, Math.round(raw)));
+}
+
+export function nextRatingPoints(currentPoints, delta) {
+  return Math.max(RATING.minRp, Math.round(Number(currentPoints || RATING.seasonStartingRp) + Number(delta || 0)));
+}
+
+export function cashClubPointsFromRake(rakeMicros) {
+  const value = Math.max(0, Math.round(Number(rakeMicros || 0)));
+  if (value <= 0) return 0;
+  return Math.max(1, Math.floor((value / USDT_SCALE) * CASH_CLUB.pointsPerUsdtRake));
+}
+
+export function cashClubStatus(points) {
+  const value = Math.max(0, Math.round(Number(points || 0)));
+  return [...CASH_CLUB.statuses].reverse().find((status) => value >= status.min) || CASH_CLUB.statuses[0];
+}
+
+export function cashClubProgress(points) {
+  const value = Math.max(0, Math.round(Number(points || 0)));
+  const current = cashClubStatus(value);
+  const index = CASH_CLUB.statuses.findIndex((status) => status.id === current.id);
+  const next = CASH_CLUB.statuses[index + 1] || null;
+  if (!next) {
+    return {
+      current: value - current.min,
+      required: 0,
+      progress: 1,
+      nextStatus: null
+    };
+  }
+  const span = Math.max(1, next.min - current.min);
+  const currentInLevel = Math.max(0, value - current.min);
+  return {
+    current: currentInLevel,
+    required: span,
+    progress: Math.max(0, Math.min(1, Number((currentInLevel / span).toFixed(4)))),
+    nextStatus: next
+  };
 }
 
 function cashLimit(smallBlind, bigBlind, count, options = {}) {
