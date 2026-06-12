@@ -53,6 +53,7 @@ const homeSessionPill = document.querySelector("#homeSessionPill");
 const homeScreenInstallButton = document.querySelector("#homeScreenInstallButton");
 const homeScreenInstallStatus = document.querySelector("#homeScreenInstallStatus");
 const homeOfferMeta = document.querySelector("#homeOfferMeta");
+const productModeHub = document.querySelector("#productModeHub");
 const homeRatingLeague = document.querySelector("#homeRatingLeague");
 const homeRatingPoints = document.querySelector("#homeRatingPoints");
 const homeCashClub = document.querySelector("#homeCashClub");
@@ -330,7 +331,8 @@ async function boot() {
   });
   limitPills.addEventListener("click", onLimitSelect);
   tableLimitPills.addEventListener("click", onLimitSelect);
-  gameModeSwitch?.addEventListener("click", onGameModeHubSelect);
+  gameModeSwitch?.addEventListener("click", onGameModeSelect);
+  productModeHub?.addEventListener("click", onGameFormatSelect);
   document.querySelectorAll("[data-lobby-tab]").forEach((button) => {
     button.addEventListener("click", () => {
       if (button.dataset.lobbyTab === "cashier" && button.dataset.cashierSection) {
@@ -493,13 +495,7 @@ function onGameModeSelect(event) {
   haptic("selection");
 }
 
-function onGameModeHubSelect(event) {
-  const modeButton = event.target.closest("[data-game-mode]");
-  if (modeButton) {
-    onGameModeSelect(event);
-    return;
-  }
-
+function onGameFormatSelect(event) {
   const actionButton = event.target.closest("[data-mode-action]");
   if (!actionButton) return;
   const action = actionButton.dataset.modeAction;
@@ -512,9 +508,6 @@ function onGameModeHubSelect(event) {
     selectLobbyTab("tournaments");
     showStatus("Sit&Go добавлен в дорожную карту турниров. Подключим после базовой MTT-сетки.");
     return;
-  }
-  if (action === "affiliate") {
-    showStatus("Affiliate-раздел будет отдельной страницей с ссылками, CPA/RevShare и статистикой партнёра.");
   }
 }
 
@@ -3599,6 +3592,9 @@ function onLobbyMenuAction(event) {
     runAction(() => openCashierSection("history"));
   } else if (action === "support") {
     showStatus("Поддержку подключим отдельным разделом");
+    updateTelegramBackButton();
+  } else if (action === "affiliate") {
+    showStatus("Affiliate-раздел будет отдельной страницей с ссылками, CPA/RevShare и статистикой партнёра.");
     updateTelegramBackButton();
   }
 }

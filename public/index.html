@@ -196,44 +196,39 @@
           </section>
           <div class="home-promo-dots" id="homePromoDots" aria-hidden="true"></div>
 
-          <section class="product-mode-hub" aria-label="Игровые режимы">
+          <section class="product-mode-hub" id="productModeHub" aria-label="Игровые режимы">
             <div class="section-title product-mode-title">
               <div>
-                <p class="eyebrow">Лобби</p>
-                <h2>Режимы игры</h2>
+                <p class="eyebrow">Играть</p>
+                <h2>Выберите формат</h2>
               </div>
               <span>Texas Hold'em</span>
             </div>
-            <div class="game-mode-switch product-mode-grid" id="gameModeSwitch" aria-label="Режим игры">
-              <button type="button" class="mode-tile mode-tile--cash" data-game-mode="cash">
-                <small>на баланс</small>
-                <span>USDT <svg class="tether-mark" viewBox="0 0 24 24" aria-label="USDT"><circle cx="12" cy="12" r="12"/><path d="M13.55 10.18V8.56h3.8V6H6.65v2.56h3.8v1.62C7.36 10.34 5 10.96 5 11.71c0 .75 2.36 1.37 5.45 1.53V18h3.1v-4.76c3.09-.16 5.45-.78 5.45-1.53 0-.75-2.36-1.37-5.45-1.53Zm0 2.07v-.01c-.49.03-1 .04-1.55.04s-1.06-.01-1.55-.04v.01c-2.21-.12-3.87-.51-3.87-.98 0-.39 1.18-.73 2.91-.9v.86c.78.07 1.63.11 2.51.11.88 0 1.73-.04 2.51-.11v-.86c1.73.17 2.91.51 2.91.9 0 .47-1.66.86-3.87.98Z"/></svg></span>
-                <b>Cash</b>
+            <div class="game-mode-switch product-mode-segment" id="gameModeSwitch" aria-label="Режим игры">
+              <button type="button" data-game-mode="cash">
+                <span>Cash <svg class="tether-mark" viewBox="0 0 24 24" aria-label="USDT"><circle cx="12" cy="12" r="12"/><path d="M13.55 10.18V8.56h3.8V6H6.65v2.56h3.8v1.62C7.36 10.34 5 10.96 5 11.71c0 .75 2.36 1.37 5.45 1.53V18h3.1v-4.76c3.09-.16 5.45-.78 5.45-1.53 0-.75-2.36-1.37-5.45-1.53Zm0 2.07v-.01c-.49.03-1 .04-1.55.04s-1.06-.01-1.55-.04v.01c-2.21-.12-3.87-.51-3.87-.98 0-.39 1.18-.73 2.91-.9v.86c.78.07 1.63.11 2.51.11.88 0 1.73-.04 2.51-.11v-.86c1.73.17 2.91.51 2.91.9 0 .47-1.66.86-3.87.98Z"/></svg></span>
+                <small>USDT-столы</small>
               </button>
-              <button type="button" class="mode-tile active" data-game-mode="play">
-                <small>сезон</small>
-                <span>RP</span>
-                <b>Рейтинг</b>
+              <button type="button" class="active" data-game-mode="play">
+                <span>Рейтинг</span>
+                <small>RP-сезон</small>
               </button>
-              <button type="button" class="mode-tile" data-lobby-tab="tournaments">
-                <small>серии</small>
-                <span>MTT</span>
-                <b>Турниры</b>
+            </div>
+            <div class="play-format-grid" aria-label="Дополнительные форматы">
+              <button type="button" data-lobby-tab="tournaments">
+                <span class="format-icon">MTT</span>
+                <strong>Турниры</strong>
+                <small>серии и freeroll</small>
               </button>
-              <button type="button" class="mode-tile" data-mode-action="sitgo">
-                <small>быстро</small>
-                <span>SNG</span>
-                <b>Sit&Go</b>
+              <button type="button" data-mode-action="sitgo">
+                <span class="format-icon">SNG</span>
+                <strong>Sit&Go</strong>
+                <small>быстрые столы</small>
               </button>
-              <button type="button" class="mode-tile" data-mode-action="private">
-                <small>для друзей</small>
-                <span>NLH</span>
-                <b>Приватный</b>
-              </button>
-              <button type="button" class="mode-tile" data-mode-action="affiliate">
-                <small>доход</small>
-                <span>CPA</span>
-                <b>Affiliate</b>
+              <button type="button" data-mode-action="private">
+                <span class="format-icon">NLH</span>
+                <strong>Приватный</strong>
+                <small>игра с друзьями</small>
               </button>
             </div>
           </section>
@@ -784,6 +779,11 @@
             <button type="button" data-menu-action="details">
               <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 5h14v16l-3-2-3 2-3-2-3 2Z"/><path d="M8 9h8M8 13h8"/></svg></span>
               <span><strong>Детализация</strong><small>операции, платежи и баланс</small></span>
+              <span class="tg-chevron">›</span>
+            </button>
+            <button type="button" data-menu-action="affiliate">
+              <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M2.8 21a5.2 5.2 0 0 1 10.4 0"/><path d="M17 8h4v4"/><path d="m14 15 7-7"/></svg></span>
+              <span><strong>Affiliate</strong><small>рефералы, CPA и RevShare</small></span>
               <span class="tg-chevron">›</span>
             </button>
             <button type="button" data-menu-action="support">

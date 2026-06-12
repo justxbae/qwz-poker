@@ -8479,12 +8479,12 @@ body:not(.in-game).scroll-bounce-release .lobby-view.active {
 body:not(.in-game) .home-promo-banners {
   display: flex;
   overflow-x: auto;
-  gap: 10px;
+  gap: 9px;
   margin-inline: 0;
-  border-radius: var(--native-group-radius);
-  background: var(--native-surface);
-  padding: 14px;
-  scroll-padding-left: 14px;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  scroll-padding-left: 0;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
@@ -8495,13 +8495,14 @@ body:not(.in-game) .home-promo-banners::-webkit-scrollbar {
 }
 
 body:not(.in-game) .promo-banner {
-  flex: 0 0 min(304px, calc(100vw - 86px));
-  min-height: 142px;
+  flex: 0 0 min(326px, calc(100vw - 72px));
+  min-height: 124px;
   border: 0;
-  border-radius: 14px;
+  border-radius: 18px;
   outline: 0;
   box-shadow: none;
   scroll-snap-align: start;
+  padding: 16px;
 }
 
 body:not(.in-game) .home-promo-dots {
@@ -8531,7 +8532,9 @@ body:not(.in-game) .promo-banner::after {
 }
 
 body:not(.in-game) .promo-banner--primary {
-  background: var(--tg-button);
+  background:
+    radial-gradient(circle at 88% 86%, rgba(255, 255, 255, 0.18) 0 42px, transparent 44px),
+    linear-gradient(135deg, #1595e6 0%, #2aabee 52%, #51c2ff 100%);
   color: var(--tg-button-text);
 }
 
@@ -8552,7 +8555,7 @@ body:not(.in-game) .promo-banner--primary .promo-action {
 
 body:not(.in-game) .promo-banner--event,
 body:not(.in-game) .promo-banner--status {
-  background: var(--native-control);
+  background: linear-gradient(145deg, #243443 0%, #1f2b36 100%);
 }
 
 body:not(.in-game) .training-switcher {
@@ -8624,19 +8627,29 @@ body:not(.in-game) .training-switcher .game-mode-switch .tether-mark {
 
 body:not(.in-game) .product-mode-hub {
   display: grid;
-  gap: 10px;
+  gap: 11px;
   border-radius: var(--native-group-radius);
   background: var(--tg-surface);
-  padding: 14px;
+  padding: 12px;
 }
 
 body:not(.in-game) .home-wallet {
-  gap: 12px;
-  padding: 14px;
+  gap: 10px;
+  padding: 12px;
+}
+
+body:not(.in-game) .home-account {
+  grid-template-columns: 42px minmax(0, 1fr) 28px;
+  gap: 9px;
+}
+
+body:not(.in-game) .home-account .lobby-avatar {
+  width: 42px;
+  height: 42px;
 }
 
 body:not(.in-game) .home-balance strong {
-  font-size: 28px;
+  font-size: 25px;
 }
 
 body:not(.in-game) .home-wallet-actions {
@@ -8644,13 +8657,13 @@ body:not(.in-game) .home-wallet-actions {
 }
 
 body:not(.in-game) .home-wallet-actions button {
-  min-height: 58px;
-  border-radius: 14px;
+  min-height: 48px;
+  border-radius: 13px;
 }
 
 body:not(.in-game) .home-wallet-actions button svg {
-  width: 26px;
-  height: 26px;
+  width: 23px;
+  height: 23px;
 }
 
 body:not(.in-game) .product-mode-title {
@@ -8661,83 +8674,122 @@ body:not(.in-game) .product-mode-title h2 {
   font-size: 19px;
 }
 
-body:not(.in-game) .product-mode-grid {
+body:not(.in-game) .product-mode-segment {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 4px;
+  border-radius: 16px;
+  background: var(--native-control);
+}
+
+body:not(.in-game) .product-mode-segment button {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  min-height: 48px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: var(--tg-hint);
+  padding: 5px 8px;
+  text-align: center;
+}
+
+body:not(.in-game) .product-mode-segment button.active {
+  background: var(--tg-button);
+  color: var(--tg-button-text);
+}
+
+body:not(.in-game) .product-mode-segment button:disabled {
+  opacity: 0.42;
+}
+
+body:not(.in-game) .product-mode-segment button small {
+  color: inherit;
+  font-size: 11px;
+  font-weight: 520;
+  opacity: 0.78;
+}
+
+body:not(.in-game) .product-mode-segment button span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+body:not(.in-game) .product-mode-segment .tether-mark {
+  width: 14px;
+  height: 14px;
+}
+
+.play-format-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  margin: 0;
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
 }
 
-body:not(.in-game) .product-mode-grid .mode-tile {
+.play-format-grid button {
   display: grid;
   align-content: center;
   justify-items: start;
   gap: 3px;
-  min-height: 72px;
-  border: 1px solid transparent;
-  border-radius: 14px;
+  min-height: 76px;
+  border: 0;
+  border-radius: 15px;
   background: var(--native-control);
   color: var(--tg-text);
   padding: 10px;
   text-align: left;
 }
 
-body:not(.in-game) .product-mode-grid .mode-tile.active {
-  border-color: rgba(42, 171, 238, 0.32);
-  background: var(--tg-button);
-  color: var(--tg-button-text);
+.play-format-grid .format-icon {
+  display: inline-grid;
+  place-items: center;
+  min-width: 36px;
+  height: 22px;
+  border-radius: 9px;
+  background: rgba(42, 171, 238, 0.16);
+  color: var(--tg-button);
+  font-size: 11px;
+  font-weight: 800;
 }
 
-body:not(.in-game) .product-mode-grid .mode-tile:disabled {
-  opacity: 0.42;
-}
-
-body:not(.in-game) .product-mode-grid .mode-tile small {
-  color: inherit;
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 0;
-  opacity: 0.7;
-  text-transform: uppercase;
-}
-
-body:not(.in-game) .product-mode-grid .mode-tile span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: inherit;
-  font-size: 13px;
-  font-weight: 720;
-  line-height: 1.1;
-}
-
-body:not(.in-game) .product-mode-grid .mode-tile b {
+.play-format-grid strong {
   overflow: hidden;
   max-width: 100%;
-  color: inherit;
+  color: var(--tg-text);
   font-size: 14px;
-  font-weight: 720;
-  line-height: 1.12;
+  font-weight: 700;
+  line-height: 1.08;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-body:not(.in-game) .product-mode-grid .tether-mark {
-  width: 14px;
-  height: 14px;
+.play-format-grid small {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--tg-hint);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 body:not(.in-game) .progression-card {
   display: grid;
-  gap: 12px;
-  margin-top: 10px;
+  gap: 10px;
+  margin-top: 0;
   border: 0;
   border-radius: var(--native-group-radius);
   background: var(--tg-surface);
-  padding: 14px;
+  padding: 12px;
 }
 
 body:not(.in-game) .progression-card .section-title {
@@ -8745,20 +8797,20 @@ body:not(.in-game) .progression-card .section-title {
 }
 
 body:not(.in-game) .progression-card .section-title h2 {
-  font-size: 19px;
+  font-size: 18px;
 }
 
 .progression-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .progression-summary > div {
   min-width: 0;
-  border-radius: 12px;
+  border-radius: 11px;
   background: var(--native-control);
-  padding: 10px;
+  padding: 8px;
 }
 
 .progression-summary span,
@@ -8773,7 +8825,7 @@ body:not(.in-game) .progression-card .section-title h2 {
   display: block;
   overflow: hidden;
   color: var(--tg-text);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -8790,17 +8842,21 @@ body:not(.in-game) .progression-card .section-title h2 {
 
 .leaderboard-row,
 .leaderboard-empty {
-  min-height: 42px;
+  min-height: 38px;
   background: var(--native-control);
   color: var(--tg-text);
 }
 
 .leaderboard-row {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto auto;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 7px 9px;
+}
+
+.leaderboard-row small {
+  display: none;
 }
 
 .leaderboard-rank {
@@ -8835,7 +8891,7 @@ body:not(.in-game) .home-games {
   border: 1px solid var(--tg-separator);
   border-radius: var(--native-group-radius);
   background: var(--tg-surface);
-  padding: 14px;
+  padding: 12px;
 }
 
 body:not(.in-game) .home-games .section-title {
@@ -8843,7 +8899,7 @@ body:not(.in-game) .home-games .section-title {
 }
 
 body:not(.in-game) .home-games .section-title h2 {
-  font-size: 19px;
+  font-size: 18px;
 }
 
 body:not(.in-game) .home-limit-pills {
