@@ -291,7 +291,7 @@ async function boot() {
 
   createTableForm.addEventListener("submit", onCreateTable);
   refreshButton?.addEventListener("click", loadTables);
-  profileRefreshButton.addEventListener("click", () => runAction(loadProfile));
+  profileRefreshButton?.addEventListener("click", () => runAction(loadProfile));
   cashierPrimaryButton?.addEventListener("click", () => {
     document.querySelector(".cashier-topup-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
@@ -492,6 +492,7 @@ function onGameModeSelect(event) {
   renderModeContext();
   renderTables();
   renderHomeCta();
+  selectLobbyTab(state.gameMode === "play" ? "tables" : "home");
   haptic("selection");
 }
 
@@ -506,7 +507,8 @@ function onGameFormatSelect(event) {
   }
   if (action === "sitgo") {
     selectLobbyTab("tournaments");
-    showStatus("Sit&Go добавлен в дорожную карту турниров. Подключим после базовой MTT-сетки.");
+    document.querySelector("#sitGoPreview")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    showStatus("Sit&Go: быстрые столы будут открываться из турнирного раздела.");
     return;
   }
 }
@@ -533,6 +535,7 @@ function renderModeBalance() {
 
 function renderModeContext() {
   const cashMode = state.gameMode === "cash";
+  document.body.dataset.gameMode = cashMode ? "cash" : "play";
   if (modeBanner) {
     if (modeBannerKicker) modeBannerKicker.textContent = cashMode ? "USDT" : "Рейтинг";
     if (modeBannerTitle) {
@@ -790,7 +793,7 @@ function setupPromoCarousel() {
       }
       const active = [...promoDots.children].findIndex((dot) => dot.classList.contains("active"));
       const next = items[((active >= 0 ? active : 0) + 1) % items.length];
-      next?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+      scrollPromoTo(next);
       scheduleAuto();
     }, 10000);
   };
@@ -804,11 +807,19 @@ function setupPromoCarousel() {
     dot.className = index === 0 ? "active" : "";
     dot.addEventListener("click", () => {
       pauseAuto();
-      items[index].scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+      scrollPromoTo(items[index]);
       scheduleAuto();
     });
     return dot;
   }));
+
+  const scrollPromoTo = (item) => {
+    if (!item) return;
+    promoCarousel.scrollTo({
+      left: Math.max(0, item.offsetLeft - promoCarousel.offsetLeft),
+      behavior: "smooth",
+    });
+  };
 
   const update = () => {
     const center = promoCarousel.scrollLeft + promoCarousel.clientWidth / 2;
@@ -3588,13 +3599,15 @@ function onLobbyMenuAction(event) {
   closeLobbyMenu({ silent: true });
   if (action === "profile") {
     selectLobbyTab("profile");
+  } else if (action === "cashier") {
+    runAction(() => openCashierSection("deposit"));
   } else if (action === "details") {
     runAction(() => openCashierSection("history"));
   } else if (action === "support") {
     showStatus("Поддержку подключим отдельным разделом");
     updateTelegramBackButton();
   } else if (action === "affiliate") {
-    showStatus("Affiliate-раздел будет отдельной страницей с ссылками, CPA/RevShare и статистикой партнёра.");
+    selectLobbyTab("affiliate");
     updateTelegramBackButton();
   }
 }

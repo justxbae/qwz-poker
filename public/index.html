@@ -231,6 +231,7 @@
                 <small>игра с друзьями</small>
               </button>
             </div>
+            <p class="mode-context-copy" id="modeContextCopy">Cash открывает денежные столы, турниры, Sit&Go и приватные игры. Рейтинг ведёт сразу к отдельным RP-столам без лишних режимов.</p>
           </section>
 
           <section class="lobby-card progression-card" id="progressionCard">
@@ -469,6 +470,29 @@
             <div class="tournament-list" id="tournamentList"></div>
             <div class="cashier-status" id="tournamentStatus" role="status"></div>
           </section>
+          <section class="lobby-card sitgo-preview" id="sitGoPreview">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Sit&Go</p>
+                <h2>Быстрые столы</h2>
+              </div>
+              <span>скоро</span>
+            </div>
+            <div class="sitgo-grid">
+              <article>
+                <strong>Heads-up turbo</strong>
+                <span>2 игрока · старт сразу после посадки</span>
+              </article>
+              <article>
+                <strong>6-max bounty</strong>
+                <span>быстрый вылет, фиксированный призовой фонд</span>
+              </article>
+              <article>
+                <strong>Jackpot SNG</strong>
+                <span>случайный множитель призов перед стартом</span>
+              </article>
+            </div>
+          </section>
         </section>
 
         <section class="lobby-view" data-lobby-view="profile">
@@ -479,7 +503,7 @@
               <h2 id="profileName">Игрок</h2>
               <span id="profileUsername">@player</span>
             </div>
-            <button type="button" id="profileRefreshButton" class="round-control" aria-label="Обновить профиль">↻</button>
+            <button type="button" id="profileRefreshButton" class="round-control" aria-label="Обновить профиль" hidden>↻</button>
           </section>
           <section class="lobby-card">
             <div class="section-title">
@@ -548,6 +572,45 @@
               <button type="button" class="settings-action" data-lobby-tab="cashier">Касса</button>
               <button type="button" class="settings-action" data-lobby-tab="tables">Мои столы</button>
             </div>
+          </section>
+        </section>
+
+        <section class="lobby-view affiliate-view" data-lobby-view="affiliate">
+          <section class="affiliate-hero">
+            <p class="eyebrow">Affiliate</p>
+            <h2>Партнёрская программа QWZ</h2>
+            <p>Раздел для тех, кто приводит игроков: ссылки, промокоды, RevShare/CPA, выплаты и качество трафика будут собраны в одном кабинете.</p>
+            <div class="affiliate-actions">
+              <button type="button" data-lobby-tab="cashier" data-cashier-section="deposit">Касса</button>
+              <button type="button" data-lobby-tab="profile">Мой профиль</button>
+            </div>
+          </section>
+          <section class="affiliate-grid">
+            <article class="affiliate-card affiliate-card--green">
+              <span>RevShare</span>
+              <strong>до 35%</strong>
+              <p>Доля от рейка приведённых игроков после антифрод-проверки и холда.</p>
+            </article>
+            <article class="affiliate-card affiliate-card--gold">
+              <span>CPA</span>
+              <strong>за FTD</strong>
+              <p>Фиксированная выплата за первого платящего игрока после выполнения условий качества.</p>
+            </article>
+            <article class="affiliate-card affiliate-card--violet">
+              <span>Sub-affiliate</span>
+              <strong>2 уровень</strong>
+              <p>Небольшой процент с партнёров второго уровня для сеток и комьюнити.</p>
+            </article>
+          </section>
+          <section class="lobby-card affiliate-link-card">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Ссылка</p>
+                <h2>Персональный инвайт</h2>
+              </div>
+              <span>скоро</span>
+            </div>
+            <div class="affiliate-link-preview">t.me/qwzpokerbot/app?ref=your_code</div>
           </section>
         </section>
 
@@ -774,6 +837,11 @@
             <button type="button" data-menu-action="profile">
               <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg></span>
               <span><strong>Профиль</strong><small>уровень, статистика и статус</small></span>
+              <span class="tg-chevron">›</span>
+            </button>
+            <button type="button" data-menu-action="cashier">
+              <span class="menu-icon menu-icon--cashier" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h16v10H4Z"/><path d="M8 7V5h8v2"/><path d="M8 17v2h8v-2"/><path d="M12 10v4M10 12h4"/></svg></span>
+              <span><strong>Касса</strong><small>депозит, вывод и способы оплаты</small></span>
               <span class="tg-chevron">›</span>
             </button>
             <button type="button" data-menu-action="details">

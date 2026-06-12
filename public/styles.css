@@ -8631,6 +8631,7 @@ body:not(.in-game) .product-mode-hub {
   border-radius: var(--native-group-radius);
   background: var(--tg-surface);
   padding: 12px;
+  transition: background 220ms ease, transform 220ms ease;
 }
 
 body:not(.in-game) .home-wallet {
@@ -8732,6 +8733,11 @@ body:not(.in-game) .product-mode-segment .tether-mark {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+  overflow: hidden;
+  max-height: 112px;
+  opacity: 1;
+  transform: translateY(0);
+  transition: max-height 240ms ease, opacity 180ms ease, transform 220ms ease;
 }
 
 .play-format-grid button {
@@ -8746,6 +8752,25 @@ body:not(.in-game) .product-mode-segment .tether-mark {
   color: var(--tg-text);
   padding: 10px;
   text-align: left;
+}
+
+body[data-game-mode="play"] .play-format-grid {
+  pointer-events: none;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+body[data-game-mode="cash"] .play-format-grid button:nth-child(1) {
+  background: linear-gradient(135deg, rgba(94, 92, 230, 0.3), rgba(42, 171, 238, 0.16));
+}
+
+body[data-game-mode="cash"] .play-format-grid button:nth-child(2) {
+  background: linear-gradient(135deg, rgba(52, 199, 89, 0.25), rgba(42, 171, 238, 0.14));
+}
+
+body[data-game-mode="cash"] .play-format-grid button:nth-child(3) {
+  background: linear-gradient(135deg, rgba(255, 159, 10, 0.24), rgba(42, 171, 238, 0.12));
 }
 
 .play-format-grid .format-icon {
@@ -8780,6 +8805,18 @@ body:not(.in-game) .product-mode-segment .tether-mark {
   line-height: 1.15;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.mode-context-copy {
+  margin: 0;
+  color: var(--tg-hint);
+  font-size: 12px;
+  font-weight: 520;
+  line-height: 1.28;
+}
+
+body[data-game-mode="play"] .mode-context-copy {
+  color: rgba(42, 171, 238, 0.9);
 }
 
 body:not(.in-game) .progression-card {
@@ -8912,6 +8949,183 @@ body:not(.in-game) .home-games .home-offer-meta {
 
 body:not(.in-game) .home-games .home-game-actions {
   margin-top: 8px;
+}
+
+.sitgo-preview {
+  background:
+    linear-gradient(135deg, rgba(52, 199, 89, 0.18), transparent 42%),
+    var(--tg-surface);
+}
+
+.sitgo-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.sitgo-grid article {
+  display: grid;
+  gap: 4px;
+  border-radius: 14px;
+  background: var(--native-control);
+  padding: 12px;
+}
+
+.sitgo-grid strong {
+  color: var(--tg-text);
+  font-size: 15px;
+}
+
+.sitgo-grid span {
+  color: var(--tg-hint);
+  font-size: 12px;
+  font-weight: 540;
+}
+
+.profile-hero {
+  background:
+    radial-gradient(circle at 12% 10%, rgba(42, 171, 238, 0.22), transparent 38%),
+    linear-gradient(135deg, rgba(52, 199, 89, 0.08), rgba(94, 92, 230, 0.1)),
+    var(--tg-surface);
+}
+
+.profile-hero .profile-avatar {
+  box-shadow: 0 0 0 3px rgba(42, 171, 238, 0.14), 0 16px 28px rgba(0, 0, 0, 0.22);
+}
+
+.profile-main h2 {
+  letter-spacing: 0;
+}
+
+.profile-progress {
+  overflow: hidden;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--native-control);
+}
+
+.profile-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--tg-button), #37d67a);
+}
+
+.affiliate-view {
+  display: none;
+  gap: 12px;
+}
+
+.affiliate-view.active {
+  display: grid;
+}
+
+.affiliate-hero,
+.affiliate-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--native-group-radius);
+}
+
+.affiliate-hero {
+  display: grid;
+  gap: 12px;
+  background:
+    radial-gradient(circle at 86% 8%, rgba(52, 199, 89, 0.26), transparent 32%),
+    radial-gradient(circle at 0 95%, rgba(94, 92, 230, 0.24), transparent 38%),
+    var(--tg-surface);
+  padding: 18px;
+}
+
+.affiliate-hero h2 {
+  margin: 0;
+  color: var(--tg-text);
+  font-size: 28px;
+  line-height: 1.02;
+}
+
+.affiliate-hero p {
+  margin: 0;
+  color: var(--tg-hint);
+  font-size: 14px;
+  font-weight: 540;
+  line-height: 1.36;
+}
+
+.affiliate-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.affiliate-actions button {
+  min-height: 48px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--tg-button);
+  color: var(--tg-button-text);
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.affiliate-actions button + button {
+  background: var(--native-control);
+  color: var(--tg-text);
+}
+
+.affiliate-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.affiliate-card {
+  display: grid;
+  gap: 6px;
+  min-height: 128px;
+  padding: 16px;
+  color: #fff;
+}
+
+.affiliate-card span {
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.affiliate-card strong {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.affiliate-card p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.affiliate-card--green {
+  background: linear-gradient(135deg, #11996f, #156dba);
+}
+
+.affiliate-card--gold {
+  background: linear-gradient(135deg, #b17a13, #e5534b);
+}
+
+.affiliate-card--violet {
+  background: linear-gradient(135deg, #5e5ce6, #2aabee);
+}
+
+.affiliate-link-preview {
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--native-control);
+  color: var(--tg-link);
+  padding: 13px;
+  font-size: 13px;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cashier-sheet-backdrop {
