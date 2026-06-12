@@ -8622,6 +8622,114 @@ body:not(.in-game) .training-switcher .game-mode-switch .tether-mark {
   height: 17px;
 }
 
+body:not(.in-game) .product-mode-hub {
+  display: grid;
+  gap: 10px;
+  border-radius: var(--native-group-radius);
+  background: var(--tg-surface);
+  padding: 14px;
+}
+
+body:not(.in-game) .home-wallet {
+  gap: 12px;
+  padding: 14px;
+}
+
+body:not(.in-game) .home-balance strong {
+  font-size: 28px;
+}
+
+body:not(.in-game) .home-wallet-actions {
+  gap: 8px;
+}
+
+body:not(.in-game) .home-wallet-actions button {
+  min-height: 58px;
+  border-radius: 14px;
+}
+
+body:not(.in-game) .home-wallet-actions button svg {
+  width: 26px;
+  height: 26px;
+}
+
+body:not(.in-game) .product-mode-title {
+  margin: 0;
+}
+
+body:not(.in-game) .product-mode-title h2 {
+  font-size: 19px;
+}
+
+body:not(.in-game) .product-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+body:not(.in-game) .product-mode-grid .mode-tile {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 3px;
+  min-height: 72px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: var(--native-control);
+  color: var(--tg-text);
+  padding: 10px;
+  text-align: left;
+}
+
+body:not(.in-game) .product-mode-grid .mode-tile.active {
+  border-color: rgba(42, 171, 238, 0.32);
+  background: var(--tg-button);
+  color: var(--tg-button-text);
+}
+
+body:not(.in-game) .product-mode-grid .mode-tile:disabled {
+  opacity: 0.42;
+}
+
+body:not(.in-game) .product-mode-grid .mode-tile small {
+  color: inherit;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0;
+  opacity: 0.7;
+  text-transform: uppercase;
+}
+
+body:not(.in-game) .product-mode-grid .mode-tile span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 720;
+  line-height: 1.1;
+}
+
+body:not(.in-game) .product-mode-grid .mode-tile b {
+  overflow: hidden;
+  max-width: 100%;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 720;
+  line-height: 1.12;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body:not(.in-game) .product-mode-grid .tether-mark {
+  width: 14px;
+  height: 14px;
+}
+
 body:not(.in-game) .progression-card {
   display: grid;
   gap: 12px;

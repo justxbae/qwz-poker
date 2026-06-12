@@ -309,7 +309,7 @@ async function boot() {
   cashierPayButton?.addEventListener("click", () => runAction(payCashierAmount));
   tournamentList?.addEventListener("click", onTournamentAction);
   quickPlayButton.addEventListener("click", () => runAction(quickPlay));
-  quickPrivateButton.addEventListener("click", () => runAction(quickCreatePrivateTable));
+  quickPrivateButton?.addEventListener("click", () => runAction(quickCreatePrivateTable));
   continueGameButton.addEventListener("click", continueGame);
   if (adminNavButton) adminNavButton.hidden = !ADMIN_MODE;
   updateBottomNavIndicator();
@@ -330,7 +330,7 @@ async function boot() {
   });
   limitPills.addEventListener("click", onLimitSelect);
   tableLimitPills.addEventListener("click", onLimitSelect);
-  gameModeSwitch?.addEventListener("click", onGameModeSelect);
+  gameModeSwitch?.addEventListener("click", onGameModeHubSelect);
   document.querySelectorAll("[data-lobby-tab]").forEach((button) => {
     button.addEventListener("click", () => {
       if (button.dataset.lobbyTab === "cashier" && button.dataset.cashierSection) {
@@ -493,6 +493,31 @@ function onGameModeSelect(event) {
   haptic("selection");
 }
 
+function onGameModeHubSelect(event) {
+  const modeButton = event.target.closest("[data-game-mode]");
+  if (modeButton) {
+    onGameModeSelect(event);
+    return;
+  }
+
+  const actionButton = event.target.closest("[data-mode-action]");
+  if (!actionButton) return;
+  const action = actionButton.dataset.modeAction;
+  haptic("selection");
+  if (action === "private") {
+    runAction(quickCreatePrivateTable);
+    return;
+  }
+  if (action === "sitgo") {
+    selectLobbyTab("tournaments");
+    showStatus("Sit&Go добавлен в дорожную карту турниров. Подключим после базовой MTT-сетки.");
+    return;
+  }
+  if (action === "affiliate") {
+    showStatus("Affiliate-раздел будет отдельной страницей с ссылками, CPA/RevShare и статистикой партнёра.");
+  }
+}
+
 function currentLimits() {
   const configured = state.gameMode === "cash" ? state.config?.cash?.limits : state.config?.play?.limits;
   return configured?.length ? configured : [{ smallBlind: 25, bigBlind: 50 }];
@@ -556,7 +581,7 @@ function setupTelegramControls() {
 function setupTelegramHomeScreenInstall() {
   if (!homeScreenInstallButton) return;
 
-  const canInstall = Boolean(tg?.addToHomeScreen && tg?.checkHomeScreenStatus);
+  const canInstall = Boolean(tg?.addToHomeScreen && tg?.checkHomeScreenStatus && telegramVersionAtLeast("8.0"));
   if (!canInstall) {
     homeScreenInstallButton.hidden = true;
     return;
@@ -578,6 +603,19 @@ function setupTelegramHomeScreenInstall() {
   });
 
   refreshHomeScreenInstallStatus();
+}
+
+function telegramVersionAtLeast(target) {
+  const currentParts = String(tg?.version || "0").split(".").map((part) => Number(part) || 0);
+  const targetParts = String(target || "0").split(".").map((part) => Number(part) || 0);
+  const length = Math.max(currentParts.length, targetParts.length);
+  for (let index = 0; index < length; index += 1) {
+    const current = currentParts[index] || 0;
+    const expected = targetParts[index] || 0;
+    if (current > expected) return true;
+    if (current < expected) return false;
+  }
+  return true;
 }
 
 function refreshHomeScreenInstallStatus() {
