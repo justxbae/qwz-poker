@@ -7938,8 +7938,8 @@ body:not(.in-game) {
 .home-wallet-actions button {
   display: grid;
   place-items: center;
-  min-height: 72px;
-  border-radius: 18px;
+  min-height: 50px;
+  border-radius: 14px;
   background: var(--tg-button);
   color: var(--tg-button-text);
   padding: 0;
@@ -7947,8 +7947,8 @@ body:not(.in-game) {
 
 .home-wallet-actions button svg {
   display: block;
-  width: 31px;
-  height: 31px;
+  width: 23px;
+  height: 23px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2.4;
@@ -7969,13 +7969,13 @@ body:not(.in-game) {
 .promo-banner {
   position: relative;
   display: grid;
-  min-height: 104px;
+  min-height: 86px;
   justify-items: start;
   border: 0;
   border-radius: var(--native-group-radius);
   background: var(--tg-surface);
   color: var(--tg-text);
-  padding: 14px;
+  padding: 12px 14px;
   text-align: left;
 }
 
@@ -8755,10 +8755,7 @@ body:not(.in-game) .product-mode-segment .tether-mark {
 }
 
 body[data-game-mode="play"] .play-format-grid {
-  pointer-events: none;
-  max-height: 0;
-  opacity: 0;
-  transform: translateY(-8px);
+  display: none;
 }
 
 body[data-game-mode="cash"] .play-format-grid button:nth-child(1) {
@@ -9575,7 +9572,7 @@ body:not(.in-game) .nav-profile-avatar {
 }
 
 body:not(.in-game) .home-balance strong {
-  font-size: 30px;
+  font-size: 26px;
   line-height: 1;
   letter-spacing: -0.035em;
 }
@@ -9583,8 +9580,8 @@ body:not(.in-game) .home-balance strong {
 body:not(.in-game) .home-wallet-actions button {
   position: relative;
   overflow: hidden;
-  min-height: 54px;
-  border-radius: 16px;
+  min-height: 48px;
+  border-radius: 14px;
   transition: transform 160ms ease, filter 160ms ease, background 180ms ease;
 }
 
@@ -9907,8 +9904,10 @@ body:not(.in-game) .scroll-reveal.is-visible {
 body.in-game {
   font-family: "SF Pro Rounded", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
   background:
-    radial-gradient(circle at 50% 12%, rgba(42, 171, 238, 0.14), transparent 34%),
-    linear-gradient(180deg, #101923, #0d151e 72%);
+    radial-gradient(circle at 15% 14%, rgba(230, 142, 66, 0.16), transparent 30%),
+    radial-gradient(circle at 86% 20%, rgba(150, 74, 184, 0.16), transparent 32%),
+    radial-gradient(circle at 50% 98%, rgba(40, 130, 120, 0.18), transparent 42%),
+    linear-gradient(180deg, #0a0d12, #070a0e 74%);
 }
 
 body.in-game .game-toolbar {
@@ -9933,7 +9932,32 @@ body.in-game .game-toolbar .icon-control:active {
 }
 
 body.in-game .board {
-  filter: saturate(1.05);
+  border: 0;
+  border-radius: 46% / 27%;
+  background:
+    radial-gradient(ellipse 64% 50% at 50% 40%, rgba(150, 240, 210, 0.26) 0%, transparent 62%),
+    radial-gradient(ellipse at center, #2a8d75 0%, #176855 46%, #0c4035 100%);
+  box-shadow:
+    0 0 0 2px rgba(196, 255, 235, 0.55),
+    0 0 26px rgba(96, 230, 200, 0.32),
+    0 0 70px rgba(40, 140, 120, 0.28),
+    inset 0 0 60px rgba(0, 40, 30, 0.55),
+    inset 0 2px 0 rgba(255, 255, 255, 0.14),
+    0 28px 60px rgba(0, 0, 0, 0.5);
+}
+
+body.in-game .board::before {
+  inset: 18px 14px;
+  border: 1px solid rgba(214, 255, 240, 0.32);
+  border-radius: 46% / 27%;
+  box-shadow: inset 0 0 22px rgba(0, 50, 38, 0.4);
+}
+
+body.in-game .board::after {
+  color: rgba(220, 255, 244, 0.16);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-shadow: 0 2px 12px rgba(0, 40, 30, 0.5);
 }
 
 body.in-game .pot,
@@ -11884,5 +11908,177 @@ body.in-game .game-screen.has-bot-actions .seat-count-6.seat-0 {
   body.in-game .game-screen.has-bot-actions .seat-count-5.seat-0,
   body.in-game .game-screen.has-bot-actions .seat-count-6.seat-0 {
     top: 88%;
+  }
+}
+
+/* Product polish pass: lighter typography, calmer buttons, predictable taps. */
+button,
+.bottom-nav button,
+.wallet-actions button,
+.home-wallet-actions button,
+.play-format-grid button,
+.product-mode-segment button,
+.table-item button,
+.cashier-pay-button,
+.buyin-submit,
+.betting-actions button,
+.pre-actions button {
+  font-weight: 600;
+  letter-spacing: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.section-title h2,
+.home-identity strong,
+.home-player strong,
+.profile-main h2,
+.table-item strong,
+.tournament-card strong,
+.pot,
+.player-name,
+.player-stack {
+  font-weight: 620;
+}
+
+.eyebrow,
+.promo-kicker,
+.section-title > span,
+.home-identity small,
+.player-rank,
+.mode-context-copy,
+.tg-row-value,
+.table-item span,
+.cashier-note {
+  font-weight: 500;
+}
+
+.bottom-nav {
+  width: min(346px, calc(100vw - 96px));
+  left: max(10px, calc(50vw - 212px));
+  gap: 4px;
+  border-radius: 28px;
+  padding: 5px;
+}
+
+.bottom-nav button {
+  min-height: 48px;
+  border-radius: 23px;
+  font-size: 17px;
+}
+
+.bottom-nav .nav-label {
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.bottom-nav button.active {
+  background: rgba(42, 171, 238, 0.18);
+  color: #f3f8ff;
+}
+
+.profile-nav-fab {
+  right: max(10px, calc(50vw - 212px));
+  width: 60px;
+  min-height: 60px;
+  border-radius: 24px;
+}
+
+.nav-profile-avatar {
+  width: 48px;
+  height: 48px;
+  font-weight: 600;
+}
+
+.home-wallet-actions button,
+.wallet-actions button,
+.cashier-pay-button,
+.buyin-submit,
+.table-item button,
+.tournament-card button,
+.play-format-grid button,
+.product-mode-segment button,
+.limit-pills button,
+.icon-control,
+.sit-button {
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.betting-actions,
+.pre-actions,
+.bot-actions {
+  border: 1px solid rgba(122, 162, 194, 0.14);
+  border-radius: 14px;
+  background: rgba(23, 33, 43, 0.92);
+  padding: 5px;
+}
+
+.betting-actions button,
+.pre-actions button,
+.bot-actions button {
+  border-radius: 11px;
+  font-size: 16px;
+}
+
+.betting-actions [data-poker-action="fold"] {
+  background: #d9505c;
+}
+
+.betting-actions [data-poker-action="check"],
+.betting-actions [data-poker-action="call"] {
+  background: #2aabee;
+}
+
+.betting-actions [data-poker-action="bet"],
+.betting-actions [data-poker-action="raise"],
+.bet-confirm {
+  background: #d8a542;
+  color: #151719;
+}
+
+button,
+.tg-menu-row,
+.promo-banner,
+.play-format-grid button,
+.product-mode-segment button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:hover {
+  filter: brightness(1.03);
+}
+
+button:active,
+.play-format-grid button:active,
+.product-mode-segment button:active,
+.promo-banner:active,
+.tg-menu-row:active {
+  transform: scale(0.99);
+}
+
+@media (hover: none) {
+  button:hover {
+    filter: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .bottom-nav {
+    width: min(326px, calc(100vw - 86px));
+    left: 8px;
+  }
+
+  .profile-nav-fab {
+    right: 8px;
+  }
+
+  .bottom-nav button {
+    min-height: 46px;
+  }
+
+  .bottom-nav .nav-label {
+    font-size: 9.5px;
   }
 }

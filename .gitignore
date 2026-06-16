@@ -3,3 +3,7 @@ node_modules
 .DS_Store
 *.log
 .idea
+references photo/
+*.docx
+.docx_render_qwz_economics/
+.docx_render_tz/
