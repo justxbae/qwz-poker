@@ -12082,3 +12082,1806 @@ button:active,
     font-size: 9.5px;
   }
 }
+
+/* ============================================================
+   QWZ Lobby v2 — final layer
+   Calm hierarchy, one signature accent (emerald), premium density.
+   Touches lobby only (body:not(.in-game)). HTML/JS untouched.
+   ============================================================ */
+:root {
+  --qwz-bg-0: #06090d;
+  --qwz-bg-1: #0a1016;
+  --qwz-surface: #121a23;
+  --qwz-surface-2: #182230;
+  --qwz-surface-3: #1f2c3d;
+  --qwz-line: rgba(180, 210, 240, 0.07);
+  --qwz-line-strong: rgba(180, 210, 240, 0.14);
+  --qwz-ink: #f1f6fb;
+  --qwz-ink-dim: #aab6c4;
+  --qwz-ink-mute: #6e7c8c;
+  --qwz-emerald: #2fd396;
+  --qwz-emerald-2: #21b07e;
+  --qwz-gold: #f4c14a;
+  --qwz-red: #ff5566;
+  --qwz-radius-lg: 20px;
+  --qwz-radius-md: 14px;
+  --qwz-radius-sm: 10px;
+  --qwz-shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset,
+                     0 12px 28px rgba(0, 0, 0, 0.32);
+}
+
+body:not(.in-game) {
+  background:
+    radial-gradient(140% 60% at 50% -8%, rgba(47, 211, 150, 0.10), transparent 58%),
+    radial-gradient(110% 55% at 0% 25%, rgba(244, 193, 74, 0.05), transparent 60%),
+    linear-gradient(180deg, var(--qwz-bg-1) 0%, var(--qwz-bg-0) 100%);
+  color: var(--qwz-ink);
+  font-family: "SF Pro Rounded", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body:not(.in-game) .lobby-shell {
+  width: min(430px, 100%);
+  padding: 8px 14px calc(96px + env(safe-area-inset-bottom));
+}
+
+body:not(.in-game) .lobby-view {
+  gap: 12px;
+}
+
+/* --- Hero balance ---------------------------------------------------- */
+body:not(.in-game) .home-wallet {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--qwz-line-strong);
+  border-radius: var(--qwz-radius-lg);
+  background:
+    radial-gradient(120% 100% at 100% 0%, rgba(47, 211, 150, 0.14), transparent 55%),
+    radial-gradient(80% 80% at 0% 100%, rgba(244, 193, 74, 0.06), transparent 60%),
+    linear-gradient(180deg, #1a2330 0%, #121a23 100%);
+  box-shadow: var(--qwz-shadow-card);
+  padding: 14px 14px 14px;
+  gap: 12px;
+}
+
+body:not(.in-game) .home-wallet::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 14%;
+  right: 14%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(47, 211, 150, 0.55), transparent);
+  pointer-events: none;
+}
+
+body:not(.in-game) .home-wallet::after {
+  display: none;
+}
+
+body:not(.in-game) .home-account {
+  grid-template-columns: 40px minmax(0, 1fr) 22px;
+  gap: 10px;
+  align-items: center;
+}
+
+body:not(.in-game) .home-account .lobby-avatar {
+  width: 40px;
+  height: 40px;
+  font-size: 15px;
+  font-weight: 700;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.22), transparent 38%),
+    linear-gradient(140deg, #2c3b4f, #1a2330);
+  box-shadow: 0 0 0 1px var(--qwz-line-strong);
+}
+
+body:not(.in-game) .home-identity strong {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--qwz-ink);
+}
+
+body:not(.in-game) .home-identity span {
+  font-size: 12.5px;
+  color: var(--qwz-ink-mute);
+}
+
+body:not(.in-game) .home-identity .player-rank {
+  margin-top: 5px;
+  padding: 3px 8px;
+  border: 1px solid var(--qwz-line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--qwz-ink-dim);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+body:not(.in-game) .home-profile-link {
+  width: 22px;
+  min-height: 22px;
+  font-size: 20px;
+  color: var(--qwz-ink-mute);
+}
+
+body:not(.in-game) .home-balance {
+  position: relative;
+  border-top: 1px solid var(--qwz-line);
+  padding-top: 12px;
+  gap: 4px;
+}
+
+body:not(.in-game) .home-balance > span {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--qwz-ink-mute);
+}
+
+body:not(.in-game) .home-balance strong {
+  align-items: baseline;
+  gap: 6px;
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  color: var(--qwz-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+body:not(.in-game) .home-balance strong small {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--qwz-ink-mute);
+}
+
+body:not(.in-game) .home-balance .tether-mark {
+  width: 18px;
+  height: 18px;
+}
+
+body:not(.in-game) .home-wallet-actions {
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+body:not(.in-game) .home-wallet-actions button {
+  min-height: 44px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+  transition: transform 140ms ease, filter 140ms ease;
+}
+
+body:not(.in-game) .home-wallet-actions button:first-child {
+  background: linear-gradient(180deg, var(--qwz-emerald) 0%, var(--qwz-emerald-2) 100%);
+  color: #062019;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 6px 18px rgba(33, 176, 126, 0.32);
+}
+
+body:not(.in-game) .home-wallet-actions button:first-child::after {
+  content: "Депозит";
+  margin-left: 8px;
+}
+
+body:not(.in-game) .home-wallet-actions button:first-child svg {
+  width: 18px;
+  height: 18px;
+}
+
+body:not(.in-game) .home-wallet-actions .home-withdraw {
+  background: transparent;
+  border: 1px solid var(--qwz-line-strong);
+  color: var(--qwz-ink);
+  box-shadow: none;
+}
+
+body:not(.in-game) .home-wallet-actions .home-withdraw::after {
+  content: "Вывод";
+  margin-left: 8px;
+}
+
+body:not(.in-game) .home-wallet-actions .home-withdraw svg {
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+}
+
+body:not(.in-game) .home-wallet-actions button:active {
+  transform: translateY(1px);
+  filter: brightness(0.96);
+}
+
+/* --- Promo carousel -------------------------------------------------- */
+body:not(.in-game) .home-promo-banners {
+  gap: 8px;
+}
+
+body:not(.in-game) .promo-banner {
+  min-height: 78px;
+  border-radius: var(--qwz-radius-md);
+  border: 1px solid var(--qwz-line);
+  background: linear-gradient(180deg, #1a2230 0%, #131a24 100%);
+  padding: 12px 14px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+}
+
+body:not(.in-game) .promo-banner--primary {
+  background:
+    radial-gradient(80% 100% at 0% 0%, rgba(47, 211, 150, 0.18), transparent 60%),
+    linear-gradient(180deg, #1a2330 0%, #131a24 100%);
+  border-color: rgba(47, 211, 150, 0.22);
+}
+
+body:not(.in-game) .promo-banner--event {
+  background:
+    radial-gradient(80% 100% at 100% 0%, rgba(244, 193, 74, 0.16), transparent 60%),
+    linear-gradient(180deg, #1a2330 0%, #131a24 100%);
+  border-color: rgba(244, 193, 74, 0.2);
+}
+
+body:not(.in-game) .promo-banner--status {
+  background:
+    radial-gradient(70% 100% at 100% 100%, rgba(140, 108, 255, 0.16), transparent 60%),
+    linear-gradient(180deg, #1a2330 0%, #131a24 100%);
+}
+
+body:not(.in-game) .promo-banner strong {
+  font-size: 15.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin-top: 4px;
+}
+
+body:not(.in-game) .promo-kicker {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--qwz-emerald);
+}
+
+body:not(.in-game) .promo-banner--event .promo-kicker {
+  color: var(--qwz-gold);
+}
+
+body:not(.in-game) .promo-banner--status .promo-kicker {
+  color: #b9a7ff;
+}
+
+body:not(.in-game) .promo-banner small {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--qwz-ink-mute);
+  font-weight: 500;
+}
+
+body:not(.in-game) .promo-action {
+  margin-top: 8px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--qwz-ink);
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+body:not(.in-game) .home-promo-dots {
+  margin: 2px 0 -2px;
+}
+
+body:not(.in-game) .home-promo-dots span {
+  background: var(--qwz-ink-mute);
+  opacity: 0.35;
+}
+
+body:not(.in-game) .home-promo-dots span.active {
+  background: var(--qwz-emerald);
+  opacity: 1;
+}
+
+/* --- Section cards (the rhythm) ------------------------------------- */
+body:not(.in-game) .lobby-card,
+body:not(.in-game) .product-mode-hub,
+body:not(.in-game) .progression-card,
+body:not(.in-game) .home-games {
+  border: 1px solid var(--qwz-line);
+  border-radius: var(--qwz-radius-lg);
+  background: linear-gradient(180deg, #161f2b 0%, #111922 100%);
+  box-shadow: var(--qwz-shadow-card);
+  padding: 14px;
+  gap: 12px;
+}
+
+body:not(.in-game) .section-title {
+  align-items: flex-end;
+  gap: 8px;
+}
+
+body:not(.in-game) .section-title .eyebrow,
+body:not(.in-game) .eyebrow {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--qwz-ink-mute);
+}
+
+body:not(.in-game) .section-title h2 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--qwz-ink);
+  margin-top: 2px;
+}
+
+body:not(.in-game) .section-title > span {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--qwz-ink-mute);
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--qwz-line);
+}
+
+/* --- Mode hub (Cash / Rating) --------------------------------------- */
+body:not(.in-game) .product-mode-segment {
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--qwz-line);
+}
+
+body:not(.in-game) .product-mode-segment button {
+  min-height: 46px;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--qwz-ink-dim);
+  box-shadow: none;
+  font-size: 14px;
+  font-weight: 650;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+body:not(.in-game) .product-mode-segment button small {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--qwz-ink-mute);
+  margin-top: 2px;
+}
+
+body:not(.in-game) .product-mode-segment button.active {
+  background: linear-gradient(180deg, #1f2c3d, #182230);
+  color: var(--qwz-ink);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 6px 14px rgba(0, 0, 0, 0.28);
+}
+
+body[data-game-mode="cash"]:not(.in-game) .product-mode-segment button.active {
+  background: linear-gradient(180deg, #1f3a30, #143226);
+  box-shadow:
+    0 1px 0 rgba(47, 211, 150, 0.2) inset,
+    0 6px 14px rgba(33, 176, 126, 0.18);
+}
+
+body[data-game-mode="cash"]:not(.in-game) .product-mode-segment button.active small {
+  color: var(--qwz-emerald);
+}
+
+body[data-game-mode="play"]:not(.in-game) .product-mode-segment button.active small {
+  color: var(--qwz-gold);
+}
+
+body:not(.in-game) .product-mode-segment button.active small {
+  opacity: 1;
+}
+
+body:not(.in-game) .mode-context-copy {
+  margin-top: 0;
+  border-radius: 12px;
+  background: transparent;
+  padding: 0 2px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--qwz-ink-mute);
+}
+
+body:not(.in-game) .play-format-grid {
+  gap: 8px;
+}
+
+body:not(.in-game) .play-format-grid button {
+  min-height: 74px;
+  border-radius: 14px;
+  border: 1px solid var(--qwz-line);
+  background: linear-gradient(180deg, #1c2634 0%, #141d28 100%);
+  box-shadow: none;
+  padding: 11px 12px;
+}
+
+body:not(.in-game) .play-format-grid .format-icon {
+  min-width: 34px;
+  height: 22px;
+  border-radius: 8px;
+  background: rgba(47, 211, 150, 0.16);
+  color: var(--qwz-emerald);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+body:not(.in-game) .play-format-grid strong {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--qwz-ink);
+  margin-top: 6px;
+}
+
+body:not(.in-game) .play-format-grid small {
+  font-size: 11px;
+  color: var(--qwz-ink-mute);
+}
+
+/* override the colorful per-child gradients from the older layer */
+body[data-game-mode="cash"]:not(.in-game) .play-format-grid button:nth-child(1),
+body[data-game-mode="cash"]:not(.in-game) .play-format-grid button:nth-child(2),
+body[data-game-mode="cash"]:not(.in-game) .play-format-grid button:nth-child(3) {
+  background: linear-gradient(180deg, #1c2634 0%, #141d28 100%);
+}
+
+/* --- Leaderboard / progression -------------------------------------- */
+body:not(.in-game) .progression-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+body:not(.in-game) .progression-summary > div {
+  position: relative;
+  padding: 10px 11px;
+  border-radius: var(--qwz-radius-md);
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--qwz-line);
+  box-shadow: none;
+}
+
+body:not(.in-game) .progression-summary > div span {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--qwz-ink-mute);
+}
+
+body:not(.in-game) .progression-summary > div strong {
+  margin-top: 4px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--qwz-ink);
+}
+
+body:not(.in-game) .progression-summary > div:nth-child(1) strong {
+  color: var(--qwz-gold);
+}
+
+body:not(.in-game) .progression-summary > div:nth-child(2) strong {
+  color: var(--qwz-ink);
+}
+
+body:not(.in-game) .progression-summary > div:nth-child(3) strong {
+  color: var(--qwz-emerald);
+}
+
+body:not(.in-game) .leaderboard-empty,
+body:not(.in-game) .leaderboard-list {
+  margin-top: 2px;
+  border-radius: var(--qwz-radius-md);
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--qwz-line);
+  padding: 10px 12px;
+  color: var(--qwz-ink-mute);
+  font-size: 12.5px;
+  box-shadow: none;
+}
+
+/* --- Tables list & limit pills -------------------------------------- */
+body:not(.in-game) .limit-pills {
+  gap: 6px;
+}
+
+body:not(.in-game) .limit-pills button {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--qwz-line);
+  background: transparent;
+  color: var(--qwz-ink-dim);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+body:not(.in-game) .limit-pills button.active {
+  background: rgba(47, 211, 150, 0.14);
+  border-color: rgba(47, 211, 150, 0.36);
+  color: var(--qwz-emerald);
+}
+
+body:not(.in-game) .table-list {
+  gap: 8px;
+}
+
+body:not(.in-game) .table-item {
+  padding: 12px;
+  border-radius: var(--qwz-radius-md);
+  border: 1px solid var(--qwz-line);
+  background: linear-gradient(180deg, #1a2330 0%, #131a24 100%);
+  gap: 12px;
+}
+
+body:not(.in-game) .table-item .table-avatar {
+  background: rgba(47, 211, 150, 0.14);
+  color: var(--qwz-emerald);
+  border-radius: 12px;
+}
+
+body:not(.in-game) .table-item strong {
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--qwz-ink);
+}
+
+body:not(.in-game) .table-item small {
+  font-size: 11px;
+  color: var(--qwz-ink-mute);
+}
+
+body:not(.in-game) .table-item button {
+  min-height: 34px;
+  padding: 0 16px;
+  border-radius: 10px;
+  background: var(--qwz-emerald);
+  color: #062019;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+/* --- Quick play CTA ------------------------------------------------- */
+body:not(.in-game) .home-game-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+body:not(.in-game) #quickPlayButton {
+  min-height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--qwz-emerald) 0%, var(--qwz-emerald-2) 100%);
+  color: #051c14;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.22) inset,
+    0 10px 24px rgba(33, 176, 126, 0.3);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 0 16px;
+  gap: 1px;
+}
+
+body:not(.in-game) #quickPlayButton .tg-row-main {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #051c14;
+}
+
+body:not(.in-game) #quickPlayButton small {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(5, 28, 20, 0.7);
+}
+
+body:not(.in-game) .secondary-pill {
+  min-height: 52px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: transparent;
+  border: 1px solid var(--qwz-line-strong);
+  color: var(--qwz-ink);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+body:not(.in-game) .home-offer-meta {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--qwz-ink-mute);
+}
+
+/* --- Generic menu rows (history, install, settings) ----------------- */
+body:not(.in-game) .tg-menu-group.home-tools,
+body:not(.in-game) .settings-list {
+  border-radius: var(--qwz-radius-lg);
+  border: 1px solid var(--qwz-line);
+  background: linear-gradient(180deg, #161f2b 0%, #111922 100%);
+  box-shadow: var(--qwz-shadow-card);
+  overflow: hidden;
+  padding: 4px;
+  gap: 0;
+}
+
+body:not(.in-game) .tg-menu-row {
+  min-height: 54px;
+  padding: 0 12px;
+  background: transparent;
+  border-radius: 14px;
+  color: var(--qwz-ink);
+}
+
+body:not(.in-game) .tg-menu-row + .tg-menu-row {
+  border-top: 1px solid var(--qwz-line);
+  border-radius: 0;
+}
+
+body:not(.in-game) .tg-menu-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+body:not(.in-game) .tg-row-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(47, 211, 150, 0.12);
+  color: var(--qwz-emerald);
+}
+
+body:not(.in-game) .tg-row-icon--gray {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--qwz-ink-dim);
+}
+
+body:not(.in-game) .tg-row-icon--blue {
+  background: rgba(74, 158, 255, 0.14);
+  color: #6db4ff;
+}
+
+body:not(.in-game) .tg-row-main {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--qwz-ink);
+}
+
+body:not(.in-game) .tg-row-value {
+  font-size: 12px;
+  color: var(--qwz-ink-mute);
+  font-weight: 500;
+}
+
+body:not(.in-game) .session-pill {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--qwz-ink-dim);
+  border: 1px solid var(--qwz-line);
+}
+
+body:not(.in-game) .tg-chevron {
+  color: var(--qwz-ink-mute);
+  font-weight: 400;
+}
+
+/* --- Bottom nav as a premium pill ----------------------------------- */
+body:not(.in-game) .bottom-nav {
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  height: 64px;
+  width: min(360px, calc(100vw - 28px));
+  border-radius: 22px;
+  border: 1px solid var(--qwz-line-strong);
+  background: linear-gradient(180deg, rgba(24, 34, 48, 0.94), rgba(16, 22, 32, 0.94));
+  backdrop-filter: blur(22px) saturate(1.1);
+  -webkit-backdrop-filter: blur(22px) saturate(1.1);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 14px 36px rgba(0, 0, 0, 0.45);
+  padding: 6px 8px;
+}
+
+body:not(.in-game) .bottom-nav button {
+  border-radius: 14px;
+  color: var(--qwz-ink-mute);
+}
+
+body:not(.in-game) .bottom-nav button .nav-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+}
+
+body:not(.in-game) .bottom-nav button.active {
+  background: transparent;
+  color: var(--qwz-emerald);
+}
+
+body:not(.in-game) .bottom-nav button.active .nav-icon {
+  background: rgba(47, 211, 150, 0.14);
+  color: var(--qwz-emerald);
+  border-radius: 10px;
+}
+
+body:not(.in-game) .bottom-nav .nav-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* --- Lobby menu sheet (the "More" sheet) ---------------------------- */
+body:not(.in-game) .lobby-menu-sheet {
+  border-radius: var(--qwz-radius-lg) var(--qwz-radius-lg) 0 0;
+  background: linear-gradient(180deg, #182230 0%, #0e1620 100%);
+  border-top: 1px solid var(--qwz-line-strong);
+}
+
+body:not(.in-game) .lobby-menu-list button {
+  background: transparent;
+  color: var(--qwz-ink);
+}
+
+body:not(.in-game) .lobby-menu-list button .menu-icon {
+  background: rgba(47, 211, 150, 0.12);
+  color: var(--qwz-emerald);
+  border-radius: 12px;
+}
+
+/* =====================================================================
+   QWZ Lobby v2 — Telegram-native breathing room
+   ТЗ: Telegram-dark, голубой акцент, минимум градиентов и контуров,
+   без казино-стиля. Минимум подписей, плотность по референсам
+   (Tribute, major, TonPoker). Одна карта одной высоты, ровные отступы.
+   ===================================================================== */
+
+body:not(.in-game) {
+  --qwz-acc: #2aabee;
+  --qwz-acc-soft: rgba(42, 171, 238, 0.14);
+  --qwz-bg: #0e1419;
+  --qwz-card: #182532;
+  --qwz-card-2: rgba(255, 255, 255, 0.04);
+  --qwz-divider: rgba(255, 255, 255, 0.06);
+  --qwz-ink: #f1f6fb;
+  --qwz-dim: #8a98a8;
+  --qwz-mute: #5d6b7c;
+  background: var(--qwz-bg) !important;
+}
+
+body:not(.in-game) .lobby-shell {
+  padding: calc(14px + env(safe-area-inset-top)) 14px calc(96px + env(safe-area-inset-bottom)) !important;
+  gap: 12px !important;
+  min-height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  flex: 1 1 auto !important;
+}
+
+/* ---------- HERO: profile · balance · primary action ---------- */
+body:not(.in-game) .home-wallet {
+  display: grid !important;
+  grid-template-columns: 40px minmax(0, 1fr) auto !important;
+  grid-template-areas:
+    "ava ident bal"
+    "act act act" !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 14px !important;
+  border-radius: 18px !important;
+  background: var(--qwz-card) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+body:not(.in-game) .home-wallet::after,
+body:not(.in-game) .home-wallet::before { display: none !important; }
+body:not(.in-game) .home-account { display: contents !important; }
+body:not(.in-game) .home-account .lobby-avatar {
+  grid-area: ava !important;
+  width: 40px !important;
+  height: 40px !important;
+  font-size: 16px !important;
+  border-radius: 50% !important;
+}
+body:not(.in-game) .home-identity {
+  grid-area: ident !important;
+  display: grid !important;
+  gap: 1px !important;
+  min-width: 0 !important;
+}
+body:not(.in-game) .home-identity strong {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  color: var(--qwz-ink) !important;
+  letter-spacing: 0 !important;
+}
+body:not(.in-game) .home-identity span,
+body:not(.in-game) .home-identity .player-rank {
+  font-size: 12px !important;
+  color: var(--qwz-dim) !important;
+  font-weight: 500 !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 1 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+}
+body:not(.in-game) .home-identity .player-rank { display: none !important; }
+body:not(.in-game) .home-profile-link { display: none !important; }
+
+body:not(.in-game) .home-balance {
+  grid-area: bal !important;
+  display: flex !important;
+  align-items: baseline !important;
+  justify-content: flex-end !important;
+  gap: 4px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  text-align: right !important;
+}
+body:not(.in-game) .home-balance > span { display: none !important; }
+body:not(.in-game) .home-balance strong {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+  line-height: 1 !important;
+  color: var(--qwz-ink) !important;
+}
+body:not(.in-game) .home-balance strong small {
+  font-size: 11px !important;
+  color: var(--qwz-dim) !important;
+  font-weight: 500 !important;
+}
+
+body:not(.in-game) .home-wallet-actions {
+  grid-area: act !important;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px !important;
+  margin-top: 4px !important;
+}
+body:not(.in-game) .home-wallet-actions button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+  border-radius: 12px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  background: var(--qwz-acc) !important;
+  color: #fff !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+body:not(.in-game) .home-wallet-actions button::after { content: "Депозит"; }
+body:not(.in-game) .home-wallet-actions .home-withdraw {
+  background: var(--qwz-card-2) !important;
+  color: var(--qwz-ink) !important;
+}
+body:not(.in-game) .home-wallet-actions .home-withdraw::after { content: "Вывод"; }
+body:not(.in-game) .home-wallet-actions button svg {
+  width: 15px !important;
+  height: 15px !important;
+  stroke-width: 2.4 !important;
+}
+
+/* ---------- Hide noise on home: promo carousel, leaderboard, tools ---------- */
+body:not(.in-game) [data-lobby-view="home"].active .home-promo-banners,
+body:not(.in-game) [data-lobby-view="home"].active .home-promo-dots,
+body:not(.in-game) [data-lobby-view="home"].active .progression-card,
+body:not(.in-game) [data-lobby-view="home"].active .mode-context-copy,
+body:not(.in-game) [data-lobby-view="home"].active .product-mode-title,
+body:not(.in-game) [data-lobby-view="home"].active .home-game-actions,
+body:not(.in-game) [data-lobby-view="home"].active .home-offer-meta,
+body:not(.in-game) [data-lobby-view="home"].active .home-metrics {
+  display: none !important;
+}
+/* Tables grow to fill remaining height; tools row pinned right above nav */
+body:not(.in-game) [data-lobby-view="home"].active .home-games {
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .home-table-list {
+  flex: 1 1 auto !important;
+  overflow-y: auto !important;
+  scrollbar-width: none !important;
+  align-content: start !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .home-table-list::-webkit-scrollbar {
+  display: none !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .home-tools {
+  display: grid !important;
+  border-radius: 16px !important;
+  background: var(--qwz-card) !important;
+  padding: 4px 14px !important;
+  gap: 0 !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .home-tools .tg-menu-row {
+  display: grid !important;
+  grid-template-columns: 34px minmax(0, 1fr) auto 14px !important;
+  align-items: center !important;
+  gap: 12px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 12px 0 !important;
+  min-height: 52px !important;
+  text-align: left !important;
+  color: var(--qwz-ink) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .home-tools .tg-menu-row + .tg-menu-row {
+  border-top: 1px solid var(--qwz-divider) !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .home-tools .tg-row-icon {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 10px !important;
+  background: var(--qwz-acc-soft) !important;
+  color: var(--qwz-acc) !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .home-tools .tg-row-value,
+body:not(.in-game) [data-lobby-view="home"].active .home-tools .session-pill {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: var(--qwz-dim) !important;
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .home-tools .tg-chevron {
+  color: var(--qwz-mute) !important;
+  font-size: 18px !important;
+}
+
+/* ---------- Mode tabs: single horizontal scroll row, 5 pills ---------- */
+body:not(.in-game) .product-mode-hub {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  gap: 6px !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 2px 2px !important;
+  margin: 0 -2px !important;
+}
+body:not(.in-game) .product-mode-hub::-webkit-scrollbar { display: none !important; }
+body:not(.in-game) .product-mode-hub::before,
+body:not(.in-game) .product-mode-hub::after { display: none !important; }
+
+body:not(.in-game) .game-mode-switch.product-mode-segment,
+body:not(.in-game) .play-format-grid,
+body[data-game-mode="play"]:not(.in-game) .play-format-grid,
+body[data-game-mode="cash"]:not(.in-game) .play-format-grid {
+  display: contents !important;
+}
+
+body:not(.in-game) .product-mode-hub button {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  min-height: 36px !important;
+  padding: 0 14px !important;
+  border-radius: 999px !important;
+  background: var(--qwz-card) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: var(--qwz-dim) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  text-align: center !important;
+  transform: none !important;
+  max-height: none !important;
+  opacity: 1 !important;
+}
+body:not(.in-game) .product-mode-hub button.active {
+  background: var(--qwz-acc) !important;
+  color: #fff !important;
+}
+body:not(.in-game) .product-mode-hub button span,
+body:not(.in-game) .product-mode-hub button strong {
+  font: inherit !important;
+  color: inherit !important;
+  margin: 0 !important;
+  display: inline !important;
+}
+body:not(.in-game) .product-mode-hub button small,
+body:not(.in-game) .product-mode-hub button .format-icon { display: none !important; }
+body:not(.in-game) .product-mode-hub button .tether-mark {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+/* ---------- Tables block: open, no card-in-card, list rows ---------- */
+body:not(.in-game) .home-games {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  gap: 8px !important;
+}
+body:not(.in-game) .home-games .section-title { display: none !important; }
+
+body:not(.in-game) .home-limit-pills {
+  display: flex !important;
+  gap: 6px !important;
+  padding: 0 !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+body:not(.in-game) .home-limit-pills::-webkit-scrollbar { display: none !important; }
+body:not(.in-game) .home-limit-pills button {
+  flex: 0 0 auto !important;
+  min-height: 30px !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  background: var(--qwz-card-2) !important;
+  color: var(--qwz-dim) !important;
+  border: 0 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+body:not(.in-game) .home-limit-pills button.active {
+  background: var(--qwz-acc) !important;
+  color: #fff !important;
+}
+
+body:not(.in-game) .home-table-list {
+  display: grid !important;
+  gap: 0 !important;
+  background: var(--qwz-card) !important;
+  border-radius: 16px !important;
+  padding: 4px 14px !important;
+  overflow: hidden !important;
+}
+body:not(.in-game) .home-table-list .table-item {
+  display: grid !important;
+  grid-template-columns: 36px minmax(0, 1fr) 18px !important;
+  align-items: center !important;
+  gap: 12px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 12px 0 !important;
+  min-height: 56px !important;
+  position: relative !important;
+}
+body:not(.in-game) .home-table-list .table-item + .table-item {
+  border-top: 1px solid var(--qwz-divider) !important;
+}
+body:not(.in-game) .home-table-list .table-item .table-avatar {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 12px !important;
+  background: var(--qwz-acc-soft) !important;
+  color: var(--qwz-acc) !important;
+  font-size: 14px !important;
+  display: grid !important;
+  place-items: center !important;
+}
+body:not(.in-game) .home-table-list .table-summary { min-width: 0 !important; }
+body:not(.in-game) .home-table-list .table-summary strong {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: var(--qwz-ink) !important;
+  letter-spacing: 0 !important;
+}
+body:not(.in-game) .home-table-list .table-summary > span,
+body:not(.in-game) .home-table-list .table-summary .table-row + span {
+  font-size: 12px !important;
+  color: var(--qwz-dim) !important;
+  font-weight: 500 !important;
+}
+body:not(.in-game) .home-table-list .table-row small { display: none !important; }
+
+/* turn the Войти button into a clean chevron anchored to the right */
+body:not(.in-game) .home-table-list .table-item > button {
+  appearance: none !important;
+  width: 18px !important;
+  min-width: 18px !important;
+  max-width: 18px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  font-size: 0 !important;
+  color: transparent !important;
+  text-indent: -9999px !important;
+  overflow: hidden !important;
+  justify-self: end !important;
+  align-self: center !important;
+  position: relative !important;
+  cursor: pointer !important;
+}
+body:not(.in-game) .home-table-list .table-item > button::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  display: block !important;
+  background: no-repeat center / 8px 14px url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 14'><path d='M1 1l6 6-6 6' fill='none' stroke='%235d6b7c' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>") !important;
+  text-indent: 0 !important;
+}
+
+/* ---------- Bottom nav: floating Telegram pill, no border ---------- */
+body:not(.in-game) .bottom-nav {
+  position: fixed !important;
+  left: 14px !important;
+  right: 14px !important;
+  bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+  width: auto !important;
+  margin: 0 !important;
+  background: rgba(24, 37, 50, 0.92) !important;
+  border: 0 !important;
+  border-radius: 22px !important;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(22px) !important;
+  padding: 6px 8px !important;
+}
+body:not(.in-game) .bottom-nav button {
+  background: transparent !important;
+  color: var(--qwz-mute) !important;
+}
+body:not(.in-game) .bottom-nav button .nav-label {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}
+body:not(.in-game) .bottom-nav button.active {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+body:not(.in-game) .bottom-nav button.active .nav-icon,
+body:not(.in-game) .bottom-nav button.active .nav-label {
+  color: var(--qwz-acc) !important;
+}
+
+/* ---------- Apply same Telegram-blue styling to other views ---------- */
+body:not(.in-game) .lobby-view.active {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+
+body:not(.in-game) .lobby-view.active .lobby-card,
+body:not(.in-game) .lobby-view.active .wallet-card,
+body:not(.in-game) .lobby-view.active .cashier-card,
+body:not(.in-game) .lobby-view.active .cashier-topup-card,
+body:not(.in-game) .lobby-view.active .cashier-withdraw-card,
+body:not(.in-game) .lobby-view.active .cashier-history-card,
+body:not(.in-game) .lobby-view.active .profile-hero,
+body:not(.in-game) .lobby-view.active .affiliate-hero,
+body:not(.in-game) .lobby-view.active .create-card {
+  background: var(--qwz-card) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 18px !important;
+  padding: 14px !important;
+  gap: 10px !important;
+}
+
+body:not(.in-game) .lobby-view.active .table-list {
+  display: grid !important;
+  gap: 0 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+}
+body:not(.in-game) .lobby-view.active .table-list .table-item {
+  display: grid !important;
+  grid-template-columns: 36px minmax(0, 1fr) 18px !important;
+  align-items: center !important;
+  gap: 12px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 12px 0 !important;
+  min-height: 56px !important;
+}
+body:not(.in-game) .lobby-view.active .table-list .table-item + .table-item {
+  border-top: 1px solid var(--qwz-divider) !important;
+}
+body:not(.in-game) .lobby-view.active .table-list .table-item .table-avatar {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 12px !important;
+  background: var(--qwz-acc-soft) !important;
+  color: var(--qwz-acc) !important;
+  font-size: 14px !important;
+}
+body:not(.in-game) .lobby-view.active .table-list .table-row strong {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: var(--qwz-ink) !important;
+}
+body:not(.in-game) .lobby-view.active .table-list .table-row small {
+  display: none !important;
+}
+body:not(.in-game) .lobby-view.active .table-list .table-summary > span {
+  font-size: 12px !important;
+  color: var(--qwz-dim) !important;
+  font-weight: 500 !important;
+}
+body:not(.in-game) .lobby-view.active .table-list .table-item > button {
+  width: 18px !important;
+  min-width: 18px !important;
+  max-width: 18px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  text-indent: -9999px !important;
+  overflow: hidden !important;
+  justify-self: end !important;
+  position: relative !important;
+}
+body:not(.in-game) .lobby-view.active .table-list .table-item > button::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  background: no-repeat center / 8px 14px url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 14'><path d='M1 1l6 6-6 6' fill='none' stroke='%235d6b7c' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>") !important;
+  text-indent: 0 !important;
+}
+
+body:not(.in-game) .lobby-view.active .section-title {
+  display: flex !important;
+  align-items: baseline !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+}
+body:not(.in-game) .lobby-view.active .section-title .eyebrow {
+  display: none !important;
+}
+body:not(.in-game) .lobby-view.active .section-title h2 {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+  margin: 0 !important;
+  color: var(--qwz-ink) !important;
+}
+body:not(.in-game) .lobby-view.active .section-title > span {
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+  color: var(--qwz-mute) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+body:not(.in-game) .lobby-view.active .limit-pills {
+  display: flex !important;
+  gap: 6px !important;
+  padding: 0 !important;
+}
+body:not(.in-game) .lobby-view.active .limit-pills button {
+  flex: 0 0 auto !important;
+  min-height: 30px !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  background: var(--qwz-card-2) !important;
+  color: var(--qwz-dim) !important;
+  border: 0 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+body:not(.in-game) .lobby-view.active .limit-pills button.active {
+  background: var(--qwz-acc) !important;
+  color: #fff !important;
+}
+
+body:not(.in-game) .lobby-view.active .cashier-pay-button,
+body:not(.in-game) .lobby-view.active .create-grid button,
+body:not(.in-game) .lobby-view.active .affiliate-actions button:first-child {
+  background: var(--qwz-acc) !important;
+  color: #fff !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  min-height: 46px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  box-shadow: none !important;
+}
+
+/* Re-suppress the format hub title only on home (overridden by general rules above) */
+body:not(.in-game) [data-lobby-view="home"].active .product-mode-hub .section-title,
+body:not(.in-game) [data-lobby-view="home"].active .product-mode-hub .section-title h2,
+body:not(.in-game) [data-lobby-view="home"].active .product-mode-hub .section-title > span,
+body:not(.in-game) [data-lobby-view="home"].active .product-mode-title {
+  display: none !important;
+}
+
+/* =====================================================================
+   QWZ Lobby v3 — polish: promo carousel back, balance pop,
+   colour variety (blue primary + accent palette), menu icons,
+   tab scroll affordance.
+   ===================================================================== */
+
+:root {
+  --qwz-violet: #8b6cff;
+  --qwz-gold:   #f4c14a;
+  --qwz-teal:   #36c8c8;
+  --qwz-green:  #2fc97e;
+  --qwz-pink:   #ff6ea0;
+}
+
+/* ---------- Balance: prominent chip on the right ---------- */
+body:not(.in-game) .home-balance {
+  align-items: baseline !important;
+  gap: 6px !important;
+}
+body:not(.in-game) .home-balance strong {
+  font-size: 22px !important;
+  font-weight: 800 !important;
+  color: var(--qwz-acc) !important;
+  letter-spacing: -0.01em !important;
+}
+body:not(.in-game) .home-balance strong b {
+  font: inherit !important;
+}
+body:not(.in-game) .home-balance strong small {
+  display: inline-block !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: var(--qwz-dim) !important;
+  margin-left: 2px !important;
+  padding: 2px 6px !important;
+  background: var(--qwz-card-2) !important;
+  border-radius: 6px !important;
+}
+
+/* ---------- Promo carousel restored, compact gradient tiles ---------- */
+body:not(.in-game) [data-lobby-view="home"].active .home-promo-banners {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+  scroll-snap-type: x mandatory !important;
+  scrollbar-width: none !important;
+  margin: 0 -14px !important;
+  padding: 2px 14px 4px !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .home-promo-banners::-webkit-scrollbar { display: none !important; }
+body:not(.in-game) [data-lobby-view="home"].active .home-promo-dots {
+  display: none !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .promo-banner {
+  flex: 0 0 78% !important;
+  scroll-snap-align: start !important;
+  display: grid !important;
+  grid-template-rows: auto 1fr auto !important;
+  gap: 4px !important;
+  min-height: 92px !important;
+  border-radius: 16px !important;
+  padding: 12px 14px !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: #fff !important;
+  text-align: left !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .promo-banner::after { display: none !important; }
+body:not(.in-game) [data-lobby-view="home"].active .promo-banner--primary {
+  background: linear-gradient(135deg, #2aabee 0%, #1d6fd8 100%) !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .promo-banner--event {
+  background: linear-gradient(135deg, #8b6cff 0%, #5b3cd9 100%) !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .promo-banner--status {
+  background: linear-gradient(135deg, #f4c14a 0%, #d68b1a 100%) !important;
+  color: #1a1206 !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .promo-banner .promo-kicker {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: rgba(255, 255, 255, 0.78) !important;
+  margin: 0 !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .promo-banner--status .promo-kicker {
+  color: rgba(26, 18, 6, 0.7) !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .promo-banner strong {
+  margin: 0 !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  line-height: 1.15 !important;
+  color: inherit !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .promo-banner small {
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: rgba(255, 255, 255, 0.78) !important;
+  line-height: 1.2 !important;
+  max-width: 100% !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .promo-banner--status small {
+  color: rgba(26, 18, 6, 0.7) !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .promo-banner .promo-action {
+  display: none !important;
+}
+
+/* ---------- Mode tabs: smaller padding so all 5 fit, scroll hint ---------- */
+body:not(.in-game) .product-mode-hub {
+  margin: 0 -14px !important;
+  padding: 0 14px 2px !important;
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%) !important;
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%) !important;
+}
+body:not(.in-game) .product-mode-hub button {
+  padding: 0 11px !important;
+  min-height: 34px !important;
+  font-size: 12.5px !important;
+}
+
+/* ---------- Coloured accents on game-mode tabs to break monotony ---------- */
+body[data-game-mode="cash"]:not(.in-game) .product-mode-hub .game-mode-switch button[data-game-mode="cash"],
+body[data-game-mode="play"]:not(.in-game) .product-mode-hub .game-mode-switch button[data-game-mode="play"] {
+  background: var(--qwz-acc) !important;
+  color: #fff !important;
+}
+
+/* ---------- Tables list: coloured stake avatars ---------- */
+body:not(.in-game) .home-table-list .table-item:nth-child(3n+1) .table-avatar,
+body:not(.in-game) .lobby-view.active .table-list .table-item:nth-child(3n+1) .table-avatar {
+  background: rgba(42, 171, 238, 0.14) !important;
+  color: var(--qwz-acc) !important;
+}
+body:not(.in-game) .home-table-list .table-item:nth-child(3n+2) .table-avatar,
+body:not(.in-game) .lobby-view.active .table-list .table-item:nth-child(3n+2) .table-avatar {
+  background: rgba(139, 108, 255, 0.14) !important;
+  color: var(--qwz-violet) !important;
+}
+body:not(.in-game) .home-table-list .table-item:nth-child(3n+3) .table-avatar,
+body:not(.in-game) .lobby-view.active .table-list .table-item:nth-child(3n+3) .table-avatar {
+  background: rgba(54, 200, 200, 0.14) !important;
+  color: var(--qwz-teal) !important;
+}
+
+/* ---------- Menu sheet icons: per-row accent colours ---------- */
+body:not(.in-game) .lobby-menu-list button .menu-icon {
+  background: rgba(42, 171, 238, 0.14) !important;
+  color: var(--qwz-acc) !important;
+  border-radius: 11px !important;
+}
+body:not(.in-game) .lobby-menu-list button[data-menu-action="cashier"] .menu-icon {
+  background: rgba(47, 201, 126, 0.14) !important;
+  color: var(--qwz-green) !important;
+}
+body:not(.in-game) .lobby-menu-list button[data-menu-action="details"] .menu-icon {
+  background: rgba(139, 108, 255, 0.14) !important;
+  color: var(--qwz-violet) !important;
+}
+body:not(.in-game) .lobby-menu-list button[data-menu-action="affiliate"] .menu-icon {
+  background: rgba(244, 193, 74, 0.14) !important;
+  color: var(--qwz-gold) !important;
+}
+body:not(.in-game) .lobby-menu-list button[data-menu-action="support"] .menu-icon {
+  background: rgba(54, 200, 200, 0.14) !important;
+  color: var(--qwz-teal) !important;
+}
+
+/* ---------- Home-tools icons: per-row accent ---------- */
+body:not(.in-game) [data-lobby-view="home"].active .home-tools .tg-menu-row:nth-child(1) .tg-row-icon {
+  background: rgba(139, 108, 255, 0.14) !important;
+  color: var(--qwz-violet) !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .home-tools .tg-menu-row:nth-child(2) .tg-row-icon {
+  background: rgba(244, 193, 74, 0.14) !important;
+  color: var(--qwz-gold) !important;
+}
+
+/* ---------- Tournament cards: gold accent on the eyebrow ---------- */
+body:not(.in-game) .lobby-view.active .tournament-list .tournament-card .eyebrow,
+body:not(.in-game) .lobby-view.active .tournament-card [class*="eyebrow"] {
+  color: var(--qwz-gold) !important;
+}
+
+/* ---------- Deposit button: stronger Telegram-blue gradient ---------- */
+body:not(.in-game) .home-wallet-actions button:not(.home-withdraw) {
+  background: linear-gradient(135deg, #2aabee 0%, #1d8fcf 100%) !important;
+  box-shadow: 0 6px 18px rgba(42, 171, 238, 0.28) !important;
+}
+
+/* =====================================================================
+   QWZ Lobby v4 — authoritative pass
+   Balance hero · mode-aware actions w/ transition · segmented mode
+   toggle · format pills fit · promo carousel + animated dots ·
+   tighter table header · robust menu sheet.
+   ===================================================================== */
+
+/* ---------- HERO: avatar+name / balance row / actions ---------- */
+body:not(.in-game) .home-wallet {
+  grid-template-columns: 44px minmax(0, 1fr) !important;
+  grid-template-areas:
+    "ava ident"
+    "bal bal"
+    "act act" !important;
+  align-items: center !important;
+  gap: 4px 12px !important;
+  padding: 16px 16px 14px !important;
+  border-radius: 20px !important;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(42, 171, 238, 0.10) 0%, transparent 45%),
+    var(--qwz-card) !important;
+}
+body:not(.in-game) .home-account .lobby-avatar {
+  grid-area: ava !important;
+  width: 44px !important;
+  height: 44px !important;
+  font-size: 17px !important;
+}
+body:not(.in-game) .home-identity { grid-area: ident !important; align-self: center !important; }
+body:not(.in-game) .home-identity strong { font-size: 15px !important; }
+body:not(.in-game) .home-identity span {
+  display: block !important;
+  font-size: 12px !important;
+  color: var(--qwz-dim) !important;
+}
+
+/* balance becomes the hero block */
+body:not(.in-game) .home-balance {
+  grid-area: bal !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  gap: 2px !important;
+  margin-top: 12px !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+body:not(.in-game) .home-balance > span {
+  display: block !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.09em !important;
+  text-transform: uppercase !important;
+  color: var(--qwz-dim) !important;
+}
+body:not(.in-game) .home-balance strong {
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 6px !important;
+  font-size: 30px !important;
+  font-weight: 800 !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.02em !important;
+  color: var(--qwz-ink) !important;
+}
+body:not(.in-game) .home-balance strong b { font: inherit !important; color: inherit !important; }
+body:not(.in-game) .home-balance strong small {
+  display: inline-block !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  color: var(--qwz-dim) !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+/* actions: cash only, smooth collapse on rating ---------------------- */
+body:not(.in-game) .home-wallet-actions {
+  grid-area: act !important;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px !important;
+  margin-top: 14px !important;
+  max-height: 52px !important;
+  opacity: 1 !important;
+  overflow: hidden !important;
+  transition: max-height 320ms cubic-bezier(.4,0,.2,1), opacity 240ms ease, margin-top 320ms ease !important;
+}
+body[data-game-mode="play"]:not(.in-game) .home-wallet-actions {
+  max-height: 0 !important;
+  opacity: 0 !important;
+  margin-top: 0 !important;
+  pointer-events: none !important;
+}
+body:not(.in-game) .home-wallet-actions button {
+  min-height: 44px !important;
+  border-radius: 13px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  gap: 8px !important;
+}
+
+/* ---------- Mode area: segmented toggle + format pills ---------- */
+body:not(.in-game) .product-mode-hub {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  overflow: visible !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  mask-image: none !important;
+  -webkit-mask-image: none !important;
+}
+/* primary 2-segment control */
+body:not(.in-game) .game-mode-switch.product-mode-segment {
+  display: flex !important;
+  gap: 4px !important;
+  padding: 4px !important;
+  border-radius: 14px !important;
+  background: var(--qwz-card) !important;
+  border: 0 !important;
+}
+body:not(.in-game) .game-mode-switch.product-mode-segment button {
+  flex: 1 1 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+  border-radius: 11px !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: var(--qwz-dim) !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  transition: background 240ms ease, color 240ms ease !important;
+}
+body:not(.in-game) .game-mode-switch.product-mode-segment button.active {
+  background: var(--qwz-acc) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 14px rgba(42, 171, 238, 0.3) !important;
+}
+body:not(.in-game) .game-mode-switch.product-mode-segment button small { display: none !important; }
+body:not(.in-game) .game-mode-switch.product-mode-segment button .tether-mark {
+  width: 14px !important; height: 14px !important;
+}
+/* secondary format pills, 3 equal, fit 390 */
+body:not(.in-game) .play-format-grid,
+body[data-game-mode="play"]:not(.in-game) .play-format-grid,
+body[data-game-mode="cash"]:not(.in-game) .play-format-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 6px !important;
+  max-height: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  overflow: visible !important;
+  padding: 0 !important;
+}
+body:not(.in-game) .play-format-grid button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 38px !important;
+  padding: 0 8px !important;
+  border-radius: 12px !important;
+  background: var(--qwz-card) !important;
+  border: 0 !important;
+  color: var(--qwz-dim) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+body:not(.in-game) .play-format-grid button strong {
+  margin: 0 !important; font: inherit !important; color: inherit !important;
+}
+body:not(.in-game) .play-format-grid button small,
+body:not(.in-game) .play-format-grid button .format-icon { display: none !important; }
+body:not(.in-game) .play-format-grid button:nth-child(1) { color: var(--qwz-gold) !important; }
+body:not(.in-game) .play-format-grid button:nth-child(2) { color: var(--qwz-teal) !important; }
+body:not(.in-game) .play-format-grid button:nth-child(3) { color: var(--qwz-violet) !important; }
+
+/* ---------- Promo carousel: clean peek + restore animated dots ---------- */
+body:not(.in-game) [data-lobby-view="home"].active .home-promo-banners {
+  margin: 0 -14px !important;
+  padding: 2px 14px 0 !important;
+  gap: 10px !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .promo-banner {
+  flex: 0 0 calc(100% - 40px) !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .home-promo-dots {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  margin: 2px 0 0 !important;
+  padding: 0 !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .home-promo-dots span {
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 3px !important;
+  background: rgba(255, 255, 255, 0.22) !important;
+  transition: width 280ms ease, background 280ms ease !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .home-promo-dots span.active {
+  width: 24px !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .home-promo-dots span.active::after {
+  content: "" !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  width: 0 !important;
+  border-radius: 3px !important;
+  background: var(--qwz-acc) !important;
+  animation: qwzPromoProgress 10s linear forwards !important;
+}
+@keyframes qwzPromoProgress { to { width: 100%; } }
+
+/* ---------- Tables: tighten header→pills gap ---------- */
+body:not(.in-game) [data-lobby-view="home"].active .home-games { gap: 8px !important; }
+body:not(.in-game) [data-lobby-view="home"].active .home-games .section-title {
+  display: flex !important;
+  margin: 0 0 2px !important;
+}
+body:not(.in-game) [data-lobby-view="home"].active .home-limit-pills {
+  margin: 0 !important;
+  padding: 0 0 2px !important;
+}
+
+/* ---------- Robust menu sheet (reachable on short screens) ---------- */
+body:not(.in-game) .lobby-menu-sheet {
+  max-height: min(78vh, 560px) !important;
+  overflow-y: auto !important;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+  z-index: 90 !important;
+}
+body:not(.in-game) .lobby-menu-list button {
+  min-height: 56px !important;
+  padding: 10px 12px !important;
+}
