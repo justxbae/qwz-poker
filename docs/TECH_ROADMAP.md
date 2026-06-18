@@ -11,6 +11,7 @@
 ✅ PostgreSQL персистентность с миграциями (`server/db.js`) — wallets, ledger, payments, hand_histories, admin_events, tournament_registrations, fund_movements, saved_stacks
 ✅ Транзакционные wallet+ledger операции с `FOR UPDATE`
 ✅ Telegram Stars инвойсы (createInvoiceLink + pre_checkout + successful_payment)
+✅ Stars payment confirmation: webhook readiness fail-closed, authenticated order polling, authoritative wallet refresh, duplicate webhook test
 ✅ Турниры — регистрация / отмена с эскроу через advisory_xact_lock
 ✅ Admin commands в боте (`/balance`, `/grant`, `/deduct`) с идемпотентностью
 ✅ Admin API + панель в Mini App с диагностикой
@@ -552,7 +553,7 @@ create table user_risk_scores (
 1. **Property-based testing** для poker-engine — генерировать рандомные сценарии раздач и проверять инварианты (сумма стеков + банк = const, side-pots распределяются корректно при любой комбинации all-in’ов).
 2. **Load testing**: artillery / k6 скрипт, эмулирующий 100/500/1000 одновременных игроков с реалистичной траекторией (auth → join → play → leave).
 3. **Chaos testing**: random kill сервера во время раздачи → проверка восстановления (после внедрения Redis state).
-4. **Payment testing**: mock-провайдеры для TON / USDT / RUB / Stars — flow с задержками, ошибками, ретраями, чарджбэками.
+4. **Payment testing**: mock-провайдеры для TON / USDT / RUB / Stars — базовые success, webhook mismatch и retry/idempotency покрыты; добавить PostgreSQL integration, задержки, чарджбэки и provider outages.
 5. **Fraud testing**: симуляция multi-account, chip dump, bot timing — проверка, что fraud engine ловит.
 6. **Visual regression** (после дизайна): Percy / Chromatic для Mini App layout.
 

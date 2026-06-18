@@ -554,6 +554,18 @@ test("crypto deposit order can be created but does not credit chips before confi
 
 test("Stars, Crypto Bot, and xRocket deposit rails create invoices and credit cash on confirmation", async () => {
   const telegramApi = await startMockApiServer(async (req) => {
+    if (req.method === "POST" && req.url.startsWith("/bottest-token/getWebhookInfo")) {
+      return {
+        status: 200,
+        body: {
+          ok: true,
+          result: {
+            url: "https://qwz.test/api/telegram/webhook",
+            pending_update_count: 0
+          }
+        }
+      };
+    }
     if (req.method !== "POST" || !req.url.startsWith("/bottest-token/createInvoiceLink")) {
       return { status: 404, body: { ok: false, description: "not found" } };
     }
@@ -602,6 +614,7 @@ test("Stars, Crypto Bot, and xRocket deposit rails create invoices and credit ca
 
   const server = await startServer({
     REAL_MONEY_ENABLED: "true",
+    APP_PUBLIC_URL: "https://qwz.test",
     TELEGRAM_API_BASE: telegramApi.url,
     CRYPTOBOT_API_KEY: "crypto-test-key",
     CRYPTOBOT_API_BASE: cryptoBotApi.url,
@@ -628,6 +641,21 @@ test("Stars, Crypto Bot, and xRocket deposit rails create invoices and credit ca
     assert.equal(starsInvoice.order.stars, 2500);
     assert.equal(starsInvoice.order.invoiceUrl, "https://t.me/$qwz_test_invoice");
 
+    const pendingStars = await request(`/api/cashier/payment-orders/${starsInvoice.order.id}`, {
+      token: auth.token
+    });
+    assert.equal(pendingStars.order.status, "pending");
+    assert.equal(pendingStars.cashier.cashBalanceMicros, 0);
+
+    const otherAuth = await request("/api/auth", {
+      method: "POST",
+      body: { initData: telegramInitData({ id: 333, first_name: "Other", username: "other" }) }
+    });
+    await assert.rejects(
+      () => request(`/api/cashier/payment-orders/${starsInvoice.order.id}`, { token: otherAuth.token }),
+      /Платёж не найден/
+    );
+
     await request("/api/telegram/webhook", {
       method: "POST",
       body: {
@@ -649,6 +677,28 @@ test("Stars, Crypto Bot, and xRocket deposit rails create invoices and credit ca
     assert.equal(paidCashier.activeBonuses.length, 1);
     assert.equal(paidCashier.activeBonuses[0].type, "welcome");
     assert.equal(paidCashier.activeBonuses[0].wageringRequiredMicros, 37_500_000);
+
+    const paidStars = await request(`/api/cashier/payment-orders/${starsInvoice.order.id}`, {
+      token: auth.token
+    });
+    assert.equal(paidStars.order.status, "paid");
+    assert.equal(paidStars.cashier.cashBalanceMicros, 25_000_000);
+
+    await request("/api/telegram/webhook", {
+      method: "POST",
+      body: {
+        message: {
+          successful_payment: {
+            invoice_payload: starsInvoice.order.payload,
+            currency: "XTR",
+            total_amount: starsInvoice.order.stars,
+            telegram_payment_charge_id: "stars-charge-1"
+          }
+        }
+      }
+    });
+    paidCashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(paidCashier.cashBalanceMicros, 25_000_000);
 
     const cryptoOrder = await request("/api/cashier/crypto-order", {
       method: "POST",
@@ -805,11 +855,50 @@ test("Stars, Crypto Bot, and xRocket deposit rails create invoices and credit ca
     assert.equal(paidCashier.activeBonuses[0].wageringPaidMicros, 5_000);
     assert.equal(opponentCashier.activeBonuses[0].wageringPaidMicros, 5_000);
   } finally {
+    server.kill();
     await Promise.all([
       telegramApi.close(),
       cryptoBotApi.close(),
       xRocketApi.close()
     ]);
+  }
+});
+
+test("Stars invoice is blocked when Telegram webhook cannot return payment confirmation", async () => {
+  let invoiceRequests = 0;
+  const telegramApi = await startMockApiServer(async (req) => {
+    if (req.method === "POST" && req.url.startsWith("/bottest-token/getWebhookInfo")) {
+      return {
+        status: 200,
+        body: { ok: true, result: { url: "https://wrong.test/api/telegram/webhook" } }
+      };
+    }
+    if (req.method === "POST" && req.url.startsWith("/bottest-token/createInvoiceLink")) {
+      invoiceRequests += 1;
+      return { status: 200, body: { ok: true, result: "https://t.me/$must_not_open" } };
+    }
+    return { status: 404, body: { ok: false, description: "not found" } };
+  });
+
+  const server = await startServer({
+    REAL_MONEY_ENABLED: "true",
+    APP_PUBLIC_URL: "https://qwz.test",
+    TELEGRAM_API_BASE: telegramApi.url
+  });
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await assert.rejects(
+      () => request("/api/cashier/stars-invoice", {
+        method: "POST",
+        token: auth.token,
+        body: { usdtAmount: 1 }
+      }),
+      /сервер не готов принять подтверждение Telegram/
+    );
+    assert.equal(invoiceRequests, 0);
+  } finally {
+    server.kill();
+    await telegramApi.close();
   }
 });
 

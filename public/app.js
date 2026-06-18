@@ -956,6 +956,12 @@ async function loadCashier() {
 
 function renderCashier(cashier) {
   const cashMode = Boolean(cashier.realMoneyEnabled);
+  if (state.user) {
+    state.user.balance = Number(cashier.playBalance || 0);
+    state.user.cashBalanceMicros = Number(cashier.cashBalanceMicros || 0);
+    renderModeBalance();
+    renderHomeCta();
+  }
   if (cashierAssetLabel) cashierAssetLabel.textContent = cashMode ? "Баланс USDT" : "Игровые фишки";
   if (cashierTopupTitle) cashierTopupTitle.textContent = cashMode ? "Пополнить баланс" : "Тестовый баланс";
   if (cashierDepositNetwork) cashierDepositNetwork.textContent = cashMode ? "USDT" : "DEV";
@@ -1259,7 +1265,7 @@ async function payCashierAmount() {
           usdtAmount: quote.usdtAmount
         }
       });
-      openStarsInvoice(data.order?.invoiceUrl || data.order?.invoiceLink || "");
+      openStarsInvoice(data.order);
       cashierStatus.textContent = "Счёт Stars открыт.";
       return;
     }
@@ -1306,7 +1312,8 @@ function renderCryptoPaymentInstructions(order) {
   ].join("").trim();
 }
 
-async function openStarsInvoice(invoiceLink) {
+async function openStarsInvoice(order) {
+  const invoiceLink = order?.invoiceUrl || order?.invoiceLink || "";
   if (!invoiceLink) {
     showError("Не удалось создать счёт Telegram Stars");
     return;
@@ -1315,12 +1322,16 @@ async function openStarsInvoice(invoiceLink) {
   if (tg?.openInvoice) {
     tg.openInvoice(invoiceLink, async (status) => {
       if (status === "paid") {
-        cashierStatus.textContent = "Оплата прошла. Обновляем баланс...";
-        await auth();
-        await loadCashier();
-        await loadProfile();
-        cashierStatus.textContent = "Баланс обновлён";
-        showStatus("Баланс пополнен");
+        cashierStatus.textContent = "Stars списаны. Ждём подтверждение сервера...";
+        const confirmed = await waitForPaymentConfirmation(order);
+        if (confirmed) {
+          cashierStatus.textContent = "Баланс пополнен";
+          showStatus(`Баланс пополнен на ${Number(order.usdtAmount || 0).toFixed(2)} USDT`);
+          haptic("success");
+          return;
+        }
+        cashierStatus.textContent = "Платёж принят Telegram, подтверждение задерживается. Не оплачивайте повторно — баланс обновится автоматически.";
+        showStatus("Платёж обрабатывается. Не оплачивайте повторно.");
         return;
       }
       cashierStatus.textContent = status === "cancelled" ? "Оплата отменена" : "Оплата не завершена";
@@ -1334,6 +1345,34 @@ async function openStarsInvoice(invoiceLink) {
     return;
   }
   window.open(invoiceLink, "_blank", "noopener,noreferrer");
+}
+
+async function waitForPaymentConfirmation(order, options = {}) {
+  const orderId = String(order?.id || "");
+  if (!orderId) return false;
+  const attempts = Math.max(1, Number(options.attempts || 20));
+  const intervalMs = Math.max(250, Number(options.intervalMs || 1500));
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const data = await api(`/api/cashier/payment-orders/${encodeURIComponent(orderId)}`);
+      if (data.cashier) renderCashier(data.cashier);
+      if (data.order?.status === "paid") {
+        await loadProfile();
+        return true;
+      }
+      if (["failed", "expired", "manual_review"].includes(data.order?.status)) return false;
+    } catch (error) {
+      console.warn("payment confirmation unavailable", error);
+    }
+    if (attempt < attempts - 1) await delay(intervalMs);
+  }
+
+  return false;
+}
+
+function delay(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 async function loadProfile() {

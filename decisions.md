@@ -17,3 +17,13 @@
 **Влияет на:** `render.yaml`, production deploy, cash API и платежи.
 **Что обновлено:** Production start command и regression-тест конфигурации.
 **Открытые вопросы:** Перед деплоем проверить, что в Render заданы `DATABASE_URL`, `REDIS_URL`, `BOT_TOKEN` и секреты активных платежных провайдеров.
+
+## 2026-06-18: Подтверждение Stars-депозита только по серверному paid
+
+**Зона:** architecture / economy / frontend / development
+
+**Решение:** Telegram callback `openInvoice(status='paid')` не считается подтверждением зачисления. UI показывает успешное пополнение только после authenticated polling конкретного order, когда backend вернул `payment_orders.status='paid'` и актуальный PostgreSQL cash wallet. Перед созданием Stars-инвойса backend проверяет Telegram webhook через `getWebhookInfo` и при неверном URL блокирует создание счёта.
+**Почему:** Telegram может списать Stars до того, как webhook и транзакция wallet+ledger завершились. Без server-side проверки UI выдавал ложное сообщение «Баланс пополнен» при нулевом балансе.
+**Влияет на:** Stars deposits, `/api/cashier`, `/api/profile`, payment monitoring, frontend cashier UX.
+**Что обновлено:** Payment-status endpoint с ownership check, authoritative wallet refresh, polling UI, fail-closed webhook readiness, USDT-aware Stars reconciliation, regression-тесты и incident runbook.
+**Открытые вопросы:** Текущий production service должен быть возобновлён в Render; после запуска проверить pending Stars-order пользователя `@quinwize` и обработать его по runbook без повторного платежа.

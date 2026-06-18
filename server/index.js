@@ -210,6 +210,8 @@ const RISK_LARGE_WITHDRAWAL_USDT_MICROS = Math.max(0, Math.round(Number(process.
 const RISK_LARGE_ADMIN_ADJUST_CHIPS = Math.max(0, Math.round(Number(process.env.RISK_LARGE_ADMIN_ADJUST_CHIPS || ADMIN_GRANT_MAX_CHIPS / 2)));
 const BONUS_EXPIRY_INTERVAL_MS = 24 * 60 * 60 * 1000;
 let lastReconciliationAlertKey = "";
+let telegramWebhookDiagnostics = null;
+let lastTelegramWebhookAlertKey = "";
 
 seedPublicTables();
 const tournaments = seedTournaments();
@@ -246,6 +248,9 @@ server.listen(PORT, HOST, () => {
       `State store: ${stateStoreEnabled() ? "Redis" : "memory"}`
     ]
   });
+  checkTelegramWebhookConfiguration().catch((error) => {
+    reportError(error, { kind: "telegram_webhook_check" });
+  });
 });
 
 setInterval(async () => {
@@ -272,6 +277,14 @@ setInterval(async () => {
     console.error("Reconciliation check failed:", error.message);
   }
 }, RECONCILIATION_INTERVAL_MS);
+
+setInterval(async () => {
+  try {
+    await checkTelegramWebhookConfiguration();
+  } catch (error) {
+    reportError(error, { kind: "telegram_webhook_check" });
+  }
+}, 5 * 60 * 1000);
 
 setInterval(async () => {
   try {
@@ -479,6 +492,20 @@ async function handleApi(req, res, url) {
     return;
   }
 
+  const paymentStatusMatch = url.pathname.match(/^\/api\/cashier\/payment-orders\/([^/]+)$/);
+  if (req.method === "GET" && paymentStatusMatch) {
+    const order = await paymentOrderFromId(paymentStatusMatch[1]);
+    if (!order || String(order.userId) !== String(user.id)) {
+      sendJson(res, 404, { error: "Платёж не найден" });
+      return;
+    }
+    sendJson(res, 200, {
+      order: cryptoOrderView(order),
+      cashier: await cashierView(user)
+    });
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/tournaments") {
     sendJson(res, 200, { tournaments: tournamentListView(user) });
     return;
@@ -552,6 +579,7 @@ async function handleApi(req, res, url) {
   if (req.method === "POST" && url.pathname === "/api/cashier/stars-invoice") {
     requireRealMoneyEnabled();
     await sendIdempotentJson(req, res, user, "cashier_stars_invoice", async () => {
+      await requireTelegramPaymentsReady();
       const body = await readJson(req);
       const quote = quoteCashDeposit({ ...body, method: "stars" });
       const orderId = randomId("stars");
@@ -1230,7 +1258,7 @@ async function adminDashboardView(options = {}) {
   const cashLedgerDebitTotal = dbStats ? dbStats.cashLedgerDebitTotal : memoryCashLedgerTotal("debit");
   const paidStarsChipsTotal = dbStats ? dbStats.paidStarsChipsTotal : [...starOrders.values()]
     .filter((order) => order.status === "paid")
-    .reduce((sum, order) => sum + Number(order.chips || 0), 0);
+    .reduce((sum, order) => sum + Number(order.creditedAsset === "USDT" ? order.cashUsdtMicros : order.chips || 0), 0);
   const depositStarsLedgerTotal = dbStats ? dbStats.depositStarsLedgerTotal : memoryLedgerCategoryTotal("credit", "deposit_stars");
   const playerFundsTotal = walletTotal + tableStackTotal + savedStackTotal + tournamentEscrowTotal;
   const reconciliation = buildReconciliationAudit({
@@ -1704,6 +1732,7 @@ async function healthSnapshot({ publicView = false } = {}) {
       pendingStars: [...starOrders.values()].filter((order) => order.status === "pending").length,
       paidStars: [...starOrders.values()].filter((order) => order.status === "paid").length
     };
+    health.telegramWebhook = telegramWebhookDiagnostics;
     health.memory = {
       rssMb: Math.round(memory.rss / 1024 / 1024),
       heapUsedMb: Math.round(memory.heapUsed / 1024 / 1024),
@@ -2009,6 +2038,7 @@ async function normalizeUser(user) {
 }
 
 async function profileView(user) {
+  await refreshUserWallets(user);
   const profile = await getProfileForUser(user);
   const bonus = await bonusSummary(user);
   const activeTables = [...tables.values()]
@@ -2473,6 +2503,7 @@ function formatCash(amountMicros) {
 }
 
 async function cashierView(user) {
+  await refreshUserWallets(user);
   const activeTables = userActiveTables(user);
   const playTableStack = activeTables.filter((table) => table.gameMode !== "cash").reduce((sum, table) => sum + table.stack, 0);
   const cashTableStackMicros = activeTables.filter((table) => table.gameMode === "cash").reduce((sum, table) => sum + table.stack, 0);
@@ -2499,6 +2530,16 @@ async function cashierView(user) {
     transactions: cashMode ? await getCashTransactions(user) : await getTransactions(user),
     playTransactions: await getTransactions(user)
   };
+}
+
+async function refreshUserWallets(user) {
+  const [playBalance, cashBalanceMicros] = await Promise.all([
+    getWallet(user.id),
+    getCashWallet(user.id)
+  ]);
+  user.balance = playBalance;
+  user.cashBalanceMicros = cashBalanceMicros;
+  return user;
 }
 
 function userActiveTables(user) {
@@ -4160,6 +4201,64 @@ async function callTelegram(method, payload) {
   return data;
 }
 
+async function requireTelegramPaymentsReady() {
+  const diagnostics = await checkTelegramWebhookConfiguration({ notify: false });
+  if (diagnostics?.ok) return;
+  const error = new Error("Платежи Stars временно недоступны: сервер не готов принять подтверждение Telegram");
+  error.status = 503;
+  throw error;
+}
+
+async function checkTelegramWebhookConfiguration({ notify = true } = {}) {
+  if (!REAL_MONEY_ENABLED) return { ok: true, skipped: "real_money_disabled" };
+  if (!APP_PUBLIC_URL) {
+    telegramWebhookDiagnostics = { ok: false, error: "APP_PUBLIC_URL is not configured" };
+  } else {
+    try {
+      const data = await callTelegram("getWebhookInfo", {});
+      const info = data.result || {};
+      const expectedUrl = `${APP_PUBLIC_URL}/api/telegram/webhook`;
+      telegramWebhookDiagnostics = {
+        ok: info.url === expectedUrl,
+        checkedAt: new Date().toISOString(),
+        urlMatches: info.url === expectedUrl,
+        pendingUpdateCount: Number(info.pending_update_count || 0),
+        lastErrorDate: Number(info.last_error_date || 0),
+        lastErrorMessage: info.last_error_message || ""
+      };
+    } catch (error) {
+      telegramWebhookDiagnostics = {
+        ok: false,
+        checkedAt: new Date().toISOString(),
+        error: error.message
+      };
+    }
+  }
+
+  if (notify && !telegramWebhookDiagnostics.ok) {
+    const alertKey = [
+      telegramWebhookDiagnostics.urlMatches,
+      telegramWebhookDiagnostics.pendingUpdateCount,
+      telegramWebhookDiagnostics.lastErrorDate,
+      telegramWebhookDiagnostics.lastErrorMessage,
+      telegramWebhookDiagnostics.error
+    ].join(":");
+    if (alertKey !== lastTelegramWebhookAlertKey) {
+      lastTelegramWebhookAlertKey = alertKey;
+      notifyAdmin("telegram_webhook_unhealthy", "Telegram webhook не готов принимать платежи", {
+        lines: [
+          `URL совпадает: ${telegramWebhookDiagnostics.urlMatches ? "да" : "нет"}`,
+          `Ожидающих updates: ${telegramWebhookDiagnostics.pendingUpdateCount || 0}`,
+          `Ошибка: ${telegramWebhookDiagnostics.lastErrorMessage || telegramWebhookDiagnostics.error || "неизвестно"}`
+        ]
+      });
+    }
+  } else if (telegramWebhookDiagnostics.ok) {
+    lastTelegramWebhookAlertKey = "";
+  }
+  return telegramWebhookDiagnostics;
+}
+
 async function sendBotMessage(chatId, text) {
   if (!chatId || !BOT_TOKEN || BOT_TOKEN.includes("replace_with") || BOT_TOKEN === "test-token") return;
   await callTelegram("sendMessage", {
@@ -4759,6 +4858,7 @@ function cryptoOrderView(order) {
     invoiceUrl: order.invoiceUrl || order.raw?.invoiceUrl || "",
     payload: order.payload || "",
     status: order.status,
+    paidAt: order.paidAt || "",
     expiresAt: order.expiresAt,
     tonConnect: order.method === "ton" ? {
       address: order.receiverAddress || "",

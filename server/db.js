@@ -2000,7 +2000,9 @@ export async function dashboardStats() {
       (select coalesce(sum(payout_usdt_micros), 0)::bigint from withdrawal_orders where status = 'approved') as approved_withdrawal_payout_usdt_total,
       (select coalesce(sum(cash_usdt_micros), 0)::bigint from wallets) as cash_wallet_total,
       (select coalesce(sum(locked_usdt_micros), 0)::bigint from wallets) as locked_usdt_total,
-      (select coalesce(sum(chips), 0)::bigint from payment_orders where status = 'paid' and method = 'stars') as paid_stars_chips_total,
+      (select coalesce(sum(
+        case when credited_asset = 'USDT' then cash_usdt_micros else chips end
+      ), 0)::bigint from payment_orders where status = 'paid' and method = 'stars') as paid_stars_chips_total,
       (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'credit' and category = 'deposit_stars') as deposit_stars_ledger_total,
       (select count(*)::int from idempotency_keys where expires_at > now()) as idempotency_key_count,
       (select count(*)::int from active_table_snapshots) as active_table_snapshot_count,

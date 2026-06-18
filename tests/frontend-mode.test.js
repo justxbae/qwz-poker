@@ -25,3 +25,10 @@ test("Render starts the production server with real money enabled", () => {
   assert.match(renderConfig, /startCommand:\s*npm start/);
   assert.match(renderConfig, /key:\s*REAL_MONEY_ENABLED\s*\n\s*value:\s*"true"/);
 });
+
+test("Stars UI confirms balance only after server marks the order paid", () => {
+  assert.match(appSource, /waitForPaymentConfirmation\(order\)/);
+  assert.match(appSource, /data\.order\?\.status === "paid"/);
+  assert.match(appSource, /Не оплачивайте повторно/);
+  assert.doesNotMatch(appSource, /if \(status === "paid"\) \{[\s\S]{0,300}showStatus\("Баланс пополнен"\)/);
+});

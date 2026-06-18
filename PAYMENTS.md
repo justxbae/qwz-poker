@@ -22,14 +22,30 @@ Flow:
 4. Telegram `pre_checkout_query` checks payload, currency `XTR`, and amount.
 5. Telegram `successful_payment` calls `completePaymentOrder`.
 6. `completePaymentOrder` sets order `paid` and credits cash wallet in the same PostgreSQL transaction.
+7. Client polls the authenticated payment-status endpoint and reports success only after the server returns `status='paid'` with the refreshed PostgreSQL wallet balance.
+
+Before creating an invoice, the backend calls Telegram `getWebhookInfo` and verifies that the configured webhook URL is exactly `${APP_PUBLIC_URL}/api/telegram/webhook`. If payment confirmation cannot return to the server, invoice creation fails closed before the user can spend Stars.
 
 Configured conversion:
 
 ```text
-1000 Stars = 12.5 USDT
+100 Stars = 1.00 USDT
 ```
 
-That is a revenue-sensitive rate. If the acquisition cost on Fragment is actually `15 USD / 1000 Stars`, the project loses margin before fees. Keep the rate configurable and treat `STARS_USDT_RATE` as business input, not a hardcoded truth.
+The rate remains configurable through `STARS_USDT_RATE`; production currently uses `0.01 USDT` per Star.
+
+## Client confirmation rule
+
+Telegram's `openInvoice(..., status='paid')` callback only confirms that Telegram accepted the payment. It is not proof that QWZ has committed wallet+ledger state.
+
+- Never show “Баланс пополнен” from the client callback alone.
+- Poll `GET /api/cashier/payment-orders/:orderId`.
+- Show success only when that endpoint returns `order.status='paid'`.
+- A pending confirmation must explicitly tell the player not to pay again.
+- `/api/cashier` and `/api/profile` refresh both wallet buckets from the authoritative store before responding.
+- The endpoint returns 404 for orders owned by another user.
+
+Operational recovery is documented in `docs/PAYMENT_INCIDENT_RUNBOOK.md`.
 
 ## Crypto Bot
 
