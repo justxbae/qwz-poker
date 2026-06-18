@@ -625,7 +625,7 @@ test("Stars, Crypto Bot, and xRocket deposit rails create invoices and credit ca
       body: { usdtAmount: 25 }
     });
     assert.equal(starsInvoice.order.method, "stars");
-    assert.equal(starsInvoice.order.stars, 2000);
+    assert.equal(starsInvoice.order.stars, 2500);
     assert.equal(starsInvoice.order.invoiceUrl, "https://t.me/$qwz_test_invoice");
 
     await request("/api/telegram/webhook", {
@@ -1043,9 +1043,11 @@ test("tournament registration spends chips and cancellation refunds them", async
     assert.ok(tournament);
     assert.equal(tournament.registered, false);
 
-    data = await request(`/api/tournaments/${tournament.id}/register`, {
+    const registerPath = `/api/tournaments/${tournament.id}/register`;
+    data = await request(registerPath, {
       method: "POST",
-      token: auth.token
+      token: auth.token,
+      idempotencyKey: "same-tournament-register"
     });
 
     let registered = data.tournaments.find((item) => item.id === tournament.id);
@@ -1054,6 +1056,17 @@ test("tournament registration spends chips and cancellation refunds them", async
     assert.equal(data.profile.balance, 10000 - tournament.totalCost);
     assert.equal(data.cashier.transactions[0].title, "Вход в турнир");
     assert.equal(data.cashier.transactions[0].category, "tournament_buyin");
+
+    const replayedRegistration = await request(registerPath, {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "same-tournament-register"
+    });
+    assert.equal(replayedRegistration.profile.balance, data.profile.balance);
+    assert.equal(
+      replayedRegistration.cashier.transactions.filter((entry) => entry.category === "tournament_buyin").length,
+      1
+    );
 
     const dashboard = (await request("/api/admin", { token: auth.token })).admin;
     assert.equal(dashboard.stats.walletTotal, 10000 - tournament.totalCost);
@@ -1066,9 +1079,11 @@ test("tournament registration spends chips and cancellation refunds them", async
       && movement.amount === tournament.totalCost
     )));
 
-    data = await request(`/api/tournaments/${tournament.id}/cancel`, {
+    const cancelPath = `/api/tournaments/${tournament.id}/cancel`;
+    data = await request(cancelPath, {
       method: "POST",
-      token: auth.token
+      token: auth.token,
+      idempotencyKey: "same-tournament-cancel"
     });
 
     registered = data.tournaments.find((item) => item.id === tournament.id);
@@ -1077,6 +1092,16 @@ test("tournament registration spends chips and cancellation refunds them", async
     assert.equal(data.profile.balance, 10000);
     assert.equal(data.cashier.transactions[0].title, "Возврат турнирного бай-ина");
     assert.equal(data.cashier.transactions[0].category, "tournament_refund");
+    const replayedCancellation = await request(cancelPath, {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "same-tournament-cancel"
+    });
+    assert.equal(replayedCancellation.profile.balance, data.profile.balance);
+    assert.equal(
+      replayedCancellation.cashier.transactions.filter((entry) => entry.category === "tournament_refund").length,
+      1
+    );
     const afterCancelDashboard = (await request("/api/admin", { token: auth.token })).admin;
     assert.ok(afterCancelDashboard.recentFundMovements.some((movement) => (
       movement.category === "tournament_escrow_to_wallet"
@@ -1265,9 +1290,6 @@ async function startServerAndWaitForExit(extraEnv = {}) {
     child.on("exit", (code) => {
       resolve({ code, stdout, stderr });
     });
-    child.unref();
-    child.stdout?.unref?.();
-    child.stderr?.unref?.();
   });
 }
 

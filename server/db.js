@@ -655,7 +655,7 @@ export async function listTournamentRegistrations(tournamentIds = []) {
   }));
 }
 
-export async function registerTournament(providerUserId, tournament, provider = "telegram") {
+export async function registerTournament(providerUserId, tournament, provider = "telegram", idempotencyKey = "") {
   if (!pool) return null;
   const appUserId = await ensureIdentity(provider, providerUserId);
   const buyIn = Math.max(0, Math.round(Number(tournament.buyIn) || 0));
@@ -703,9 +703,9 @@ export async function registerTournament(providerUserId, tournament, provider = 
     await client.query("update wallets set balance = $2, updated_at = now() where app_user_id = $1", [appUserId, after]);
     await client.query(`
       insert into ledger_entries (
-        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after
+        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after, idempotency_key
       )
-      values ($1, $2, $3, $4, 'debit', 'tournament_buyin', 'Вход в турнир', $5, $6, $7)
+      values ($1, $2, $3, $4, 'debit', 'tournament_buyin', 'Вход в турнир', $5, $6, $7, $8)
     `, [
       id("ledger"),
       appUserId,
@@ -713,7 +713,8 @@ export async function registerTournament(providerUserId, tournament, provider = 
       String(providerUserId),
       totalCost,
       `${tournament.title} · бай-ин ${buyIn.toLocaleString("ru-RU")} + fee ${fee.toLocaleString("ru-RU")}`,
-      after
+      after,
+      idempotencyKey || null
     ]);
     await client.query(`
       insert into tournament_registrations (
@@ -745,7 +746,7 @@ export async function registerTournament(providerUserId, tournament, provider = 
   }
 }
 
-export async function cancelTournamentRegistration(providerUserId, tournament, provider = "telegram") {
+export async function cancelTournamentRegistration(providerUserId, tournament, provider = "telegram", idempotencyKey = "") {
   if (!pool) return null;
   const appUserId = await ensureIdentity(provider, providerUserId);
   const client = await pool.connect();
@@ -786,9 +787,9 @@ export async function cancelTournamentRegistration(providerUserId, tournament, p
     `, [appUserId, Number(registration.rows[0].fee || 0)]);
     await client.query(`
       insert into ledger_entries (
-        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after
+        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after, idempotency_key
       )
-      values ($1, $2, $3, $4, 'credit', 'tournament_refund', 'Возврат турнирного бай-ина', $5, $6, $7)
+      values ($1, $2, $3, $4, 'credit', 'tournament_refund', 'Возврат турнирного бай-ина', $5, $6, $7, $8)
     `, [
       id("ledger"),
       appUserId,
@@ -796,7 +797,8 @@ export async function cancelTournamentRegistration(providerUserId, tournament, p
       String(providerUserId),
       refund,
       tournament.title,
-      after
+      after,
+      idempotencyKey || null
     ]);
     await client.query("commit");
     return { balance: after, cancelled: true };

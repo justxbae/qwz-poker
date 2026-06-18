@@ -502,7 +502,9 @@ function onGameFormatSelect(event) {
   const action = actionButton.dataset.modeAction;
   haptic("selection");
   if (action === "private") {
-    runAction(quickCreatePrivateTable);
+    selectLobbyTab("tables");
+    document.querySelector("#createTableForm")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    showStatus("Приватный стол создаётся в форме ниже: выберите лимит и количество игроков.");
     return;
   }
   if (action === "sitgo") {

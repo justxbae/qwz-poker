@@ -474,11 +474,11 @@ async function handleApi(req, res, url) {
       return;
     }
 
-    await sendIdempotentJson(req, res, user, `tournament_${action}:${tournamentId}`, async () => {
+    await sendIdempotentJson(req, res, user, `tournament_${action}:${tournamentId}`, async (idempotencyKey) => {
       if (action === "register") {
-        await registerTournament(tournament, user);
+        await registerTournament(tournament, user, idempotencyKey);
       } else {
-        await cancelTournamentRegistration(tournament, user);
+        await cancelTournamentRegistration(tournament, user, idempotencyKey);
       }
 
       return {
@@ -2497,7 +2497,7 @@ function tournamentView(tournament, user) {
   };
 }
 
-async function registerTournament(tournament, user) {
+async function registerTournament(tournament, user, idempotencyKey = "") {
   if (tournament.status !== "registering") {
     const error = new Error("Регистрация на турнир пока закрыта");
     error.status = 409;
@@ -2518,7 +2518,7 @@ async function registerTournament(tournament, user) {
   }
 
   const registeredAt = new Date().toISOString();
-  const dbResult = await dbRegisterTournament(user.id, tournament);
+  const dbResult = await dbRegisterTournament(user.id, tournament, "telegram", idempotencyKey);
   if (dbResult) {
     user.balance = setWalletBalanceLocal(user.id, dbResult.balance);
   } else {
@@ -2527,7 +2527,8 @@ async function registerTournament(tournament, user) {
       category: "tournament_buyin",
       title: "Вход в турнир",
       amount: totalCost,
-      meta: `${tournament.title} · бай-ин ${formatNumber(tournament.buyIn)} + fee ${formatNumber(tournament.fee)}`
+      meta: `${tournament.title} · бай-ин ${formatNumber(tournament.buyIn)} + fee ${formatNumber(tournament.fee)}`,
+      idempotencyKey
     });
   }
 
@@ -2539,6 +2540,7 @@ async function registerTournament(tournament, user) {
   });
   applyMemoryTournamentRegistration(user, tournament, "register");
   await recordFundMovement(user, {
+    id: idempotencyKey ? `move_${idempotencyKey}` : undefined,
     category: "wallet_to_tournament_escrow",
     from: "wallet",
     to: "tournament_escrow",
@@ -2570,7 +2572,7 @@ async function registerTournament(tournament, user) {
   });
 }
 
-async function cancelTournamentRegistration(tournament, user) {
+async function cancelTournamentRegistration(tournament, user, idempotencyKey = "") {
   if (!tournament.registrations.has(user.id)) return;
   if (tournament.status !== "registering") {
     const error = new Error("Отменить регистрацию уже нельзя");
@@ -2579,7 +2581,7 @@ async function cancelTournamentRegistration(tournament, user) {
   }
 
   const totalCost = tournament.buyIn + tournament.fee;
-  const dbResult = await dbCancelTournamentRegistration(user.id, tournament);
+  const dbResult = await dbCancelTournamentRegistration(user.id, tournament, "telegram", idempotencyKey);
   if (dbResult) {
     user.balance = setWalletBalanceLocal(user.id, dbResult.balance);
   } else {
@@ -2588,12 +2590,14 @@ async function cancelTournamentRegistration(tournament, user) {
       category: "tournament_refund",
       title: "Возврат турнирного бай-ина",
       amount: totalCost,
-      meta: tournament.title
+      meta: tournament.title,
+      idempotencyKey
     });
   }
   tournament.registrations.delete(user.id);
   applyMemoryTournamentRegistration(user, tournament, "cancel");
   await recordFundMovement(user, {
+    id: idempotencyKey ? `move_${idempotencyKey}` : undefined,
     category: "tournament_escrow_to_wallet",
     from: "tournament_escrow",
     to: "wallet",
@@ -2899,7 +2903,7 @@ async function recordCashTransaction(user, transaction) {
 
 async function recordFundMovement(user, movement) {
   const normalized = {
-    id: randomId("move"),
+    id: movement.id || randomId("move"),
     category: normalizeLedgerCategory(movement.category),
     from: normalizeLedgerCategory(movement.from || movement.fromBucket),
     to: normalizeLedgerCategory(movement.to || movement.toBucket),
