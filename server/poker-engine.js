@@ -166,7 +166,7 @@ export function addBuyIn(table, user, amount) {
   const seat = table.seats.find((candidate) => candidate.userId === user.id);
   if (!seat) throwHttp(404, "Вы не сидите за этим столом");
   if (!canBuyIn(table) && seat.sittingOutReason !== "rebuy") {
-    throwHttp(409, "Докупить фишки можно только между раздачами");
+    throwHttp(409, table.gameMode === "cash" ? "Пополнить стек можно только между раздачами" : "Докупить фишки можно только между раздачами");
   }
 
   const chips = clamp(Number(amount || 0), 1, table.maxBuyIn || 10_000_000_000);
@@ -174,7 +174,7 @@ export function addBuyIn(table, user, amount) {
   seat.sittingOut = false;
   seat.sittingOutUntil = 0;
   seat.sittingOutReason = "";
-  table.message = `${seat.name} добавил ${chips} на стол`;
+  table.message = `${seat.name} добавил ${formatTableAmount(table, chips)} на стол`;
   addLog(table, table.message);
   return seat.stack;
 }
@@ -214,7 +214,7 @@ export function sitOut(table, user, timeoutMs = SIT_OUT_TIMEOUT_MS) {
 export function sitIn(table, user) {
   const seat = table.seats.find((candidate) => candidate.userId === user.id);
   if (!seat) throwHttp(404, "Вы не сидите за этим столом");
-  if (seat.stack <= 0) throwHttp(409, "Сначала докупите фишки");
+  if (seat.stack <= 0) throwHttp(409, table.gameMode === "cash" ? "Сначала пополните стек" : "Сначала докупите фишки");
   seat.sittingOut = false;
   seat.sitOutNextHand = false;
   seat.sittingOutUntil = 0;
@@ -245,7 +245,7 @@ export function prepareStartIntro(table) {
   table.dealerIndex = nextSeatedIndex(table, table.dealerIndex);
   table.smallBlindIndex = playableSeats(table).length === 2 ? table.dealerIndex : nextSeatedIndex(table, table.dealerIndex);
   table.bigBlindIndex = nextSeatedIndex(table, table.smallBlindIndex);
-  table.message = `Игра ${table.smallBlind}/${table.bigBlind}. ${table.seats[table.smallBlindIndex].name} SB, ${table.seats[table.bigBlindIndex].name} BB`;
+  table.message = `Игра ${formatTableAmount(table, table.smallBlind)}/${formatTableAmount(table, table.bigBlind)}. ${table.seats[table.smallBlindIndex].name} SB, ${table.seats[table.bigBlindIndex].name} BB`;
   addLog(table, table.message);
 }
 
@@ -318,8 +318,8 @@ export function startHand(table, user) {
   postBlind(table, table.bigBlindIndex, table.bigBlind);
   addLog(table, `Раздача #${table.handNumber}`);
   addLog(table, `Fair hash ${table.fairnessProof.serverSeedHash}`);
-  addLog(table, `${table.seats[table.smallBlindIndex].name} SB ${table.smallBlind}`);
-  addLog(table, `${table.seats[table.bigBlindIndex].name} BB ${table.bigBlind}`);
+  addLog(table, `${table.seats[table.smallBlindIndex].name} SB ${formatTableAmount(table, table.smallBlind)}`);
+  addLog(table, `${table.seats[table.bigBlindIndex].name} BB ${formatTableAmount(table, table.bigBlind)}`);
 
   table.currentBet = table.bigBlind;
   table.lastAggressorIndex = table.bigBlindIndex;
@@ -454,6 +454,7 @@ export function publicTable(table, viewerId = "") {
       username: seat.username,
       photoUrl: seat.photoUrl || "",
       stack: seat.stack,
+      handStartStack: seat.handStartStack,
       bet: seat.bet,
       totalBet: seat.totalBet,
       folded: seat.folded,
@@ -543,8 +544,8 @@ function applyAction(table, seatIndex, body = {}) {
     if (toCall <= 0) throwHttp(409, "Сейчас нечего коллировать");
     moveChipsToPot(table, seat, toCall);
     seat.acted = true;
-    table.message = `${seat.name} колл ${toCall}`;
-    addLog(table, `${seat.name}: call ${toCall}`);
+    table.message = `${seat.name} колл ${formatTableAmount(table, toCall)}`;
+    addLog(table, `${seat.name}: call ${formatTableAmount(table, toCall)}`);
     advanceAfterAction(table);
     return;
   }
@@ -557,7 +558,7 @@ function applyAction(table, seatIndex, body = {}) {
     const targetBet = Math.min(fullTargetBet, allInTargetBet);
     const needed = targetBet - seat.bet;
     const raiseBy = targetBet - table.currentBet;
-    if (needed <= 0 || raiseBy <= 0) throwHttp(409, "Недостаточно фишек для рейза");
+    if (needed <= 0 || raiseBy <= 0) throwHttp(409, table.gameMode === "cash" ? "Недостаточно средств для рейза" : "Недостаточно фишек для рейза");
 
     moveChipsToPot(table, seat, needed);
     const isFullRaise = raiseBy >= table.minRaise;
@@ -571,8 +572,8 @@ function applyAction(table, seatIndex, body = {}) {
     } else {
       seat.acted = true;
     }
-    table.message = seat.stack === 0 ? `${seat.name} all-in ${seat.bet}` : `${seat.name} рейз до ${seat.bet}`;
-    addLog(table, seat.stack === 0 ? `${seat.name}: all-in ${seat.bet}` : `${seat.name}: raise до ${seat.bet}`);
+    table.message = seat.stack === 0 ? `${seat.name} all-in ${formatTableAmount(table, seat.bet)}` : `${seat.name} рейз до ${formatTableAmount(table, seat.bet)}`;
+    addLog(table, seat.stack === 0 ? `${seat.name}: all-in ${formatTableAmount(table, seat.bet)}` : `${seat.name}: raise до ${formatTableAmount(table, seat.bet)}`);
     advanceAfterAction(table);
     return;
   }
@@ -592,8 +593,8 @@ function applyAction(table, seatIndex, body = {}) {
     } else {
       seat.acted = true;
     }
-    table.message = seat.stack === 0 ? `${seat.name} all-in ${seat.bet}` : `${seat.name} ставка ${seat.bet}`;
-    addLog(table, seat.stack === 0 ? `${seat.name}: all-in ${seat.bet}` : `${seat.name}: bet ${seat.bet}`);
+    table.message = seat.stack === 0 ? `${seat.name} all-in ${formatTableAmount(table, seat.bet)}` : `${seat.name} ставка ${formatTableAmount(table, seat.bet)}`;
+    addLog(table, seat.stack === 0 ? `${seat.name}: all-in ${formatTableAmount(table, seat.bet)}` : `${seat.name}: bet ${formatTableAmount(table, seat.bet)}`);
     advanceAfterAction(table);
     return;
   }
@@ -607,8 +608,8 @@ function applyAutoCheckOrCall(table, seatIndex, prefix) {
   if (toCall > 0) {
     moveChipsToPot(table, seat, toCall);
     seat.acted = true;
-    table.message = `${seat.name} ${prefix}-колл ${toCall}`;
-    addLog(table, `${seat.name}: ${prefix}-call ${toCall}`);
+    table.message = `${seat.name} ${prefix}-колл ${formatTableAmount(table, toCall)}`;
+    addLog(table, `${seat.name}: ${prefix}-call ${formatTableAmount(table, toCall)}`);
   } else {
     seat.acted = true;
     table.message = `${seat.name} ${prefix}-чек`;
@@ -674,8 +675,8 @@ function finishByFold(table) {
   const wonAmount = contestedPot - rake;
   winner.stack += wonAmount + uncalledAmount;
   table.rakeCollected += rake;
-  table.message = `${winner.name} забирает банк ${wonAmount}`;
-  if (uncalledAmount > 0) table.message += `; возврат ${uncalledAmount}`;
+  table.message = `${winner.name} забирает банк ${formatTableAmount(table, wonAmount)}`;
+  if (uncalledAmount > 0) table.message += `; возврат ${formatTableAmount(table, uncalledAmount)}`;
   addLog(table, table.message);
   const pots = [];
   if (contestedPot > 0) {
@@ -717,7 +718,7 @@ function finishShowdown(table) {
     if (pot.isUncalled) {
       const receiver = pot.eligible[0];
       receiver.stack += pot.amount;
-      summaries.push(`${receiver.name} получает возврат ${pot.amount}`);
+      summaries.push(`${receiver.name} получает возврат ${formatTableAmount(table, pot.amount)}`);
       historyPots.push({
         label: "возврат",
         amount: pot.amount,
@@ -745,7 +746,7 @@ function finishShowdown(table) {
     }
 
     const winnerNames = orderedWinners.map((winner) => winner.seat.name).join(", ");
-    summaries.push(`${winnerNames} забирает ${pot.label} ${payoutAmount} (${handDescription})`);
+    summaries.push(`${winnerNames} забирает ${pot.label} ${formatTableAmount(table, payoutAmount)} (${handDescription})`);
     historyPots.push({
       label: pot.label,
       amount: payoutAmount,
@@ -760,7 +761,7 @@ function finishShowdown(table) {
 
   table.message = summaries.length
     ? summaries.join("; ")
-    : `Банк ${totalPot} не разыгран`;
+    : `Банк ${formatTableAmount(table, totalPot)} не разыгран`;
   addLog(table, table.message);
   recordHandHistory(table, { pots: historyPots, rake: totalRake });
   table.pot = 0;
@@ -1247,6 +1248,16 @@ function throwHttp(status, message) {
   const error = new Error(message);
   error.status = status;
   throw error;
+}
+
+function formatTableAmount(table, amount) {
+  const value = Number(amount || 0);
+  if (table?.gameMode !== "cash") return String(value);
+  const usdt = Math.abs(value / 1_000_000).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+  return `${value < 0 ? "-" : ""}$${usdt}`;
 }
 
 function clamp(value, min, max) {

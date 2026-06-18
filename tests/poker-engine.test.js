@@ -32,6 +32,23 @@ test("table seats expose Telegram profile photos", () => {
   assert.equal(view.seats[1].photoUrl, "https://example.com/player-2.jpg");
 });
 
+test("cash table messages expose dollars instead of raw micros or chips", () => {
+  const table = createTable(
+    { ...owner, stack: 10_000_000 },
+    { gameMode: "cash", maxPlayers: 2, smallBlind: 50_000, bigBlind: 100_000 }
+  );
+  joinTable(table, { ...player2, stack: 10_000_000 });
+  startHand(table);
+
+  let view = publicTable(table, owner.id);
+  assert.ok(view.actionLog.some((entry) => entry.text.includes("SB $0.05")));
+  assert.equal(view.seats[0].handStartStack, 10_000_000);
+  act(table, owner, { action: "fold" });
+  view = publicTable(table, owner.id);
+  assert.match(view.message, /банк \$0\.10/);
+  assert.doesNotMatch(view.message, /chips|фиш/i);
+});
+
 test("provably fair deck is deterministic and verifiable", () => {
   const seed = "a".repeat(64);
   const first = createProvablyFairDeck({

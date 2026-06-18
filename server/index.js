@@ -2331,7 +2331,7 @@ function seedPublicTables() {
   for (const limit of CASH_TABLE_LIMITS) {
     for (let index = 1; index <= limit.count; index += 1) {
       const table = createTable(null, {
-        name: `QWZ NL ${formatUsdtMicros(limit.smallBlind)}/${formatUsdtMicros(limit.bigBlind)} USDT #${index}`,
+        name: `QWZ NL $${formatUsdtMicros(limit.smallBlind)}/$${formatUsdtMicros(limit.bigBlind)} #${index}`,
         maxPlayers: 6,
         smallBlind: limit.smallBlind,
         bigBlind: limit.bigBlind,
@@ -2379,7 +2379,7 @@ async function reconcileSystemPublicTables() {
       const cashMode = limit.gameMode === "cash";
       const table = createTable(null, {
         name: cashMode
-          ? `QWZ NL ${formatUsdtMicros(limit.smallBlind)}/${formatUsdtMicros(limit.bigBlind)} USDT #${index}`
+          ? `QWZ NL $${formatUsdtMicros(limit.smallBlind)}/$${formatUsdtMicros(limit.bigBlind)} #${index}`
           : `QWZ NL ${limit.smallBlind}/${limit.bigBlind} #${index}`,
         maxPlayers: 6,
         smallBlind: limit.smallBlind,
@@ -2945,13 +2945,13 @@ async function recordTableTransaction(user, table, transaction) {
 
 function formatTableAmount(table, amount) {
   return table?.gameMode === "cash"
-    ? `${formatUsdtMicros(amount)} USDT`
+    ? `$${formatUsdtMicros(amount)} USDT`
     : `${formatNumber(amount)} chips`;
 }
 
 function formatAvailableBalance(user, table) {
   return table?.gameMode === "cash"
-    ? `${formatUsdtMicros(user.cashBalanceMicros)} USDT`
+    ? `$${formatUsdtMicros(user.cashBalanceMicros)} USDT`
     : `${formatNumber(user.balance)} chips`;
 }
 
