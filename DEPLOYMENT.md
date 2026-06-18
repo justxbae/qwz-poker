@@ -12,7 +12,7 @@ Steps:
 
 1. Push this project to GitHub.
 2. Open Render and create a new Blueprint from the repository.
-3. Render will read `render.yaml` and start the app with `node server/index.js`.
+3. Render will read `render.yaml` and start the app with `npm start`.
 4. Add the secret environment variable:
    - `BOT_TOKEN`
    - `REAL_MONEY_ENABLED=false` for demo/play mode, or `true` for live-money mode
@@ -23,14 +23,14 @@ Steps:
 After deploy, copy the public Render URL, for example:
 
 ```text
-https://qwz-poker.onrender.com
+https://qwz-poker-t8mc.onrender.com
 ```
 
 Set Telegram webhook (with a secret_token, see ниже):
 
 ```bash
 SECRET=$(openssl rand -hex 32)
-curl "https://api.telegram.org/bot$BOT_TOKEN/setWebhook?url=https://qwz-poker.onrender.com/api/telegram/webhook&secret_token=$SECRET"
+curl "https://api.telegram.org/bot$BOT_TOKEN/setWebhook?url=https://qwz-poker-t8mc.onrender.com/api/telegram/webhook&secret_token=$SECRET"
 # затем добавить $SECRET в TELEGRAM_WEBHOOK_SECRET на Render
 ```
 

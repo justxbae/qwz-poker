@@ -26,4 +26,4 @@
 **Почему:** Telegram может списать Stars до того, как webhook и транзакция wallet+ledger завершились. Без server-side проверки UI выдавал ложное сообщение «Баланс пополнен» при нулевом балансе.
 **Влияет на:** Stars deposits, `/api/cashier`, `/api/profile`, payment monitoring, frontend cashier UX.
 **Что обновлено:** Payment-status endpoint с ownership check, authoritative wallet refresh, polling UI, fail-closed webhook readiness, USDT-aware Stars reconciliation, regression-тесты и incident runbook.
-**Открытые вопросы:** Текущий production service должен быть возобновлён в Render; после запуска проверить pending Stars-order пользователя `@quinwize` и обработать его по runbook без повторного платежа.
+**Открытые вопросы:** Production работает на `https://qwz-poker-t8mc.onrender.com`; старый адрес без суффикса не относится к активному сервису. Проверить pending Stars-order пользователя `@quinwize` и обработать его по runbook без повторного платежа.
