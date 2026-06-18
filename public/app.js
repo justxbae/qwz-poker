@@ -23,6 +23,7 @@ const state = {
   currentTable: null,
   config: null,
   progression: null,
+  homeStats: null,
   gameMode: "cash",
   selectedSmallBlind: 25,
   tables: [],
@@ -47,6 +48,10 @@ const lobbyBalance = document.querySelector("#lobbyBalance");
 const lobbyTableStack = document.querySelector("#lobbyTableStack");
 const lobbyActiveTables = document.querySelector("#lobbyActiveTables");
 const lobbyRank = document.querySelector("#lobbyRank");
+const homeWalletSide = document.querySelector("#homeWalletSide");
+const homeWalletSideValue = document.querySelector("#homeWalletSideValue");
+const homeWalletSideCurrency = document.querySelector("#homeWalletSideCurrency");
+const homeWalletSideHint = document.querySelector("#homeWalletSideHint");
 const homeActivityText = document.querySelector("#homeActivityText");
 const homeSessionPill = document.querySelector("#homeSessionPill");
 const homeScreenInstallButton = document.querySelector("#homeScreenInstallButton");
@@ -526,13 +531,17 @@ function activeBalance() {
 
 function renderModeBalance() {
   if (!lobbyBalance) return;
-  lobbyBalance.textContent = state.gameMode === "cash" ? formatUsdtDisplay(activeBalance()) : formatChips(activeBalance());
+  const cashMode = state.gameMode === "cash";
+  lobbyBalance.textContent = cashMode ? formatUsdt(activeBalance()) : formatChips(activeBalance());
   if (!lobbyBalanceCurrency) return;
-  if (state.gameMode === "cash") {
-    lobbyBalanceCurrency.replaceChildren(" ", createTetherMark());
+  if (cashMode) {
+    lobbyBalanceCurrency.replaceChildren(createTetherMark("tether-mark--hero"));
+    lobbyBalanceCurrency.setAttribute("aria-label", "USDT");
   } else {
     lobbyBalanceCurrency.textContent = " фишек";
+    lobbyBalanceCurrency.removeAttribute("aria-label");
   }
+  renderHomeWalletSide(state.homeStats || {});
 }
 
 function renderModeContext() {
@@ -550,6 +559,7 @@ function renderModeContext() {
   if (publicGamesTitle) publicGamesTitle.textContent = cashMode ? "Cash-столы" : "Рейтинговые столы";
   if (privateGamesTitle) privateGamesTitle.textContent = cashMode ? "Приватные cash-столы" : "Приватные рейтинговые столы";
   if (walletWithdrawButton) walletWithdrawButton.disabled = !cashMode;
+  renderHomeWalletSide(state.homeStats || {});
 }
 
 function renderLimitOptions() {
@@ -1397,6 +1407,7 @@ async function loadProgression() {
 function renderProfile(profileData) {
   const user = profileData.user || {};
   const profile = profileData.profile || {};
+  state.homeStats = profileData;
   profileName.textContent = user.name || "Игрок";
   profileUsername.textContent = user.username ? `@${user.username}` : `id ${user.id || ""}`;
   const cashLevel = Number(profile.cashLevel || 1);
@@ -1411,6 +1422,7 @@ function renderProfile(profileData) {
   profileSavedStack.textContent = formatChips(profileData.savedStack);
   lobbyTableStack.textContent = formatChips(profileData.tableStack);
   lobbyActiveTables.textContent = String(profileData.activeTableCount || 0);
+  renderHomeWalletSide(profileData);
   homeActivityText.textContent = profileData.activeTableCount
     ? `${profileData.activeTableCount} ${plural(profileData.activeTableCount, "стол", "стола", "столов")} · ${formatChips(profileData.tableStack)} за столами`
     : "Выберите стол и начните игру.";
@@ -1437,6 +1449,28 @@ function renderProfile(profileData) {
   renderAvatar(lobbyAvatar, user);
 
   renderProfileSessions(profileData.activeTables || []);
+}
+
+function renderHomeWalletSide(profileData = {}) {
+  if (!homeWalletSideValue || !homeWalletSideCurrency || !homeWalletSideHint) return;
+  const cashMode = state.gameMode === "cash";
+  const tableStack = cashMode ? Number(profileData.cashTableStackMicros || 0) : Number(profileData.tableStack || 0);
+  const activeTableCount = Number(profileData.activeTableCount || 0);
+  homeWalletSideValue.textContent = cashMode ? formatUsdt(tableStack) : formatChips(tableStack);
+  if (cashMode) {
+    homeWalletSideCurrency.replaceChildren(createTetherMark("tether-mark--mini"));
+    homeWalletSideCurrency.setAttribute("aria-label", "USDT");
+  } else {
+    homeWalletSideCurrency.textContent = " фишек";
+    homeWalletSideCurrency.removeAttribute("aria-label");
+  }
+  homeWalletSideHint.textContent = activeTableCount
+    ? `${activeTableCount} ${plural(activeTableCount, "стол", "стола", "столов")}`
+    : "нет активных";
+  if (homeWalletSide) {
+    homeWalletSide.dataset.mode = cashMode ? "cash" : "play";
+    homeWalletSide.dataset.active = activeTableCount ? "true" : "false";
+  }
 }
 
 function renderProgression(progression) {
@@ -4379,10 +4413,11 @@ function formatTableAmount(table, value) {
   return formatModeAmount(value, table?.gameMode === "cash");
 }
 
-function createTetherMark() {
+function createTetherMark(className = "") {
   const namespace = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(namespace, "svg");
   svg.classList.add("tether-mark");
+  if (className) svg.classList.add(className);
   svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("aria-label", "USDT");
   svg.innerHTML = '<circle cx="12" cy="12" r="12"/><path d="M13.55 10.18V8.56h3.8V6H6.65v2.56h3.8v1.62C7.36 10.34 5 10.96 5 11.71c0 .75 2.36 1.37 5.45 1.53V18h3.1v-4.76c3.09-.16 5.45-.78 5.45-1.53 0-.75-2.36-1.37-5.45-1.53Zm0 2.07v-.01c-.49.03-1 .04-1.55.04s-1.06-.01-1.55-.04v.01c-2.21-.12-3.87-.51-3.87-.98 0-.39 1.18-.73 2.91-.9v.86c.78.07 1.63.11 2.51.11.88 0 1.73-.04 2.51-.11v-.86c1.73.17 2.91.51 2.91.9 0 .47-1.66.86-3.87.98Z"/>';

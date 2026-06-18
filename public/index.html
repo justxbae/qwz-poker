@@ -164,6 +164,11 @@
               <span>Доступный баланс</span>
               <strong><b id="lobbyBalance">0</b><small id="lobbyBalanceCurrency"> фишек</small></strong>
             </div>
+            <div class="home-wallet-side" id="homeWalletSide">
+              <span>За столами</span>
+              <strong><b id="homeWalletSideValue">0</b><small id="homeWalletSideCurrency"> фишек</small></strong>
+              <small id="homeWalletSideHint">нет активных</small>
+            </div>
             <div class="home-wallet-actions">
               <button type="button" id="walletTopupButton" aria-label="Депозит" title="Депозит">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -809,13 +814,9 @@
             <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m4 11 8-7 8 7v9H4Z"/><path d="M9.5 20v-6h5v6"/></svg></span>
             <span class="nav-label">Главная</span>
           </button>
-          <button type="button" data-lobby-tab="tables">
-            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path class="svg-fill" d="M12 3.3C10.3 6.1 4.5 8.5 4.5 13a4.4 4.4 0 0 0 7 3.5L9.8 21h4.4l-1.7-4.5a4.4 4.4 0 0 0 7-3.5c0-4.5-5.8-6.9-7.5-9.7Z"/></svg></span>
-            <span class="nav-label">Столы</span>
-          </button>
-          <button type="button" data-lobby-tab="tournaments">
-            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 4.5h8v7a4 4 0 0 1-8 0Z"/><path d="M8 7H5v2a4 4 0 0 0 4 4M16 7h3v2a4 4 0 0 1-4 4M12 15.5V19M8.5 20h7"/></svg></span>
-            <span class="nav-label">Турниры</span>
+          <button type="button" data-lobby-tab="profile">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg></span>
+            <span class="nav-label">Профиль</span>
           </button>
           <button type="button" id="lobbyMenuButton" data-lobby-menu-trigger>
             <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/></svg></span>
