@@ -6,6 +6,7 @@
     <title>QWZ Poker</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/lobby-qa.css" />
   </head>
   <body>
     <main class="app">
@@ -518,48 +519,35 @@
             </div>
             <button type="button" id="profileRefreshButton" class="round-control" aria-label="Обновить профиль" hidden>↻</button>
           </section>
-          <section class="lobby-card">
-            <div class="section-title">
-              <div>
-                <p class="eyebrow">Банкролл</p>
-                <h2 id="profileBalance">0 фишек</h2>
-              </div>
-              <span>фишек</span>
+          <section class="lobby-card profile-dashboard">
+            <div class="profile-balance-row">
+              <span>Баланс</span>
+              <strong id="profileBalance">0 фишек</strong>
+              <small id="profileStatus">В лобби</small>
             </div>
-            <div class="stats-cards">
+            <div class="profile-dashboard-stats">
+              <div><span>Доступно</span><strong id="profileChips">0</strong></div>
               <div><span>За столами</span><strong id="profileTableStack">0</strong></div>
-              <div><span>Сохранённый стек</span><strong id="profileSavedStack">0</strong></div>
-              <div><span>Баланс</span><strong id="profileChips">0</strong></div>
+              <div><span>Сохранено</span><strong id="profileSavedStack">0</strong></div>
             </div>
-          </section>
-          <section class="lobby-card">
-            <div class="section-title">
+            <div class="profile-mode-card profile-mode-card--cash">
               <div>
-                <p class="eyebrow">Cash profile</p>
-                <h2 id="profileCashTitle">Новичок · Уровень 1</h2>
+                <span>Cash</span>
+                <strong id="profileCashTitle">Новичок · Уровень 1</strong>
               </div>
-              <span id="profileCashXpLabel">0 / 120 XP</span>
+              <small id="profileCashXpLabel">0 / 120 XP</small>
+              <div class="profile-progress" aria-label="Прогресс уровня"><span id="profileCashProgress"></span></div>
+              <p><b id="profileCashHands">0</b> рук · <b id="profileHands">0</b> всего</p>
             </div>
-            <div class="profile-progress" aria-label="Прогресс уровня"><span id="profileCashProgress"></span></div>
-            <div class="stats-cards">
-              <div><span>Cash рук</span><strong id="profileCashHands">0</strong></div>
-              <div><span>Всего рук</span><strong id="profileHands">0</strong></div>
-              <div><span>Статус</span><strong id="profileStatus">В лобби</strong></div>
-            </div>
-          </section>
-          <section class="lobby-card">
-            <div class="section-title">
+            <div class="profile-mode-card profile-mode-card--rating">
               <div>
-                <p class="eyebrow">Рейтинговый режим</p>
-                <h2 id="profileRatingTitle">Unranked</h2>
+                <span>Рейтинг</span>
+                <strong id="profileRatingTitle">Unranked</strong>
               </div>
-              <span id="profileRatingPoints">0 pts</span>
+              <small id="profileRatingPoints">0 pts</small>
+              <p><b id="profileRatingHands">0</b> рук · сезон <b id="profileRatingSeason">—</b></p>
             </div>
-            <div class="stats-cards">
-              <div><span>Рейтинговых рук</span><strong id="profileRatingHands">0</strong></div>
-              <div><span>Столов</span><strong id="profileTables">0</strong></div>
-              <div><span>Сезон</span><strong id="profileRatingSeason">—</strong></div>
-            </div>
+            <span id="profileTables" hidden>0</span>
           </section>
           <section class="lobby-card">
             <div class="section-title">

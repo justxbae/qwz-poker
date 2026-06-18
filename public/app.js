@@ -1459,22 +1459,17 @@ function renderHomeWalletSide(profileData = {}) {
   const cashMode = state.gameMode === "cash";
   const profile = profileData.profile || {};
   const cashClubTitle = profile.cashClubStatus || "Cash Club";
-  const nextCashClubTitle = profile.cashClubNextStatus || "";
   const currentPoints = Number(profile.cashXpCurrent || profile.cashClubPoints || 0);
-  const requiredPoints = Number(profile.cashXpRequired || 0);
   const progress = Math.max(0, Math.min(1, Number(profile.cashXpProgress || 0)));
-  const compactNextCashClubTitle = String(nextCashClubTitle || "").replace(/\s*Club$/i, "").trim();
 
   homeWalletSideCurrency.hidden = true;
   if (cashMode) {
     if (homeWalletSideLabel) homeWalletSideLabel.textContent = "Cash Club";
     homeWalletSideValue.textContent = cashClubTitle;
-    homeWalletSideHint.textContent = nextCashClubTitle
-      ? `${Math.max(0, requiredPoints - currentPoints)} pts до ${compactNextCashClubTitle || nextCashClubTitle}`
-      : `${formatNumber(currentPoints)} pts`;
+    homeWalletSideHint.textContent = `${formatNumber(currentPoints)} pts`;
     if (homeWalletSideMeter) homeWalletSideMeter.style.width = `${Math.max(8, Math.round(progress * 100))}%`;
     if (homeWalletSideAction) {
-      homeWalletSideAction.textContent = "Прогресс";
+      homeWalletSideAction.textContent = "";
       homeWalletSideAction.disabled = true;
     }
   } else {

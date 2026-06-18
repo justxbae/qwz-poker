@@ -1,0 +1,254 @@
+/* Final lobby corrections. This file is intentionally loaded after styles.css. */
+
+body:not(.in-game) .home-wallet {
+  grid-template-columns: 44px minmax(0, 1fr) 108px !important;
+  grid-template-areas: "ava ident side" "bal bal side" "act act act" !important;
+}
+
+body:not(.in-game) .home-wallet-side {
+  min-height: 0 !important;
+  padding: 10px !important;
+  border-radius: 15px !important;
+  gap: 6px !important;
+  justify-content: center !important;
+}
+
+body:not(.in-game) .home-wallet-side span { font-size: 9px !important; line-height: 1 !important; }
+body:not(.in-game) .home-wallet-side strong { font-size: 16px !important; line-height: 1.05 !important; }
+body:not(.in-game) .home-wallet-side small { font-size: 10px !important; line-height: 1 !important; }
+body:not(.in-game) .home-wallet-side-meter { height: 4px !important; }
+body:not(.in-game) .home-wallet-side[data-mode="cash"] .home-wallet-side-action { display: none !important; }
+body:not(.in-game) .home-wallet-side[data-mode="play"] .home-wallet-side-meter,
+body:not(.in-game) .home-wallet-side[data-mode="play"] #homeWalletSideHint { display: none !important; }
+
+body:not(.in-game) .home-wallet-side[data-mode="play"] .home-wallet-side-action {
+  min-height: 28px !important;
+  padding: 0 10px !important;
+  border-radius: 10px !important;
+  font-size: 11px !important;
+}
+
+body:not(.in-game) .play-format-grid,
+body[data-game-mode="cash"]:not(.in-game) .play-format-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 7px !important;
+}
+
+body:not(.in-game) .play-format-grid button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 42px !important;
+  height: 42px !important;
+  padding: 0 8px !important;
+  gap: 6px !important;
+  border-radius: 13px !important;
+  text-align: center !important;
+}
+
+body:not(.in-game) .play-format-grid .format-icon {
+  display: block !important;
+  width: 15px !important;
+  height: 15px !important;
+  min-width: 15px !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+body:not(.in-game) .play-format-grid .format-icon svg { width: 15px !important; height: 15px !important; }
+body:not(.in-game) .play-format-grid .format-copy { display: block !important; min-width: 0 !important; }
+body:not(.in-game) .play-format-grid strong {
+  display: block !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+body:not(.in-game) .play-format-grid small { display: none !important; }
+
+body:not(.in-game) .lobby-menu-list { display: block !important; }
+body:not(.in-game) .lobby-menu-list button {
+  display: grid !important;
+  grid-template-columns: 36px minmax(0, 1fr) 18px !important;
+  grid-template-areas: "icon copy chevron" !important;
+  align-items: center !important;
+  min-height: 62px !important;
+  padding: 10px 4px !important;
+  gap: 10px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body:not(.in-game) .lobby-menu-list button + button { border-top: 1px solid var(--qwz-divider) !important; }
+body:not(.in-game) .lobby-menu-list button .menu-icon {
+  grid-area: icon !important;
+  width: 36px !important;
+  height: 36px !important;
+  margin: 0 !important;
+  border-radius: 11px !important;
+}
+body:not(.in-game) .lobby-menu-list button .menu-copy { grid-area: copy !important; gap: 2px !important; }
+body:not(.in-game) .lobby-menu-list button strong { font-size: 14px !important; line-height: 1.1 !important; }
+body:not(.in-game) .lobby-menu-list button small { font-size: 11px !important; line-height: 1.2 !important; }
+body:not(.in-game) .lobby-menu-list button .menu-meta { display: none !important; }
+body:not(.in-game) .lobby-menu-list button .tg-chevron {
+  grid-area: chevron !important;
+  align-self: center !important;
+  justify-self: center !important;
+}
+
+body:not(.in-game) .lobby-shell { padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important; }
+body:not(.in-game) .bottom-nav {
+  left: max(20px, calc(50vw - 195px)) !important;
+  right: max(20px, calc(50vw - 195px)) !important;
+  bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+  width: auto !important;
+  height: 60px !important;
+  min-height: 60px !important;
+  padding: 5px !important;
+  border-radius: 25px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: rgba(24, 37, 50, 0.96) !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38) !important;
+}
+
+body:not(.in-game) .bottom-nav::before { border-radius: 20px !important; }
+body:not(.in-game) .bottom-nav::after { display: none !important; }
+body:not(.in-game) .bottom-nav button,
+body:not(.in-game) .bottom-nav button.active {
+  min-height: 50px !important;
+  border-radius: 20px !important;
+  box-shadow: none !important;
+}
+body:not(.in-game) .bottom-nav button.active { background: rgba(118, 137, 155, 0.18) !important; }
+body:not(.in-game) .bottom-nav .nav-icon,
+body:not(.in-game) .bottom-nav button.active .nav-icon,
+body:not(.in-game) .bottom-nav .nav-icon::before,
+body:not(.in-game) .bottom-nav .nav-icon::after {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+body:not(.in-game) .lobby-view[data-lobby-view="profile"].active { gap: 8px !important; }
+body:not(.in-game) .lobby-view[data-lobby-view="profile"].active .profile-hero {
+  min-height: 72px !important;
+  padding: 10px 12px !important;
+  gap: 10px !important;
+}
+body:not(.in-game) .lobby-view[data-lobby-view="profile"].active .profile-avatar {
+  width: 46px !important;
+  height: 46px !important;
+  font-size: 17px !important;
+}
+body:not(.in-game) .lobby-view[data-lobby-view="profile"].active .profile-main h2 {
+  font-size: 18px !important;
+  line-height: 1.1 !important;
+}
+
+body:not(.in-game) .profile-dashboard {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  padding: 12px !important;
+}
+body:not(.in-game) .profile-balance-row,
+body:not(.in-game) .profile-dashboard-stats { grid-column: 1 / -1 !important; }
+body:not(.in-game) .profile-balance-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: end !important;
+  gap: 2px 10px !important;
+}
+body:not(.in-game) .profile-balance-row > span {
+  grid-column: 1 / -1 !important;
+  color: var(--qwz-mute) !important;
+  font-size: 10px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+}
+body:not(.in-game) .profile-balance-row > strong { font-size: 24px !important; line-height: 1 !important; }
+body:not(.in-game) .profile-balance-row > small { color: var(--qwz-green) !important; font-size: 11px !important; }
+body:not(.in-game) .profile-dashboard-stats {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+}
+body:not(.in-game) .profile-dashboard-stats > div {
+  min-width: 0 !important;
+  padding: 8px !important;
+  border-radius: 12px !important;
+  background: var(--qwz-card-2) !important;
+}
+body:not(.in-game) .profile-dashboard-stats span,
+body:not(.in-game) .profile-mode-card span {
+  display: block !important;
+  color: var(--qwz-mute) !important;
+  font-size: 9px !important;
+  line-height: 1.1 !important;
+}
+body:not(.in-game) .profile-dashboard-stats strong {
+  display: block !important;
+  margin-top: 3px !important;
+  overflow: hidden !important;
+  color: var(--qwz-ink) !important;
+  font-size: 13px !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+body:not(.in-game) .profile-mode-card {
+  position: relative !important;
+  min-width: 0 !important;
+  padding: 10px !important;
+  border-radius: 14px !important;
+  background: var(--qwz-card-2) !important;
+}
+body:not(.in-game) .profile-mode-card > div:first-child { display: grid !important; gap: 3px !important; }
+body:not(.in-game) .profile-mode-card strong {
+  overflow: hidden !important;
+  font-size: 12px !important;
+  line-height: 1.15 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+body:not(.in-game) .profile-mode-card > small {
+  display: block !important;
+  margin-top: 6px !important;
+  color: var(--qwz-dim) !important;
+  font-size: 9px !important;
+}
+body:not(.in-game) .profile-mode-card .profile-progress { height: 4px !important; margin-top: 5px !important; }
+body:not(.in-game) .profile-mode-card p {
+  margin: 7px 0 0 !important;
+  color: var(--qwz-mute) !important;
+  font-size: 9px !important;
+  line-height: 1.2 !important;
+}
+body:not(.in-game) .profile-mode-card--cash::after,
+body:not(.in-game) .profile-mode-card--rating::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 10px !important;
+  right: 10px !important;
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 50% !important;
+  background: var(--qwz-green) !important;
+  box-shadow: 0 0 10px rgba(47, 201, 126, 0.5) !important;
+}
+body:not(.in-game) .profile-mode-card--rating::after {
+  background: var(--qwz-violet) !important;
+  box-shadow: 0 0 10px rgba(139, 108, 255, 0.5) !important;
+}
+body:not(.in-game) .lobby-view[data-lobby-view="profile"].active > .lobby-card:not(.profile-dashboard) {
+  padding: 10px 12px !important;
+  gap: 6px !important;
+}
+body:not(.in-game) .lobby-view[data-lobby-view="profile"].active .settings-row,
+body:not(.in-game) .lobby-view[data-lobby-view="profile"].active .settings-action {
+  min-height: 38px !important;
+  padding-block: 8px !important;
+}
