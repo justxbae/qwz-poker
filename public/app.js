@@ -2,8 +2,7 @@ const tg = window.Telegram?.WebApp;
 const BOT_USERNAME = "qwzpokerbot";
 const params = new URLSearchParams(window.location.search);
 const DEV_MODE = params.has("dev1")
-  || params.get("dev") === "1"
-  || window.localStorage.getItem("qwzDevMode") === "1";
+  || params.get("dev") === "1";
 const ADMIN_MODE = params.get("admin") === "1" || window.location.pathname === "/admin";
 const ADMIN_SECRET_STORAGE_KEY = "qwzAdminWebSecret";
 const adminHashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
@@ -462,8 +461,10 @@ async function loadConfig() {
   state.config = await api("/api/config", { auth: false });
   const cashButton = gameModeSwitch?.querySelector('[data-game-mode="cash"]');
   if (cashButton) {
-    cashButton.disabled = !state.config.realMoneyEnabled;
-    cashButton.title = state.config.realMoneyEnabled ? "" : "USDT-игра станет доступна после запуска денежных операций";
+    cashButton.disabled = false;
+    cashButton.title = state.config.realMoneyEnabled
+      ? ""
+      : "USDT-игра доступна только если сервер запущен с REAL_MONEY_ENABLED=true";
   }
   if (state.config.realMoneyEnabled) {
     state.gameMode = "cash";
@@ -4430,15 +4431,27 @@ function initials(name) {
 
 function renderAvatar(node, user = {}) {
   if (!node) return;
+  const image = node.querySelector("img");
+  if (image) image.remove();
+  const fallback = () => {
+    node.style.backgroundImage = "";
+    node.classList.remove("has-photo");
+    node.replaceChildren(initials(user.name));
+  };
   if (user.photoUrl) {
-    node.textContent = "";
-    node.style.backgroundImage = `url("${user.photoUrl}")`;
-    node.classList.add("has-photo");
+    const nextImage = document.createElement("img");
+    nextImage.alt = "";
+    nextImage.decoding = "async";
+    nextImage.referrerPolicy = "no-referrer";
+    nextImage.addEventListener("error", fallback, { once: true });
+    nextImage.addEventListener("load", () => {
+      node.replaceChildren(nextImage);
+      node.classList.add("has-photo");
+    }, { once: true });
+    nextImage.src = user.photoUrl;
     return;
   }
-  node.style.backgroundImage = "";
-  node.classList.remove("has-photo");
-  node.textContent = initials(user.name);
+  fallback();
 }
 
 function onBetPreset(event) {
