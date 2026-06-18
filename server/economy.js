@@ -123,7 +123,7 @@ export function depositSettings({ realMoneyEnabled = true } = {}) {
     ...ECONOMY.cash.deposit,
     currency: ASSETS.CASH,
     balanceBucket: BALANCE_BUCKETS.CASH,
-    starsUsdtRate: Number(process.env.STARS_USDT_RATE || 0.0125),
+    starsUsdtRate: Number(process.env.STARS_USDT_RATE || 0.01),
     tonUsdtRate: Number(process.env.TON_USDT_RATE || 3),
     methods: [
       { id: "stars", title: "Stars", enabled: starsEnabled, speed: starsEnabled ? "Telegram invoice" : "скоро" },
@@ -148,7 +148,7 @@ export function cashSettings() {
     currency: ASSETS.CASH,
     scale: USDT_SCALE,
     limits: CASH_TABLE_LIMITS,
-    starsUsdtRate: Number(process.env.STARS_USDT_RATE || 0.0125),
+    starsUsdtRate: Number(process.env.STARS_USDT_RATE || 0.01),
     tonUsdtRate: Number(process.env.TON_USDT_RATE || 3)
   };
 }
@@ -175,7 +175,7 @@ export function quoteCashDeposit({ usdtAmount = 0, method = "stars" } = {}) {
   const requestedMicros = toUsdtMicros(usdtAmount || deposit.minUsdtMicros / USDT_SCALE);
   const cashUsdtMicros = clamp(requestedMicros, deposit.minUsdtMicros, deposit.maxUsdtMicros);
   const tonUsdtRate = Number(process.env.TON_USDT_RATE || 3);
-  const starsUsdtRate = Number(process.env.STARS_USDT_RATE || 0.0125);
+  const starsUsdtRate = Number(process.env.STARS_USDT_RATE || 0.01);
   const usdtAmountValue = fromUsdtMicros(cashUsdtMicros);
 
   if (methodId === "stars") {

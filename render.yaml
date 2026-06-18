@@ -42,7 +42,7 @@ services:
       - key: TON_RUB_RATE
         sync: false
       - key: STARS_USDT_RATE
-        value: "0.0125"
+        value: "0.01"
       - key: USDT_TRC20_PAYMENTS_ENABLED
         value: "false"
       - key: USDT_TRC20_RECEIVER_ADDRESS
