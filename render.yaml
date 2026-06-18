@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     buildCommand: npm ci
-    startCommand: node server/index.js
+    startCommand: npm start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
@@ -60,7 +60,7 @@ services:
       - key: REDIS_URL
         sync: false
       - key: REAL_MONEY_ENABLED
-        value: "false"
+        value: "true"
       - key: SENTRY_DSN
         sync: false
       - key: SENTRY_TRACES_SAMPLE_RATE

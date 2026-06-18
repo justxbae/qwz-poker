@@ -13827,6 +13827,11 @@ body:not(.in-game) .play-format-grid button:nth-child(1) { color: var(--qwz-gold
 body:not(.in-game) .play-format-grid button:nth-child(2) { color: var(--qwz-teal) !important; }
 body:not(.in-game) .play-format-grid button:nth-child(3) { color: var(--qwz-violet) !important; }
 
+/* Rating is a standalone public-table mode; cash-only formats do not apply. */
+body[data-game-mode="play"]:not(.in-game) .play-format-grid {
+  display: none !important;
+}
+
 /* ---------- Promo carousel: clean peek + restore animated dots ---------- */
 body:not(.in-game) [data-lobby-view="home"].active .home-promo-banners {
   width: 100% !important;

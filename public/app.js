@@ -23,7 +23,7 @@ const state = {
   currentTable: null,
   config: null,
   progression: null,
-  gameMode: "play",
+  gameMode: "cash",
   selectedSmallBlind: 25,
   tables: [],
   tournaments: []
@@ -493,7 +493,6 @@ function onGameModeSelect(event) {
   renderModeContext();
   renderTables();
   renderHomeCta();
-  selectLobbyTab(state.gameMode === "play" ? "tables" : "home");
   haptic("selection");
 }
 
