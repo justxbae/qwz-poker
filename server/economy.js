@@ -8,6 +8,13 @@ export const ASSETS = {
   CASH: "USDT"
 };
 
+export const WELCOME_BONUS = {
+  percent: 0.25,
+  capUsdtMicros: toUsdtMicros(50),
+  wageringMultiplier: 6,
+  expiresInDays: 30
+};
+
 export const PLAY_TABLE_LIMITS = [
   { smallBlind: 25, bigBlind: 50, count: 4 },
   { smallBlind: 50, bigBlind: 100, count: 4 },
@@ -241,6 +248,30 @@ export function quoteCashDeposit({ usdtAmount = 0, method = "stars" } = {}) {
     cryptoAmount: decimalAmount(usdtAmountValue / tonUsdtRate, 6),
     receiverAddress: process.env.TON_RECEIVER_ADDRESS || "",
     confirmationsRequired: Number(process.env.TON_CONFIRMATIONS_REQUIRED || 1)
+  };
+}
+
+export function quoteWelcomeBonus(depositUsdtMicros = 0) {
+  const deposit = Math.max(0, Math.round(Number(depositUsdtMicros) || 0));
+  const bonusAmountMicros = Math.min(
+    WELCOME_BONUS.capUsdtMicros,
+    Math.floor(deposit * WELCOME_BONUS.percent)
+  );
+  return {
+    bonusAmountMicros,
+    wageringRequiredMicros: bonusAmountMicros * WELCOME_BONUS.wageringMultiplier,
+    expiresInDays: WELCOME_BONUS.expiresInDays
+  };
+}
+
+export function advanceWelcomeBonusWagering({ paidMicros = 0, requiredMicros = 0, rakeMicros = 0 } = {}) {
+  const paid = Math.max(0, Math.round(Number(paidMicros) || 0));
+  const required = Math.max(0, Math.round(Number(requiredMicros) || 0));
+  const rake = Math.max(0, Math.round(Number(rakeMicros) || 0));
+  const wageringPaidMicros = paid + rake;
+  return {
+    wageringPaidMicros,
+    completed: required > 0 && wageringPaidMicros >= required
   };
 }
 

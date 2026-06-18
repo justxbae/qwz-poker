@@ -13,6 +13,7 @@ import {
   ECONOMY,
   PLAY_TABLE_LIMITS,
   RATING,
+  advanceWelcomeBonusWagering,
   cashClubPointsFromRake,
   cashClubProgress,
   cashClubStatus,
@@ -22,6 +23,7 @@ import {
   playSettings,
   quoteCashDeposit,
   quoteDeposit,
+  quoteWelcomeBonus,
   quoteWithdrawal as quoteCashWithdrawal,
   ratingDeltaForHand,
   ratingLeague,
@@ -40,6 +42,7 @@ import {
 import {
   addCashWalletEntry as dbAddCashWalletEntry,
   addWalletEntry as dbAddWalletEntry,
+  applyBonusWagering as dbApplyBonusWagering,
   completePaymentOrder as dbCompletePaymentOrder,
   createPaymentOrder as dbCreatePaymentOrder,
   createWithdrawalOrder as dbCreateWithdrawalOrder,
@@ -49,6 +52,7 @@ import {
   databaseEnabled,
   deleteActiveTableSnapshot as dbDeleteActiveTableSnapshot,
   getCashWallet as dbGetCashWallet,
+  getBonusSummary as dbGetBonusSummary,
   getPaymentOrder as dbGetPaymentOrder,
   getPlayerProfile as dbGetPlayerProfile,
   getIdempotencyResult as dbGetIdempotencyResult,
@@ -56,6 +60,7 @@ import {
   getWithdrawalOrder as dbGetWithdrawalOrder,
   getWallet as dbGetWallet,
   initDatabase,
+  expireWelcomeBonuses as dbExpireWelcomeBonuses,
   listActiveTableSnapshots as dbListActiveTableSnapshots,
   listAdminEvents as dbListAdminEvents,
   listCashLedger as dbListCashLedger,
@@ -173,6 +178,11 @@ const userProfiles = new Map();
 const savedStacks = new Map();
 const wallets = new Map();
 const cashWallets = new Map();
+const bonusWallets = new Map();
+const bonusGrants = new Map();
+const bonusLedgerEntries = new Map();
+const memoryWelcomeBonusUsers = new Set();
+const memoryBonusWageringEvents = new Set();
 const transactions = new Map();
 const cashTransactions = new Map();
 const fundMovements = new Map();
@@ -198,6 +208,7 @@ const RECONCILIATION_DRIFT_ALERT_CHIPS = Number(process.env.RECONCILIATION_DRIFT
 const SESSION_TTL_MS = Number(process.env.SESSION_TTL_SECONDS || 24 * 60 * 60) * 1000;
 const RISK_LARGE_WITHDRAWAL_USDT_MICROS = Math.max(0, Math.round(Number(process.env.RISK_LARGE_WITHDRAWAL_USDT || 1000) * 1_000_000));
 const RISK_LARGE_ADMIN_ADJUST_CHIPS = Math.max(0, Math.round(Number(process.env.RISK_LARGE_ADMIN_ADJUST_CHIPS || ADMIN_GRANT_MAX_CHIPS / 2)));
+const BONUS_EXPIRY_INTERVAL_MS = 24 * 60 * 60 * 1000;
 let lastReconciliationAlertKey = "";
 
 seedPublicTables();
@@ -269,6 +280,14 @@ setInterval(async () => {
     console.error("TON polling failed:", error.message);
   }
 }, TON_POLLING_INTERVAL_MS);
+
+setInterval(async () => {
+  try {
+    await expireBonuses();
+  } catch (error) {
+    console.error("Bonus expiry failed:", error.message);
+  }
+}, BONUS_EXPIRY_INTERVAL_MS);
 
 setInterval(() => {
   const now = Date.now();
@@ -1710,7 +1729,6 @@ async function persistCompletedHands(table) {
   for (const hand of table.handHistory || []) {
     const key = `${table.id}:${hand.id}`;
     if (persistedHandIds.has(key)) continue;
-    persistedHandIds.add(key);
 
     const record = {
       id: hand.id,
@@ -1743,6 +1761,16 @@ async function persistCompletedHands(table) {
           hand,
           table
         });
+        if (table.gameMode === "cash" && Number(hand.rake || 0) > 0) {
+          const rakeShare = Math.floor(Number(hand.rake || 0) / progressUserIds.length);
+          const dbUnlocks = await dbApplyBonusWagering({
+            providerUserIds: progressUserIds,
+            rakeAmountMicros: rakeShare,
+            handId: hand.id
+          });
+          const unlocks = dbUnlocks ?? applyMemoryBonusWagering(progressUserIds, rakeShare, hand.id);
+          for (const unlock of unlocks) notifyBonusUnlocked(unlock);
+        }
       }
       await trackAnalytics("hand_completed", {
         category: "gameplay",
@@ -1771,6 +1799,7 @@ async function persistCompletedHands(table) {
           idempotencyKey: `rake:${hand.id}`
         });
       }
+      persistedHandIds.add(key);
     } catch (error) {
       console.error("Hand history persist failed:", error.message);
     }
@@ -1981,6 +2010,7 @@ async function normalizeUser(user) {
 
 async function profileView(user) {
   const profile = await getProfileForUser(user);
+  const bonus = await bonusSummary(user);
   const activeTables = [...tables.values()]
     .map((table) => {
       const seat = table.seats.find((candidate) => candidate.userId === user.id);
@@ -2013,6 +2043,8 @@ async function profileView(user) {
     balance: user.balance,
     playBalance: user.balance,
     cashBalanceMicros: user.cashBalanceMicros,
+    bonusBalanceMicros: bonus.bonusBalanceMicros,
+    activeBonuses: bonus.grants,
     savedStack: await getSavedStack(user),
     tableStack,
     cashTableStackMicros,
@@ -2269,17 +2301,191 @@ function memoryRatingTier(points) {
   return "Unranked";
 }
 
+async function bonusSummary(user) {
+  const dbSummary = await dbGetBonusSummary(user.id);
+  if (dbSummary) return dbSummary;
+  return {
+    bonusBalanceMicros: Number(bonusWallets.get(user.id) || 0),
+    grants: (bonusGrants.get(user.id) || [])
+      .filter((grant) => grant.status === "active")
+      .map((grant) => ({ ...grant }))
+  };
+}
+
+async function awardWelcomeBonus(order, completed) {
+  let grant = completed?.bonusGrant || null;
+  if (!completed) {
+    if (memoryWelcomeBonusUsers.has(order.userId)) return null;
+    const quote = quoteWelcomeBonus(order.cashUsdtMicros);
+    if (quote.bonusAmountMicros <= 0) return null;
+    memoryWelcomeBonusUsers.add(order.userId);
+    grant = {
+      id: `bonus_welcome_${order.userId}`,
+      type: "welcome",
+      status: "active",
+      bonusAmountMicros: quote.bonusAmountMicros,
+      wageringRequiredMicros: quote.wageringRequiredMicros,
+      wageringPaidMicros: 0,
+      sourceId: order.id,
+      expiresAt: new Date(Date.now() + quote.expiresInDays * 24 * 60 * 60 * 1000).toISOString()
+    };
+    const grants = bonusGrants.get(order.userId) || [];
+    grants.push(grant);
+    bonusGrants.set(order.userId, grants);
+    const nextBonusBalance = Number(bonusWallets.get(order.userId) || 0) + grant.bonusAmountMicros;
+    bonusWallets.set(order.userId, nextBonusBalance);
+    addMemoryBonusLedger(order.userId, {
+      type: "credit",
+      category: "bonus_credit",
+      title: "Welcome Bonus",
+      amount: grant.bonusAmountMicros,
+      balanceAfter: nextBonusBalance,
+      grantId: grant.id
+    });
+  }
+  if (!grant) return null;
+  await sendBotMessage(order.userId, [
+    `Вам начислен Welcome Bonus ${formatCash(grant.bonusAmountMicros)}.`,
+    `Сыграйте ${formatCash(grant.wageringRequiredMicros)} рейка за 30 дней, чтобы перевести бонус на основной баланс.`
+  ].join("\n"));
+  return grant;
+}
+
+function applyMemoryBonusWagering(userIds, rakeAmountMicros, handId) {
+  const rake = Math.max(0, Math.round(Number(rakeAmountMicros) || 0));
+  if (rake <= 0) return [];
+  const unlocked = [];
+  for (const userId of [...new Set(userIds.map(String).filter(Boolean))]) {
+    const grants = bonusGrants.get(userId) || [];
+    for (const grant of grants) {
+      if (grant.status !== "active" || new Date(grant.expiresAt).getTime() <= Date.now()) continue;
+      const eventKey = `${grant.id}:${handId}`;
+      if (memoryBonusWageringEvents.has(eventKey)) continue;
+      memoryBonusWageringEvents.add(eventKey);
+      const progress = advanceWelcomeBonusWagering({
+        paidMicros: grant.wageringPaidMicros,
+        requiredMicros: grant.wageringRequiredMicros,
+        rakeMicros: rake
+      });
+      grant.wageringPaidMicros = progress.wageringPaidMicros;
+      if (!progress.completed) continue;
+      const bonusBefore = Number(bonusWallets.get(userId) || 0);
+      if (bonusBefore < grant.bonusAmountMicros) throw new Error(`Bonus wallet invariant failed for grant ${grant.id}`);
+      const bonusAfter = bonusBefore - grant.bonusAmountMicros;
+      const cashAfter = getCashWalletLocal(userId) + grant.bonusAmountMicros;
+      bonusWallets.set(userId, bonusAfter);
+      setCashWalletBalanceLocal(userId, cashAfter);
+      grant.status = "completed";
+      grant.completedAt = new Date().toISOString();
+      addMemoryBonusLedger(userId, {
+        type: "debit",
+        category: "bonus_unlock",
+        title: "Welcome Bonus unlocked",
+        amount: grant.bonusAmountMicros,
+        balanceAfter: bonusAfter,
+        grantId: grant.id
+      });
+      const history = cashTransactions.get(userId) || [];
+      history.unshift({
+        id: randomId("tx"),
+        type: "credit",
+        category: "bonus_unlock",
+        title: "Welcome Bonus unlocked",
+        amount: grant.bonusAmountMicros,
+        asset: ASSETS.CASH,
+        balanceBucket: BALANCE_BUCKETS.CASH,
+        meta: `grant ${grant.id}`,
+        createdAt: new Date().toISOString()
+      });
+      cashTransactions.set(userId, history.slice(0, 30));
+      unlocked.push({
+        grantId: grant.id,
+        providerUserId: userId,
+        bonusAmountMicros: grant.bonusAmountMicros,
+        cashBalanceMicros: cashAfter
+      });
+    }
+  }
+  return unlocked;
+}
+
+async function expireBonuses() {
+  const dbExpired = await dbExpireWelcomeBonuses();
+  const expired = dbExpired ?? await expireMemoryBonuses();
+  for (const grant of expired) {
+    await sendBotMessage(grant.providerUserId, `Ваш Welcome Bonus ${formatCash(grant.bonusAmountMicros)} истёк.`);
+  }
+  return expired;
+}
+
+async function expireMemoryBonuses(now = Date.now()) {
+  const expired = [];
+  for (const [userId, grants] of bonusGrants) {
+    for (const grant of grants) {
+      if (grant.status !== "active" || new Date(grant.expiresAt).getTime() > now) continue;
+      const bonusBefore = Number(bonusWallets.get(userId) || 0);
+      const amount = Math.min(bonusBefore, grant.bonusAmountMicros);
+      const bonusAfter = bonusBefore - amount;
+      bonusWallets.set(userId, bonusAfter);
+      grant.status = "expired";
+      grant.expiredAt = new Date(now).toISOString();
+      addMemoryBonusLedger(userId, {
+        type: "debit",
+        category: "bonus_expired",
+        title: "Welcome Bonus expired",
+        amount,
+        balanceAfter: bonusAfter,
+        grantId: grant.id
+      });
+      if (amount > 0) {
+        await recordPlatformLedger({
+          type: "credit",
+          category: "bonus_expired",
+          title: "Expired Welcome Bonus",
+          amount,
+          contextId: grant.id,
+          meta: `user ${userId}`,
+          idempotencyKey: `bonus:${grant.id}:expired:platform`
+        });
+      }
+      expired.push({ grantId: grant.id, providerUserId: userId, bonusAmountMicros: amount });
+    }
+  }
+  return expired;
+}
+
+function addMemoryBonusLedger(userId, entry) {
+  const history = bonusLedgerEntries.get(userId) || [];
+  history.unshift({ id: randomId("ledger"), ...entry, asset: "USDT", balanceBucket: "bonus_usdt", createdAt: new Date().toISOString() });
+  bonusLedgerEntries.set(userId, history.slice(0, 100));
+}
+
+function notifyBonusUnlocked(unlock) {
+  setCashWalletBalanceLocal(unlock.providerUserId, unlock.cashBalanceMicros);
+  sendBotMessage(
+    unlock.providerUserId,
+    `Бонус разблокирован! ${formatCash(unlock.bonusAmountMicros)} добавлено на основной счёт.`
+  );
+}
+
+function formatCash(amountMicros) {
+  return `$${formatUsdtMicros(amountMicros)} USDT`;
+}
+
 async function cashierView(user) {
   const activeTables = userActiveTables(user);
   const playTableStack = activeTables.filter((table) => table.gameMode !== "cash").reduce((sum, table) => sum + table.stack, 0);
   const cashTableStackMicros = activeTables.filter((table) => table.gameMode === "cash").reduce((sum, table) => sum + table.stack, 0);
   const cashMode = REAL_MONEY_ENABLED;
+  const bonus = await bonusSummary(user);
   const balance = cashMode ? user.cashBalanceMicros : user.balance;
   const tableStack = cashMode ? cashTableStackMicros : playTableStack;
   return {
     balance,
     playBalance: user.balance,
     cashBalanceMicros: user.cashBalanceMicros,
+    bonusBalanceMicros: bonus.bonusBalanceMicros,
+    activeBonuses: bonus.grants,
     tableStack,
     cashTableStackMicros,
     totalBankroll: balance + tableStack,
@@ -3575,6 +3781,7 @@ async function handleAdminPaymentAction({ admin, paymentId, action, reason = "" 
   };
   cryptoOrders.set(order.id, paidOrder);
   setCashWalletBalanceLocal(order.userId, balance);
+  await awardWelcomeBonus(order, completed);
   await trackAnalytics("deposit_paid", {
     userId: order.userId,
     category: "payments",
@@ -3648,6 +3855,7 @@ async function processSuccessfulStarPayment(payment) {
   order.telegramPaymentChargeId = payment.telegram_payment_charge_id || "";
   starOrders.set(order.id, order);
   setCashWalletBalanceLocal(order.userId, balance);
+  await awardWelcomeBonus(order, completed);
   await trackAnalytics("deposit_paid", {
     userId: order.userId,
     category: "payments",
@@ -3792,6 +4000,7 @@ async function handleCryptoWebhook(event) {
   const paidOrder = { ...order, status: "paid", externalId, txHash, paidAt: new Date().toISOString() };
   cryptoOrders.set(order.id, paidOrder);
   setCashWalletBalanceLocal(order.userId, balance);
+  await awardWelcomeBonus(order, completed);
   await trackAnalytics("deposit_paid", {
     userId: order.userId,
     category: "payments",

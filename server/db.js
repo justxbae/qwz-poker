@@ -1,10 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
   RATING,
+  advanceWelcomeBonusWagering,
   cashClubPointsFromRake,
   cashClubProgress,
   cashClubStatus,
   nextRatingPoints,
+  quoteWelcomeBonus,
   ratingDeltaForHand,
   ratingLeague
 } from "./economy.js";
@@ -936,7 +938,7 @@ export async function completePaymentOrder(orderId, payment) {
     }
 
     const appUserId = currentOrder.rows[0].app_user_id;
-    await client.query("insert into wallets (app_user_id, balance, cash_usdt_micros) values ($1, 0, 0) on conflict do nothing", [appUserId]);
+    await client.query("insert into wallets (app_user_id, balance, cash_usdt_micros, bonus_usdt_micros) values ($1, 0, 0, 0) on conflict do nothing", [appUserId]);
     const wallet = await client.query(`select ${balanceColumn} as balance from wallets where app_user_id = $1 for update`, [appUserId]);
     const before = Number(wallet.rows[0]?.balance || 0);
     const amount = Math.max(0, Math.round(Number(cashPayment ? order.cashUsdtMicros : order.chips) || 0));
@@ -945,6 +947,15 @@ export async function completePaymentOrder(orderId, payment) {
     const asset = order.asset || (method === "stars" ? "Stars" : method.toUpperCase());
     const network = order.network || "";
     const ledgerKey = `payment:${order.id}`;
+    const priorPaidDeposits = cashPayment ? await client.query(`
+      select count(*)::int as count
+      from payment_orders
+      where app_user_id = $1
+        and status = 'paid'
+        and credited_asset = 'USDT'
+        and id <> $2
+    `, [appUserId, order.id]) : { rows: [{ count: 0 }] };
+    const firstCashDeposit = cashPayment && Number(priorPaidDeposits.rows[0]?.count || 0) === 0;
 
     await client.query(`update wallets set ${balanceColumn} = $2, updated_at = now() where app_user_id = $1`, [appUserId, after]);
     await client.query(`
@@ -980,6 +991,74 @@ export async function completePaymentOrder(orderId, payment) {
       payment.telegram_payment_charge_id || "",
       JSON.stringify({ successfulPayment: payment })
     ]);
+    let bonusGrant = null;
+    if (firstCashDeposit && amount > 0) {
+      const quote = quoteWelcomeBonus(amount);
+      if (quote.bonusAmountMicros > 0) {
+        const grantId = deterministicId("bonus", `welcome:${appUserId}`);
+        const insertedGrant = await client.query(`
+          insert into bonus_grants (
+            id, app_user_id, provider, provider_user_id, bonus_type, status,
+            amount_usdt_micros, wagering_required, wagering_done,
+            bonus_amount_micros, wagering_required_micros, wagering_paid_micros,
+            source_id, expires_at, meta
+          )
+          values (
+            $1, $2, $3, $4, 'welcome', 'active',
+            $5, $6, 0, $5, $6, 0,
+            $7, now() + ($8::text || ' days')::interval, $9::jsonb
+          )
+          on conflict do nothing
+          returning id, bonus_amount_micros, wagering_required_micros, wagering_paid_micros, expires_at, status
+        `, [
+          grantId,
+          appUserId,
+          order.provider || "telegram",
+          String(order.userId),
+          quote.bonusAmountMicros,
+          quote.wageringRequiredMicros,
+          order.id,
+          quote.expiresInDays,
+          JSON.stringify({ depositOrderId: order.id, depositUsdtMicros: amount, percent: 0.25 })
+        ]);
+        if (insertedGrant.rowCount) {
+          const bonusWallet = await client.query(`
+            update wallets
+            set bonus_usdt_micros = bonus_usdt_micros + $2, updated_at = now()
+            where app_user_id = $1
+            returning bonus_usdt_micros
+          `, [appUserId, quote.bonusAmountMicros]);
+          const bonusBalance = Number(bonusWallet.rows[0]?.bonus_usdt_micros || 0);
+          await client.query(`
+            insert into ledger_entries (
+              id, app_user_id, provider, provider_user_id, type, category, title,
+              amount, meta, balance_after, idempotency_key, asset, balance_bucket
+            )
+            values ($1, $2, $3, $4, 'credit', 'bonus_credit', 'Welcome Bonus',
+                    $5, $6, $7, $8, 'USDT', 'bonus_usdt')
+            on conflict do nothing
+          `, [
+            id("ledger"),
+            appUserId,
+            order.provider || "telegram",
+            String(order.userId),
+            quote.bonusAmountMicros,
+            `25% first deposit bonus · order ${order.id}`,
+            bonusBalance,
+            `bonus:${grantId}:credit`
+          ]);
+          bonusGrant = {
+            id: grantId,
+            type: "welcome",
+            status: "active",
+            bonusAmountMicros: quote.bonusAmountMicros,
+            wageringRequiredMicros: quote.wageringRequiredMicros,
+            wageringPaidMicros: 0,
+            expiresAt: insertedGrant.rows[0].expires_at
+          };
+        }
+      }
+    }
     await client.query("commit");
     return {
       order: {
@@ -989,6 +1068,7 @@ export async function completePaymentOrder(orderId, payment) {
         telegramPaymentChargeId: payment.telegram_payment_charge_id || ""
       },
       balance: after,
+      bonusGrant,
       alreadyPaid: false
     };
   } catch (error) {
@@ -997,6 +1077,229 @@ export async function completePaymentOrder(orderId, payment) {
   } finally {
     client.release();
   }
+}
+
+export async function applyBonusWagering({
+  providerUserIds = [],
+  rakeAmountMicros = 0,
+  handId = "",
+  provider = "telegram"
+} = {}) {
+  if (!pool) return null;
+  const userIds = [...new Set(providerUserIds.map(String).filter(Boolean))];
+  const rake = Math.max(0, Math.round(Number(rakeAmountMicros) || 0));
+  if (!userIds.length || rake <= 0 || !handId) return [];
+  const client = await pool.connect();
+  const completed = [];
+
+  try {
+    await client.query("begin");
+    for (const providerUserId of userIds) {
+      const identity = await client.query(`
+        select app_user_id
+        from user_identities
+        where provider = $1 and provider_user_id = $2
+      `, [provider, providerUserId]);
+      if (!identity.rowCount) continue;
+      const appUserId = identity.rows[0].app_user_id;
+      const grants = await client.query(`
+        select id, bonus_amount_micros, wagering_required_micros, wagering_paid_micros, expires_at
+        from bonus_grants
+        where app_user_id = $1 and status = 'active' and expires_at > now()
+        order by created_at asc
+        for update
+      `, [appUserId]);
+
+      for (const grant of grants.rows) {
+        const event = await client.query(`
+          insert into bonus_wagering_events (grant_id, hand_id, rake_amount_micros)
+          values ($1, $2, $3)
+          on conflict do nothing
+          returning grant_id
+        `, [grant.id, handId, rake]);
+        if (!event.rowCount) continue;
+
+        const progress = advanceWelcomeBonusWagering({
+          paidMicros: grant.wagering_paid_micros,
+          requiredMicros: grant.wagering_required_micros,
+          rakeMicros: rake
+        });
+        const nextPaid = progress.wageringPaidMicros;
+        const required = Number(grant.wagering_required_micros || 0);
+        if (!progress.completed) {
+          await client.query(`
+            update bonus_grants
+            set wagering_paid_micros = $2, wagering_done = $2, updated_at = now()
+            where id = $1
+          `, [grant.id, nextPaid]);
+          continue;
+        }
+
+        const wallet = await client.query(`
+          select cash_usdt_micros, bonus_usdt_micros
+          from wallets
+          where app_user_id = $1
+          for update
+        `, [appUserId]);
+        const bonusAmount = Number(grant.bonus_amount_micros || 0);
+        const bonusBefore = Number(wallet.rows[0]?.bonus_usdt_micros || 0);
+        const cashBefore = Number(wallet.rows[0]?.cash_usdt_micros || 0);
+        if (bonusBefore < bonusAmount) {
+          throw new Error(`Bonus wallet invariant failed for grant ${grant.id}`);
+        }
+        const bonusAfter = bonusBefore - bonusAmount;
+        const cashAfter = cashBefore + bonusAmount;
+        await client.query(`
+          update bonus_grants
+          set wagering_paid_micros = $2, wagering_done = $2, status = 'completed', updated_at = now()
+          where id = $1
+        `, [grant.id, nextPaid]);
+        await client.query(`
+          update wallets
+          set bonus_usdt_micros = $2, cash_usdt_micros = $3, updated_at = now()
+          where app_user_id = $1
+        `, [appUserId, bonusAfter, cashAfter]);
+        await insertBonusTransferLedger(client, {
+          appUserId,
+          provider,
+          providerUserId,
+          grantId: grant.id,
+          amount: bonusAmount,
+          bonusAfter,
+          cashAfter,
+          category: "bonus_unlock",
+          title: "Welcome Bonus unlocked"
+        });
+        completed.push({
+          grantId: grant.id,
+          providerUserId,
+          bonusAmountMicros: bonusAmount,
+          wageringPaidMicros: nextPaid,
+          wageringRequiredMicros: required,
+          cashBalanceMicros: cashAfter
+        });
+      }
+    }
+    await client.query("commit");
+    return completed;
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function expireWelcomeBonuses() {
+  if (!pool) return null;
+  const client = await pool.connect();
+  const expired = [];
+  try {
+    await client.query("begin");
+    const grants = await client.query(`
+      select bg.id, bg.app_user_id, bg.provider, bg.provider_user_id, bg.bonus_amount_micros
+      from bonus_grants bg
+      where bg.status = 'active' and bg.expires_at <= now()
+      order by bg.expires_at asc
+      for update
+    `);
+    for (const grant of grants.rows) {
+      const wallet = await client.query(`
+        select bonus_usdt_micros
+        from wallets
+        where app_user_id = $1
+        for update
+      `, [grant.app_user_id]);
+      const bonusBefore = Number(wallet.rows[0]?.bonus_usdt_micros || 0);
+      const amount = Math.min(bonusBefore, Number(grant.bonus_amount_micros || 0));
+      const bonusAfter = bonusBefore - amount;
+      await client.query(`
+        update bonus_grants set status = 'expired', updated_at = now() where id = $1
+      `, [grant.id]);
+      await client.query(`
+        update wallets set bonus_usdt_micros = $2, updated_at = now() where app_user_id = $1
+      `, [grant.app_user_id, bonusAfter]);
+      if (amount > 0) {
+        await client.query(`
+          insert into ledger_entries (
+            id, app_user_id, provider, provider_user_id, type, category, title,
+            amount, meta, balance_after, idempotency_key, asset, balance_bucket
+          )
+          values ($1, $2, $3, $4, 'debit', 'bonus_expired', 'Welcome Bonus expired',
+                  $5, $6, $7, $8, 'USDT', 'bonus_usdt')
+          on conflict do nothing
+        `, [
+          id("ledger"), grant.app_user_id, grant.provider, grant.provider_user_id,
+          amount, `grant ${grant.id}`, bonusAfter, `bonus:${grant.id}:expired`
+        ]);
+        await client.query(`
+          insert into platform_ledger_entries (
+            id, type, category, title, amount, context_id, meta, idempotency_key
+          )
+          values ($1, 'credit', 'bonus_expired', 'Expired Welcome Bonus', $2, $3, $4, $5)
+          on conflict do nothing
+        `, [id("platform"), amount, grant.id, `user ${grant.provider_user_id}`, `bonus:${grant.id}:expired:platform`]);
+      }
+      expired.push({ grantId: grant.id, providerUserId: grant.provider_user_id, bonusAmountMicros: amount });
+    }
+    await client.query("commit");
+    return expired;
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function getBonusSummary(providerUserId, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const result = await query(`
+    select coalesce(w.bonus_usdt_micros, 0)::bigint as bonus_balance_micros,
+           coalesce(jsonb_agg(jsonb_build_object(
+             'id', bg.id,
+             'type', bg.bonus_type,
+             'status', bg.status,
+             'bonusAmountMicros', bg.bonus_amount_micros,
+             'wageringRequiredMicros', bg.wagering_required_micros,
+             'wageringPaidMicros', bg.wagering_paid_micros,
+             'expiresAt', bg.expires_at
+           ) order by bg.created_at desc) filter (where bg.id is not null), '[]'::jsonb) as grants
+    from wallets w
+    left join bonus_grants bg on bg.app_user_id = w.app_user_id and bg.status = 'active'
+    where w.app_user_id = $1
+    group by w.bonus_usdt_micros
+  `, [appUserId]);
+  if (!result.rowCount) return { bonusBalanceMicros: 0, grants: [] };
+  return {
+    bonusBalanceMicros: Number(result.rows[0].bonus_balance_micros || 0),
+    grants: (result.rows[0].grants || []).map((grant) => ({
+      ...grant,
+      bonusAmountMicros: Number(grant.bonusAmountMicros || 0),
+      wageringRequiredMicros: Number(grant.wageringRequiredMicros || 0),
+      wageringPaidMicros: Number(grant.wageringPaidMicros || 0)
+    }))
+  };
+}
+
+async function insertBonusTransferLedger(client, {
+  appUserId, provider, providerUserId, grantId, amount, bonusAfter, cashAfter, category, title
+}) {
+  await client.query(`
+    insert into ledger_entries (
+      id, app_user_id, provider, provider_user_id, type, category, title,
+      amount, meta, balance_after, idempotency_key, asset, balance_bucket
+    )
+    values
+      ($1, $2, $3, $4, 'debit', $5, $6, $7, $8, $9, $10, 'USDT', 'bonus_usdt'),
+      ($11, $2, $3, $4, 'credit', $5, $6, $7, $8, $12, $13, 'USDT', 'cash_usdt')
+    on conflict do nothing
+  `, [
+    id("ledger"), appUserId, provider, String(providerUserId), category, title,
+    amount, `grant ${grantId}`, bonusAfter, `bonus:${grantId}:${category}:debit`,
+    id("ledger"), cashAfter, `bonus:${grantId}:${category}:credit`
+  ]);
 }
 
 export async function listPaymentOrders(limit = 10) {
@@ -2352,7 +2655,35 @@ async function migrate() {
       updated_at timestamptz not null default now()
     );
 
+    alter table bonus_grants add column if not exists bonus_amount_micros bigint not null default 0 check (bonus_amount_micros >= 0);
+    alter table bonus_grants add column if not exists wagering_required_micros bigint not null default 0 check (wagering_required_micros >= 0);
+    alter table bonus_grants add column if not exists wagering_paid_micros bigint not null default 0 check (wagering_paid_micros >= 0);
+    update bonus_grants
+    set bonus_amount_micros = greatest(bonus_amount_micros, amount_usdt_micros),
+        wagering_required_micros = greatest(wagering_required_micros, wagering_required),
+        wagering_paid_micros = greatest(wagering_paid_micros, wagering_done);
+    with duplicate_welcome as (
+      select id, row_number() over (partition by app_user_id order by created_at asc, id asc) as position
+      from bonus_grants
+      where bonus_type = 'welcome'
+    )
+    update bonus_grants bg
+    set bonus_type = 'welcome_duplicate_archived', status = 'cancelled', updated_at = now()
+    from duplicate_welcome duplicate
+    where bg.id = duplicate.id and duplicate.position > 1;
+
     create index if not exists idx_bonus_grants_user_status on bonus_grants(app_user_id, status, created_at desc);
+    create unique index if not exists idx_bonus_grants_welcome_once
+      on bonus_grants(app_user_id, bonus_type)
+      where bonus_type = 'welcome';
+
+    create table if not exists bonus_wagering_events (
+      grant_id text not null references bonus_grants(id) on delete cascade,
+      hand_id text not null,
+      rake_amount_micros bigint not null default 0 check (rake_amount_micros >= 0),
+      created_at timestamptz not null default now(),
+      primary key (grant_id, hand_id)
+    );
 
     create table if not exists referrals (
       id text primary key,

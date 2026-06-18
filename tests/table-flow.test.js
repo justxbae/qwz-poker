@@ -645,6 +645,10 @@ test("Stars, Crypto Bot, and xRocket deposit rails create invoices and credit ca
     let paidCashier = (await request("/api/cashier", { token: auth.token })).cashier;
     assert.equal(paidCashier.balance, 25_000_000);
     assert.equal(paidCashier.transactions[0].category, "deposit_stars");
+    assert.equal(paidCashier.bonusBalanceMicros, 6_250_000);
+    assert.equal(paidCashier.activeBonuses.length, 1);
+    assert.equal(paidCashier.activeBonuses[0].type, "welcome");
+    assert.equal(paidCashier.activeBonuses[0].wageringRequiredMicros, 37_500_000);
 
     const cryptoOrder = await request("/api/cashier/crypto-order", {
       method: "POST",
@@ -679,6 +683,8 @@ test("Stars, Crypto Bot, and xRocket deposit rails create invoices and credit ca
     paidCashier = (await request("/api/cashier", { token: auth.token })).cashier;
     assert.equal(paidCashier.balance, 50_000_000);
     assert.equal(paidCashier.transactions[0].category, "deposit_cryptobot");
+    assert.equal(paidCashier.bonusBalanceMicros, 6_250_000);
+    assert.equal(paidCashier.activeBonuses.length, 1);
 
     const xRocketOrder = await request("/api/cashier/crypto-order", {
       method: "POST",
@@ -717,10 +723,87 @@ test("Stars, Crypto Bot, and xRocket deposit rails create invoices and credit ca
     paidCashier = (await request("/api/cashier", { token: auth.token })).cashier;
     assert.equal(paidCashier.balance, 75_000_000);
     assert.equal(paidCashier.transactions[0].category, "deposit_xrocket");
+    assert.equal(paidCashier.bonusBalanceMicros, 6_250_000);
+    assert.equal(paidCashier.activeBonuses.length, 1);
 
     const profile = (await request("/api/profile", { token: auth.token })).profile;
     assert.equal(profile.cashBalanceMicros, 75_000_000);
+    assert.equal(profile.bonusBalanceMicros, 6_250_000);
+    assert.equal(profile.activeBonuses.length, 1);
     assert.equal(profile.balance, 0);
+
+    const opponentAuth = await request("/api/auth", {
+      method: "POST",
+      body: { initData: telegramInitData({ id: 222, first_name: "Opponent", username: "opponent" }) }
+    });
+    const opponentInvoice = await request("/api/cashier/stars-invoice", {
+      method: "POST",
+      token: opponentAuth.token,
+      body: { usdtAmount: 10 }
+    });
+    await request("/api/telegram/webhook", {
+      method: "POST",
+      body: {
+        message: {
+          successful_payment: {
+            invoice_payload: opponentInvoice.order.payload,
+            currency: "XTR",
+            total_amount: opponentInvoice.order.stars,
+            telegram_payment_charge_id: "stars-charge-opponent"
+          }
+        }
+      }
+    });
+
+    let cashTable = (await request("/api/tables", {
+      method: "POST",
+      token: auth.token,
+      body: {
+        name: "Bonus wagering",
+        gameMode: "cash",
+        maxPlayers: 2,
+        smallBlind: 50_000,
+        bigBlind: 100_000,
+        minBuyIn: 2_500_000,
+        maxBuyIn: 25_000_000,
+        buyInAmount: 10_000_000
+      }
+    })).table;
+    cashTable = (await request(`/api/tables/${cashTable.id}/join`, {
+      method: "POST",
+      token: opponentAuth.token,
+      body: { buyInAmount: 10_000_000 }
+    })).table;
+    cashTable = (await request(`/api/tables/${cashTable.id}/start-hand`, {
+      method: "POST",
+      token: auth.token
+    })).table;
+    cashTable = (await request(`/api/tables/${cashTable.id}/act`, {
+      method: "POST",
+      token: auth.token,
+      body: { action: "call" }
+    })).table;
+    cashTable = (await request(`/api/tables/${cashTable.id}/act`, {
+      method: "POST",
+      token: opponentAuth.token,
+      body: { action: "check" }
+    })).table;
+    cashTable = (await request(`/api/tables/${cashTable.id}/act`, {
+      method: "POST",
+      token: opponentAuth.token,
+      body: { action: "bet", amount: 1_000_000 }
+    })).table;
+    cashTable = (await request(`/api/tables/${cashTable.id}/act`, {
+      method: "POST",
+      token: auth.token,
+      body: { action: "fold" }
+    })).table;
+    assert.equal(cashTable.status, "showdown");
+
+    paidCashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    const opponentCashier = (await request("/api/cashier", { token: opponentAuth.token })).cashier;
+    assert.equal(paidCashier.activeBonuses[0].wageringPaidMicros, 5_000);
+    assert.equal(opponentCashier.activeBonuses[0].wageringPaidMicros, 5_000);
   } finally {
     await Promise.all([
       telegramApi.close(),
@@ -1211,6 +1294,21 @@ function signCryptoBotWebhook(body, apiKey) {
 function signXRocketWebhook(body, secretKey) {
   const secret = createHash("sha256").update(secretKey).digest();
   return createHmac("sha256", secret).update(body).digest("hex");
+}
+
+function telegramInitData(user, botToken = "test-token") {
+  const params = new URLSearchParams({
+    auth_date: String(Math.floor(Date.now() / 1000)),
+    query_id: `test-${user.id}`,
+    user: JSON.stringify(user)
+  });
+  const dataCheckString = [...params.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n");
+  const secretKey = createHmac("sha256", "WebAppData").update(botToken).digest();
+  params.set("hash", createHmac("sha256", secretKey).update(dataCheckString).digest("hex"));
+  return params.toString();
 }
 
 async function startMockApiServer(handler) {

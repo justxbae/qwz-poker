@@ -2,11 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   RATING,
+  advanceWelcomeBonusWagering,
   cashClubPointsFromRake,
   cashClubStatus,
   formatUsdtMicros,
   nextRatingPoints,
   quoteCashDeposit,
+  quoteWelcomeBonus,
   ratingDeltaForHand,
   ratingLeague,
   toUsdtMicros
@@ -16,6 +18,23 @@ test("cash uses USDT micros directly and Stars quote 100 per USDT", () => {
   assert.equal(toUsdtMicros(14.5), 14_500_000);
   assert.equal(formatUsdtMicros(14_500_000), "14.50");
   assert.equal(quoteCashDeposit({ usdtAmount: 25, method: "stars" }).stars, 2500);
+});
+
+test("welcome bonus is 25% capped at $50 with 6x rake wagering", () => {
+  assert.deepEqual(quoteWelcomeBonus(toUsdtMicros(20)), {
+    bonusAmountMicros: toUsdtMicros(5),
+    wageringRequiredMicros: toUsdtMicros(30),
+    expiresInDays: 30
+  });
+  assert.equal(quoteWelcomeBonus(toUsdtMicros(300)).bonusAmountMicros, toUsdtMicros(50));
+  assert.deepEqual(advanceWelcomeBonusWagering({
+    paidMicros: toUsdtMicros(29),
+    requiredMicros: toUsdtMicros(30),
+    rakeMicros: toUsdtMicros(1)
+  }), {
+    wageringPaidMicros: toUsdtMicros(30),
+    completed: true
+  });
 });
 
 test("rating uses BB result caps and ignores private or inactive hands", () => {
