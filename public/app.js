@@ -49,9 +49,12 @@ const lobbyTableStack = document.querySelector("#lobbyTableStack");
 const lobbyActiveTables = document.querySelector("#lobbyActiveTables");
 const lobbyRank = document.querySelector("#lobbyRank");
 const homeWalletSide = document.querySelector("#homeWalletSide");
+const homeWalletSideLabel = document.querySelector("#homeWalletSideLabel");
 const homeWalletSideValue = document.querySelector("#homeWalletSideValue");
 const homeWalletSideCurrency = document.querySelector("#homeWalletSideCurrency");
 const homeWalletSideHint = document.querySelector("#homeWalletSideHint");
+const homeWalletSideMeter = document.querySelector("#homeWalletSideMeter");
+const homeWalletSideAction = document.querySelector("#homeWalletSideAction");
 const homeActivityText = document.querySelector("#homeActivityText");
 const homeSessionPill = document.querySelector("#homeSessionPill");
 const homeScreenInstallButton = document.querySelector("#homeScreenInstallButton");
@@ -1454,22 +1457,52 @@ function renderProfile(profileData) {
 function renderHomeWalletSide(profileData = {}) {
   if (!homeWalletSideValue || !homeWalletSideCurrency || !homeWalletSideHint) return;
   const cashMode = state.gameMode === "cash";
-  const tableStack = cashMode ? Number(profileData.cashTableStackMicros || 0) : Number(profileData.tableStack || 0);
+  const profile = profileData.profile || {};
   const activeTableCount = Number(profileData.activeTableCount || 0);
-  homeWalletSideValue.textContent = cashMode ? formatUsdt(tableStack) : formatChips(tableStack);
+  const cashClubTitle = profile.cashClubStatus || "Cash Club";
+  const nextCashClubTitle = profile.cashClubNextStatus || "";
+  const currentPoints = Number(profile.cashXpCurrent || profile.cashClubPoints || 0);
+  const requiredPoints = Number(profile.cashXpRequired || 0);
+  const progress = Math.max(0, Math.min(1, Number(profile.cashXpProgress || 0)));
+
   if (cashMode) {
-    homeWalletSideCurrency.replaceChildren(createTetherMark("tether-mark--mini"));
-    homeWalletSideCurrency.setAttribute("aria-label", "USDT");
+    if (homeWalletSideLabel) homeWalletSideLabel.textContent = "Cash Club";
+    homeWalletSideValue.textContent = cashClubTitle;
+    homeWalletSideCurrency.textContent = " статус";
+    homeWalletSideCurrency.removeAttribute("aria-label");
+    homeWalletSideHint.textContent = nextCashClubTitle
+      ? `${Math.max(0, requiredPoints - currentPoints)} pts до ${nextCashClubTitle}`
+      : `рейк ${formatUsdt(profile.cashRakeContributed || 0)} USDT`;
+    if (homeWalletSideMeter) homeWalletSideMeter.style.width = `${Math.max(8, Math.round(progress * 100))}%`;
+    if (homeWalletSideAction) {
+      homeWalletSideAction.textContent = "Прогресс";
+      homeWalletSideAction.disabled = true;
+    }
   } else {
+    if (homeWalletSideLabel) homeWalletSideLabel.textContent = "Бонус дня";
+    homeWalletSideValue.textContent = formatChips(10000);
     homeWalletSideCurrency.textContent = " фишек";
     homeWalletSideCurrency.removeAttribute("aria-label");
+    homeWalletSideHint.textContent = "каждые 24 часа";
+    if (homeWalletSideMeter) homeWalletSideMeter.style.width = "100%";
+    if (homeWalletSideAction) {
+      homeWalletSideAction.textContent = "Получить 10 000";
+      homeWalletSideAction.disabled = true;
+    }
   }
-  homeWalletSideHint.textContent = activeTableCount
-    ? `${activeTableCount} ${plural(activeTableCount, "стол", "стола", "столов")}`
-    : "нет активных";
+  if (cashMode && homeWalletSideAction) homeWalletSideAction.title = "Пока недоступно";
+  if (!cashMode && homeWalletSideAction) homeWalletSideAction.title = "Бонус скоро будет доступен";
+  if (!cashMode && homeWalletSideMeter) homeWalletSideMeter.dataset.mode = "bonus";
+  if (cashMode && homeWalletSideMeter) homeWalletSideMeter.dataset.mode = "cash";
+  if (cashMode && homeWalletSideHint) {
+    homeWalletSideHint.textContent = nextCashClubTitle
+      ? `${Math.max(0, requiredPoints - currentPoints)} pts до ${nextCashClubTitle}`
+      : `рейк ${formatUsdt(profile.cashRakeContributed || 0)} USDT`;
+  }
   if (homeWalletSide) {
     homeWalletSide.dataset.mode = cashMode ? "cash" : "play";
     homeWalletSide.dataset.active = activeTableCount ? "true" : "false";
+    homeWalletSide.dataset.state = cashMode ? "club" : "bonus";
   }
 }
 

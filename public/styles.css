@@ -14051,3 +14051,283 @@ body:not(.in-game) .bottom-nav button {
 body:not(.in-game) .bottom-nav button .nav-label {
   font-size: 10.5px !important;
 }
+
+body:not(.in-game) .lobby-shell {
+  padding-bottom: calc(128px + env(safe-area-inset-bottom)) !important;
+}
+
+body:not(.in-game) .bottom-nav {
+  left: max(12px, calc(50vw - 186px)) !important;
+  width: min(372px, calc(100vw - 24px)) !important;
+  min-height: 56px !important;
+  height: 56px !important;
+  padding: 4px !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: linear-gradient(180deg, rgba(32, 43, 54, 0.98) 0%, rgba(24, 34, 48, 0.98) 100%) !important;
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.34),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset !important;
+}
+
+body:not(.in-game) .bottom-nav::after {
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14) !important;
+}
+
+body:not(.in-game) .bottom-nav button {
+  min-height: 48px !important;
+  border-radius: 18px !important;
+}
+
+body:not(.in-game) .bottom-nav button .nav-label {
+  font-size: 10px !important;
+}
+
+body:not(.in-game) .home-wallet-side {
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+body:not(.in-game) .home-wallet-side::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  background: radial-gradient(120% 100% at 0% 0%, rgba(42, 171, 238, 0.08), transparent 46%) !important;
+  pointer-events: none !important;
+}
+
+body:not(.in-game) .home-wallet-side > * {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+body:not(.in-game) .home-wallet-side-meter {
+  height: 5px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  overflow: hidden !important;
+}
+
+body:not(.in-game) .home-wallet-side-meter span {
+  display: block !important;
+  height: 100% !important;
+  width: 0%;
+  border-radius: inherit !important;
+  background: linear-gradient(90deg, var(--qwz-acc) 0%, #58c7ff 100%) !important;
+  transition: width 240ms ease !important;
+}
+
+body:not(.in-game) .home-wallet-side[data-state="bonus"] .home-wallet-side-meter span {
+  background: linear-gradient(90deg, var(--qwz-gold) 0%, #f7d87a 100%) !important;
+}
+
+body:not(.in-game) .home-wallet-side-action {
+  min-height: 32px !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--qwz-ink) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.01em !important;
+}
+
+body:not(.in-game) .home-wallet-side-action:disabled {
+  opacity: 0.95 !important;
+}
+
+body:not(.in-game) .home-wallet-side[data-mode="cash"] .home-wallet-side-action {
+  background: rgba(42, 171, 238, 0.12) !important;
+  color: #7dd0ff !important;
+}
+
+body:not(.in-game) .home-wallet-side[data-mode="play"] .home-wallet-side-action {
+  background: rgba(244, 193, 74, 0.12) !important;
+  color: #ffd77a !important;
+}
+
+body:not(.in-game) .play-format-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+body:not(.in-game) .play-format-grid button {
+  display: grid !important;
+  grid-template-columns: 30px minmax(0, 1fr) !important;
+  grid-template-areas:
+    "icon title"
+    "icon desc" !important;
+  align-items: center !important;
+  justify-items: start !important;
+  text-align: left !important;
+  min-height: 86px !important;
+  padding: 12px !important;
+  gap: 4px 10px !important;
+}
+
+body:not(.in-game) .play-format-grid .format-icon {
+  grid-area: icon !important;
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  border-radius: 11px !important;
+  display: grid !important;
+  place-items: center !important;
+  background: rgba(42, 171, 238, 0.14) !important;
+  color: var(--qwz-acc) !important;
+}
+
+body:not(.in-game) .play-format-grid .format-icon svg {
+  width: 18px !important;
+  height: 18px !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 1.8 !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+}
+
+body:not(.in-game) .play-format-grid .format-copy {
+  display: contents !important;
+}
+
+body:not(.in-game) .play-format-grid strong {
+  grid-area: title !important;
+  margin: 0 !important;
+  font-size: 13px !important;
+  line-height: 1.1 !important;
+}
+
+body:not(.in-game) .play-format-grid small {
+  grid-area: desc !important;
+  margin: 0 !important;
+  line-height: 1.2 !important;
+}
+
+body:not(.in-game) .play-format-grid button[data-lobby-tab="tournaments"] .format-icon {
+  background: rgba(244, 193, 74, 0.14) !important;
+  color: var(--qwz-gold) !important;
+}
+
+body:not(.in-game) .play-format-grid button[data-mode-action="sitgo"] .format-icon {
+  background: rgba(54, 200, 200, 0.14) !important;
+  color: var(--qwz-teal) !important;
+}
+
+body:not(.in-game) .play-format-grid button[data-mode-action="private"] .format-icon {
+  background: rgba(139, 108, 255, 0.14) !important;
+  color: var(--qwz-violet) !important;
+}
+
+body:not(.in-game) .lobby-menu-sheet {
+  border-radius: 28px 28px 0 0 !important;
+  background: linear-gradient(180deg, #182230 0%, #0e1620 100%) !important;
+  box-shadow: 0 -18px 44px rgba(0, 0, 0, 0.5) !important;
+}
+
+body:not(.in-game) .lobby-menu-head {
+  padding: 4px 2px 10px !important;
+}
+
+body:not(.in-game) .lobby-menu-head p {
+  letter-spacing: 0.1em !important;
+}
+
+body:not(.in-game) .lobby-menu-list {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+body:not(.in-game) .lobby-menu-list button {
+  position: relative !important;
+  min-height: 112px !important;
+  align-items: start !important;
+  border-radius: 18px !important;
+  padding: 12px !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  background:
+    radial-gradient(120% 100% at 0% 0%, rgba(42, 171, 238, 0.08), transparent 45%),
+    rgba(255, 255, 255, 0.03) !important;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18) !important;
+  display: grid !important;
+  grid-template-columns: 36px minmax(0, 1fr) auto !important;
+  grid-template-areas:
+    "icon copy meta"
+    "icon copy chevron" !important;
+  gap: 8px 10px !important;
+}
+
+body:not(.in-game) .lobby-menu-list button .menu-icon {
+  grid-area: icon !important;
+  width: 36px !important;
+  height: 36px !important;
+  margin-top: 2px !important;
+  border-radius: 12px !important;
+  display: grid !important;
+  place-items: center !important;
+}
+
+body:not(.in-game) .lobby-menu-list button .menu-icon svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+body:not(.in-game) .lobby-menu-list button .menu-copy {
+  grid-area: copy !important;
+  display: grid !important;
+  gap: 4px !important;
+}
+
+body:not(.in-game) .lobby-menu-list button strong {
+  font-size: 14px !important;
+  line-height: 1.05 !important;
+}
+
+body:not(.in-game) .lobby-menu-list button small {
+  font-size: 11px !important;
+  line-height: 1.25 !important;
+}
+
+body:not(.in-game) .lobby-menu-list button .menu-meta {
+  grid-area: meta !important;
+  justify-self: end !important;
+  align-self: start !important;
+  min-height: 22px !important;
+  padding: 3px 8px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--qwz-dim) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+}
+
+body:not(.in-game) .lobby-menu-list button .tg-chevron {
+  grid-area: chevron !important;
+  align-self: end !important;
+  justify-self: end !important;
+  color: var(--qwz-dim) !important;
+}
+
+body:not(.in-game) .lobby-menu-list button[data-menu-action="cashier"] .menu-icon {
+  background: rgba(47, 201, 126, 0.14) !important;
+  color: var(--qwz-green) !important;
+}
+
+body:not(.in-game) .lobby-menu-list button[data-menu-action="details"] .menu-icon {
+  background: rgba(42, 171, 238, 0.14) !important;
+  color: var(--qwz-acc) !important;
+}
+
+body:not(.in-game) .lobby-menu-list button[data-menu-action="affiliate"] .menu-icon {
+  background: rgba(244, 193, 74, 0.14) !important;
+  color: var(--qwz-gold) !important;
+}
+
+body:not(.in-game) .lobby-menu-list button[data-menu-action="support"] .menu-icon {
+  background: rgba(54, 200, 200, 0.14) !important;
+  color: var(--qwz-teal) !important;
+}
