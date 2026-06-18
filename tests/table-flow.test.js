@@ -503,6 +503,7 @@ test("idempotency key rejects a different request body", async () => {
 
 test("crypto deposit order can be created but does not credit chips before confirmation", async () => {
   const server = await startServer({
+    ADMIN_USER_IDS: "dev-user",
     REAL_MONEY_ENABLED: "true",
     TON_PAYMENTS_ENABLED: "true",
     TON_RECEIVER_ADDRESS: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
@@ -613,6 +614,7 @@ test("Stars, Crypto Bot, and xRocket deposit rails create invoices and credit ca
   });
 
   const server = await startServer({
+    ADMIN_USER_IDS: "dev-user",
     REAL_MONEY_ENABLED: "true",
     APP_PUBLIC_URL: "https://qwz.test",
     TELEGRAM_API_BASE: telegramApi.url,
@@ -781,6 +783,30 @@ test("Stars, Crypto Bot, and xRocket deposit rails create invoices and credit ca
     assert.equal(profile.bonusBalanceMicros, 6_250_000);
     assert.equal(profile.activeBonuses.length, 1);
     assert.equal(profile.balance, 0);
+
+    const manualStarsInvoice = await request("/api/cashier/stars-invoice", {
+      method: "POST",
+      token: auth.token,
+      body: { usdtAmount: 1 }
+    });
+    await assert.rejects(
+      () => request(`/api/admin/payments/${manualStarsInvoice.order.id}/approve`, {
+        method: "POST",
+        token: auth.token,
+        idempotencyKey: "manual-stars-without-receipt",
+        body: { reason: "manual_test", confirmPaid: false }
+      }),
+      /требуется проверка Telegram receipt/
+    );
+    const manualStarsApproval = await request(`/api/admin/payments/${manualStarsInvoice.order.id}/approve`, {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "manual-stars-with-receipt",
+      body: { reason: "telegram_receipt_verified", confirmPaid: true }
+    });
+    assert.equal(manualStarsApproval.payment.status, "paid");
+    paidCashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(paidCashier.cashBalanceMicros, 76_000_000);
 
     const opponentAuth = await request("/api/auth", {
       method: "POST",

@@ -47,6 +47,8 @@ Telegram's `openInvoice(..., status='paid')` callback only confirms that Telegra
 
 Operational recovery is documented in `docs/PAYMENT_INCIDENT_RUNBOOK.md`.
 
+Finance admins may manually approve a pending Stars order only after checking the Telegram receipt. The API requires `confirmPaid: true`, records `telegram_receipt_verified` in the audit trail, and still uses the same idempotent `completePaymentOrder` transaction.
+
 ## Crypto Bot
 
 Supported as an invoice rail.

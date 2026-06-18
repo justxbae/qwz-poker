@@ -27,3 +27,13 @@
 **Влияет на:** Stars deposits, `/api/cashier`, `/api/profile`, payment monitoring, frontend cashier UX.
 **Что обновлено:** Payment-status endpoint с ownership check, authoritative wallet refresh, polling UI, fail-closed webhook readiness, USDT-aware Stars reconciliation, regression-тесты и incident runbook.
 **Открытые вопросы:** Production работает на `https://qwz-poker-t8mc.onrender.com`; старый адрес без суффикса не относится к активному сервису. Проверить pending Stars-order пользователя `@quinwize` и обработать его по runbook без повторного платежа.
+
+## 2026-06-18: Guarded manual approval для pending Stars
+
+**Зона:** architecture / economy / development
+
+**Решение:** Finance-admin может вручную подтвердить Stars-order только в статусе `pending/manual_review`, после отдельного UI-предупреждения и с API-флагом `confirmPaid=true`. Начисление проходит через тот же идемпотентный `completePaymentOrder`, прямые wallet updates запрещены.
+**Почему:** Telegram webhook может исчерпать retries после production-ошибки, но подтверждённый receipt должен иметь безопасный операционный recovery path.
+**Влияет на:** admin payment orders, Stars incident recovery, audit trail.
+**Что обновлено:** Кнопки Stars approve/reject, receipt confirmation guard, PostgreSQL `FOR UPDATE OF` fix, тесты.
+**Открытые вопросы:** Нет.

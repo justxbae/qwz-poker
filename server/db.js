@@ -917,7 +917,7 @@ export async function completePaymentOrder(orderId, payment) {
       from payment_orders po
       left join app_users au on au.id = po.app_user_id
       where po.id = $1
-      for update
+      for update of po
     `, [orderId]);
     if (!currentOrder.rowCount) {
       await client.query("commit");
@@ -1432,7 +1432,7 @@ export async function reviewWithdrawalOrder(orderId, review) {
       from withdrawal_orders wo
       left join app_users au on au.id = wo.app_user_id
       where wo.id = $1
-      for update
+      for update of wo
     `, [orderId]);
     if (!current.rowCount) {
       await client.query("commit");

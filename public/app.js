@@ -2137,6 +2137,7 @@ function renderAdminPayments(payments) {
   for (const payment of filtered) {
     const row = document.createElement("div");
     row.className = `cashier-transaction admin-payment-row ${payment.status === "paid" ? "credit" : "debit"}`;
+    row.dataset.paymentMethod = payment.method || "";
     const main = document.createElement("div");
     const title = document.createElement("strong");
     title.textContent = `${paymentMethodTitle(payment)} · ${formatPaymentAmount(payment)}`;
@@ -2148,7 +2149,7 @@ function renderAdminPayments(payments) {
     status.textContent = payment.status;
     row.append(main, status);
 
-    const canAdminAct = payment.method !== "stars" && ["pending", "manual_review"].includes(payment.status);
+    const canAdminAct = ["pending", "manual_review"].includes(payment.status);
     if (canAdminAct) {
       const actions = document.createElement("div");
       actions.className = "admin-payment-actions";
@@ -2276,12 +2277,23 @@ async function onAdminPaymentAction(event) {
   const paymentId = button.dataset.paymentId;
   const action = button.dataset.paymentAction;
   if (!paymentId || !action) return;
+  const paymentRow = button.closest(".admin-payment-row");
+  const isStars = paymentRow?.dataset.paymentMethod === "stars";
+  const warning = action === "approve"
+    ? isStars
+      ? "Подтвердить Stars-платёж вручную? Делайте это только после проверки Telegram receipt. Операция начислит реальный USDT-баланс."
+      : "Подтвердить платёж вручную и начислить USDT?"
+    : "Отклонить платёж?";
+  if (!window.confirm(warning)) return;
   adminStatus.textContent = action === "approve" ? "Подтверждаем платеж..." : "Отклоняем платеж...";
   await api(`/api/admin/payments/${encodeURIComponent(paymentId)}/${action}`, {
     method: "POST",
     idempotencyKey: requestKey(`admin-payment-${action}-${paymentId}`),
     body: {
-      reason: action === "approve" ? "manual_admin_approval" : "manual_admin_reject"
+      reason: action === "approve"
+        ? isStars ? "telegram_receipt_verified" : "manual_admin_approval"
+        : "manual_admin_reject",
+      confirmPaid: action === "approve" && isStars
     }
   });
   adminStatus.textContent = action === "approve" ? "Платеж подтвержден." : "Платеж отклонен.";

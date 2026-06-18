@@ -61,3 +61,9 @@ limit 20;
 4. Повторный webhook не меняет баланс.
 5. `/api/cashier/payment-orders/:id` возвращает `paid`, а `/api/cashier` и Главная показывают `$1.00`.
 6. Reconciliation: paid Stars total равен `deposit_stars` ledger total.
+
+## PostgreSQL incident 2026-06-18
+
+Причина первого production `500`: payment query использовал `LEFT JOIN app_users ... FOR UPDATE`. PostgreSQL запрещает блокировать nullable-сторону outer join. Исправление: `FOR UPDATE OF po` для payment order и `FOR UPDATE OF wo` для withdrawal order.
+
+Ручное подтверждение Stars доступно finance-admin только для `pending/manual_review`, требует явного подтверждения Telegram receipt и остаётся идемпотентным по `payment:{orderId}`.

@@ -1187,7 +1187,8 @@ async function handleAdminApi(req, res, url, adminUser) {
         admin: adminUser,
         paymentId,
         action,
-        reason: body.reason || ""
+        reason: body.reason || "",
+        confirmPaid: body.confirmPaid === true
       });
       await recordAdminAudit({
         req,
@@ -3747,16 +3748,11 @@ function notifyWithdrawalReviewed(admin, order, reason) {
   });
 }
 
-async function handleAdminPaymentAction({ admin, paymentId, action, reason = "" }) {
+async function handleAdminPaymentAction({ admin, paymentId, action, reason = "", confirmPaid = false }) {
   const order = await paymentOrderFromId(paymentId);
   if (!order) {
     const error = new Error("Платеж не найден");
     error.status = 404;
-    throw error;
-  }
-  if (order.method === "stars") {
-    const error = new Error("Stars платежи нельзя подтверждать вручную");
-    error.status = 409;
     throw error;
   }
   if (!["pending", "manual_review"].includes(order.status)) {
@@ -3767,6 +3763,11 @@ async function handleAdminPaymentAction({ admin, paymentId, action, reason = "" 
 
   const adminProfile = admin || { id: "system", name: "Admin", username: "" };
   const normalizedReason = String(reason || "").trim() || `manual_${action}`;
+  if (order.method === "stars" && action === "approve" && !confirmPaid) {
+    const error = new Error("Для ручного подтверждения Stars требуется проверка Telegram receipt");
+    error.status = 409;
+    throw error;
+  }
 
   if (action === "reject") {
     await dbUpdatePaymentOrderStatus(order.id, {
