@@ -1458,21 +1458,20 @@ function renderHomeWalletSide(profileData = {}) {
   if (!homeWalletSideValue || !homeWalletSideCurrency || !homeWalletSideHint) return;
   const cashMode = state.gameMode === "cash";
   const profile = profileData.profile || {};
-  const activeTableCount = Number(profileData.activeTableCount || 0);
   const cashClubTitle = profile.cashClubStatus || "Cash Club";
   const nextCashClubTitle = profile.cashClubNextStatus || "";
   const currentPoints = Number(profile.cashXpCurrent || profile.cashClubPoints || 0);
   const requiredPoints = Number(profile.cashXpRequired || 0);
   const progress = Math.max(0, Math.min(1, Number(profile.cashXpProgress || 0)));
+  const compactNextCashClubTitle = String(nextCashClubTitle || "").replace(/\s*Club$/i, "").trim();
 
+  homeWalletSideCurrency.hidden = true;
   if (cashMode) {
     if (homeWalletSideLabel) homeWalletSideLabel.textContent = "Cash Club";
     homeWalletSideValue.textContent = cashClubTitle;
-    homeWalletSideCurrency.textContent = " статус";
-    homeWalletSideCurrency.removeAttribute("aria-label");
     homeWalletSideHint.textContent = nextCashClubTitle
-      ? `${Math.max(0, requiredPoints - currentPoints)} pts до ${nextCashClubTitle}`
-      : `рейк ${formatUsdt(profile.cashRakeContributed || 0)} USDT`;
+      ? `${Math.max(0, requiredPoints - currentPoints)} pts до ${compactNextCashClubTitle || nextCashClubTitle}`
+      : `${formatNumber(currentPoints)} pts`;
     if (homeWalletSideMeter) homeWalletSideMeter.style.width = `${Math.max(8, Math.round(progress * 100))}%`;
     if (homeWalletSideAction) {
       homeWalletSideAction.textContent = "Прогресс";
@@ -1480,28 +1479,20 @@ function renderHomeWalletSide(profileData = {}) {
     }
   } else {
     if (homeWalletSideLabel) homeWalletSideLabel.textContent = "Бонус дня";
-    homeWalletSideValue.textContent = formatChips(10000);
-    homeWalletSideCurrency.textContent = " фишек";
-    homeWalletSideCurrency.removeAttribute("aria-label");
-    homeWalletSideHint.textContent = "каждые 24 часа";
+    homeWalletSideValue.textContent = "10 000";
+    homeWalletSideHint.textContent = "24ч";
     if (homeWalletSideMeter) homeWalletSideMeter.style.width = "100%";
     if (homeWalletSideAction) {
-      homeWalletSideAction.textContent = "Получить 10 000";
+      homeWalletSideAction.textContent = "Получить";
       homeWalletSideAction.disabled = true;
     }
   }
-  if (cashMode && homeWalletSideAction) homeWalletSideAction.title = "Пока недоступно";
+  if (cashMode && homeWalletSideAction) homeWalletSideAction.title = "Прогресс уровня";
   if (!cashMode && homeWalletSideAction) homeWalletSideAction.title = "Бонус скоро будет доступен";
   if (!cashMode && homeWalletSideMeter) homeWalletSideMeter.dataset.mode = "bonus";
   if (cashMode && homeWalletSideMeter) homeWalletSideMeter.dataset.mode = "cash";
-  if (cashMode && homeWalletSideHint) {
-    homeWalletSideHint.textContent = nextCashClubTitle
-      ? `${Math.max(0, requiredPoints - currentPoints)} pts до ${nextCashClubTitle}`
-      : `рейк ${formatUsdt(profile.cashRakeContributed || 0)} USDT`;
-  }
   if (homeWalletSide) {
     homeWalletSide.dataset.mode = cashMode ? "cash" : "play";
-    homeWalletSide.dataset.active = activeTableCount ? "true" : "false";
     homeWalletSide.dataset.state = cashMode ? "club" : "bonus";
   }
 }
