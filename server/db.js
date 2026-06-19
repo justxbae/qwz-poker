@@ -106,6 +106,125 @@ export async function getCashWallet(providerUserId, provider = "telegram") {
   return result.rowCount ? Number(result.rows[0].cash_usdt_micros || 0) : 0;
 }
 
+export async function getDailyPlayClaim(providerUserId, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const result = await query(`
+    select claimed_at as "claimedAt"
+    from daily_play_claims
+    where app_user_id = $1
+  `, [appUserId]);
+  return { claimedAt: result.rows[0]?.claimedAt || null };
+}
+
+export async function claimDailyPlayChips(providerUserId, {
+  amount = 10_000,
+  cooldownSeconds = 24 * 60 * 60,
+  idempotencyKey = ""
+} = {}, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const normalizedAmount = Math.max(1, Math.round(Number(amount) || 10_000));
+  const normalizedCooldown = Math.max(1, Math.round(Number(cooldownSeconds) || 24 * 60 * 60));
+  const ledgerKey = normalizeIdempotencyKey(idempotencyKey);
+  const client = await pool.connect();
+
+  try {
+    await client.query("begin");
+    await client.query(`
+      insert into daily_play_claims (app_user_id)
+      values ($1)
+      on conflict do nothing
+    `, [appUserId]);
+    const claimState = await client.query(`
+      select claimed_at as "claimedAt", now() as "currentTime"
+      from daily_play_claims
+      where app_user_id = $1
+      for update
+    `, [appUserId]);
+    await client.query(
+      "insert into wallets (app_user_id, balance) values ($1, 0) on conflict do nothing",
+      [appUserId]
+    );
+    const wallet = await client.query(
+      "select balance from wallets where app_user_id = $1 for update",
+      [appUserId]
+    );
+    const balance = Number(wallet.rows[0]?.balance || 0);
+
+    if (ledgerKey) {
+      const existing = await client.query(`
+        select 1
+        from ledger_entries
+        where idempotency_key = $1
+        limit 1
+      `, [ledgerKey]);
+      if (existing.rowCount) {
+        await client.query("commit");
+        return {
+          claimed: true,
+          claimedAt: claimState.rows[0]?.claimedAt || null,
+          balance,
+          idempotentReplay: true
+        };
+      }
+    }
+
+    const currentTime = new Date(claimState.rows[0].currentTime).getTime();
+    const claimedAt = claimState.rows[0].claimedAt ? new Date(claimState.rows[0].claimedAt).getTime() : 0;
+    const availableAt = claimedAt ? claimedAt + normalizedCooldown * 1000 : currentTime;
+    if (claimedAt && availableAt > currentTime) {
+      await client.query("commit");
+      return {
+        claimed: false,
+        claimedAt: new Date(claimedAt).toISOString(),
+        balance,
+        cooldown: true
+      };
+    }
+
+    const after = balance + normalizedAmount;
+    const updatedClaim = await client.query(`
+      update daily_play_claims
+      set claimed_at = now(), updated_at = now()
+      where app_user_id = $1
+      returning claimed_at as "claimedAt"
+    `, [appUserId]);
+    await client.query(
+      "update wallets set balance = $2, updated_at = now() where app_user_id = $1",
+      [appUserId, after]
+    );
+    await client.query(`
+      insert into ledger_entries (
+        id, app_user_id, provider, provider_user_id, type, category, title,
+        amount, meta, balance_after, idempotency_key, asset, balance_bucket
+      )
+      values ($1, $2, $3, $4, 'credit', 'daily_play_claim', 'Ежедневные игровые фишки',
+              $5, '24h rating play claim', $6, $7, 'PLAY_CHIPS', 'play')
+    `, [
+      id("ledger"),
+      appUserId,
+      provider,
+      String(providerUserId),
+      normalizedAmount,
+      after,
+      ledgerKey || null
+    ]);
+    await client.query("commit");
+    return {
+      claimed: true,
+      claimedAt: updatedClaim.rows[0].claimedAt,
+      balance: after,
+      idempotentReplay: false
+    };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function setWallet(providerUserId, balance, provider = "telegram") {
   if (!pool) return null;
   const appUserId = await ensureIdentity(provider, providerUserId);
@@ -2297,6 +2416,14 @@ async function migrate() {
       stack bigint not null default 0 check (stack >= 0),
       updated_at timestamptz not null default now()
     );
+
+    create table if not exists daily_play_claims (
+      app_user_id text primary key references app_users(id) on delete cascade,
+      claimed_at timestamptz,
+      updated_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_daily_play_claims_claimed_at on daily_play_claims(claimed_at desc);
 
     create table if not exists ledger_entries (
       id text primary key,

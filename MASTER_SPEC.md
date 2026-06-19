@@ -1043,7 +1043,7 @@ Add-on (перерыв после ранних уровней):
 - [ ] Redis sessions + Redis table state (устойчивость к перезапускам)
 - [ ] Idempotency keys на всех денежных эндпойнтах
 - [ ] Провабли-фэйр: двухфазный commit-reveal с player seed
-- [ ] Play chips: daily claim, timer, изолированный баланс
+- [x] Play chips backend: daily claim, cooldown API, изолированный play ledger; frontend timer wiring отдельно
 - [ ] KYC tir-0 → tir-1 автотриггер при достижении порога
 - [ ] Geo-блок на уровне бэкенда (второй уровень за Cloudflare)
 - [ ] Reconciliation cron + alert в Telegram

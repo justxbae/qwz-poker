@@ -53,3 +53,18 @@ test("admin UI exposes guarded actions for pending Stars orders", () => {
   assert.match(appSource, /telegram_receipt_verified/);
   assert.match(appSource, /confirmPaid: action === "approve" && isStars/);
 });
+
+test("daily play claim persists cooldown and credits only the play ledger bucket", () => {
+  assert.match(dbSource, /create table if not exists daily_play_claims/);
+  assert.match(dbSource, /'daily_play_claim', 'Ежедневные игровые фишки'/);
+  assert.match(dbSource, /'PLAY_CHIPS', 'play'/);
+  assert.match(appSource, /gameMode:\s*"cash"/);
+});
+
+test("frontend wires the daily play claim button to the backend endpoint and countdown state", () => {
+  assert.match(appSource, /dailyPlayClaim:\s*null/);
+  assert.match(appSource, /homeWalletSideAction\?\.addEventListener\("click",\s*\(\)\s*=> runAction\(claimDailyPlayBonus\)\)/);
+  assert.match(appSource, /api\("\/api\/play\/daily-claim",\s*\{\s*method:\s*"POST"/);
+  assert.match(appSource, /formatCooldown\(dailyPlayClaim\.cooldownSeconds \|\| 0\)/);
+  assert.doesNotMatch(appSource, /Ежедневная бесплатная выдача в разработке/);
+});

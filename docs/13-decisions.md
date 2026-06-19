@@ -1,5 +1,19 @@
 # QWZ Decisions
 
+## 2026-06-19: Daily play-chip claim в рейтинговом режиме
+
+**Зона:** product / architecture / development
+
+**Решение:** В рейтинговом режиме правая верхняя карточка лобби работает как daily claim для `10 000` `PLAY_CHIPS` раз в `24` часа. Это отдельная play-only механика: она не трогает `cash_usdt_micros`, не конвертируется в USDT и не показывается в cash-режиме. Backend должен отдавать состояние клейма вместе с профилем: `canClaim`, `claimedAt`, `availableAt`, `cooldownSeconds`, `amount`. При успешном claim сервер делает атомарную проверку cooldown, увеличивает play-баланс, пишет `ledger_entries` с `balance_bucket='play'` и возвращает обновлённый профиль. Frontend в `play` показывает активную кнопку только когда `canClaim=true`, иначе отображает таймер до следующей выдачи.
+
+**Почему:** UI уже содержит этот слот как часть дизайна, но без серверной логики карточка остаётся декоративной. Для MVP нужна простая и проверяемая механика удержания игроков в play-цикле без смешивания с cash-экономикой.
+
+**Влияет на:** `/api/profile`, `/api/progression` или отдельный claim endpoint, play wallet, ledger entries, lobby right-side card, rating lobby UX.
+
+**Что обновлено:** Реализованы `daily_play_claims`, `POST /api/play/daily-claim`, блок `dailyPlayClaim` в profile/progression, play-ledger credit, memory fallback и regression-тесты. Frontend wiring остаётся отдельной задачей.
+
+**Открытые вопросы:** Нужен ли отдельный streak/bonus escalation, или остаёмся на фиксированных `10 000` каждые `24` часа.
+
 ## 2026-06-19: Lobby wallet hero and simplified bottom nav
 
 **Зона:** frontend
@@ -39,3 +53,13 @@
 **Влияет на:** lobby hero, daily bonus preview, format buttons, bottom navigation, lobby menu, profile view.
 **Что обновлено:** `public/index.html`, `public/app.js`, `public/lobby-qa.css`, `docs/13-decisions.md`.
 **Открытые вопросы:** Функциональная выдача ежедневного бонуса остаётся отдельной backend/API задачей; текущая кнопка неактивна.
+
+## 2026-06-19: Daily play claim frontend wiring
+
+**Зона:** frontend
+
+**Решение:** Кнопка `Получить` в rating hero-card отправляет `POST /api/play/daily-claim` с `X-Idempotency-Key`, а UI берёт состояние только из `dailyPlayClaim`, которое приходит в `/api/profile`, `/api/progression` и в ответе claim endpoint. Если `canClaim=false`, фронтенд не придумывает своё состояние, а показывает countdown до `availableAt`; при `409 cooldown` таймер просто пересинхронизируется из ответа сервера. После успешного claim фронтенд сразу обновляет play-баланс, progression и CTA без полной перезагрузки приложения.
+**Почему:** Механика daily claim уже стала частью лобби, но до wiring оставалась декоративной. Такой контракт сохраняет server-driven модель и не переносит бонусную логику на клиент.
+**Влияет на:** `public/app.js`, `/api/play/daily-claim`, lobby rating hero-card, play-mode empty-balance CTA.
+**Что обновлено:** `public/app.js`, `tests/frontend-mode.test.js`, `docs/13-decisions.md`.
+**Открытые вопросы:** Отдельный streak/multiday bonus по-прежнему не нужен; если появится, backend должен расширить `dailyPlayClaim`, а не перекладывать расчёт на frontend.

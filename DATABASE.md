@@ -22,6 +22,7 @@ Persisted in PostgreSQL:
 - `ledger_entries` - immutable wallet movement history.
 - `platform_ledger_entries` - immutable project-side ledger for rake, future tournament fees, withdrawals, bonuses, reversals, and manual review adjustments.
 - `saved_stacks` - saved stack after leaving a table.
+- `daily_play_claims` - one 24-hour play-chip claim timestamp per internal `app_user_id`.
 - `poker_tables` - canonical table catalogue for cash, rating, tournaments, and private games.
 - `table_seats` - canonical table seat state for future table-state persistence.
 - `payment_orders` - Stars orders and payment statuses.
@@ -86,6 +87,7 @@ Wallet changes should go through `ledger_entries`. The app writes the balance up
 - buy-ins;
 - rebuys;
 - manual admin grants and deducts.
+- daily rating-mode play-chip claims.
 
 This keeps balances auditable and prevents silent balance rewrites.
 
@@ -97,6 +99,7 @@ All money-changing API calls accept `X-Idempotency-Key`:
 
 - `/api/cashier/stars-invoice`
 - `/api/cashier/demo-topup`
+- `/api/play/daily-claim`
 - `/api/tables`
 - `/api/tables/:id/join`
 - `/api/tables/:id/rebuy`

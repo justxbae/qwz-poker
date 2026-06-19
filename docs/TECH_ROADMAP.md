@@ -12,6 +12,7 @@
 ✅ Транзакционные wallet+ledger операции с `FOR UPDATE`
 ✅ Telegram Stars инвойсы (createInvoiceLink + pre_checkout + successful_payment)
 ✅ Stars payment confirmation: webhook readiness fail-closed, authenticated order polling, authoritative wallet refresh, duplicate webhook test
+✅ Daily rating claim: 10 000 PLAY_CHIPS / 24h per app_user_id, atomic play ledger, idempotent API
 ✅ Турниры — регистрация / отмена с эскроу через advisory_xact_lock
 ✅ Admin commands в боте (`/balance`, `/grant`, `/deduct`) с идемпотентностью
 ✅ Admin API + панель в Mini App с диагностикой

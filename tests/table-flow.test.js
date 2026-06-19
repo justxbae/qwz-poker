@@ -417,6 +417,70 @@ test("cashier returns deposit settings and records wallet operations", async () 
   }
 });
 
+test("daily play claim credits 10000 play chips once per cooldown without touching cash", async () => {
+  const server = await startServer();
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    const initialProfile = (await request("/api/profile", { token: auth.token })).profile;
+    assert.equal(initialProfile.dailyPlayClaim.canClaim, true);
+    assert.equal(initialProfile.dailyPlayClaim.claimedAt, null);
+    assert.equal(initialProfile.dailyPlayClaim.cooldownSeconds, 0);
+    assert.equal(initialProfile.dailyPlayClaim.amount, 10_000);
+
+    const claimed = await request("/api/play/daily-claim", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "daily-claim-first"
+    });
+    assert.equal(claimed.profile.balance, 10_000);
+    assert.equal(claimed.profile.playBalance, 10_000);
+    assert.equal(claimed.profile.cashBalanceMicros, 0);
+    assert.equal(claimed.profile.bonusBalanceMicros, 0);
+    assert.equal(claimed.dailyPlayClaim.canClaim, false);
+    assert.ok(claimed.dailyPlayClaim.claimedAt);
+    assert.ok(claimed.dailyPlayClaim.availableAt);
+    assert.ok(claimed.dailyPlayClaim.cooldownSeconds > 86_300);
+    assert.equal(claimed.dailyPlayClaim.amount, 10_000);
+    assert.equal(claimed.progression.dailyPlayClaim.canClaim, false);
+
+    const replay = await request("/api/play/daily-claim", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "daily-claim-first"
+    });
+    assert.equal(replay.profile.balance, 10_000);
+
+    const cooldown = await requestResponse("/api/play/daily-claim", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "daily-claim-too-soon"
+    });
+    assert.equal(cooldown.status, 409);
+    assert.match(cooldown.data.error, /уже получены/);
+    assert.equal(cooldown.data.dailyPlayClaim.canClaim, false);
+
+    const cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.playBalance, 10_000);
+    assert.equal(cashier.cashBalanceMicros, 0);
+    assert.equal(cashier.bonusBalanceMicros, 0);
+    assert.equal(cashier.playTransactions[0].category, "daily_play_claim");
+    assert.equal(cashier.playTransactions[0].amount, 10_000);
+
+    const otherAuth = await request("/api/auth", {
+      method: "POST",
+      body: { initData: telegramInitData({ id: 444, first_name: "Daily", username: "daily" }) }
+    });
+    const otherClaim = await request("/api/play/daily-claim", {
+      method: "POST",
+      token: otherAuth.token,
+      idempotencyKey: "daily-claim-other-user"
+    });
+    assert.equal(otherClaim.profile.balance, 10_000);
+  } finally {
+    server.kill();
+  }
+});
+
 test("idempotency key prevents duplicated wallet money operations", async () => {
   const server = await startServer({ ADMIN_USER_IDS: "dev-user" });
   try {
@@ -1386,6 +1450,20 @@ async function request(path, options = {}) {
   const data = await response.json();
   if (!response.ok) throw new Error(data.error);
   return data;
+}
+
+async function requestResponse(path, options = {}) {
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method: options.method || "GET",
+    headers: {
+      "content-type": "application/json",
+      ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
+      ...(options.idempotencyKey ? { "x-idempotency-key": options.idempotencyKey } : {}),
+      ...(options.headers || {})
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined
+  });
+  return { status: response.status, data: await response.json() };
 }
 
 async function requestText(path, options = {}) {

@@ -23,6 +23,7 @@ const state = {
   currentTable: null,
   config: null,
   progression: null,
+  dailyPlayClaim: null,
   homeStats: null,
   gameMode: "cash",
   selectedSmallBlind: 25,
@@ -269,6 +270,7 @@ let queuedPreAction = "";
 let queuedPreActionKey = "";
 let pendingBetAction = "";
 let pendingBuyIn = null;
+let pendingDailyPlayClaim = false;
 let currentLobbyTab = "home";
 let fairnessSeedSyncing = false;
 const fairnessSeedSyncedTables = new Set();
@@ -320,6 +322,7 @@ async function boot() {
   tournamentList?.addEventListener("click", onTournamentAction);
   quickPlayButton.addEventListener("click", () => runAction(quickPlay));
   quickPrivateButton?.addEventListener("click", () => runAction(quickCreatePrivateTable));
+  homeWalletSideAction?.addEventListener("click", () => runAction(claimDailyPlayBonus));
   continueGameButton.addEventListener("click", continueGame);
   if (adminNavButton) adminNavButton.hidden = !ADMIN_MODE;
   updateBottomNavIndicator();
@@ -420,6 +423,8 @@ async function boot() {
       console.error(error);
     }
   }, 1000);
+
+  window.setInterval(tickDailyPlayClaim, 1000);
 }
 
 function completeBoot() {
@@ -548,6 +553,45 @@ function currentLimits() {
 
 function activeBalance() {
   return state.gameMode === "cash" ? Number(state.user?.cashBalanceMicros || 0) : Number(state.user?.balance || 0);
+}
+
+function getDailyPlayClaimState(profileData = null) {
+  return profileData?.dailyPlayClaim || state.progression?.dailyPlayClaim || state.dailyPlayClaim || null;
+}
+
+function formatCooldown(seconds) {
+  const totalSeconds = Math.max(0, Math.ceil(Number(seconds) || 0));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+  return [hours, minutes, secs].map((value) => String(value).padStart(2, "0")).join(":");
+}
+
+function setDailyPlayClaim(nextClaim) {
+  if (!nextClaim) return;
+  const cooldownSeconds = Math.max(0, Number(nextClaim.cooldownSeconds || 0));
+  state.dailyPlayClaim = {
+    ...nextClaim,
+    canClaim: Boolean(nextClaim.canClaim || cooldownSeconds === 0),
+    cooldownSeconds
+  };
+}
+
+function tickDailyPlayClaim() {
+  const claim = state.dailyPlayClaim;
+  if (!claim || claim.canClaim) return;
+  const availableAtMs = claim.availableAt ? new Date(claim.availableAt).getTime() : 0;
+  const remainingSeconds = availableAtMs
+    ? Math.max(0, Math.ceil((availableAtMs - Date.now()) / 1000))
+    : Math.max(0, Number(claim.cooldownSeconds || 0) - 1);
+  const canClaim = remainingSeconds === 0;
+  state.dailyPlayClaim = {
+    ...claim,
+    canClaim,
+    cooldownSeconds: remainingSeconds
+  };
+  renderHomeWalletSide(state.homeStats || {});
+  renderHomeCta();
 }
 
 function renderModeBalance() {
@@ -1418,6 +1462,7 @@ async function loadProgression() {
   try {
     const data = await api("/api/progression");
     state.progression = data.progression || null;
+    if (data.progression?.dailyPlayClaim) setDailyPlayClaim(data.progression.dailyPlayClaim);
     renderProgression(state.progression);
   } catch (error) {
     console.warn("progression unavailable", error);
@@ -1429,6 +1474,7 @@ function renderProfile(profileData) {
   const user = profileData.user || {};
   const profile = profileData.profile || {};
   state.homeStats = profileData;
+  if (profileData.dailyPlayClaim) setDailyPlayClaim(profileData.dailyPlayClaim);
   profileName.textContent = user.name || "Игрок";
   profileUsername.textContent = user.username ? `@${user.username}` : `id ${user.id || ""}`;
   const cashLevel = Number(profile.cashLevel || 1);
@@ -1476,6 +1522,7 @@ function renderHomeWalletSide(profileData = {}) {
   if (!homeWalletSideValue || !homeWalletSideCurrency || !homeWalletSideHint) return;
   const cashMode = state.gameMode === "cash";
   const profile = profileData.profile || {};
+  const dailyPlayClaim = getDailyPlayClaimState(profileData);
   const cashClubTitle = profile.cashClubStatus || "Cash Club";
   const currentPoints = Number(profile.cashXpCurrent || profile.cashClubPoints || 0);
   const progress = Math.max(0, Math.min(1, Number(profile.cashXpProgress || 0)));
@@ -1491,17 +1538,27 @@ function renderHomeWalletSide(profileData = {}) {
       homeWalletSideAction.disabled = true;
     }
   } else {
+    const cooldownSeconds = Math.max(0, Number(dailyPlayClaim?.cooldownSeconds || 0));
+    const canClaim = Boolean(dailyPlayClaim?.canClaim || cooldownSeconds === 0);
+    const amount = Number(dailyPlayClaim?.amount || 10000);
+    const bonusProgress = canClaim ? 1 : Math.max(0.08, Math.min(1, 1 - (cooldownSeconds / (24 * 60 * 60))));
     if (homeWalletSideLabel) homeWalletSideLabel.textContent = "Бонус дня";
-    homeWalletSideValue.textContent = "10 000";
-    homeWalletSideHint.textContent = "24ч";
-    if (homeWalletSideMeter) homeWalletSideMeter.style.width = "100%";
+    homeWalletSideValue.textContent = formatNumber(amount);
+    homeWalletSideHint.textContent = canClaim ? "доступно сейчас" : formatCooldown(cooldownSeconds);
+    if (homeWalletSideMeter) homeWalletSideMeter.style.width = `${Math.round(bonusProgress * 100)}%`;
     if (homeWalletSideAction) {
       homeWalletSideAction.textContent = "Получить";
-      homeWalletSideAction.disabled = true;
+      homeWalletSideAction.disabled = !canClaim || pendingDailyPlayClaim;
     }
   }
   if (cashMode && homeWalletSideAction) homeWalletSideAction.title = "Прогресс уровня";
-  if (!cashMode && homeWalletSideAction) homeWalletSideAction.title = "Бонус скоро будет доступен";
+  if (!cashMode && homeWalletSideAction) {
+    homeWalletSideAction.title = !dailyPlayClaim
+      ? "Состояние бонуса загружается"
+      : dailyPlayClaim.canClaim
+      ? "Получить ежедневные игровые фишки"
+      : `Следующая выдача через ${formatCooldown(dailyPlayClaim?.cooldownSeconds || 0)}`;
+  }
   if (!cashMode && homeWalletSideMeter) homeWalletSideMeter.dataset.mode = "bonus";
   if (cashMode && homeWalletSideMeter) homeWalletSideMeter.dataset.mode = "cash";
   if (homeWalletSide) {
@@ -1514,6 +1571,7 @@ function renderProgression(progression) {
   const profile = progression?.profile || {};
   const rating = progression?.rating || {};
   const cashClub = progression?.cashClub?.current || {};
+  if (progression?.dailyPlayClaim) setDailyPlayClaim(progression.dailyPlayClaim);
   const league = profile.ratingLeague || profile.ratingTier || "Bronze";
   const ratingPoints = Number(profile.ratingPoints || rating.startingRp || 1000);
   if (homeRatingLeague) homeRatingLeague.textContent = league;
@@ -2439,6 +2497,17 @@ async function onCreateTable(event) {
 
 async function quickPlay() {
   if (activeBalance() <= 0) {
+    if (state.gameMode === "play") {
+      const claim = getDailyPlayClaimState(state.homeStats || {});
+      if (claim?.canClaim) {
+        await claimDailyPlayBonus();
+        return;
+      }
+      showError(claim
+        ? `Следующая выдача игровых фишек через ${formatCooldown(claim.cooldownSeconds || 0)}`
+        : "Игровые фишки сейчас недоступны");
+      return;
+    }
     openCashierTopup();
     return;
   }
@@ -2469,14 +2538,25 @@ function renderHomeCta() {
   const balance = activeBalance();
   const quickPlayTitle = quickPlayButton.querySelector(".tg-row-main");
   const cashMode = state.gameMode === "cash";
+  const dailyPlayClaim = getDailyPlayClaimState(state.homeStats || {});
   quickPlayButton.disabled = false;
 
   if (balance <= 0) {
-    if (!cashMode && !DEV_MODE) {
-      if (quickPlayTitle) quickPlayTitle.textContent = "Игровые фишки скоро";
-      quickPlayHint.textContent = "Ежедневная бесплатная выдача в разработке";
+    if (!cashMode) {
+      const amount = Number(dailyPlayClaim?.amount || 10000);
+      if (dailyPlayClaim?.canClaim) {
+        if (quickPlayTitle) quickPlayTitle.textContent = "Получить фишки";
+        else quickPlayButton.textContent = "Получить фишки";
+        quickPlayHint.textContent = `Бонус дня ${formatNumber(amount)} доступен сейчас`;
+      } else {
+        if (quickPlayTitle) quickPlayTitle.textContent = "Фишки по таймеру";
+        else quickPlayButton.textContent = "Фишки по таймеру";
+        quickPlayHint.textContent = dailyPlayClaim
+          ? `Следующая выдача через ${formatCooldown(dailyPlayClaim.cooldownSeconds || 0)}`
+          : "Ежедневная выдача загружается";
+        quickPlayButton.disabled = !dailyPlayClaim?.canClaim;
+      }
       renderHomeOfferMeta(limit, minBuyIn, "entry", cashMode);
-      quickPlayButton.disabled = true;
       return;
     }
     if (quickPlayTitle) quickPlayTitle.textContent = cashMode ? "Внести депозит" : "Получить фишки";
@@ -4821,8 +4901,51 @@ async function api(path, options = {}) {
   });
 
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Request failed");
+  if (!response.ok) {
+    const error = new Error(data.error || "Request failed");
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
   return data;
+}
+
+async function claimDailyPlayBonus() {
+  if (state.gameMode !== "play" || pendingDailyPlayClaim) return;
+  pendingDailyPlayClaim = true;
+  renderHomeWalletSide(state.homeStats || {});
+  try {
+    const data = await api("/api/play/daily-claim", {
+      method: "POST",
+      idempotencyKey: requestKey("daily-play-claim")
+    });
+    if (data.dailyPlayClaim) setDailyPlayClaim(data.dailyPlayClaim);
+    if (data.profile) {
+      state.user = {
+        ...state.user,
+        balance: Number(data.profile.balance || state.user?.balance || 0),
+        cashBalanceMicros: Number(data.profile.cashBalanceMicros || state.user?.cashBalanceMicros || 0)
+      };
+      renderProfile(data.profile);
+    }
+    if (data.progression) {
+      state.progression = data.progression;
+      renderProgression(data.progression);
+    }
+    renderModeBalance();
+    renderHomeCta();
+    showStatus("10 000 игровых фишек начислены");
+  } catch (error) {
+    if (error.status === 409 && error.data?.dailyPlayClaim) {
+      setDailyPlayClaim(error.data.dailyPlayClaim);
+      renderHomeWalletSide(state.homeStats || {});
+      renderHomeCta();
+    }
+    throw error;
+  } finally {
+    pendingDailyPlayClaim = false;
+    renderHomeWalletSide(state.homeStats || {});
+  }
 }
 
 function requestKey(prefix) {

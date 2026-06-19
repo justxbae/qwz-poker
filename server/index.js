@@ -52,6 +52,7 @@ import {
   databaseEnabled,
   deleteActiveTableSnapshot as dbDeleteActiveTableSnapshot,
   getCashWallet as dbGetCashWallet,
+  getDailyPlayClaim as dbGetDailyPlayClaim,
   getBonusSummary as dbGetBonusSummary,
   getPaymentOrder as dbGetPaymentOrder,
   getPlayerProfile as dbGetPlayerProfile,
@@ -59,6 +60,7 @@ import {
   getSavedStack as dbGetSavedStack,
   getWithdrawalOrder as dbGetWithdrawalOrder,
   getWallet as dbGetWallet,
+  claimDailyPlayChips as dbClaimDailyPlayChips,
   initDatabase,
   expireWelcomeBonuses as dbExpireWelcomeBonuses,
   listActiveTableSnapshots as dbListActiveTableSnapshots,
@@ -181,6 +183,7 @@ const cashWallets = new Map();
 const bonusWallets = new Map();
 const bonusGrants = new Map();
 const bonusLedgerEntries = new Map();
+const dailyPlayClaims = new Map();
 const memoryWelcomeBonusUsers = new Set();
 const memoryBonusWageringEvents = new Set();
 const transactions = new Map();
@@ -209,6 +212,7 @@ const SESSION_TTL_MS = Number(process.env.SESSION_TTL_SECONDS || 24 * 60 * 60) *
 const RISK_LARGE_WITHDRAWAL_USDT_MICROS = Math.max(0, Math.round(Number(process.env.RISK_LARGE_WITHDRAWAL_USDT || 1000) * 1_000_000));
 const RISK_LARGE_ADMIN_ADJUST_CHIPS = Math.max(0, Math.round(Number(process.env.RISK_LARGE_ADMIN_ADJUST_CHIPS || ADMIN_GRANT_MAX_CHIPS / 2)));
 const BONUS_EXPIRY_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const DAILY_PLAY_CLAIM_COOLDOWN_SECONDS = 24 * 60 * 60;
 let lastReconciliationAlertKey = "";
 let telegramWebhookDiagnostics = null;
 let lastTelegramWebhookAlertKey = "";
@@ -483,6 +487,28 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/progression") {
     sendJson(res, 200, { progression: await progressionView(user) });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/play/daily-claim") {
+    await sendIdempotentJson(req, res, user, "play_daily_claim", async (idempotencyKey) => {
+      const result = await claimDailyPlayReward(user, idempotencyKey);
+      const dailyPlayClaim = await dailyPlayClaimView(user);
+      if (!result.claimed) {
+        return {
+          status: 409,
+          body: {
+            error: "Ежедневные игровые фишки уже получены. Следующая выдача доступна позже.",
+            dailyPlayClaim
+          }
+        };
+      }
+      return {
+        dailyPlayClaim,
+        profile: await profileView(user),
+        progression: await progressionView(user)
+      };
+    });
     return;
   }
 
@@ -2076,6 +2102,7 @@ async function profileView(user) {
     cashBalanceMicros: user.cashBalanceMicros,
     bonusBalanceMicros: bonus.bonusBalanceMicros,
     activeBonuses: bonus.grants,
+    dailyPlayClaim: await dailyPlayClaimView(user),
     savedStack: await getSavedStack(user),
     tableStack,
     cashTableStackMicros,
@@ -2102,6 +2129,7 @@ async function progressionView(user) {
   const dbLeaderboard = await dbListRatingLeaderboard({ seasonId, limit: 50 });
   return {
     profile,
+    dailyPlayClaim: await dailyPlayClaimView(user),
     rating: {
       seasonId,
       mode: "rating",
@@ -2151,6 +2179,58 @@ async function progressionView(user) {
       }
     }
   };
+}
+
+async function dailyPlayClaimView(user, now = Date.now()) {
+  const dbState = await dbGetDailyPlayClaim(user.id);
+  const claimedAtValue = dbState ? dbState.claimedAt : dailyPlayClaims.get(String(user.id)) || null;
+  const claimedAtMs = claimedAtValue ? new Date(claimedAtValue).getTime() : 0;
+  const availableAtMs = claimedAtMs
+    ? claimedAtMs + DAILY_PLAY_CLAIM_COOLDOWN_SECONDS * 1000
+    : now;
+  const cooldownSeconds = claimedAtMs
+    ? Math.max(0, Math.ceil((availableAtMs - now) / 1000))
+    : 0;
+  return {
+    canClaim: cooldownSeconds === 0,
+    claimedAt: claimedAtMs ? new Date(claimedAtMs).toISOString() : null,
+    availableAt: new Date(availableAtMs).toISOString(),
+    cooldownSeconds,
+    amount: ECONOMY.play.dailyRefillChips
+  };
+}
+
+async function claimDailyPlayReward(user, idempotencyKey = "") {
+  const dbResult = await dbClaimDailyPlayChips(user.id, {
+    amount: ECONOMY.play.dailyRefillChips,
+    cooldownSeconds: DAILY_PLAY_CLAIM_COOLDOWN_SECONDS,
+    idempotencyKey
+  });
+  if (dbResult) {
+    setWalletBalanceLocal(user.id, dbResult.balance);
+    if (dbResult.claimedAt) dailyPlayClaims.set(String(user.id), new Date(dbResult.claimedAt).toISOString());
+    return dbResult;
+  }
+
+  const userId = String(user.id);
+  const now = Date.now();
+  const claimedAtValue = dailyPlayClaims.get(userId) || null;
+  const claimedAtMs = claimedAtValue ? new Date(claimedAtValue).getTime() : 0;
+  if (claimedAtMs && claimedAtMs + DAILY_PLAY_CLAIM_COOLDOWN_SECONDS * 1000 > now) {
+    return { claimed: false, claimedAt: claimedAtValue, balance: await getWallet(userId), cooldown: true };
+  }
+
+  const balance = await recordTransaction(user, {
+    type: "credit",
+    category: "daily_play_claim",
+    title: "Ежедневные игровые фишки",
+    amount: ECONOMY.play.dailyRefillChips,
+    meta: "24h rating play claim",
+    idempotencyKey
+  });
+  const claimedAt = new Date(now).toISOString();
+  dailyPlayClaims.set(userId, claimedAt);
+  return { claimed: true, claimedAt, balance };
 }
 
 function cashClubStatusesView() {
