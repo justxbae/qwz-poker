@@ -55,6 +55,14 @@ body:not(.in-game) .profile-dashboard-stats span {
   font-weight: 500 !important;
 }
 
+body:not(.in-game) .home-balance strong,
+body:not(.in-game) .home-balance strong b {
+  font-weight: 600 !important;
+  font-variant-numeric: proportional-nums lining-nums !important;
+  font-feature-settings: "lnum" 1, "tnum" 0 !important;
+  letter-spacing: -0.03em !important;
+}
+
 body:not(.in-game) .home-wallet {
   grid-template-columns: 44px minmax(0, 1fr) 108px !important;
   grid-template-areas: "ava ident side" "bal bal side" "act act act" !important;
