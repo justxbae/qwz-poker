@@ -27,6 +27,15 @@ test("Render starts the production server with real money enabled", () => {
   assert.match(renderConfig, /key:\s*REAL_MONEY_ENABLED\s*\n\s*value:\s*"true"/);
 });
 
+test("Telegram loader stays visible until the lobby is hydrated", () => {
+  assert.match(htmlSource, /<html[^>]*class="app-loading"/);
+  assert.match(htmlSource, /id="appBoot"/);
+  assert.match(appSource, /boot\(\)\.then\(completeBoot\)\.catch\(showBootError\)/);
+  assert.match(appSource, /function completeBoot\(\)[\s\S]*classList\.remove\("app-loading"\)[\s\S]*tg\?\.ready\(\)/);
+  const bootBody = appSource.slice(appSource.indexOf("async function boot()"), appSource.indexOf("function completeBoot()"));
+  assert.doesNotMatch(bootBody, /tg\?\.ready\(\)/);
+});
+
 test("Stars UI confirms balance only after server marks the order paid", () => {
   assert.match(appSource, /waitForPaymentConfirmation\(order\)/);
   assert.match(appSource, /data\.order\?\.status === "paid"/);

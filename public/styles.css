@@ -14169,6 +14169,72 @@ body:not(.in-game) .lobby-menu-list button {
   border-radius: inherit;
 }
 
+/* Keep Telegram's native loader until hydrated data is ready. This local
+   fallback prevents the default markup from flashing during slow requests. */
+.app-loading body {
+  overflow: hidden !important;
+}
+.app-loading .app {
+  visibility: hidden !important;
+}
+.app-boot {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 24px;
+  background: #0e1621;
+  color: #f4f5f7;
+  text-align: center;
+  transition: opacity 180ms ease, visibility 180ms ease;
+}
+.app-ready .app-boot {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.app-boot-mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #2aabee, #1677ff);
+  box-shadow: 0 16px 40px rgba(42, 171, 238, 0.24);
+  font-size: 19px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+}
+.app-boot strong {
+  margin-top: 4px;
+  font-size: 20px;
+  font-weight: 650;
+}
+.app-boot span {
+  color: rgba(244, 245, 247, 0.58);
+  font-size: 13px;
+}
+.app-boot:not(.has-error) .app-boot-mark {
+  animation: qwzBootPulse 1.25s ease-in-out infinite;
+}
+.app-boot button {
+  min-height: 40px;
+  margin-top: 8px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 12px;
+  background: #2aabee;
+  color: #fff;
+  font: inherit;
+  font-weight: 650;
+}
+@keyframes qwzBootPulse {
+  50% { transform: scale(0.96); opacity: 0.78; }
+}
+
 body:not(.in-game) .home-wallet {
   grid-template-columns: 44px minmax(0, 1fr) minmax(104px, 122px) !important;
   grid-template-areas:

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" class="app-loading">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -9,6 +9,12 @@
     <link rel="stylesheet" href="/lobby-qa.css" />
   </head>
   <body>
+    <section class="app-boot" id="appBoot" aria-live="polite" aria-label="Загрузка QWZ Poker">
+      <div class="app-boot-mark">QWZ</div>
+      <strong>QWZ Poker</strong>
+      <span id="appBootStatus">Загрузка...</span>
+      <button type="button" id="appBootRetry" hidden onclick="window.location.reload()">Повторить</button>
+    </section>
     <main class="app">
       <section class="topbar">
         <div>

@@ -41,6 +41,9 @@ if (![1, 7, 30].includes(adminAnalyticsDays)) adminAnalyticsDays = 7;
 const cashierSheetHomes = new Map();
 
 const profile = document.querySelector("#profile");
+const appBoot = document.querySelector("#appBoot");
+const appBootStatus = document.querySelector("#appBootStatus");
+const appBootRetry = document.querySelector("#appBootRetry");
 const lobbyAvatar = document.querySelector("#lobbyAvatar");
 const lobbyName = document.querySelector("#lobbyName");
 const lobbyUsername = document.querySelector("#lobbyUsername");
@@ -271,14 +274,13 @@ let fairnessSeedSyncing = false;
 const fairnessSeedSyncedTables = new Set();
 let revealObserver = null;
 
-boot();
+boot().then(completeBoot).catch(showBootError);
 
 async function boot() {
   resetScroll();
   setupTapGuards();
   setupScrollDynamics();
   setupLobbyOverscroll();
-  tg?.ready();
   tg?.expand();
   setupTelegramControls();
   renderPokerHandsGuide();
@@ -418,6 +420,22 @@ async function boot() {
       console.error(error);
     }
   }, 1000);
+}
+
+function completeBoot() {
+  window.requestAnimationFrame(() => {
+    document.documentElement.classList.remove("app-loading");
+    document.documentElement.classList.add("app-ready");
+    tg?.ready();
+  });
+}
+
+function showBootError(error) {
+  console.error("App boot failed:", error);
+  if (appBootStatus) appBootStatus.textContent = "Не удалось загрузить приложение";
+  if (appBootRetry) appBootRetry.hidden = false;
+  appBoot?.classList.add("has-error");
+  tg?.ready();
 }
 
 async function auth() {
