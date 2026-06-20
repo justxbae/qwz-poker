@@ -226,6 +226,37 @@ test("postflop fold applies rake only to called chips and returns uncalled bet",
   assert.equal(table.handHistory[0].pots[1].amount, 100);
 });
 
+test("tournament hands never collect cash-game rake", () => {
+  const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
+  table.tournamentId = "mtt-test";
+  joinTable(table, player2);
+  maybeStartHand(table);
+  startHand(table);
+
+  act(table, owner, { action: "call" });
+  act(table, player2, { action: "check" });
+  act(table, player2, { action: "bet", amount: 100 });
+  act(table, owner, { action: "fold" });
+
+  assert.equal(table.rakeCollected, 0);
+  assert.equal(table.handHistory[0].rake, 0);
+  assert.equal(table.seats.reduce((sum, seat) => sum + seat.stack, 0), 20_000);
+});
+
+test("tournament ante is posted without changing the amount to call", () => {
+  const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
+  table.tournamentId = "mtt-ante";
+  table.ante = 10;
+  joinTable(table, player2);
+  maybeStartHand(table);
+  startHand(table);
+
+  assert.equal(table.pot, 95);
+  assert.equal(table.currentBet, 50);
+  assert.equal(publicTable(table, owner.id).viewer.toCall, 25);
+  assert.equal(table.seats.reduce((sum, seat) => sum + seat.stack, 0), 19_905);
+});
+
 test("expired turn auto-checks when possible", () => {
   const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
   joinTable(table, player2);

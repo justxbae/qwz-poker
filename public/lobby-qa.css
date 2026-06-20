@@ -63,6 +63,182 @@ body:not(.in-game) .home-balance strong b {
   letter-spacing: -0.03em !important;
 }
 
+body:not(.in-game) .tournament-list,
+body:not(.in-game) .tournament-history-list,
+body:not(.in-game) .profile-tournament-history {
+  display: grid !important;
+  gap: 10px !important;
+}
+
+body:not(.in-game) .tournament-card {
+  gap: 10px !important;
+  padding: 12px !important;
+  border-radius: 18px !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid var(--qwz-line-strong) !important;
+}
+
+body:not(.in-game) .tournament-card-head,
+body:not(.in-game) .tournament-main {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+}
+
+body:not(.in-game) .tournament-card-copy {
+  display: grid !important;
+  gap: 4px !important;
+  min-width: 0 !important;
+}
+
+body:not(.in-game) .tournament-card-kickers {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+}
+
+body:not(.in-game) .tournament-card-kickers span {
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 20px !important;
+  padding: 0 8px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--qwz-dim) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+}
+
+body:not(.in-game) .tournament-card-copy strong {
+  overflow: hidden !important;
+  color: var(--qwz-ink) !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  line-height: 1.12 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+body:not(.in-game) .tournament-card-copy small {
+  color: var(--qwz-dim) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  line-height: 1.3 !important;
+}
+
+body:not(.in-game) .tournament-status-pill {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 28px !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--qwz-ink) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}
+
+body:not(.in-game) .tournament-status-pill[data-state="registered"] { color: var(--qwz-acc) !important; }
+body:not(.in-game) .tournament-status-pill[data-state="live"],
+body:not(.in-game) .tournament-status-pill[data-state="final"] { color: var(--qwz-green) !important; }
+body:not(.in-game) .tournament-status-pill[data-state="out"] { color: #ff8d8d !important; }
+body:not(.in-game) .tournament-status-pill[data-state="itm"] { color: var(--qwz-gold) !important; }
+
+body:not(.in-game) .tournament-meta-grid,
+body:not(.in-game) .tournament-runtime,
+body:not(.in-game) .profile-tournament-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+body:not(.in-game) .tournament-meta-grid span,
+body:not(.in-game) .tournament-runtime span,
+body:not(.in-game) .profile-tournament-stat {
+  display: grid !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+  padding: 9px 10px !important;
+  border-radius: 14px !important;
+  background: rgba(255, 255, 255, 0.035) !important;
+  color: var(--qwz-mute) !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+}
+
+body:not(.in-game) .tournament-meta-grid strong,
+body:not(.in-game) .tournament-runtime strong,
+body:not(.in-game) .profile-tournament-stat strong {
+  overflow: hidden !important;
+  color: var(--qwz-ink) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+body:not(.in-game) .tournament-player-note {
+  margin: 0 !important;
+  color: var(--qwz-dim) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  line-height: 1.3 !important;
+}
+
+body:not(.in-game) .tournament-card button {
+  min-height: 42px !important;
+  border-radius: 14px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+body:not(.in-game) .tournament-history-item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  padding: 10px 12px !important;
+  border-radius: 15px !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.04) !important;
+}
+
+body:not(.in-game) .tournament-history-copy {
+  display: grid !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+}
+
+body:not(.in-game) .tournament-history-copy span,
+body:not(.in-game) .tournament-history-copy small {
+  color: var(--qwz-dim) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+}
+
+body:not(.in-game) .tournament-history-copy strong {
+  overflow: hidden !important;
+  color: var(--qwz-ink) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+body:not(.in-game) .tournament-history-item > b {
+  flex: 0 0 auto !important;
+  color: var(--qwz-ink) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-align: right !important;
+}
+
 body:not(.in-game) .home-wallet {
   grid-template-columns: 44px minmax(0, 1fr) 108px !important;
   grid-template-areas: "ava ident side" "bal bal side" "act act act" !important;

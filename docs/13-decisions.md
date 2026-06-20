@@ -1,5 +1,19 @@
 # QWZ Decisions
 
+## 2026-06-20: Tournament runtime MVP и разделение cash/play
+
+**Зона:** product / architecture / economy / development
+
+**Решение:** Турнирный MVP реализуется в текущем Node.js монолите для MTT и базового SNG. Канонический state machine: `created`, `registration_open`, `late_registration`, `running`, `final_table`, `finished`, `cancelled`. Scheduler запускает MTT по времени, SNG по заполнению, управляет blind clock, посадкой, балансировкой и финальным столом. Каждый турнир имеет явный `balanceBucket`: cash-турнир списывает и выплачивает только `cash_usdt_micros`, play-турнир — только PLAY_CHIPS. Buy-in и fee разделены: buy-in является турнирным escrow, fee сразу отражается в platform ledger; отмена до старта реверсирует обе части. Payout выполняется одной PostgreSQL-транзакцией и идемпотентен.
+
+**Почему:** Старый backend поддерживал только регистрацию и смешивал fee с escrow. Полноценный runtime требует персистентного состояния и строгого запрета создавать cash из play-баланса.
+
+**Влияет на:** `server/tournament-engine.js`, tournament API, poker table runtime, `tournaments`, `tournament_tables`, `tournament_results`, `tournament_payouts`, ledger, profile stats и reconciliation.
+
+**Что обновлено:** Добавлены MTT/SNG runtime, scheduler, secure seating, late registration, blind levels/ante, no-rake tournament hands, table balancing, final table, atomic payout, history API, bucket-specific fee/prize stats и тесты.
+
+**Открытые вопросы:** Re-entry/add-on, freeroll, satellites, bounty, series и отдельный tournament time-bank отложены на следующую итерацию.
+
 ## 2026-06-19: Daily play-chip claim в рейтинговом режиме
 
 **Зона:** product / architecture / development

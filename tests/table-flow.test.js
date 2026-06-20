@@ -1301,8 +1301,9 @@ test("tournament registration spends chips and cancellation refunds them", async
     await topUp(auth.token, 2);
 
     let data = await request("/api/tournaments", { token: auth.token });
-    const tournament = data.tournaments.find((item) => item.status === "registering");
+    const tournament = data.tournaments.find((item) => item.canRegister && item.balanceBucket === "play");
     assert.ok(tournament);
+    assert.equal(tournament.status, "registration_open");
     assert.equal(tournament.registered, false);
 
     const registerPath = `/api/tournaments/${tournament.id}/register`;
@@ -1332,13 +1333,18 @@ test("tournament registration spends chips and cancellation refunds them", async
 
     const dashboard = (await request("/api/admin", { token: auth.token })).admin;
     assert.equal(dashboard.stats.walletTotal, 10000 - tournament.totalCost);
-    assert.equal(dashboard.stats.tournamentEscrowTotal, tournament.totalCost);
+    assert.equal(dashboard.stats.tournamentEscrowTotal, tournament.buyIn);
     assert.equal(dashboard.stats.tournamentPrizePoolTotal, tournament.buyIn);
     assert.equal(dashboard.stats.tournamentFeeReserveTotal, tournament.fee);
-    assert.equal(dashboard.stats.playerFundsTotal, 10000);
+    assert.equal(dashboard.stats.playerFundsTotal, 10000 - tournament.fee);
     assert.ok(dashboard.recentFundMovements.some((movement) => (
       movement.category === "wallet_to_tournament_escrow"
-      && movement.amount === tournament.totalCost
+      && movement.from === "play_wallet"
+      && movement.amount === tournament.buyIn
+    )));
+    assert.ok(dashboard.recentFundMovements.some((movement) => (
+      movement.category === "wallet_to_tournament_fee"
+      && movement.amount === tournament.fee
     )));
 
     const cancelPath = `/api/tournaments/${tournament.id}/cancel`;
@@ -1367,8 +1373,57 @@ test("tournament registration spends chips and cancellation refunds them", async
     const afterCancelDashboard = (await request("/api/admin", { token: auth.token })).admin;
     assert.ok(afterCancelDashboard.recentFundMovements.some((movement) => (
       movement.category === "tournament_escrow_to_wallet"
-      && movement.amount === tournament.totalCost
+      && movement.to === "play_wallet"
+      && movement.amount === tournament.buyIn
     )));
+  } finally {
+    server.kill();
+  }
+});
+
+test("full SNG starts automatically, seats players, and protects tournament stacks", async () => {
+  const server = await startServer({ TOURNAMENT_TEST_MODE: "true" });
+  try {
+    const first = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    const second = await request("/api/auth", {
+      method: "POST",
+      body: { initData: telegramInitData({ id: 991, first_name: "Second", username: "second" }) }
+    });
+    await topUp(first.token, 2);
+    await topUp(second.token, 2);
+
+    const lobby = await request("/api/tournaments", { token: first.token });
+    const sng = lobby.tournaments.find((item) => item.type === "sng" && item.canRegister);
+    assert.ok(sng);
+    await request(`/api/tournaments/${sng.id}/register`, {
+      method: "POST",
+      token: first.token,
+      idempotencyKey: "sng-first"
+    });
+    await request(`/api/tournaments/${sng.id}/register`, {
+      method: "POST",
+      token: second.token,
+      idempotencyKey: "sng-second"
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 1300));
+    const started = (await request(`/api/tournaments/${sng.id}`, { token: first.token })).tournament;
+    assert.ok(["running", "final_table"].includes(started.status));
+    assert.equal(started.tableIds.length, 1);
+    assert.equal(started.playerState.status, "playing");
+
+    const tableId = started.playerState.tableId;
+    const table = (await request(`/api/tables/${tableId}`, { token: first.token })).table;
+    assert.equal(table.tournamentId, sng.id);
+    assert.equal(table.seats.length, 2);
+    await assert.rejects(
+      request(`/api/tables/${tableId}/leave`, { method: "POST", token: first.token }),
+      /Покинуть турнирный стол/
+    );
+    await assert.rejects(
+      request(`/api/tables/${tableId}/rebuy`, { method: "POST", token: first.token }),
+      /не входят в MVP/
+    );
   } finally {
     server.kill();
   }

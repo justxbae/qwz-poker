@@ -13,7 +13,7 @@
 ✅ Telegram Stars инвойсы (createInvoiceLink + pre_checkout + successful_payment)
 ✅ Stars payment confirmation: webhook readiness fail-closed, authenticated order polling, authoritative wallet refresh, duplicate webhook test
 ✅ Daily rating claim: 10 000 PLAY_CHIPS / 24h per app_user_id, atomic play ledger, idempotent API
-✅ Турниры — регистрация / отмена с эскроу через advisory_xact_lock
+✅ Турниры MVP — MTT/SNG state machine, регистрация/отмена, scheduler, посадка/балансировка, blind clock, final table, atomic payout и история
 ✅ Admin commands в боте (`/balance`, `/grant`, `/deduct`) с идемпотентностью
 ✅ Admin API + панель в Mini App с диагностикой
 ✅ Health endpoint + audit metrics
@@ -239,11 +239,13 @@ paid    → reversed         (chargeback / возврат)
 
 ---
 
-### 2.3. Турнирный движок (доделать)
+### 2.3. Турнирный движок (MVP сделан; расширенные форматы позже)
 
-**Сейчас:** только регистрация/отмена. **Нет** запуска матча, посадки, blind structure, выплат.
+**Сейчас:** MTT и SNG работают в монолите: расписание/автозапуск, виртуальные столы, blind structure, late registration, балансировка, финальный стол и автоматические выплаты реализованы. Runtime остаётся single-process и восстанавливается через существующие snapshots + PostgreSQL state.
 
 **Что нужно:**
+
+Реализовано в MVP:
 
 1. **Расписание blind levels**:
    ```json
@@ -259,10 +261,14 @@ paid    → reversed         (chargeback / возврат)
    [{"place": 1, "percent": 35}, {"place": 2, "percent": 22}, ...]
    ```
    Обычно top 10–15% получают что-то.
-7. **Late registration window** (первые 30 мин после старта — можно подключаться).
-8. **Re-entry / Rebuy / Add-on** — продление участия за дополнительный fee.
-9. **Cancel-with-refund** если < min_players к старту.
-10. **Time-bank** — у каждого игрока 60 сек банка на сложные решения.
+7. **Late registration window**.
+8. **Cancel-with-refund** если меньше `minPlayers` к старту.
+
+Следующая итерация:
+
+1. **Re-entry / Rebuy / Add-on**.
+2. **Time-bank** для турнирных решений.
+3. Freeroll, satellites, bounty и series.
 
 **Дополнительные форматы:**
 - **Spin & Go** (3-max, лотерейный prize pool — 5x/10x/100x/1000x от buy-in)

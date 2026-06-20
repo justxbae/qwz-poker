@@ -30,6 +30,10 @@ Persisted in PostgreSQL:
 - `idempotency_keys` - dedupe cache for money endpoints, so retries and double taps return the same response instead of charging twice.
 - `fund_movements` - movement of chips between wallet, table, saved stack, tournament escrow, and reserves.
 - `tournament_registrations` - active and cancelled tournament registrations.
+- `tournaments` - canonical MTT/SNG definition and persisted state machine.
+- `tournament_tables` - current virtual table composition and blind state.
+- `tournament_results` - immutable finishing place and prize result per player.
+- `tournament_payouts` - idempotent payout records tied to wallet ledger credits.
 - `hand_histories` - completed hand summaries, board, pots, seats, rake, and fairness proof.
 - `hand_actions` - normalized per-hand action history for replay, analytics, and anti-fraud.
 - `hand_results` - normalized winners, combinations, win amounts, and rake per player.
@@ -105,6 +109,8 @@ All money-changing API calls accept `X-Idempotency-Key`:
 - `/api/tables/:id/rebuy`
 - `/api/tournaments/:id/register`
 - `/api/tournaments/:id/cancel`
+- `/api/tournaments/:id`
+- `/api/tournaments/history`
 
 With PostgreSQL enabled, responses are stored in `idempotency_keys` for 24 hours. In local or demo mode the same behavior is preserved only until process restart.
 
@@ -135,6 +141,9 @@ Tracked server-side events include:
 - `hand_completed`
 - `tournament_register`
 - `tournament_cancel`
+- `tournament_payout`
+
+Tournament registration, refund, and payout respect the tournament `balance_bucket`. Cash uses integer USDT micros and `ledger_entries.balance_bucket='cash'`; play uses integer PLAY_CHIPS and `balance_bucket='play'`. The buy-in liability and platform fee are tracked separately. Settlement locks the tournament row, writes all results/payouts, credits wallets, updates profile stats, marks registrations finished, and closes tournament tables in one transaction.
 
 The admin dashboard aggregates a 7-day funnel: opened app -> opened cashier -> created deposit order -> paid deposit -> joined table, plus hands, actions, deposit amount, and table activity. If traffic grows, `analytics_events` can be streamed into ClickHouse/BigQuery/Amplitude without changing the product event names.
 

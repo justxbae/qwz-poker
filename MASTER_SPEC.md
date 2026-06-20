@@ -1007,6 +1007,12 @@ Add-on (перерыв после ранних уровней):
 | 8 | 15 мин | 400 | 800 | 100 |
 | ... | 15 мин | ×1.5 | ×1.5 | ×1.5 |
 
+### 13.6. Реализация MVP
+
+Backend поддерживает MTT и базовый SNG в текущем монолите. Канонический state machine: `created → registration_open → late_registration → running → final_table → finished`, с терминальным `cancelled`. SNG стартует при заполнении, MTT — по `startsAt`; при нехватке `minPlayers` регистрации возвращаются.
+
+У турнира обязателен `balanceBucket`: `cash` списывает и выплачивает только USDT micros, `play` — только PLAY_CHIPS. Конвертация между buckets запрещена. Турнирные игровые стеки не являются wallet balance и не участвуют в cash/play table-stack reconciliation. Re-entry, add-on, freeroll, satellites и bounty не входят в первый MVP.
+
 ---
 
 ## 14. Продуктовые KPI

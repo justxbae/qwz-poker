@@ -505,8 +505,10 @@ export async function getPlayerProfile(providerUserId, provider = "telegram") {
     select cash_level, cash_xp, cash_status, rating_points, rating_tier, rating_season_id,
            cash_club_points, cash_rake_contributed, rating_peak_points, rating_active_days,
            tournament_entries, tournament_itm, tournament_final_tables, tournament_wins,
-           tournament_fees_paid, tournament_prize_won,
-           sng_played, sng_wins, sng_fees_paid, sng_prize_won,
+           tournament_fees_paid, tournament_cash_fees_paid_micros, tournament_play_fees_paid, tournament_prize_won,
+           tournament_cash_prize_won_micros, tournament_play_prize_won,
+           sng_played, sng_wins, sng_fees_paid, sng_cash_fees_paid_micros, sng_play_fees_paid, sng_prize_won,
+           sng_cash_prize_won_micros, sng_play_prize_won,
            hands_played, cash_hands_played, rating_hands_played, tournaments_played
     from player_profiles
     where app_user_id = $1
@@ -599,8 +601,10 @@ export async function recordProfileHandProgress({
       returning cash_level, cash_xp, cash_status, rating_points, rating_tier, rating_season_id,
                 cash_club_points, cash_rake_contributed, rating_peak_points, rating_active_days,
                 tournament_entries, tournament_itm, tournament_final_tables, tournament_wins,
-                tournament_fees_paid, tournament_prize_won,
-                sng_played, sng_wins, sng_fees_paid, sng_prize_won,
+                tournament_fees_paid, tournament_cash_fees_paid_micros, tournament_play_fees_paid, tournament_prize_won,
+                tournament_cash_prize_won_micros, tournament_play_prize_won,
+                sng_played, sng_wins, sng_fees_paid, sng_cash_fees_paid_micros, sng_play_fees_paid, sng_prize_won,
+                sng_cash_prize_won_micros, sng_play_prize_won,
                 hands_played, cash_hands_played, rating_hands_played, tournaments_played
     `, [
       appUserId,
@@ -663,9 +667,9 @@ export async function recordPlatformLedgerEntry(entry) {
   }
   const result = await query(`
     insert into platform_ledger_entries (
-      id, type, category, title, amount, context_id, meta, idempotency_key
+      id, type, category, title, amount, context_id, meta, idempotency_key, asset, balance_bucket
     )
-    values ($1, $2, $3, $4, $5, $6, $7, $8)
+    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     on conflict do nothing
     returning id
   `, [
@@ -676,7 +680,9 @@ export async function recordPlatformLedgerEntry(entry) {
     amount,
     entry.contextId || "",
     entry.meta || "",
-    idempotencyKey || null
+    idempotencyKey || null,
+    entry.asset || "PLAY_CHIPS",
+    entry.balanceBucket === "cash" ? "cash" : "play"
   ]);
   return { id: result.rows[0]?.id || null };
 }
@@ -765,7 +771,7 @@ export async function listTournamentRegistrations(tournamentIds = []) {
            au.username
     from tournament_registrations tr
     left join app_users au on au.id = tr.app_user_id
-    where tr.status = 'active'
+    where tr.status in ('active', 'seated')
       and tr.tournament_id = any($1::text[])
     order by tr.registered_at asc
   `, [tournamentIds]);
@@ -776,12 +782,278 @@ export async function listTournamentRegistrations(tournamentIds = []) {
   }));
 }
 
+export async function listTournamentStates(tournamentIds = []) {
+  if (!pool) return null;
+  if (!tournamentIds.length) return [];
+  const [stateRows, resultRows] = await Promise.all([
+    query(`
+      select id, status, starts_at as "startsAt", registration_opens_at as "registrationOpensAt",
+             late_reg_ends_at as "lateRegEndsAt", current_level as "currentLevel",
+             started_at as "startedAt", finished_at as "finishedAt", cancelled_at as "cancelledAt", raw
+      from tournaments where id = any($1::text[])
+    `, [tournamentIds]),
+    query(`
+      select tr.tournament_id as "tournamentId", ui.provider_user_id as "userId",
+             au.display_name as name, au.username, tr.place,
+             tr.prize_amount as "prizeAmount", tr.eliminated_at as "eliminatedAt"
+      from tournament_results tr
+      join app_users au on au.id = tr.app_user_id
+      left join user_identities ui on ui.app_user_id = tr.app_user_id and ui.provider = 'telegram'
+      where tr.tournament_id = any($1::text[])
+      order by tr.tournament_id, tr.place
+    `, [tournamentIds])
+  ]);
+  return stateRows.rows.map((row) => ({
+    ...row,
+    currentLevel: Number(row.currentLevel || 1),
+    eliminations: Array.isArray(row.raw?.eliminations) ? row.raw.eliminations : [],
+    results: resultRows.rows.filter((result) => result.tournamentId === row.id).map((result) => ({
+      ...result,
+      place: Number(result.place || 0),
+      prizeAmount: Number(result.prizeAmount || 0)
+    }))
+  }));
+}
+
+export async function upsertTournamentDefinitions(tournaments = []) {
+  if (!pool) return null;
+  for (const tournament of tournaments) {
+    await query(`
+      insert into tournaments (
+        id, title, type, status, balance_bucket, buy_in, fee, guaranteed_prize_pool,
+        max_players, min_players, max_players_per_table, starting_stack, structure,
+        payout_structure, registration_opens_at, starts_at, late_reg_ends_at,
+        re_entry_limit, add_on_allowed, current_level, raw, updated_at
+      ) values (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb,
+        $14::jsonb, $15, $16, $17, $18, $19, $20, $21::jsonb, now()
+      )
+      on conflict (id) do update set
+        title = excluded.title,
+        type = excluded.type,
+        balance_bucket = excluded.balance_bucket,
+        buy_in = excluded.buy_in,
+        fee = excluded.fee,
+        guaranteed_prize_pool = excluded.guaranteed_prize_pool,
+        max_players = excluded.max_players,
+        min_players = excluded.min_players,
+        max_players_per_table = excluded.max_players_per_table,
+        starting_stack = excluded.starting_stack,
+        structure = excluded.structure,
+        payout_structure = excluded.payout_structure,
+        re_entry_limit = excluded.re_entry_limit,
+        add_on_allowed = excluded.add_on_allowed,
+        raw = excluded.raw,
+        updated_at = now()
+    `, [
+      tournament.id,
+      tournament.title,
+      tournament.type,
+      tournament.status,
+      tournament.balanceBucket,
+      tournament.buyIn,
+      tournament.fee,
+      tournament.guaranteedPrizePool || 0,
+      tournament.maxPlayers,
+      tournament.minPlayers,
+      tournament.maxPlayersPerTable,
+      tournament.startingStack,
+      JSON.stringify(tournament.structure || []),
+      tournament.payoutStructure ? JSON.stringify(tournament.payoutStructure) : null,
+      tournament.registrationOpensAt,
+      tournament.startsAt,
+      tournament.lateRegEndsAt,
+      tournament.reEntryLimit || 0,
+      tournament.addOnAllowed === true,
+      tournament.currentLevel || 1,
+      JSON.stringify({ prizePoolMode: tournament.prizePoolMode || "buyins" })
+    ]);
+  }
+  return true;
+}
+
+export async function updateTournamentState(tournament) {
+  if (!pool) return null;
+  await query(`
+    update tournaments
+    set status = $2,
+        current_level = $3,
+        started_at = $4,
+        finished_at = $5,
+        cancelled_at = $6,
+        raw = coalesce(raw, '{}'::jsonb) || $7::jsonb,
+        updated_at = now()
+    where id = $1
+  `, [
+    tournament.id,
+    tournament.status,
+    tournament.currentLevel || 1,
+    tournament.startedAt || null,
+    tournament.finishedAt || null,
+    tournament.cancelledAt || null,
+    JSON.stringify({ eliminations: tournament.eliminations || [] })
+  ]);
+  return true;
+}
+
+export async function saveTournamentTables(tournamentId, tables = []) {
+  if (!pool) return null;
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await client.query("update tournament_tables set status = 'closed', updated_at = now() where tournament_id = $1", [tournamentId]);
+    for (const table of tables) {
+      await client.query(`
+        insert into tournament_tables (
+          id, tournament_id, table_number, status, small_blind, big_blind, ante, seats, updated_at
+        ) values ($1, $2, $3, 'active', $4, $5, $6, $7::jsonb, now())
+        on conflict (id) do update set
+          status = 'active', small_blind = excluded.small_blind, big_blind = excluded.big_blind,
+          ante = excluded.ante, seats = excluded.seats, updated_at = now()
+      `, [
+        table.id,
+        tournamentId,
+        table.tableNumber,
+        table.smallBlind || 0,
+        table.bigBlind || 0,
+        table.ante || 0,
+        JSON.stringify(table.seats || [])
+      ]);
+    }
+    await client.query(`
+      update tournament_registrations
+      set status = 'seated'
+      where tournament_id = $1 and status = 'active'
+    `, [tournamentId]);
+    await client.query("commit");
+    return true;
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function settleTournament(tournament, rankedPlayers, payouts, idempotencyKey) {
+  if (!pool) return null;
+  const client = await pool.connect();
+  const bucket = tournament.balanceBucket === "cash" ? "cash" : "play";
+  try {
+    await client.query("begin");
+    const locked = await client.query("select status from tournaments where id = $1 for update", [tournament.id]);
+    if (!locked.rowCount) throw new Error("Tournament persistence row is missing");
+    if (locked.rows[0].status === "finished") {
+      await client.query("commit");
+      return { idempotentReplay: true };
+    }
+
+    const registrations = await client.query(`
+      select app_user_id, provider, provider_user_id
+      from tournament_registrations
+      where tournament_id = $1 and status in ('active', 'seated')
+      for update
+    `, [tournament.id]);
+    const byProviderUserId = new Map(registrations.rows.map((row) => [String(row.provider_user_id), row]));
+    const payoutByUserId = new Map(payouts.map((payout) => [String(payout.userId), payout]));
+
+    for (const result of rankedPlayers) {
+      const registration = byProviderUserId.get(String(result.userId));
+      if (!registration) continue;
+      const payout = payoutByUserId.get(String(result.userId));
+      const amount = Math.max(0, Math.round(Number(payout?.amount) || 0));
+      await client.query(`
+        insert into tournament_results (
+          tournament_id, app_user_id, place, prize_amount, balance_bucket, eliminated_at
+        ) values ($1, $2, $3, $4, $5, $6)
+        on conflict (tournament_id, app_user_id) do nothing
+      `, [tournament.id, registration.app_user_id, result.place, amount, bucket, result.eliminatedAt || null]);
+      if (amount <= 0) continue;
+
+      await client.query("insert into wallets (app_user_id, balance) values ($1, 0) on conflict do nothing", [registration.app_user_id]);
+      const column = bucket === "cash" ? "cash_usdt_micros" : "balance";
+      const wallet = await client.query(`select ${column} as balance from wallets where app_user_id = $1 for update`, [registration.app_user_id]);
+      const after = Number(wallet.rows[0]?.balance || 0) + amount;
+      await client.query(`update wallets set ${column} = $2, updated_at = now() where app_user_id = $1`, [registration.app_user_id, after]);
+      const payoutKey = `${idempotencyKey}:${result.userId}`;
+      await client.query(`
+        insert into ledger_entries (
+          id, app_user_id, provider, provider_user_id, type, category, title, amount,
+          meta, balance_after, idempotency_key, asset, balance_bucket
+        ) values ($1, $2, $3, $4, 'credit', 'tournament_payout', 'Приз турнира', $5,
+          $6, $7, $8, $9, $10)
+      `, [
+        id("ledger"), registration.app_user_id, registration.provider, registration.provider_user_id,
+        amount, `${tournament.title} · место ${result.place}`, after, payoutKey,
+        bucket === "cash" ? "USDT" : "PLAY_CHIPS", bucket
+      ]);
+      await client.query(`
+        insert into tournament_payouts (
+          id, tournament_id, app_user_id, place, amount, balance_bucket, idempotency_key
+        ) values ($1, $2, $3, $4, $5, $6, $7)
+      `, [id("tpayout"), tournament.id, registration.app_user_id, result.place, amount, bucket, payoutKey]);
+    }
+
+    const paidPlaces = payouts.length;
+    await client.query(`
+      update player_profiles pp
+      set tournament_itm = tournament_itm + case when tr.place <= $2 then 1 else 0 end,
+          tournament_final_tables = tournament_final_tables + case when tr.place <= $3 then 1 else 0 end,
+          tournament_wins = tournament_wins + case when tr.place = 1 then 1 else 0 end,
+          tournament_prize_won = tournament_prize_won + case when $5 = 'play' then tr.prize_amount else 0 end,
+          tournament_play_prize_won = tournament_play_prize_won + case when $5 = 'play' then tr.prize_amount else 0 end,
+          tournament_cash_prize_won_micros = tournament_cash_prize_won_micros + case when $5 = 'cash' then tr.prize_amount else 0 end,
+          sng_played = sng_played + case when $4 = 'sng' then 1 else 0 end,
+          sng_wins = sng_wins + case when $4 = 'sng' and tr.place = 1 then 1 else 0 end,
+          sng_prize_won = sng_prize_won + case when $4 = 'sng' and $5 = 'play' then tr.prize_amount else 0 end,
+          sng_play_prize_won = sng_play_prize_won + case when $4 = 'sng' and $5 = 'play' then tr.prize_amount else 0 end,
+          sng_cash_prize_won_micros = sng_cash_prize_won_micros + case when $4 = 'sng' and $5 = 'cash' then tr.prize_amount else 0 end,
+          updated_at = now()
+      from tournament_results tr
+      where tr.tournament_id = $1 and tr.app_user_id = pp.app_user_id
+    `, [tournament.id, paidPlaces, tournament.maxPlayersPerTable, tournament.type, bucket]);
+    await client.query("update tournament_registrations set status = 'finished' where tournament_id = $1 and status in ('active', 'seated')", [tournament.id]);
+    await client.query(`
+      update tournaments set status = 'finished', finished_at = now(), updated_at = now() where id = $1
+    `, [tournament.id]);
+    await client.query("update tournament_tables set status = 'closed', updated_at = now() where tournament_id = $1", [tournament.id]);
+    await client.query("commit");
+    return { idempotentReplay: false };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function listTournamentHistory(providerUserId, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const result = await query(`
+    select tr.tournament_id as "tournamentId", t.title, t.type, t.status,
+           tr.place, tr.prize_amount as "prizeAmount", tr.balance_bucket as "balanceBucket",
+           tr.created_at as "finishedAt"
+    from tournament_results tr
+    join tournaments t on t.id = tr.tournament_id
+    where tr.app_user_id = $1
+    order by tr.created_at desc
+  `, [appUserId]);
+  return result.rows.map((row) => ({
+    ...row,
+    place: Number(row.place || 0),
+    prizeAmount: Number(row.prizeAmount || 0)
+  }));
+}
+
 export async function registerTournament(providerUserId, tournament, provider = "telegram", idempotencyKey = "") {
   if (!pool) return null;
   const appUserId = await ensureIdentity(provider, providerUserId);
   const buyIn = Math.max(0, Math.round(Number(tournament.buyIn) || 0));
   const fee = Math.max(0, Math.round(Number(tournament.fee) || 0));
   const totalCost = buyIn + fee;
+  const bucket = tournament.balanceBucket === "cash" ? "cash" : "play";
+  const walletColumn = bucket === "cash" ? "cash_usdt_micros" : "balance";
   const client = await pool.connect();
 
   try {
@@ -796,9 +1068,11 @@ export async function registerTournament(providerUserId, tournament, provider = 
       for update
     `, [tournament.id, appUserId]);
     if (existing.rows[0]?.status === "active") {
-      const wallet = await client.query("select balance from wallets where app_user_id = $1", [appUserId]);
+      const wallet = await client.query(`select ${walletColumn} as balance from wallets where app_user_id = $1`, [appUserId]);
       await client.query("commit");
-      return { balance: Number(wallet.rows[0]?.balance || 0), alreadyRegistered: true };
+      return bucket === "cash"
+        ? { cashBalanceMicros: Number(wallet.rows[0]?.balance || 0), alreadyRegistered: true }
+        : { balance: Number(wallet.rows[0]?.balance || 0), alreadyRegistered: true };
     }
 
     const count = await client.query(`
@@ -812,21 +1086,23 @@ export async function registerTournament(providerUserId, tournament, provider = 
       throw error;
     }
 
-    const current = await client.query("select balance from wallets where app_user_id = $1 for update", [appUserId]);
+    const current = await client.query(`select ${walletColumn} as balance from wallets where app_user_id = $1 for update`, [appUserId]);
     const before = Number(current.rows[0]?.balance || 0);
     const after = before - totalCost;
     if (after < 0) {
-      const error = new Error(`Недостаточно chips для регистрации. Нужно ${totalCost.toLocaleString("ru-RU")} chips`);
+      const unit = bucket === "cash" ? "USDT micros" : "chips";
+      const error = new Error(`Недостаточно средств для регистрации. Нужно ${totalCost.toLocaleString("ru-RU")} ${unit}`);
       error.status = 409;
       throw error;
     }
 
-    await client.query("update wallets set balance = $2, updated_at = now() where app_user_id = $1", [appUserId, after]);
+    await client.query(`update wallets set ${walletColumn} = $2, updated_at = now() where app_user_id = $1`, [appUserId, after]);
     await client.query(`
       insert into ledger_entries (
-        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after, idempotency_key
+        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta,
+        balance_after, idempotency_key, asset, balance_bucket
       )
-      values ($1, $2, $3, $4, 'debit', 'tournament_buyin', 'Вход в турнир', $5, $6, $7, $8)
+      values ($1, $2, $3, $4, 'debit', 'tournament_buyin', 'Вход в турнир', $5, $6, $7, $8, $9, $10)
     `, [
       id("ledger"),
       appUserId,
@@ -835,8 +1111,19 @@ export async function registerTournament(providerUserId, tournament, provider = 
       totalCost,
       `${tournament.title} · бай-ин ${buyIn.toLocaleString("ru-RU")} + fee ${fee.toLocaleString("ru-RU")}`,
       after,
-      idempotencyKey || null
+      idempotencyKey || null,
+      bucket === "cash" ? "USDT" : "PLAY_CHIPS",
+      bucket
     ]);
+    if (fee > 0) {
+      await client.query(`
+        insert into platform_ledger_entries (
+          id, type, category, title, amount, context_id, meta, idempotency_key, asset, balance_bucket
+        ) values ($1, 'credit', 'tournament_fee', 'Комиссия турнира', $2, $3, $4, $5, $6, $7)
+        on conflict do nothing
+      `, [id("platform"), fee, tournament.id, tournament.title, idempotencyKey ? `fee:${idempotencyKey}` : null,
+        bucket === "cash" ? "USDT" : "PLAY_CHIPS", bucket]);
+    }
     await client.query(`
       insert into tournament_registrations (
         tournament_id, app_user_id, provider, provider_user_id, buy_in, fee, status, registered_at, cancelled_at
@@ -853,12 +1140,19 @@ export async function registerTournament(providerUserId, tournament, provider = 
       update player_profiles
       set tournaments_played = tournaments_played + 1,
           tournament_entries = tournament_entries + 1,
-          tournament_fees_paid = tournament_fees_paid + $2,
+          tournament_fees_paid = tournament_fees_paid + case when $3 = 'play' then $2 else 0 end,
+          tournament_play_fees_paid = tournament_play_fees_paid + case when $3 = 'play' then $2 else 0 end,
+          tournament_cash_fees_paid_micros = tournament_cash_fees_paid_micros + case when $3 = 'cash' then $2 else 0 end,
+          sng_fees_paid = sng_fees_paid + case when $4 = 'sng' and $3 = 'play' then $2 else 0 end,
+          sng_play_fees_paid = sng_play_fees_paid + case when $4 = 'sng' and $3 = 'play' then $2 else 0 end,
+          sng_cash_fees_paid_micros = sng_cash_fees_paid_micros + case when $4 = 'sng' and $3 = 'cash' then $2 else 0 end,
           updated_at = now()
       where app_user_id = $1
-    `, [appUserId, fee]);
+    `, [appUserId, fee, bucket, tournament.type]);
     await client.query("commit");
-    return { balance: after, alreadyRegistered: false };
+    return bucket === "cash"
+      ? { cashBalanceMicros: after, alreadyRegistered: false }
+      : { balance: after, alreadyRegistered: false };
   } catch (error) {
     await client.query("rollback");
     throw error;
@@ -870,6 +1164,8 @@ export async function registerTournament(providerUserId, tournament, provider = 
 export async function cancelTournamentRegistration(providerUserId, tournament, provider = "telegram", idempotencyKey = "") {
   if (!pool) return null;
   const appUserId = await ensureIdentity(provider, providerUserId);
+  const bucket = tournament.balanceBucket === "cash" ? "cash" : "play";
+  const walletColumn = bucket === "cash" ? "cash_usdt_micros" : "balance";
   const client = await pool.connect();
 
   try {
@@ -882,17 +1178,19 @@ export async function cancelTournamentRegistration(providerUserId, tournament, p
       for update
     `, [tournament.id, appUserId]);
     if (!registration.rowCount) {
-      const wallet = await client.query("select balance from wallets where app_user_id = $1", [appUserId]);
+      const wallet = await client.query(`select ${walletColumn} as balance from wallets where app_user_id = $1`, [appUserId]);
       await client.query("commit");
-      return { balance: Number(wallet.rows[0]?.balance || 0), cancelled: false };
+      return bucket === "cash"
+        ? { cashBalanceMicros: Number(wallet.rows[0]?.balance || 0), cancelled: false }
+        : { balance: Number(wallet.rows[0]?.balance || 0), cancelled: false };
     }
 
     const refund = Number(registration.rows[0].buy_in || 0) + Number(registration.rows[0].fee || 0);
     await client.query("insert into wallets (app_user_id, balance) values ($1, 0) on conflict do nothing", [appUserId]);
-    const current = await client.query("select balance from wallets where app_user_id = $1 for update", [appUserId]);
+    const current = await client.query(`select ${walletColumn} as balance from wallets where app_user_id = $1 for update`, [appUserId]);
     const after = Number(current.rows[0]?.balance || 0) + refund;
 
-    await client.query("update wallets set balance = $2, updated_at = now() where app_user_id = $1", [appUserId, after]);
+    await client.query(`update wallets set ${walletColumn} = $2, updated_at = now() where app_user_id = $1`, [appUserId, after]);
     await client.query(`
       update tournament_registrations
       set status = 'cancelled', cancelled_at = now()
@@ -902,15 +1200,21 @@ export async function cancelTournamentRegistration(providerUserId, tournament, p
       update player_profiles
       set tournaments_played = greatest(0, tournaments_played - 1),
           tournament_entries = greatest(0, tournament_entries - 1),
-          tournament_fees_paid = greatest(0, tournament_fees_paid - $2),
+          tournament_fees_paid = greatest(0, tournament_fees_paid - case when $3 = 'play' then $2 else 0 end),
+          tournament_play_fees_paid = greatest(0, tournament_play_fees_paid - case when $3 = 'play' then $2 else 0 end),
+          tournament_cash_fees_paid_micros = greatest(0, tournament_cash_fees_paid_micros - case when $3 = 'cash' then $2 else 0 end),
+          sng_fees_paid = greatest(0, sng_fees_paid - case when $4 = 'sng' and $3 = 'play' then $2 else 0 end),
+          sng_play_fees_paid = greatest(0, sng_play_fees_paid - case when $4 = 'sng' and $3 = 'play' then $2 else 0 end),
+          sng_cash_fees_paid_micros = greatest(0, sng_cash_fees_paid_micros - case when $4 = 'sng' and $3 = 'cash' then $2 else 0 end),
           updated_at = now()
       where app_user_id = $1
-    `, [appUserId, Number(registration.rows[0].fee || 0)]);
+    `, [appUserId, Number(registration.rows[0].fee || 0), bucket, tournament.type]);
     await client.query(`
       insert into ledger_entries (
-        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta, balance_after, idempotency_key
+        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta,
+        balance_after, idempotency_key, asset, balance_bucket
       )
-      values ($1, $2, $3, $4, 'credit', 'tournament_refund', 'Возврат турнирного бай-ина', $5, $6, $7, $8)
+      values ($1, $2, $3, $4, 'credit', 'tournament_refund', 'Возврат турнирного бай-ина', $5, $6, $7, $8, $9, $10)
     `, [
       id("ledger"),
       appUserId,
@@ -919,10 +1223,24 @@ export async function cancelTournamentRegistration(providerUserId, tournament, p
       refund,
       tournament.title,
       after,
-      idempotencyKey || null
+      idempotencyKey || null,
+      bucket === "cash" ? "USDT" : "PLAY_CHIPS",
+      bucket
     ]);
+    const fee = Number(registration.rows[0].fee || 0);
+    if (fee > 0) {
+      await client.query(`
+        insert into platform_ledger_entries (
+          id, type, category, title, amount, context_id, meta, idempotency_key, asset, balance_bucket
+        ) values ($1, 'debit', 'tournament_fee_refund', 'Возврат комиссии турнира', $2, $3, $4, $5, $6, $7)
+        on conflict do nothing
+      `, [id("platform"), fee, tournament.id, tournament.title, idempotencyKey ? `fee-refund:${idempotencyKey}` : null,
+        bucket === "cash" ? "USDT" : "PLAY_CHIPS", bucket]);
+    }
     await client.query("commit");
-    return { balance: after, cancelled: true };
+    return bucket === "cash"
+      ? { cashBalanceMicros: after, cancelled: true }
+      : { balance: after, cancelled: true };
   } catch (error) {
     await client.query("rollback");
     throw error;
@@ -1353,9 +1671,9 @@ export async function expireWelcomeBonuses() {
         ]);
         await client.query(`
           insert into platform_ledger_entries (
-            id, type, category, title, amount, context_id, meta, idempotency_key
+            id, type, category, title, amount, context_id, meta, idempotency_key, asset, balance_bucket
           )
-          values ($1, 'credit', 'bonus_expired', 'Expired Welcome Bonus', $2, $3, $4, $5)
+          values ($1, 'credit', 'bonus_expired', 'Expired Welcome Bonus', $2, $3, $4, $5, 'USDT', 'cash')
           on conflict do nothing
         `, [id("platform"), amount, grant.id, `user ${grant.provider_user_id}`, `bonus:${grant.id}:expired:platform`]);
       }
@@ -1612,9 +1930,9 @@ export async function reviewWithdrawalOrder(orderId, review) {
       if (order.feeUsdtMicros > 0) {
         await client.query(`
           insert into platform_ledger_entries (
-            id, type, category, title, amount, context_id, meta, idempotency_key
+            id, type, category, title, amount, context_id, meta, idempotency_key, asset, balance_bucket
           )
-          values ($1, 'credit', 'withdrawal_fee', 'Withdrawal hidden fee', $2, $3, $4, $5)
+          values ($1, 'credit', 'withdrawal_fee', 'Withdrawal hidden fee', $2, $3, $4, $5, 'USDT', 'cash')
           on conflict do nothing
         `, [
           id("platform"),
@@ -2106,6 +2424,10 @@ export async function dashboardStats() {
       (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'debit' and balance_bucket = 'cash_usdt') as cash_ledger_debit_total,
       (select coalesce(sum(amount), 0)::bigint from platform_ledger_entries where type = 'credit') as platform_ledger_credit_total,
       (select coalesce(sum(amount), 0)::bigint from platform_ledger_entries where type = 'debit') as platform_ledger_debit_total,
+      (select coalesce(sum(amount), 0)::bigint from platform_ledger_entries where type = 'credit' and balance_bucket = 'play') as play_platform_ledger_credit_total,
+      (select coalesce(sum(amount), 0)::bigint from platform_ledger_entries where type = 'debit' and balance_bucket = 'play') as play_platform_ledger_debit_total,
+      (select coalesce(sum(amount), 0)::bigint from platform_ledger_entries where type = 'credit' and balance_bucket = 'cash') as cash_platform_ledger_credit_total,
+      (select coalesce(sum(amount), 0)::bigint from platform_ledger_entries where type = 'debit' and balance_bucket = 'cash') as cash_platform_ledger_debit_total,
       (select count(*)::int from hand_histories) as hand_history_count,
       (select coalesce(sum(rake), 0)::bigint from hand_histories) as hand_history_rake_total,
       (select count(*)::int from hand_actions) as hand_action_count,
@@ -2148,6 +2470,10 @@ export async function dashboardStats() {
     cashLedgerDebitTotal: Number(result.rows[0].cash_ledger_debit_total || 0),
     platformLedgerCreditTotal: Number(result.rows[0].platform_ledger_credit_total || 0),
     platformLedgerDebitTotal: Number(result.rows[0].platform_ledger_debit_total || 0),
+    playPlatformLedgerCreditTotal: Number(result.rows[0].play_platform_ledger_credit_total || 0),
+    playPlatformLedgerDebitTotal: Number(result.rows[0].play_platform_ledger_debit_total || 0),
+    cashPlatformLedgerCreditTotal: Number(result.rows[0].cash_platform_ledger_credit_total || 0),
+    cashPlatformLedgerDebitTotal: Number(result.rows[0].cash_platform_ledger_debit_total || 0),
     handHistoryCount: Number(result.rows[0].hand_history_count || 0),
     handHistoryRakeTotal: Number(result.rows[0].hand_history_rake_total || 0),
     handActionCount: Number(result.rows[0].hand_action_count || 0),
@@ -2362,11 +2688,19 @@ async function migrate() {
       tournament_final_tables integer not null default 0 check (tournament_final_tables >= 0),
       tournament_wins integer not null default 0 check (tournament_wins >= 0),
       tournament_fees_paid bigint not null default 0 check (tournament_fees_paid >= 0),
+      tournament_cash_fees_paid_micros bigint not null default 0 check (tournament_cash_fees_paid_micros >= 0),
+      tournament_play_fees_paid bigint not null default 0 check (tournament_play_fees_paid >= 0),
       tournament_prize_won bigint not null default 0 check (tournament_prize_won >= 0),
+      tournament_cash_prize_won_micros bigint not null default 0 check (tournament_cash_prize_won_micros >= 0),
+      tournament_play_prize_won bigint not null default 0 check (tournament_play_prize_won >= 0),
       sng_played integer not null default 0 check (sng_played >= 0),
       sng_wins integer not null default 0 check (sng_wins >= 0),
       sng_fees_paid bigint not null default 0 check (sng_fees_paid >= 0),
+      sng_cash_fees_paid_micros bigint not null default 0 check (sng_cash_fees_paid_micros >= 0),
+      sng_play_fees_paid bigint not null default 0 check (sng_play_fees_paid >= 0),
       sng_prize_won bigint not null default 0 check (sng_prize_won >= 0),
+      sng_cash_prize_won_micros bigint not null default 0 check (sng_cash_prize_won_micros >= 0),
+      sng_play_prize_won bigint not null default 0 check (sng_play_prize_won >= 0),
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
     );
@@ -2380,11 +2714,19 @@ async function migrate() {
     alter table player_profiles add column if not exists tournament_final_tables integer not null default 0 check (tournament_final_tables >= 0);
     alter table player_profiles add column if not exists tournament_wins integer not null default 0 check (tournament_wins >= 0);
     alter table player_profiles add column if not exists tournament_fees_paid bigint not null default 0 check (tournament_fees_paid >= 0);
+    alter table player_profiles add column if not exists tournament_cash_fees_paid_micros bigint not null default 0 check (tournament_cash_fees_paid_micros >= 0);
+    alter table player_profiles add column if not exists tournament_play_fees_paid bigint not null default 0 check (tournament_play_fees_paid >= 0);
     alter table player_profiles add column if not exists tournament_prize_won bigint not null default 0 check (tournament_prize_won >= 0);
+    alter table player_profiles add column if not exists tournament_cash_prize_won_micros bigint not null default 0 check (tournament_cash_prize_won_micros >= 0);
+    alter table player_profiles add column if not exists tournament_play_prize_won bigint not null default 0 check (tournament_play_prize_won >= 0);
     alter table player_profiles add column if not exists sng_played integer not null default 0 check (sng_played >= 0);
     alter table player_profiles add column if not exists sng_wins integer not null default 0 check (sng_wins >= 0);
     alter table player_profiles add column if not exists sng_fees_paid bigint not null default 0 check (sng_fees_paid >= 0);
+    alter table player_profiles add column if not exists sng_cash_fees_paid_micros bigint not null default 0 check (sng_cash_fees_paid_micros >= 0);
+    alter table player_profiles add column if not exists sng_play_fees_paid bigint not null default 0 check (sng_play_fees_paid >= 0);
     alter table player_profiles add column if not exists sng_prize_won bigint not null default 0 check (sng_prize_won >= 0);
+    alter table player_profiles add column if not exists sng_cash_prize_won_micros bigint not null default 0 check (sng_cash_prize_won_micros >= 0);
+    alter table player_profiles add column if not exists sng_play_prize_won bigint not null default 0 check (sng_play_prize_won >= 0);
     alter table player_profiles alter column rating_points set default 1000;
     alter table player_profiles alter column rating_peak_points set default 1000;
     alter table player_profiles alter column rating_tier set default 'Bronze';
@@ -2437,6 +2779,8 @@ async function migrate() {
       meta text not null default '',
       balance_after bigint,
       idempotency_key text,
+      asset text not null default 'PLAY_CHIPS',
+      balance_bucket text not null default 'play' check (balance_bucket in ('play', 'cash')),
       asset text not null default 'PLAY_CHIPS',
       balance_bucket text not null default 'play',
       reversal_of text references ledger_entries(id) on delete set null,
@@ -2508,6 +2852,37 @@ async function migrate() {
 
     create index if not exists idx_table_seats_user on table_seats(app_user_id, updated_at desc) where app_user_id is not null;
 
+    create table if not exists tournaments (
+      id text primary key,
+      title text not null,
+      type text not null check (type in ('mtt', 'sng')),
+      status text not null check (status in ('created', 'registration_open', 'late_registration', 'running', 'final_table', 'finished', 'cancelled')),
+      balance_bucket text not null default 'play' check (balance_bucket in ('play', 'cash')),
+      buy_in bigint not null default 0 check (buy_in >= 0),
+      fee bigint not null default 0 check (fee >= 0),
+      guaranteed_prize_pool bigint not null default 0 check (guaranteed_prize_pool >= 0),
+      max_players integer not null check (max_players >= 2),
+      min_players integer not null default 2 check (min_players >= 2),
+      max_players_per_table integer not null default 6 check (max_players_per_table between 2 and 9),
+      starting_stack bigint not null default 10000 check (starting_stack > 0),
+      structure jsonb not null default '[]'::jsonb,
+      payout_structure jsonb,
+      registration_opens_at timestamptz not null,
+      starts_at timestamptz not null,
+      late_reg_ends_at timestamptz,
+      re_entry_limit integer not null default 0 check (re_entry_limit >= 0),
+      add_on_allowed boolean not null default false,
+      current_level integer not null default 1 check (current_level >= 1),
+      started_at timestamptz,
+      finished_at timestamptz,
+      cancelled_at timestamptz,
+      raw jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_tournaments_status_start on tournaments(status, starts_at);
+
     create table if not exists tournament_registrations (
       tournament_id text not null,
       app_user_id text not null references app_users(id) on delete cascade,
@@ -2523,6 +2898,48 @@ async function migrate() {
 
     create index if not exists idx_tournament_registrations_status on tournament_registrations(tournament_id, status);
     create index if not exists idx_tournament_registrations_user on tournament_registrations(app_user_id, registered_at desc);
+
+    create table if not exists tournament_tables (
+      id text primary key,
+      tournament_id text not null references tournaments(id) on delete cascade,
+      table_number integer not null,
+      status text not null default 'active' check (status in ('active', 'closed')),
+      small_blind bigint not null default 0,
+      big_blind bigint not null default 0,
+      ante bigint not null default 0,
+      seats jsonb not null default '[]'::jsonb,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      unique (tournament_id, table_number)
+    );
+
+    create index if not exists idx_tournament_tables_active on tournament_tables(tournament_id, status);
+
+    create table if not exists tournament_results (
+      tournament_id text not null references tournaments(id) on delete cascade,
+      app_user_id text not null references app_users(id) on delete cascade,
+      place integer not null check (place > 0),
+      prize_amount bigint not null default 0 check (prize_amount >= 0),
+      balance_bucket text not null check (balance_bucket in ('play', 'cash')),
+      eliminated_at timestamptz,
+      created_at timestamptz not null default now(),
+      primary key (tournament_id, app_user_id),
+      unique (tournament_id, place)
+    );
+
+    create index if not exists idx_tournament_results_user on tournament_results(app_user_id, created_at desc);
+
+    create table if not exists tournament_payouts (
+      id text primary key,
+      tournament_id text not null references tournaments(id) on delete cascade,
+      app_user_id text not null references app_users(id) on delete cascade,
+      place integer not null check (place > 0),
+      amount bigint not null check (amount >= 0),
+      balance_bucket text not null check (balance_bucket in ('play', 'cash')),
+      idempotency_key text not null unique,
+      paid_at timestamptz not null default now(),
+      unique (tournament_id, app_user_id)
+    );
 
     create table if not exists hand_histories (
       id text primary key,
@@ -2601,6 +3018,8 @@ async function migrate() {
     );
 
     create index if not exists idx_platform_ledger_entries_category_created on platform_ledger_entries(category, created_at desc);
+    alter table platform_ledger_entries add column if not exists asset text not null default 'PLAY_CHIPS';
+    alter table platform_ledger_entries add column if not exists balance_bucket text not null default 'play';
     create index if not exists idx_platform_ledger_entries_context on platform_ledger_entries(context_id);
     create unique index if not exists idx_platform_ledger_entries_idempotency_key on platform_ledger_entries(idempotency_key) where idempotency_key is not null;
 
@@ -3076,11 +3495,19 @@ function normalizePlayerProfileRow(row = {}) {
     tournamentFinalTables: Number(row.tournament_final_tables || 0),
     tournamentWins: Number(row.tournament_wins || 0),
     tournamentFeesPaid: Number(row.tournament_fees_paid || 0),
+    tournamentCashFeesPaidMicros: Number(row.tournament_cash_fees_paid_micros || 0),
+    tournamentPlayFeesPaid: Number(row.tournament_play_fees_paid || row.tournament_fees_paid || 0),
     tournamentPrizeWon: Number(row.tournament_prize_won || 0),
+    tournamentCashPrizeWonMicros: Number(row.tournament_cash_prize_won_micros || 0),
+    tournamentPlayPrizeWon: Number(row.tournament_play_prize_won || row.tournament_prize_won || 0),
     sngPlayed: Number(row.sng_played || 0),
     sngWins: Number(row.sng_wins || 0),
     sngFeesPaid: Number(row.sng_fees_paid || 0),
-    sngPrizeWon: Number(row.sng_prize_won || 0)
+    sngCashFeesPaidMicros: Number(row.sng_cash_fees_paid_micros || 0),
+    sngPlayFeesPaid: Number(row.sng_play_fees_paid || row.sng_fees_paid || 0),
+    sngPrizeWon: Number(row.sng_prize_won || 0),
+    sngCashPrizeWonMicros: Number(row.sng_cash_prize_won_micros || 0),
+    sngPlayPrizeWon: Number(row.sng_play_prize_won || row.sng_prize_won || 0)
   };
 }
 

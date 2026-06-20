@@ -493,28 +493,15 @@
             <div class="tournament-list" id="tournamentList"></div>
             <div class="cashier-status" id="tournamentStatus" role="status"></div>
           </section>
-          <section class="lobby-card sitgo-preview" id="sitGoPreview">
+          <section class="lobby-card tournament-history-card">
             <div class="section-title">
               <div>
-                <p class="eyebrow">Sit&Go</p>
-                <h2>Быстрые столы</h2>
+                <p class="eyebrow">Мои турниры</p>
+                <h2>Результаты</h2>
               </div>
-              <span>скоро</span>
+              <span id="tournamentHistoryMeta">история</span>
             </div>
-            <div class="sitgo-grid">
-              <article>
-                <strong>Heads-up turbo</strong>
-                <span>2 игрока · старт сразу после посадки</span>
-              </article>
-              <article>
-                <strong>6-max bounty</strong>
-                <span>быстрый вылет, фиксированный призовой фонд</span>
-              </article>
-              <article>
-                <strong>Jackpot SNG</strong>
-                <span>случайный множитель призов перед стартом</span>
-              </article>
-            </div>
+            <div class="tournament-history-list" id="tournamentHistoryList"></div>
           </section>
         </section>
 
@@ -569,6 +556,17 @@
             <div class="settings-list" id="profileSessionList">
               <div class="settings-row"><span>Активных столов нет</span><strong>Лобби</strong></div>
             </div>
+          </section>
+          <section class="lobby-card profile-tournament-card">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Турниры</p>
+                <h2>Статистика</h2>
+              </div>
+              <span id="profileTournamentSummary">0 входов</span>
+            </div>
+            <div class="profile-tournament-grid" id="profileTournamentStats"></div>
+            <div class="tournament-history-list profile-tournament-history" id="profileTournamentHistory"></div>
           </section>
           <section class="lobby-card">
             <div class="section-title">

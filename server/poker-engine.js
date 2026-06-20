@@ -314,6 +314,10 @@ export function startHand(table, user) {
     seat.sitOutNextHand = false;
   }
 
+  if (table.tournamentId && Number(table.ante || 0) > 0) {
+    for (const seat of playableSeats(table)) postAnte(table, seat, table.ante);
+  }
+
   postBlind(table, table.smallBlindIndex, table.smallBlind);
   postBlind(table, table.bigBlindIndex, table.bigBlind);
   addLog(table, `Раздача #${table.handNumber}`);
@@ -667,7 +671,7 @@ function finishByFold(table) {
   const totalPot = table.pot;
   const uncalledAmount = uncalledAmountForWinner(table, winner);
   const contestedPot = Math.max(0, totalPot - uncalledAmount);
-  const rake = calculateRake({
+  const rake = table.tournamentId ? 0 : calculateRake({
     pot: contestedPot,
     bigBlind: table.bigBlind,
     boardCards: table.communityCards.length
@@ -705,7 +709,7 @@ function finishShowdown(table) {
   const contestedPot = pots
     .filter((pot) => !pot.isUncalled)
     .reduce((sum, pot) => sum + pot.amount, 0);
-  let rakeLeft = calculateRake({
+  let rakeLeft = table.tournamentId ? 0 : calculateRake({
     pot: contestedPot,
     bigBlind: table.bigBlind,
     boardCards: table.communityCards.length
@@ -935,6 +939,13 @@ function isBettingRoundComplete(table) {
 function postBlind(table, seatIndex, amount) {
   moveChipsToPot(table, table.seats[seatIndex], amount);
   table.seats[seatIndex].acted = false;
+}
+
+function postAnte(table, seat, amount) {
+  const chips = Math.min(amount, seat.stack);
+  seat.stack -= chips;
+  seat.totalBet += chips;
+  table.pot += chips;
 }
 
 function moveChipsToPot(table, seat, amount) {

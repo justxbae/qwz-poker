@@ -68,6 +68,8 @@ import {
   listCashLedger as dbListCashLedger,
   listLedger as dbListLedger,
   listTournamentRegistrations as dbListTournamentRegistrations,
+  listTournamentStates as dbListTournamentStates,
+  listTournamentHistory as dbListTournamentHistory,
   listHandHistories as dbListHandHistories,
   listUsers as dbListUsers,
   listPaymentOrders as dbListPaymentOrders,
@@ -88,6 +90,10 @@ import {
   recordRiskFlag as dbRecordRiskFlag,
   reviewWithdrawalOrder as dbReviewWithdrawalOrder,
   registerTournament as dbRegisterTournament,
+  saveTournamentTables as dbSaveTournamentTables,
+  settleTournament as dbSettleTournament,
+  updateTournamentState as dbUpdateTournamentState,
+  upsertTournamentDefinitions as dbUpsertTournamentDefinitions,
   saveIdempotencyResult as dbSaveIdempotencyResult,
   cancelTournamentRegistration as dbCancelTournamentRegistration,
   setSavedStack as dbSetSavedStack,
@@ -129,6 +135,18 @@ import {
   testBotAct,
   tickTables
 } from "./poker-engine.js";
+import {
+  TOURNAMENT_STATUSES,
+  applyTournamentTransition,
+  balancedSeating,
+  calculateTournamentPayouts,
+  cancellationAllowed,
+  createTournamentRuntime,
+  currentBlindLevel,
+  registrationAllowed,
+  schedulerDecision,
+  seatTournamentPlayers
+} from "./tournament-engine.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -216,6 +234,7 @@ const DAILY_PLAY_CLAIM_COOLDOWN_SECONDS = 24 * 60 * 60;
 let lastReconciliationAlertKey = "";
 let telegramWebhookDiagnostics = null;
 let lastTelegramWebhookAlertKey = "";
+let tournamentTickRunning = false;
 
 seedPublicTables();
 const tournaments = seedTournaments();
@@ -237,6 +256,7 @@ const server = createServer(async (req, res) => {
 });
 
 await initDatabase();
+await dbUpsertTournamentDefinitions([...tournaments.values()]);
 await initStateStore();
 await hydrateActiveTables();
 await hydrateTournamentRegistrations();
@@ -260,6 +280,7 @@ server.listen(PORT, HOST, () => {
 setInterval(async () => {
   try {
     tickTables(tables);
+    await tickTournaments();
     await persistAllCompletedHands();
   } catch (error) {
     console.error("Table tick failed:", error);
@@ -534,6 +555,23 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/tournaments") {
     sendJson(res, 200, { tournaments: tournamentListView(user) });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/tournaments/history") {
+    const history = await dbListTournamentHistory(user.id);
+    sendJson(res, 200, { history: history || memoryTournamentHistory(user.id) });
+    return;
+  }
+
+  const tournamentDetailsMatch = url.pathname.match(/^\/api\/tournaments\/([^/]+)$/);
+  if (req.method === "GET" && tournamentDetailsMatch) {
+    const tournament = tournaments.get(tournamentDetailsMatch[1]);
+    if (!tournament) {
+      sendJson(res, 404, { error: "Турнир не найден" });
+      return;
+    }
+    sendJson(res, 200, { tournament: tournamentView(tournament, user) });
     return;
   }
 
@@ -916,6 +954,10 @@ async function handleApi(req, res, url) {
     }
 
     if (req.method === "POST" && action === "join") {
+      if (table.tournamentId) {
+        sendJson(res, 409, { error: "Посадкой за турнирный стол управляет сервер" });
+        return;
+      }
       await sendIdempotentJson(req, res, user, `table_join:${table.id}`, async (idempotencyKey) => {
         const body = await readJson(req);
         const wasSeated = table.seats.some((seat) => seat.userId === user.id);
@@ -956,6 +998,10 @@ async function handleApi(req, res, url) {
     }
 
     if (req.method === "POST" && action === "leave") {
+      if (table.tournamentId) {
+        sendJson(res, 409, { error: "Покинуть турнирный стол с возвратом стека нельзя" });
+        return;
+      }
       const departingStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
       const result = leaveTable(table, user);
       await persistCompletedHands(table);
@@ -987,6 +1033,10 @@ async function handleApi(req, res, url) {
     }
 
     if (req.method === "POST" && action === "stand") {
+      if (table.tournamentId) {
+        sendJson(res, 409, { error: "Встать из-за турнирного стола нельзя" });
+        return;
+      }
       const departingStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
       const result = leaveTable(table, user);
       await persistCompletedHands(table);
@@ -1032,6 +1082,10 @@ async function handleApi(req, res, url) {
     }
 
     if (req.method === "POST" && action === "rebuy") {
+      if (table.tournamentId) {
+        sendJson(res, 409, { error: "Re-entry и add-on не входят в MVP турниров" });
+        return;
+      }
       await sendIdempotentJson(req, res, user, `table_rebuy:${table.id}`, async (idempotencyKey) => {
         const body = await readJson(req);
         const availableBalance = tableWalletBalance(user, table);
@@ -1125,7 +1179,7 @@ async function handleApi(req, res, url) {
     }
 
     if (req.method === "POST" && action === "add-test-player") {
-      if (table.gameMode === "cash") {
+      if (table.gameMode === "cash" || table.tournamentId) {
         const error = new Error("Тестовые игроки недоступны за денежным столом");
         error.status = 409;
         throw error;
@@ -1278,6 +1332,9 @@ async function adminDashboardView(options = {}) {
   const tournamentEscrowTotal = tournamentEscrow();
   const tournamentPrizePoolTotal = tournamentPrizePool();
   const tournamentFeeReserveTotal = tournamentFeeReserve();
+  const cashTournamentEscrowMicros = tournamentEscrow("cash");
+  const cashTournamentPrizePoolMicros = tournamentPrizePool("cash");
+  const cashTournamentFeeReserveMicros = tournamentFeeReserve("cash");
   const rakeCollectedTotal = [...tables.values()].reduce((sum, table) => sum + Number(table.rakeCollected || 0), 0);
   const ledgerCreditTotal = dbStats ? dbStats.ledgerCreditTotal : memoryLedgerTotal("credit");
   const ledgerDebitTotal = dbStats ? dbStats.ledgerDebitTotal : memoryLedgerTotal("debit");
@@ -1321,6 +1378,9 @@ async function adminDashboardView(options = {}) {
       tournamentEscrowTotal,
       tournamentPrizePoolTotal,
       tournamentFeeReserveTotal,
+      cashTournamentEscrowMicros,
+      cashTournamentPrizePoolMicros,
+      cashTournamentFeeReserveMicros,
       rakeCollectedTotal,
       playerFundsTotal,
       ledgerCreditTotal,
@@ -1334,6 +1394,10 @@ async function adminDashboardView(options = {}) {
       platformLedgerNetTotal: dbStats
         ? dbStats.platformLedgerCreditTotal - dbStats.platformLedgerDebitTotal
         : memoryPlatformLedgerTotal("credit") - memoryPlatformLedgerTotal("debit"),
+      playPlatformLedgerCreditTotal: dbStats ? dbStats.playPlatformLedgerCreditTotal : memoryPlatformLedgerTotal("credit", "play"),
+      playPlatformLedgerDebitTotal: dbStats ? dbStats.playPlatformLedgerDebitTotal : memoryPlatformLedgerTotal("debit", "play"),
+      cashPlatformLedgerCreditTotal: dbStats ? dbStats.cashPlatformLedgerCreditTotal : memoryPlatformLedgerTotal("credit", "cash"),
+      cashPlatformLedgerDebitTotal: dbStats ? dbStats.cashPlatformLedgerDebitTotal : memoryPlatformLedgerTotal("debit", "cash"),
       cashWalletTotal,
       cashTableStackTotal,
       lockedUsdtTotal,
@@ -1442,6 +1506,8 @@ async function recordPlatformLedger(entry = {}) {
     amount,
     contextId: entry.contextId || "",
     meta: entry.meta || "",
+    asset: entry.asset || ASSETS.PLAY,
+    balanceBucket: entry.balanceBucket === "cash" ? "cash" : "play",
     idempotencyKey,
     createdAt: new Date().toISOString()
   };
@@ -1572,6 +1638,7 @@ async function adminUsersList(limit = 100) {
 function activeTableStacksByUser() {
   const stacks = new Map();
   for (const table of tables.values()) {
+    if (table.tournamentId) continue;
     for (const seat of table.seats) {
       const userId = String(seat.user?.id || seat.userId || "");
       if (!userId) continue;
@@ -1583,6 +1650,7 @@ function activeTableStacksByUser() {
 
 function activeTableStackTotals() {
   return [...tables.values()].reduce((result, table) => {
+    if (table.tournamentId) return result;
     const stack = table.seats.reduce((sum, seat) => sum + Number(seat.stack || 0), 0);
     if (table.gameMode === "cash") {
       result.cash += stack;
@@ -1603,21 +1671,27 @@ function enrichAdminUserListItem(user, tableStacks) {
   };
 }
 
-function tournamentEscrow() {
+function tournamentEscrow(bucket = "play") {
   return [...tournaments.values()].reduce((sum, tournament) => (
-    sum + tournament.registrations.size * (Number(tournament.buyIn || 0) + Number(tournament.fee || 0))
+    sum + (tournament.balanceBucket === bucket && ![TOURNAMENT_STATUSES.FINISHED, TOURNAMENT_STATUSES.CANCELLED].includes(tournament.status)
+      ? tournament.registrations.size * Number(tournament.buyIn || 0)
+      : 0)
   ), 0);
 }
 
-function tournamentPrizePool() {
+function tournamentPrizePool(bucket = "play") {
   return [...tournaments.values()].reduce((sum, tournament) => (
-    sum + tournament.registrations.size * Number(tournament.buyIn || 0)
+    sum + (tournament.balanceBucket === bucket && ![TOURNAMENT_STATUSES.FINISHED, TOURNAMENT_STATUSES.CANCELLED].includes(tournament.status)
+      ? tournament.registrations.size * Number(tournament.buyIn || 0)
+      : 0)
   ), 0);
 }
 
-function tournamentFeeReserve() {
+function tournamentFeeReserve(bucket = "play") {
   return [...tournaments.values()].reduce((sum, tournament) => (
-    sum + tournament.registrations.size * Number(tournament.fee || 0)
+    sum + (tournament.balanceBucket === bucket && ![TOURNAMENT_STATUSES.FINISHED, TOURNAMENT_STATUSES.CANCELLED].includes(tournament.status)
+      ? tournament.registrations.size * Number(tournament.fee || 0)
+      : 0)
   ), 0);
 }
 
@@ -1645,9 +1719,9 @@ function memoryCashLedgerTotal(type) {
   ), 0);
 }
 
-function memoryPlatformLedgerTotal(type) {
+function memoryPlatformLedgerTotal(type, bucket = null) {
   return platformLedgerEntries
-    .filter((entry) => entry.type === type)
+    .filter((entry) => entry.type === type && (!bucket || (entry.balanceBucket || "play") === bucket))
     .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
 }
 
@@ -1852,7 +1926,9 @@ async function persistCompletedHands(table) {
           amount: hand.rake,
           contextId: hand.id,
           meta: `${table.name} · ${table.smallBlind}/${table.bigBlind} · hand #${hand.handNumber}`,
-          idempotencyKey: `rake:${hand.id}`
+          idempotencyKey: `rake:${hand.id}`,
+          asset: table.gameMode === "cash" ? "USDT" : "PLAY_CHIPS",
+          balanceBucket: table.gameMode === "cash" ? "cash" : "play"
         });
       }
       persistedHandIds.add(key);
@@ -2067,6 +2143,7 @@ async function normalizeUser(user) {
 async function profileView(user) {
   await refreshUserWallets(user);
   const profile = await getProfileForUser(user);
+  const tournamentHistory = await dbListTournamentHistory(user.id) || memoryTournamentHistory(user.id);
   const bonus = await bonusSummary(user);
   const activeTables = [...tables.values()]
     .map((table) => {
@@ -2082,13 +2159,14 @@ async function profileView(user) {
         stack: seat.stack,
         gameMode: table.gameMode || "play",
         currency: table.currency || ASSETS.PLAY,
+        tournamentId: table.tournamentId || null,
         sittingOut: seat.sittingOut,
         sitOutNextHand: seat.sitOutNextHand
       };
     })
     .filter(Boolean);
-  const tableStack = activeTables.filter((table) => table.gameMode !== "cash").reduce((sum, table) => sum + table.stack, 0);
-  const cashTableStackMicros = activeTables.filter((table) => table.gameMode === "cash").reduce((sum, table) => sum + table.stack, 0);
+  const tableStack = activeTables.filter((table) => table.gameMode !== "cash" && !table.tournamentId).reduce((sum, table) => sum + table.stack, 0);
+  const cashTableStackMicros = activeTables.filter((table) => table.gameMode === "cash" && !table.tournamentId).reduce((sum, table) => sum + table.stack, 0);
 
   return {
     user: {
@@ -2109,6 +2187,7 @@ async function profileView(user) {
     activeTables,
     activeTableCount: activeTables.length,
     handsPlayed: profile.handsPlayed || 0,
+    tournamentHistory,
     profile
   };
 }
@@ -2165,7 +2244,11 @@ async function progressionView(user) {
         finalTables: profile.tournamentFinalTables,
         wins: profile.tournamentWins,
         feesPaid: profile.tournamentFeesPaid,
-        prizeWon: profile.tournamentPrizeWon
+        playFeesPaid: profile.tournamentPlayFeesPaid,
+        cashFeesPaidMicros: profile.tournamentCashFeesPaidMicros,
+        prizeWon: profile.tournamentPrizeWon,
+        playPrizeWon: profile.tournamentPlayPrizeWon,
+        cashPrizeWonMicros: profile.tournamentCashPrizeWonMicros
       }
     },
     sitAndGo: {
@@ -2175,7 +2258,11 @@ async function progressionView(user) {
         played: profile.sngPlayed,
         wins: profile.sngWins,
         feesPaid: profile.sngFeesPaid,
-        prizeWon: profile.sngPrizeWon
+        playFeesPaid: profile.sngPlayFeesPaid,
+        cashFeesPaidMicros: profile.sngCashFeesPaidMicros,
+        prizeWon: profile.sngPrizeWon,
+        playPrizeWon: profile.sngPlayPrizeWon,
+        cashPrizeWonMicros: profile.sngCashPrizeWonMicros
       }
     }
   };
@@ -2303,11 +2390,19 @@ function defaultPlayerProfile() {
     tournamentFinalTables: 0,
     tournamentWins: 0,
     tournamentFeesPaid: 0,
+    tournamentCashFeesPaidMicros: 0,
+    tournamentPlayFeesPaid: 0,
     tournamentPrizeWon: 0,
+    tournamentCashPrizeWonMicros: 0,
+    tournamentPlayPrizeWon: 0,
     sngPlayed: 0,
     sngWins: 0,
     sngFeesPaid: 0,
-    sngPrizeWon: 0
+    sngCashFeesPaidMicros: 0,
+    sngPlayFeesPaid: 0,
+    sngPrizeWon: 0,
+    sngCashPrizeWonMicros: 0,
+    sngPlayPrizeWon: 0
   };
 }
 
@@ -2556,7 +2651,9 @@ async function expireMemoryBonuses(now = Date.now()) {
           amount,
           contextId: grant.id,
           meta: `user ${userId}`,
-          idempotencyKey: `bonus:${grant.id}:expired:platform`
+          idempotencyKey: `bonus:${grant.id}:expired:platform`,
+          asset: "USDT",
+          balanceBucket: "cash"
         });
       }
       expired.push({ grantId: grant.id, providerUserId: userId, bonusAmountMicros: amount });
@@ -2586,8 +2683,8 @@ function formatCash(amountMicros) {
 async function cashierView(user) {
   await refreshUserWallets(user);
   const activeTables = userActiveTables(user);
-  const playTableStack = activeTables.filter((table) => table.gameMode !== "cash").reduce((sum, table) => sum + table.stack, 0);
-  const cashTableStackMicros = activeTables.filter((table) => table.gameMode === "cash").reduce((sum, table) => sum + table.stack, 0);
+  const playTableStack = activeTables.filter((table) => table.gameMode !== "cash" && !table.tournamentId).reduce((sum, table) => sum + table.stack, 0);
+  const cashTableStackMicros = activeTables.filter((table) => table.gameMode === "cash" && !table.tournamentId).reduce((sum, table) => sum + table.stack, 0);
   const cashMode = REAL_MONEY_ENABLED;
   const bonus = await bonusSummary(user);
   const balance = cashMode ? user.cashBalanceMicros : user.balance;
@@ -2633,7 +2730,8 @@ function userActiveTables(user) {
         name: table.name,
         stack: seat.stack,
         gameMode: table.gameMode || "play",
-        currency: table.currency || ASSETS.PLAY
+        currency: table.currency || ASSETS.PLAY,
+        tournamentId: table.tournamentId || null
       };
     })
     .filter(Boolean);
@@ -2735,37 +2833,54 @@ function systemTableKey(table) {
 
 function seedTournaments() {
   const now = Date.now();
+  const fastTournamentTest = process.env.NODE_ENV === "test" && process.env.TOURNAMENT_TEST_MODE === "true";
   const entries = [
     {
       id: "sng-25-evening",
       title: "QWZ Sit&Go 25/50",
-      type: "Sit&Go",
-      status: "registering",
+      type: "sng",
+      status: "registration_open",
+      balanceBucket: "play",
       buyIn: 5000,
       fee: 250,
-      maxPlayers: 6,
+      minPlayers: 2,
+      maxPlayers: fastTournamentTest ? 2 : 6,
+      maxPlayersPerTable: 6,
+      startingStack: fastTournamentTest ? 50 : 10_000,
+      registrationOpensAt: new Date(now - 60 * 1000).toISOString(),
       startsAt: new Date(now + 30 * 60 * 1000).toISOString(),
       prizePoolMode: "buyins"
     },
     {
       id: "freezeout-daily",
       title: "Daily Freezeout",
-      type: "Freezeout",
-      status: "registering",
-      buyIn: 10000,
-      fee: 500,
+      type: "mtt",
+      status: "registration_open",
+      balanceBucket: "cash",
+      buyIn: 1_000_000,
+      fee: 100_000,
+      minPlayers: 2,
       maxPlayers: 36,
+      maxPlayersPerTable: 6,
+      startingStack: 10_000,
+      registrationOpensAt: new Date(now - 60 * 1000).toISOString(),
       startsAt: new Date(now + 3 * 60 * 60 * 1000).toISOString(),
+      lateRegEndsAt: new Date(now + 3.5 * 60 * 60 * 1000).toISOString(),
       prizePoolMode: "buyins"
     },
     {
-      id: "rebuy-weekly",
-      title: "Weekly Rebuy",
-      type: "Rebuy",
-      status: "planned",
-      buyIn: 25000,
-      fee: 1250,
+      id: "mtt-weekly",
+      title: "Weekly MTT",
+      type: "mtt",
+      status: "created",
+      balanceBucket: "cash",
+      buyIn: 3_000_000,
+      fee: 300_000,
+      minPlayers: 6,
       maxPlayers: 72,
+      maxPlayersPerTable: 6,
+      startingStack: 15_000,
+      registrationOpensAt: new Date(now + 12 * 60 * 60 * 1000).toISOString(),
       startsAt: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
       prizePoolMode: "buyins"
     }
@@ -2773,10 +2888,7 @@ function seedTournaments() {
 
   return new Map(entries.map((tournament) => [
     tournament.id,
-    {
-      ...tournament,
-      registrations: new Map()
-    }
+    createTournamentRuntime(tournament, now)
   ]));
 }
 
@@ -2784,8 +2896,308 @@ function tournamentListView(user) {
   return [...tournaments.values()].map((tournament) => tournamentView(tournament, user));
 }
 
+async function tickTournaments(now = Date.now()) {
+  if (tournamentTickRunning) return;
+  tournamentTickRunning = true;
+  try {
+    for (const tournament of tournaments.values()) {
+      const decision = schedulerDecision(tournament, now);
+      if (decision === "open_registration") {
+        applyTournamentTransition(tournament, decision, now);
+        await dbUpdateTournamentState(tournament);
+        continue;
+      }
+      if (decision === "cancel") {
+        await cancelTournamentAndRefund(tournament, now);
+        continue;
+      }
+      if (decision === "start") {
+        await startTournament(tournament, now);
+        continue;
+      }
+      if (tournament.status === TOURNAMENT_STATUSES.LATE_REGISTRATION
+        && tournament.lateRegEndsAt && new Date(tournament.lateRegEndsAt).getTime() <= now) {
+        applyTournamentTransition(tournament, "close_late_registration", now);
+        await dbUpdateTournamentState(tournament);
+      }
+      if ([TOURNAMENT_STATUSES.LATE_REGISTRATION, TOURNAMENT_STATUSES.RUNNING, TOURNAMENT_STATUSES.FINAL_TABLE].includes(tournament.status)) {
+        await advanceRunningTournament(tournament, now);
+      }
+    }
+  } finally {
+    tournamentTickRunning = false;
+  }
+}
+
+async function startTournament(tournament, now = Date.now()) {
+  applyTournamentTransition(tournament, "start", now);
+  const seating = seatTournamentPlayers([...tournament.registrations.values()], tournament.maxPlayersPerTable);
+  for (const group of seating) createTournamentTable(tournament, group.players, group.index + 1);
+  await persistTournamentRuntime(tournament);
+}
+
+function createTournamentTable(tournament, players, tableNumber) {
+  const level = currentBlindLevel(tournament);
+  const table = createTable(null, {
+    name: `${tournament.title} · стол ${tableNumber}`,
+    maxPlayers: tournament.maxPlayersPerTable,
+    smallBlind: level.smallBlind,
+    bigBlind: level.bigBlind,
+    minBuyIn: tournament.startingStack,
+    maxBuyIn: tournament.startingStack,
+    gameMode: "play",
+    isSystem: true,
+    isPrivate: true
+  });
+  table.tournamentId = tournament.id;
+  table.tournamentTableNumber = tableNumber;
+  table.ante = level.ante;
+  for (const player of players) {
+    joinTable(table, {
+      id: String(player.userId),
+      name: player.name || "Player",
+      username: player.username || "",
+      photoUrl: player.photoUrl || "",
+      stack: Math.max(1, Number(player.stack || tournament.startingStack))
+    });
+  }
+  tables.set(table.id, table);
+  tournament.tables.set(table.id, table);
+  maybeStartHand(table);
+  return table;
+}
+
+async function seatLateRegistration(tournament, registration) {
+  if (tournament.status !== TOURNAMENT_STATUSES.LATE_REGISTRATION) return;
+  const target = [...tournament.tables.values()]
+    .filter((table) => table.seats.length < table.maxPlayers)
+    .sort((left, right) => left.seats.length - right.seats.length)[0];
+  if (target) {
+    joinTable(target, { ...registration, id: registration.userId, stack: tournament.startingStack });
+    maybeStartHand(target);
+  } else {
+    createTournamentTable(tournament, [registration], tournament.tables.size + 1);
+  }
+  await persistTournamentRuntime(tournament);
+}
+
+async function advanceRunningTournament(tournament, now) {
+  const level = currentBlindLevel(tournament, now);
+  if (level.level !== tournament.currentLevel) {
+    tournament.currentLevel = level.level;
+    for (const table of tournament.tables.values()) {
+      table.smallBlind = level.smallBlind;
+      table.bigBlind = level.bigBlind;
+      table.minRaise = level.bigBlind;
+      table.ante = level.ante;
+    }
+    await dbUpdateTournamentState(tournament);
+  }
+
+  const safeToMove = [...tournament.tables.values()].every((table) => ["waiting", "showdown", "starting"].includes(table.status));
+  if (!safeToMove) return;
+  const busted = [...tournament.tables.values()].flatMap((table) => table.seats
+    .filter((seat) => seat.stack <= 0)
+    .map((seat) => ({ table, seat })));
+  const survivors = activeTournamentPlayers(tournament).length;
+  for (const [index, { table, seat }] of busted.entries()) {
+    tournament.eliminations.push({
+      userId: seat.userId,
+      name: seat.name,
+      username: seat.username || "",
+      place: survivors + busted.length - index,
+      eliminatedAt: new Date(now).toISOString()
+    });
+    leaveTable(table, { id: seat.userId });
+  }
+
+  const active = activeTournamentPlayers(tournament);
+  if (active.length <= 1 && tournament.registrations.size >= tournament.minPlayers) {
+    await finishTournament(tournament, active[0], now);
+    return;
+  }
+  if (!active.length) return;
+
+  const desiredTables = Math.ceil(active.length / tournament.maxPlayersPerTable);
+  if (active.length <= tournament.maxPlayersPerTable && tournament.status === TOURNAMENT_STATUSES.RUNNING) {
+    applyTournamentTransition(tournament, "final_table", now);
+  }
+  const sizes = [...tournament.tables.values()].filter((table) => table.seats.length).map((table) => table.seats.length);
+  const needsBalance = sizes.length !== desiredTables || (sizes.length > 1 && Math.max(...sizes) - Math.min(...sizes) > 1);
+  if (needsBalance || tournament.status === TOURNAMENT_STATUSES.FINAL_TABLE && tournament.tables.size > 1) {
+    await rebuildTournamentTables(tournament, active);
+  } else {
+    await persistTournamentRuntime(tournament);
+  }
+}
+
+function activeTournamentPlayers(tournament) {
+  return [...tournament.tables.values()].flatMap((table) => table.seats)
+    .filter((seat) => seat.stack > 0)
+    .map((seat) => ({
+      userId: seat.userId,
+      name: seat.name,
+      username: seat.username || "",
+      photoUrl: seat.photoUrl || "",
+      stack: seat.stack
+    }));
+}
+
+async function rebuildTournamentTables(tournament, players) {
+  for (const table of tournament.tables.values()) {
+    tables.delete(table.id);
+    await deleteActiveTableSnapshot(table.id);
+  }
+  tournament.tables.clear();
+  const seating = balancedSeating(players, tournament.maxPlayersPerTable);
+  seating.forEach((group, index) => createTournamentTable(tournament, group.players, index + 1));
+  await persistTournamentRuntime(tournament);
+}
+
+async function finishTournament(tournament, winner, now) {
+  const rankedPlayers = [
+    { ...winner, place: 1 },
+    ...[...tournament.eliminations].sort((left, right) => left.place - right.place)
+  ];
+  const { prizePool, payouts } = calculateTournamentPayouts(tournament, rankedPlayers);
+  const payoutKey = `tournament-payout:${tournament.id}`;
+  const dbResult = await dbSettleTournament(tournament, rankedPlayers, payouts, payoutKey);
+  if (dbResult) {
+    for (const payout of payouts) {
+      if (tournament.balanceBucket === "cash") {
+        setCashWalletBalanceLocal(payout.userId, await getCashWallet(payout.userId));
+      } else {
+        setWalletBalanceLocal(payout.userId, await getWallet(payout.userId));
+      }
+      const sessionUser = userProfiles.get(String(payout.userId));
+      if (sessionUser) sessionUser.profile = await getProfileForUser(sessionUser);
+    }
+  } else {
+    for (const payout of payouts) {
+      const registration = tournament.registrations.get(String(payout.userId));
+      if (!registration || payout.amount <= 0) continue;
+      const payoutUser = {
+        id: String(payout.userId),
+        name: registration.name || "Player",
+        username: registration.username || "",
+        balance: getWalletLocal(String(payout.userId)),
+        cashBalanceMicros: getCashWalletLocal(String(payout.userId))
+      };
+      const record = tournament.balanceBucket === "cash" ? recordCashTransaction : recordTransaction;
+      await record(payoutUser, {
+        type: "credit",
+        category: "tournament_payout",
+        title: "Приз турнира",
+        amount: payout.amount,
+        meta: `${tournament.title} · место ${payout.place}`,
+        idempotencyKey: `${payoutKey}:${payout.userId}`
+      });
+    }
+    for (const result of rankedPlayers) {
+      applyMemoryTournamentResult({ id: result.userId }, tournament, {
+        ...result,
+        amount: payouts.find((payout) => String(payout.userId) === String(result.userId))?.amount || 0
+      });
+    }
+  }
+  tournament.results = rankedPlayers.map((result) => ({
+    ...result,
+    prizeAmount: payouts.find((payout) => String(payout.userId) === String(result.userId))?.amount || 0
+  }));
+  tournament.prizePool = prizePool;
+  applyTournamentTransition(tournament, "finish", now);
+  for (const table of tournament.tables.values()) {
+    tables.delete(table.id);
+    await deleteActiveTableSnapshot(table.id);
+  }
+  tournament.tables.clear();
+  await dbUpdateTournamentState(tournament);
+}
+
+async function cancelTournamentAndRefund(tournament, now) {
+  for (const registration of [...tournament.registrations.values()]) {
+    const user = {
+      id: String(registration.userId),
+      name: registration.name || "Player",
+      username: registration.username || "",
+      balance: getWalletLocal(String(registration.userId)),
+      cashBalanceMicros: getCashWalletLocal(String(registration.userId))
+    };
+    await cancelTournamentRegistration(tournament, user, `tournament-cancel:${tournament.id}:${user.id}`);
+  }
+  applyTournamentTransition(tournament, "cancel", now);
+  await dbUpdateTournamentState(tournament);
+}
+
+async function persistTournamentRuntime(tournament) {
+  await dbUpdateTournamentState(tournament);
+  await dbSaveTournamentTables(tournament.id, [...tournament.tables.values()].map((table) => ({
+    id: table.id,
+    tableNumber: table.tournamentTableNumber,
+    smallBlind: table.smallBlind,
+    bigBlind: table.bigBlind,
+    ante: table.ante || 0,
+    seats: table.seats.map((seat) => ({ userId: seat.userId, stack: seat.stack }))
+  })));
+}
+
+function tournamentPlayerState(tournament, userId) {
+  const id = String(userId);
+  const result = tournament.results.find((entry) => String(entry.userId) === id);
+  if (result) return { status: "finished", place: result.place, prizeAmount: result.prizeAmount || 0 };
+  const table = [...tournament.tables.values()].find((candidate) => candidate.seats.some((seat) => String(seat.userId) === id));
+  if (table) return { status: "playing", tableId: table.id };
+  const eliminated = tournament.eliminations.find((entry) => String(entry.userId) === id);
+  if (eliminated) return { status: "eliminated", place: eliminated.place };
+  if (tournament.registrations.has(id)) return { status: "registered" };
+  return null;
+}
+
+function memoryTournamentHistory(userId) {
+  return [...tournaments.values()].flatMap((tournament) => tournament.results
+    .filter((result) => String(result.userId) === String(userId))
+    .map((result) => ({
+      tournamentId: tournament.id,
+      title: tournament.title,
+      type: tournament.type,
+      status: tournament.status,
+      place: result.place,
+      prizeAmount: result.prizeAmount || 0,
+      balanceBucket: tournament.balanceBucket,
+      finishedAt: tournament.finishedAt
+    })));
+}
+
+function applyMemoryTournamentResult(user, tournament, payout) {
+  const profile = userProfiles.get(String(user.id))?.profile || defaultPlayerProfile();
+  profile.tournamentItm += payout.amount > 0 ? 1 : 0;
+  profile.tournamentFinalTables += payout.place <= tournament.maxPlayersPerTable ? 1 : 0;
+  profile.tournamentWins += payout.place === 1 ? 1 : 0;
+  if (tournament.balanceBucket === "cash") {
+    profile.tournamentCashPrizeWonMicros += payout.amount;
+  } else {
+    profile.tournamentPrizeWon += payout.amount;
+    profile.tournamentPlayPrizeWon += payout.amount;
+  }
+  if (tournament.type === "sng") {
+    profile.sngPlayed += 1;
+    profile.sngWins += payout.place === 1 ? 1 : 0;
+    if (tournament.balanceBucket === "cash") profile.sngCashPrizeWonMicros += payout.amount;
+    else {
+      profile.sngPrizeWon += payout.amount;
+      profile.sngPlayPrizeWon += payout.amount;
+    }
+  }
+  const stored = userProfiles.get(String(user.id));
+  if (stored) stored.profile = profile;
+}
+
 async function hydrateTournamentRegistrations() {
-  const rows = await dbListTournamentRegistrations([...tournaments.keys()]);
+  const tournamentIds = [...tournaments.keys()];
+  const [rows, states] = await Promise.all([
+    dbListTournamentRegistrations(tournamentIds),
+    dbListTournamentStates(tournamentIds)
+  ]);
   if (!rows) return;
 
   for (const tournament of tournaments.values()) {
@@ -2801,6 +3213,26 @@ async function hydrateTournamentRegistrations() {
       registeredAt: row.registeredAt
     });
   }
+  for (const state of states || []) {
+    const tournament = tournaments.get(state.id);
+    if (!tournament) continue;
+    Object.assign(tournament, {
+      status: state.status,
+      startsAt: state.startsAt,
+      registrationOpensAt: state.registrationOpensAt,
+      lateRegEndsAt: state.lateRegEndsAt,
+      currentLevel: state.currentLevel,
+      startedAt: state.startedAt,
+      finishedAt: state.finishedAt,
+      cancelledAt: state.cancelledAt,
+      eliminations: state.eliminations || [],
+      results: state.results || []
+    });
+  }
+  for (const table of tables.values()) {
+    if (!table.tournamentId) continue;
+    tournaments.get(table.tournamentId)?.tables.set(table.id, table);
+  }
 }
 
 function tournamentView(tournament, user) {
@@ -2812,6 +3244,8 @@ function tournamentView(tournament, user) {
     title: tournament.title,
     type: tournament.type,
     status: tournament.status,
+    balanceBucket: tournament.balanceBucket,
+    currency: tournament.balanceBucket === "cash" ? "USDT" : "PLAY_CHIPS",
     buyIn: tournament.buyIn,
     fee: tournament.fee,
     totalCost,
@@ -2819,28 +3253,30 @@ function tournamentView(tournament, user) {
     participants,
     prizePool,
     startsAt: tournament.startsAt,
+    lateRegEndsAt: tournament.lateRegEndsAt,
+    structure: tournament.structure,
+    currentLevel: tournament.currentLevel,
+    currentBlinds: tournament.startedAt ? currentBlindLevel(tournament) : tournament.structure[0],
+    playerState: tournamentPlayerState(tournament, user.id),
+    results: tournament.results,
+    tableIds: [...tournament.tables.keys()],
     registered: tournament.registrations.has(user.id),
-    canRegister: tournament.status === "registering" && participants < tournament.maxPlayers && !tournament.registrations.has(user.id),
-    canCancel: tournament.status === "registering" && tournament.registrations.has(user.id)
+    canRegister: registrationAllowed(tournament, user.id),
+    canCancel: cancellationAllowed(tournament, user.id)
   };
 }
 
 async function registerTournament(tournament, user, idempotencyKey = "") {
-  if (tournament.status !== "registering") {
+  if (!registrationAllowed(tournament, user.id)) {
     const error = new Error("Регистрация на турнир пока закрыта");
     error.status = 409;
     throw error;
   }
-  if (tournament.registrations.has(user.id)) return;
-  if (tournament.registrations.size >= tournament.maxPlayers) {
-    const error = new Error("Турнир уже заполнен");
-    error.status = 409;
-    throw error;
-  }
-
   const totalCost = tournament.buyIn + tournament.fee;
-  if (user.balance < totalCost) {
-    const error = new Error(`Недостаточно chips для регистрации. Нужно ${formatNumber(totalCost)} chips`);
+  const availableBalance = tournament.balanceBucket === "cash" ? user.cashBalanceMicros : user.balance;
+  if (availableBalance < totalCost) {
+    const formatted = tournament.balanceBucket === "cash" ? `${formatUsdtMicros(totalCost)} USDT` : `${formatNumber(totalCost)} chips`;
+    const error = new Error(`Недостаточно средств для регистрации. Нужно ${formatted}`);
     error.status = 409;
     throw error;
   }
@@ -2848,9 +3284,14 @@ async function registerTournament(tournament, user, idempotencyKey = "") {
   const registeredAt = new Date().toISOString();
   const dbResult = await dbRegisterTournament(user.id, tournament, "telegram", idempotencyKey);
   if (dbResult) {
-    user.balance = setWalletBalanceLocal(user.id, dbResult.balance);
+    if (tournament.balanceBucket === "cash") {
+      user.cashBalanceMicros = setCashWalletBalanceLocal(user.id, dbResult.cashBalanceMicros);
+    } else {
+      user.balance = setWalletBalanceLocal(user.id, dbResult.balance);
+    }
   } else {
-    user.balance = await recordTransaction(user, {
+    const record = tournament.balanceBucket === "cash" ? recordCashTransaction : recordTransaction;
+    const balance = await record(user, {
       type: "debit",
       category: "tournament_buyin",
       title: "Вход в турнир",
@@ -2858,6 +3299,8 @@ async function registerTournament(tournament, user, idempotencyKey = "") {
       meta: `${tournament.title} · бай-ин ${formatNumber(tournament.buyIn)} + fee ${formatNumber(tournament.fee)}`,
       idempotencyKey
     });
+    if (tournament.balanceBucket === "cash") user.cashBalanceMicros = balance;
+    else user.balance = balance;
   }
 
   tournament.registrations.set(user.id, {
@@ -2866,13 +3309,36 @@ async function registerTournament(tournament, user, idempotencyKey = "") {
     username: user.username,
     registeredAt
   });
+  if (tournament.status === TOURNAMENT_STATUSES.LATE_REGISTRATION) {
+    await seatLateRegistration(tournament, tournament.registrations.get(user.id));
+  }
   applyMemoryTournamentRegistration(user, tournament, "register");
+  await recordPlatformLedger({
+    type: "credit",
+    category: "tournament_fee",
+    title: "Комиссия турнира",
+    amount: tournament.fee,
+    contextId: tournament.id,
+    meta: tournament.title,
+    idempotencyKey: idempotencyKey ? `fee:${idempotencyKey}` : "",
+    asset: tournament.balanceBucket === "cash" ? "USDT" : "PLAY_CHIPS",
+    balanceBucket: tournament.balanceBucket
+  });
   await recordFundMovement(user, {
-    id: idempotencyKey ? `move_${idempotencyKey}` : undefined,
+    id: idempotencyKey ? `move_buyin_${idempotencyKey}` : undefined,
     category: "wallet_to_tournament_escrow",
-    from: "wallet",
+    from: tournament.balanceBucket === "cash" ? "cash_wallet" : "play_wallet",
     to: "tournament_escrow",
-    amount: totalCost,
+    amount: tournament.buyIn,
+    contextId: tournament.id,
+    meta: tournament.title
+  });
+  await recordFundMovement(user, {
+    id: idempotencyKey ? `move_fee_${idempotencyKey}` : undefined,
+    category: "wallet_to_tournament_fee",
+    from: tournament.balanceBucket === "cash" ? "cash_wallet" : "play_wallet",
+    to: "platform_fee",
+    amount: tournament.fee,
     contextId: tournament.id,
     meta: tournament.title
   });
@@ -2880,16 +3346,16 @@ async function registerTournament(tournament, user, idempotencyKey = "") {
     user,
     lines: [
       `Турнир: ${tournament.title}`,
-      `Стоимость: ${formatNumber(totalCost)} chips`,
+      `Стоимость: ${tournament.balanceBucket === "cash" ? `${formatUsdtMicros(totalCost)} USDT` : `${formatNumber(totalCost)} chips`}`,
       `Участников: ${tournament.registrations.size}/${tournament.maxPlayers}`,
-      `Баланс: ${formatNumber(user.balance)} chips`
+      `Баланс: ${tournament.balanceBucket === "cash" ? `${formatUsdtMicros(user.cashBalanceMicros)} USDT` : `${formatNumber(user.balance)} chips`}`
     ]
   });
   await trackAnalytics("tournament_register", {
     user,
     category: "tournament",
     amount: totalCost,
-    asset: "PLAY_CHIPS",
+    asset: tournament.balanceBucket === "cash" ? "USDT" : "PLAY_CHIPS",
     contextId: tournament.id,
     meta: {
       title: tournament.title,
@@ -2902,7 +3368,7 @@ async function registerTournament(tournament, user, idempotencyKey = "") {
 
 async function cancelTournamentRegistration(tournament, user, idempotencyKey = "") {
   if (!tournament.registrations.has(user.id)) return;
-  if (tournament.status !== "registering") {
+  if (!cancellationAllowed(tournament, user.id)) {
     const error = new Error("Отменить регистрацию уже нельзя");
     error.status = 409;
     throw error;
@@ -2911,9 +3377,14 @@ async function cancelTournamentRegistration(tournament, user, idempotencyKey = "
   const totalCost = tournament.buyIn + tournament.fee;
   const dbResult = await dbCancelTournamentRegistration(user.id, tournament, "telegram", idempotencyKey);
   if (dbResult) {
-    user.balance = setWalletBalanceLocal(user.id, dbResult.balance);
+    if (tournament.balanceBucket === "cash") {
+      user.cashBalanceMicros = setCashWalletBalanceLocal(user.id, dbResult.cashBalanceMicros);
+    } else {
+      user.balance = setWalletBalanceLocal(user.id, dbResult.balance);
+    }
   } else {
-    user.balance = await recordTransaction(user, {
+    const record = tournament.balanceBucket === "cash" ? recordCashTransaction : recordTransaction;
+    const balance = await record(user, {
       type: "credit",
       category: "tournament_refund",
       title: "Возврат турнирного бай-ина",
@@ -2921,15 +3392,37 @@ async function cancelTournamentRegistration(tournament, user, idempotencyKey = "
       meta: tournament.title,
       idempotencyKey
     });
+    if (tournament.balanceBucket === "cash") user.cashBalanceMicros = balance;
+    else user.balance = balance;
   }
   tournament.registrations.delete(user.id);
   applyMemoryTournamentRegistration(user, tournament, "cancel");
+  await recordPlatformLedger({
+    type: "debit",
+    category: "tournament_fee_refund",
+    title: "Возврат комиссии турнира",
+    amount: tournament.fee,
+    contextId: tournament.id,
+    meta: tournament.title,
+    idempotencyKey: idempotencyKey ? `fee-refund:${idempotencyKey}` : "",
+    asset: tournament.balanceBucket === "cash" ? "USDT" : "PLAY_CHIPS",
+    balanceBucket: tournament.balanceBucket
+  });
   await recordFundMovement(user, {
-    id: idempotencyKey ? `move_${idempotencyKey}` : undefined,
+    id: idempotencyKey ? `move_buyin_refund_${idempotencyKey}` : undefined,
     category: "tournament_escrow_to_wallet",
     from: "tournament_escrow",
-    to: "wallet",
-    amount: totalCost,
+    to: tournament.balanceBucket === "cash" ? "cash_wallet" : "play_wallet",
+    amount: tournament.buyIn,
+    contextId: tournament.id,
+    meta: tournament.title
+  });
+  await recordFundMovement(user, {
+    id: idempotencyKey ? `move_fee_refund_${idempotencyKey}` : undefined,
+    category: "tournament_fee_to_wallet",
+    from: "platform_fee",
+    to: tournament.balanceBucket === "cash" ? "cash_wallet" : "play_wallet",
+    amount: tournament.fee,
     contextId: tournament.id,
     meta: tournament.title
   });
@@ -2937,15 +3430,15 @@ async function cancelTournamentRegistration(tournament, user, idempotencyKey = "
     user,
     lines: [
       `Турнир: ${tournament.title}`,
-      `Возврат: ${formatNumber(totalCost)} chips`,
-      `Баланс: ${formatNumber(user.balance)} chips`
+      `Возврат: ${tournament.balanceBucket === "cash" ? `${formatUsdtMicros(totalCost)} USDT` : `${formatNumber(totalCost)} chips`}`,
+      `Баланс: ${tournament.balanceBucket === "cash" ? `${formatUsdtMicros(user.cashBalanceMicros)} USDT` : `${formatNumber(user.balance)} chips`}`
     ]
   });
   await trackAnalytics("tournament_cancel", {
     user,
     category: "tournament",
     amount: totalCost,
-    asset: "PLAY_CHIPS",
+    asset: tournament.balanceBucket === "cash" ? "USDT" : "PLAY_CHIPS",
     contextId: tournament.id,
     meta: { title: tournament.title }
   });
@@ -2958,10 +3451,19 @@ function applyMemoryTournamentRegistration(user, tournament, action) {
   const sign = action === "cancel" ? -1 : 1;
   profile.tournamentsPlayed = Math.max(0, Number(profile.tournamentsPlayed || 0) + sign);
   profile.tournamentEntries = Math.max(0, Number(profile.tournamentEntries || 0) + sign);
-  profile.tournamentFeesPaid = Math.max(0, Number(profile.tournamentFeesPaid || 0) + sign * Number(tournament.fee || 0));
+  if (tournament.balanceBucket === "cash") {
+    profile.tournamentCashFeesPaidMicros = Math.max(0, Number(profile.tournamentCashFeesPaidMicros || 0) + sign * Number(tournament.fee || 0));
+  } else {
+    profile.tournamentFeesPaid = Math.max(0, Number(profile.tournamentFeesPaid || 0) + sign * Number(tournament.fee || 0));
+    profile.tournamentPlayFeesPaid = Math.max(0, Number(profile.tournamentPlayFeesPaid || 0) + sign * Number(tournament.fee || 0));
+  }
   if (tournament.type === "sit_and_go" || tournament.type === "sng") {
-    profile.sngPlayed = Math.max(0, Number(profile.sngPlayed || 0) + sign);
-    profile.sngFeesPaid = Math.max(0, Number(profile.sngFeesPaid || 0) + sign * Number(tournament.fee || 0));
+    if (tournament.balanceBucket === "cash") {
+      profile.sngCashFeesPaidMicros = Math.max(0, Number(profile.sngCashFeesPaidMicros || 0) + sign * Number(tournament.fee || 0));
+    } else {
+      profile.sngFeesPaid = Math.max(0, Number(profile.sngFeesPaid || 0) + sign * Number(tournament.fee || 0));
+      profile.sngPlayFeesPaid = Math.max(0, Number(profile.sngPlayFeesPaid || 0) + sign * Number(tournament.fee || 0));
+    }
   }
   profileUser.profile = profile;
 }
@@ -3707,7 +4209,9 @@ async function handleAdminWithdrawalAction({ admin, withdrawalId, action, reason
       amount: order.feeUsdtMicros,
       contextId: order.id,
       meta: `${order.method} · gross ${order.grossUsdtMicros} · payout ${order.payoutUsdtMicros}`,
-      idempotencyKey: `withdrawal:${order.id}:fee`
+      idempotencyKey: `withdrawal:${order.id}:fee`,
+      asset: "USDT",
+      balanceBucket: "cash"
     });
   }
   notifyWithdrawalReviewed(adminProfile, reviewed, normalizedReason);
@@ -4501,8 +5005,11 @@ function formatNumber(value) {
 
 function tableView(table, user) {
   const view = publicTable(table, user.id);
+  view.tournamentId = table.tournamentId || null;
+  view.tournamentTableNumber = table.tournamentTableNumber || null;
+  view.ante = table.ante || 0;
   view.viewer.balance = tableWalletBalance(user, table);
-  view.viewer.canBuyIn = view.viewer.canBuyIn && view.viewer.balance > 0;
+  view.viewer.canBuyIn = !table.tournamentId && view.viewer.canBuyIn && view.viewer.balance > 0;
   return view;
 }
 
