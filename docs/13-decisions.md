@@ -1,10 +1,24 @@
 # QWZ Decisions
 
+## 2026-06-20: Tournament policy correction — no spontaneous play-chip tournaments
+
+**Зона:** product
+
+**Решение:** Обычная турнирная система в QWZ работает только как cash-турниры и cash SNG. Play chips не используются как вход в спонтанные турниры и не получают отдельную турнирную сетку. Использование play-мира для турниров допускается только в виде отдельного сезонного reward-формата: после завершения рейтингового сезона топы лидерборда получают билеты, и по этим билетам запускаются специальные приглашённые турниры/фрироллы. Билеты выдаются по местам в лидерборде, а не через свободный buy-in.
+
+**Почему:** Play chips — отдельная free-to-play валюта для рейтинга и удержания, а не турнирная валюта. Смешивание её с обычными турнирами ломает продуктовую логику и создаёт нежелательный UX.
+
+**Влияет на:** tournament product scope, `MASTER_SPEC.md`, `docs/TECH_ROADMAP.md`, tournament admin flow, reward tournaments, leaderboard rewards.
+
+**Что обновлено:** Зафиксирован запрет на spontaneous play-chip tournaments и введён отдельный сезонный ticket-based reward tournament flow.
+
+**Открытые вопросы:** Формат reward-турниров после сезона: cash freeroll, ticketed entry в cash MTT или отдельная серия; это решается отдельно.
+
 ## 2026-06-20: Tournament runtime MVP и разделение cash/play
 
 **Зона:** product / architecture / economy / development
 
-**Решение:** Турнирный MVP реализуется в текущем Node.js монолите для MTT и базового SNG. Канонический state machine: `created`, `registration_open`, `late_registration`, `running`, `final_table`, `finished`, `cancelled`. Scheduler запускает MTT по времени, SNG по заполнению, управляет blind clock, посадкой, балансировкой и финальным столом. Каждый турнир имеет явный `balanceBucket`: cash-турнир списывает и выплачивает только `cash_usdt_micros`, play-турнир — только PLAY_CHIPS. Buy-in и fee разделены: buy-in является турнирным escrow, fee сразу отражается в platform ledger; отмена до старта реверсирует обе части. Payout выполняется одной PostgreSQL-транзакцией и идемпотентен.
+**Решение:** Турнирный MVP реализуется в текущем Node.js монолите для MTT и базового SNG. Канонический state machine: `created`, `registration_open`, `late_registration`, `running`, `final_table`, `finished`, `cancelled`. Scheduler запускает MTT по времени, SNG по заполнению, управляет blind clock, посадкой, балансировкой и финальным столом. Обычные турниры работают только в cash-логике: списание и выплата идут через `cash_usdt_micros`, а play chips в обычный tournament buy-in не участвуют. Сезонные reward-турниры по билетам считаются отдельным продуктовым потоком и не смешиваются с базовым tournament runtime. Buy-in и fee разделены: buy-in является турнирным escrow, fee сразу отражается в platform ledger; отмена до старта реверсирует обе части. Payout выполняется одной PostgreSQL-транзакцией и идемпотентен.
 
 **Почему:** Старый backend поддерживал только регистрацию и смешивал fee с escrow. Полноценный runtime требует персистентного состояния и строгого запрета создавать cash из play-баланса.
 
@@ -12,7 +26,7 @@
 
 **Что обновлено:** Добавлены MTT/SNG runtime, scheduler, secure seating, late registration, blind levels/ante, no-rake tournament hands, table balancing, final table, atomic payout, history API, bucket-specific fee/prize stats и тесты.
 
-**Открытые вопросы:** Re-entry/add-on, freeroll, satellites, bounty, series и отдельный tournament time-bank отложены на следующую итерацию.
+**Открытые вопросы:** Re-entry/add-on, freeroll, satellites, bounty, series, отдельный tournament time-bank и post-season ticket reward tournaments отложены на следующую итерацию.
 
 ## 2026-06-19: Daily play-chip claim в рейтинговом режиме
 
@@ -77,3 +91,13 @@
 **Влияет на:** `public/app.js`, `/api/play/daily-claim`, lobby rating hero-card, play-mode empty-balance CTA.
 **Что обновлено:** `public/app.js`, `tests/frontend-mode.test.js`, `docs/13-decisions.md`.
 **Открытые вопросы:** Отдельный streak/multiday bonus по-прежнему не нужен; если появится, backend должен расширить `dailyPlayClaim`, а не перекладывать расчёт на frontend.
+
+## 2026-06-20: Tournament frontend split between cash lobby and reward tickets
+
+**Зона:** frontend
+
+**Решение:** Обычный пользовательский `tournaments` lobby feed трактуется как cash-only витрина: фронтенд показывает только турниры с `currency=USDT`, рендерит `buyIn/fee/prizePool/participants/status/canRegister/canCancel/playerState` только из API и не смешивает их с play chips, rating chips или ticket-входами. Reward tournaments и tickets выводятся отдельно от обычного lobby feed и не маскируются под денежные buy-in турниры. В admin UI действия по турниру строятся из `tournament.actions` backend endpoint, а create/edit форма отправляет серверу полный набор полей турнира.
+**Почему:** Backend зафиксировал публичные турниры как cash-only продуктовую механику. Если оставить mixed-mode рендер, UI будет вводить игрока в заблуждение насчёт валюты входа и доступности регистрации.
+**Влияет на:** `public/app.js`, `public/index.html`, `public/lobby-qa.css`, admin tournament controls, reward event presentation.
+**Что обновлено:** Публичные cash tournament cards, мягкая обработка `409`, disable во время request, admin tournament management tab, reward tournament list, регрессионные фронтенд-тесты.
+**Открытые вопросы:** Для пользовательского reward flow нужен отдельный публичный endpoint; текущий фронт готов держать reward events отдельно, но публично их не показывает, пока backend не выдаёт `rewardTournaments` вне admin API.

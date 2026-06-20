@@ -638,6 +638,7 @@
                 <button type="button" class="active" data-admin-tab="overview">Метрики</button>
                 <button type="button" data-admin-tab="users">Игроки</button>
                 <button type="button" data-admin-tab="finance">Финансы</button>
+                <button type="button" data-admin-tab="tournaments">Турниры</button>
                 <button type="button" data-admin-tab="gameplay">Игра</button>
                 <button type="button" data-admin-tab="risk">Риски</button>
                 <button type="button" data-admin-tab="settings">Система</button>
@@ -753,6 +754,74 @@
                   <span>audit</span>
                 </div>
                 <div class="cashier-history" id="adminFundMovements"></div>
+              </section>
+            </section>
+
+            <section class="admin-panel" data-admin-panel="tournaments">
+              <section class="lobby-card">
+                <div class="section-title">
+                  <div>
+                    <p class="eyebrow">Cash tournaments</p>
+                    <h2>Создать и редактировать</h2>
+                  </div>
+                  <span id="adminTournamentFormMeta">cash-only</span>
+                </div>
+                <form class="admin-form admin-tournament-form" id="adminTournamentForm">
+                  <input id="adminTournamentId" type="hidden" />
+                  <input id="adminTournamentTitle" placeholder="Название" />
+                  <select id="adminTournamentType">
+                    <option value="mtt">MTT</option>
+                    <option value="sng">SNG</option>
+                  </select>
+                  <input id="adminTournamentBuyIn" inputmode="numeric" placeholder="Buy-in (USDT micros)" />
+                  <input id="adminTournamentFee" inputmode="numeric" placeholder="Fee (USDT micros)" />
+                  <input id="adminTournamentStartsAt" type="datetime-local" />
+                  <label class="admin-checkbox"><input id="adminTournamentRegistrationOpen" type="checkbox" /> Регистрация открыта сразу</label>
+                  <input id="adminTournamentLateRegMinutes" inputmode="numeric" placeholder="Late reg minutes" />
+                  <input id="adminTournamentMaxPlayers" inputmode="numeric" placeholder="Max players" />
+                  <input id="adminTournamentMinPlayers" inputmode="numeric" placeholder="Min players" />
+                  <textarea id="adminTournamentBlindStructure" rows="4" placeholder='blindStructure JSON'></textarea>
+                  <textarea id="adminTournamentPayoutStructure" rows="3" placeholder='payoutStructure JSON'></textarea>
+                  <input id="adminTournamentReEntryLimit" inputmode="numeric" placeholder="reEntryLimit" />
+                  <label class="admin-checkbox"><input id="adminTournamentAddOnAllowed" type="checkbox" /> Add-on allowed</label>
+                  <textarea id="adminTournamentDescription" rows="3" placeholder="Описание"></textarea>
+                  <select id="adminTournamentStatus">
+                    <option value="created">created</option>
+                    <option value="registration_open">registration_open</option>
+                    <option value="late_registration">late_registration</option>
+                    <option value="running">running</option>
+                    <option value="final_table">final_table</option>
+                    <option value="finished">finished</option>
+                    <option value="cancelled">cancelled</option>
+                  </select>
+                  <div class="admin-form-actions">
+                    <button type="submit" id="adminTournamentSubmit">Создать турнир</button>
+                    <button type="button" id="adminTournamentReset">Сбросить</button>
+                  </div>
+                </form>
+                <div class="cashier-status" id="adminTournamentStatus" role="status"></div>
+              </section>
+
+              <section class="lobby-card">
+                <div class="section-title">
+                  <div>
+                    <p class="eyebrow">Lobby</p>
+                    <h2>Обычные турниры</h2>
+                  </div>
+                  <span id="adminTournamentCount">0</span>
+                </div>
+                <div class="admin-tournament-list" id="adminTournamentList"></div>
+              </section>
+
+              <section class="lobby-card">
+                <div class="section-title">
+                  <div>
+                    <p class="eyebrow">Season rewards</p>
+                    <h2>Reward tournaments</h2>
+                  </div>
+                  <span id="adminRewardTournamentCount">0</span>
+                </div>
+                <div class="admin-reward-tournament-list" id="adminRewardTournamentList"></div>
               </section>
             </section>
 

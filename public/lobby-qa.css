@@ -239,6 +239,168 @@ body:not(.in-game) .tournament-history-item > b {
   text-align: right !important;
 }
 
+html.admin-mode .admin-tournament-form {
+  display: grid !important;
+  gap: 10px !important;
+}
+
+html.admin-mode .admin-tournament-form textarea,
+html.admin-mode .admin-tournament-form input,
+html.admin-mode .admin-tournament-form select {
+  width: 100% !important;
+  min-height: 42px !important;
+  border-radius: 12px !important;
+}
+
+html.admin-mode .admin-checkbox {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  color: var(--qwz-ink) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+html.admin-mode .admin-form-actions {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+html.admin-mode .admin-tournament-list,
+html.admin-mode .admin-reward-tournament-list {
+  display: grid !important;
+  gap: 10px !important;
+}
+
+html.admin-mode .admin-tournament-card,
+html.admin-mode .admin-reward-card {
+  display: grid !important;
+  gap: 10px !important;
+  padding: 12px !important;
+  border-radius: 16px !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid var(--qwz-line-strong) !important;
+}
+
+html.admin-mode .admin-tournament-head {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+}
+
+html.admin-mode .admin-tournament-head > div,
+html.admin-mode .admin-reward-card > div:first-child {
+  display: grid !important;
+  gap: 3px !important;
+}
+
+html.admin-mode .admin-tournament-head span,
+html.admin-mode .admin-reward-card span {
+  color: var(--qwz-dim) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+}
+
+html.admin-mode .admin-tournament-head strong,
+html.admin-mode .admin-reward-card strong {
+  color: var(--qwz-ink) !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+}
+
+html.admin-mode .admin-tournament-head small,
+html.admin-mode .admin-reward-card small {
+  color: var(--qwz-dim) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+html.admin-mode .admin-tournament-meta,
+html.admin-mode .admin-reward-meta,
+html.admin-mode .admin-tournament-payouts {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+html.admin-mode .admin-tournament-meta span,
+html.admin-mode .admin-reward-meta span,
+html.admin-mode .admin-tournament-payouts > div {
+  display: grid !important;
+  gap: 3px !important;
+  padding: 9px 10px !important;
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.035) !important;
+  color: var(--qwz-dim) !important;
+  font-size: 11px !important;
+}
+
+html.admin-mode .admin-tournament-meta strong,
+html.admin-mode .admin-reward-meta strong,
+html.admin-mode .admin-tournament-payouts strong {
+  color: var(--qwz-ink) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+html.admin-mode .admin-tournament-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+
+html.admin-mode .admin-tournament-actions button,
+html.admin-mode .admin-tournament-head button,
+html.admin-mode .admin-reward-card button {
+  min-height: 36px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+html.admin-mode .admin-tournament-details {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+html.admin-mode .admin-tournament-details summary {
+  cursor: pointer !important;
+  color: var(--qwz-ink) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+html.admin-mode .admin-tournament-participants {
+  display: grid !important;
+  gap: 6px !important;
+}
+
+html.admin-mode .admin-tournament-participants > div {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  padding: 8px 10px !important;
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+html.admin-mode .admin-tournament-participants span {
+  color: var(--qwz-ink) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+html.admin-mode .admin-tournament-participants small {
+  color: var(--qwz-dim) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+}
+
 body:not(.in-game) .home-wallet {
   grid-template-columns: 44px minmax(0, 1fr) 108px !important;
   grid-template-areas: "ava ident side" "bal bal side" "act act act" !important;

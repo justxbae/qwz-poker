@@ -26,6 +26,9 @@ const state = {
   dailyPlayClaim: null,
   homeStats: null,
   tournamentHistory: [],
+  adminTournaments: [],
+  adminRewardTournaments: [],
+  selectedAdminTournamentId: "",
   gameMode: "cash",
   selectedSmallBlind: 25,
   tables: [],
@@ -132,6 +135,31 @@ const profileTournamentStats = document.querySelector("#profileTournamentStats")
 const profileTournamentHistory = document.querySelector("#profileTournamentHistory");
 const profileTournamentSummary = document.querySelector("#profileTournamentSummary");
 const adminNavButton = document.querySelector(".admin-nav-button");
+const adminTournamentForm = document.querySelector("#adminTournamentForm");
+const adminTournamentId = document.querySelector("#adminTournamentId");
+const adminTournamentTitle = document.querySelector("#adminTournamentTitle");
+const adminTournamentType = document.querySelector("#adminTournamentType");
+const adminTournamentBuyIn = document.querySelector("#adminTournamentBuyIn");
+const adminTournamentFee = document.querySelector("#adminTournamentFee");
+const adminTournamentStartsAt = document.querySelector("#adminTournamentStartsAt");
+const adminTournamentRegistrationOpen = document.querySelector("#adminTournamentRegistrationOpen");
+const adminTournamentLateRegMinutes = document.querySelector("#adminTournamentLateRegMinutes");
+const adminTournamentMaxPlayers = document.querySelector("#adminTournamentMaxPlayers");
+const adminTournamentMinPlayers = document.querySelector("#adminTournamentMinPlayers");
+const adminTournamentBlindStructure = document.querySelector("#adminTournamentBlindStructure");
+const adminTournamentPayoutStructure = document.querySelector("#adminTournamentPayoutStructure");
+const adminTournamentReEntryLimit = document.querySelector("#adminTournamentReEntryLimit");
+const adminTournamentAddOnAllowed = document.querySelector("#adminTournamentAddOnAllowed");
+const adminTournamentDescription = document.querySelector("#adminTournamentDescription");
+const adminTournamentStatusInput = document.querySelector("#adminTournamentStatus");
+const adminTournamentSubmit = document.querySelector("#adminTournamentSubmit");
+const adminTournamentReset = document.querySelector("#adminTournamentReset");
+const adminTournamentUiStatus = document.querySelector("#adminTournamentStatus");
+const adminTournamentFormMeta = document.querySelector("#adminTournamentFormMeta");
+const adminTournamentCount = document.querySelector("#adminTournamentCount");
+const adminRewardTournamentCount = document.querySelector("#adminRewardTournamentCount");
+const adminTournamentList = document.querySelector("#adminTournamentList");
+const adminRewardTournamentList = document.querySelector("#adminRewardTournamentList");
 const adminRefreshButton = document.querySelector("#adminRefreshButton");
 const adminOperationalStatus = document.querySelector("#adminOperationalStatus");
 const adminBankrollTotal = document.querySelector("#adminBankrollTotal");
@@ -277,6 +305,8 @@ let queuedPreActionKey = "";
 let pendingBetAction = "";
 let pendingBuyIn = null;
 let pendingDailyPlayClaim = false;
+const pendingTournamentRequests = new Set();
+const pendingAdminTournamentRequests = new Set();
 let currentLobbyTab = "home";
 let fairnessSeedSyncing = false;
 const fairnessSeedSyncedTables = new Set();
@@ -297,6 +327,7 @@ async function boot() {
   await loadConfig();
   await loadTables();
   await loadProfile();
+  resetAdminTournamentForm();
   setupScrollReveal();
   setupPromoCarousel();
   if (ADMIN_MODE) {
@@ -340,8 +371,15 @@ async function boot() {
     event.preventDefault();
     runAction(adjustAdminPlayerWallet);
   });
+  adminTournamentForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    runAction(saveAdminTournament);
+  });
+  adminTournamentReset?.addEventListener("click", resetAdminTournamentForm);
   adminRecentPayments?.addEventListener("click", onAdminPaymentAction);
   adminRecentWithdrawals?.addEventListener("click", onAdminWithdrawalAction);
+  adminTournamentList?.addEventListener("click", onAdminTournamentAction);
+  adminRewardTournamentList?.addEventListener("click", onAdminRewardTournamentAction);
   adminPaymentFilter?.addEventListener("change", () => runAction(loadAdminDashboard));
   adminRefreshButton?.addEventListener("click", () => runAction(loadAdminDashboard));
   document.querySelectorAll("[data-admin-tab]").forEach((button) => {
@@ -1648,9 +1686,7 @@ function tournamentStatsSnapshot(profileData = {}) {
     itm: Number(stats.itm ?? profile.tournamentItm ?? 0),
     finalTables: Number(stats.finalTables ?? profile.tournamentFinalTables ?? 0),
     wins: Number(stats.wins ?? profile.tournamentWins ?? 0),
-    playFeesPaid: Number(stats.playFeesPaid ?? profile.tournamentPlayFeesPaid ?? profile.tournamentFeesPaid ?? 0),
     cashFeesPaidMicros: Number(stats.cashFeesPaidMicros ?? profile.tournamentCashFeesPaidMicros ?? 0),
-    playPrizeWon: Number(stats.playPrizeWon ?? profile.tournamentPlayPrizeWon ?? profile.tournamentPrizeWon ?? 0),
     cashPrizeWonMicros: Number(stats.cashPrizeWonMicros ?? profile.tournamentCashPrizeWonMicros ?? 0)
   };
 }
@@ -1667,9 +1703,7 @@ function renderProfileTournamentStats(profileData = {}) {
       ["ITM", formatNumber(stats.itm)],
       ["Финалки", formatNumber(stats.finalTables)],
       ["Победы", formatNumber(stats.wins)],
-      ["Fee play", `${formatChips(stats.playFeesPaid)} фишек`],
       ["Fee cash", `${formatUsdt(stats.cashFeesPaidMicros)} USDT`],
-      ["Призы play", `${formatChips(stats.playPrizeWon)} фишек`],
       ["Призы cash", `${formatUsdt(stats.cashPrizeWonMicros)} USDT`]
     ];
     items.forEach(([label, value]) => {
@@ -1710,9 +1744,7 @@ function tournamentStatusLabel(status) {
 }
 
 function formatTournamentAmountText(value, balanceBucket) {
-  return balanceBucket === "cash"
-    ? `${formatUsdt(value)} USDT`
-    : `${formatChips(value)} фишек`;
+  return `${formatUsdt(value)} USDT`;
 }
 
 function formatTournamentStartLabel(tournament) {
@@ -1837,6 +1869,260 @@ function renderTournamentHistoryList(container, history, { emptyText = "Исто
   });
 }
 
+function parseJsonField(value, fallback = []) {
+  const source = String(value || "").trim();
+  if (!source) return fallback;
+  return JSON.parse(source);
+}
+
+function toLocalDateTimeInput(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (part) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function resetAdminTournamentForm() {
+  state.selectedAdminTournamentId = "";
+  adminTournamentForm?.reset();
+  if (adminTournamentId) adminTournamentId.value = "";
+  if (adminTournamentType) adminTournamentType.value = "mtt";
+  if (adminTournamentStatusInput) adminTournamentStatusInput.value = "created";
+  if (adminTournamentBlindStructure) {
+    adminTournamentBlindStructure.value = JSON.stringify([
+      { level: 1, smallBlind: 25_000, bigBlind: 50_000, durationSeconds: 600 },
+      { level: 2, smallBlind: 50_000, bigBlind: 100_000, durationSeconds: 600 }
+    ], null, 2);
+  }
+  if (adminTournamentPayoutStructure) adminTournamentPayoutStructure.value = JSON.stringify([], null, 2);
+  if (adminTournamentFormMeta) adminTournamentFormMeta.textContent = "cash-only";
+  if (adminTournamentSubmit) adminTournamentSubmit.textContent = "Создать турнир";
+  if (adminTournamentUiStatus) adminTournamentUiStatus.textContent = "";
+}
+
+function fillAdminTournamentForm(tournament) {
+  if (!tournament) return;
+  state.selectedAdminTournamentId = tournament.id;
+  if (adminTournamentId) adminTournamentId.value = tournament.id || "";
+  if (adminTournamentTitle) adminTournamentTitle.value = tournament.title || "";
+  if (adminTournamentType) adminTournamentType.value = tournament.type || "mtt";
+  if (adminTournamentBuyIn) adminTournamentBuyIn.value = String(tournament.buyIn ?? "");
+  if (adminTournamentFee) adminTournamentFee.value = String(tournament.fee ?? "");
+  if (adminTournamentStartsAt) adminTournamentStartsAt.value = toLocalDateTimeInput(tournament.startsAt);
+  if (adminTournamentRegistrationOpen) adminTournamentRegistrationOpen.checked = tournament.registrationOpen === true;
+  if (adminTournamentLateRegMinutes) adminTournamentLateRegMinutes.value = String(tournament.lateRegMinutes ?? 0);
+  if (adminTournamentMaxPlayers) adminTournamentMaxPlayers.value = String(tournament.maxPlayers ?? "");
+  if (adminTournamentMinPlayers) adminTournamentMinPlayers.value = String(tournament.minPlayers ?? "");
+  if (adminTournamentBlindStructure) adminTournamentBlindStructure.value = JSON.stringify(tournament.blindStructure || tournament.structure || [], null, 2);
+  if (adminTournamentPayoutStructure) adminTournamentPayoutStructure.value = JSON.stringify(tournament.payoutStructure || [], null, 2);
+  if (adminTournamentReEntryLimit) adminTournamentReEntryLimit.value = String(tournament.reEntryLimit ?? 0);
+  if (adminTournamentAddOnAllowed) adminTournamentAddOnAllowed.checked = tournament.addOnAllowed === true;
+  if (adminTournamentDescription) adminTournamentDescription.value = tournament.description || "";
+  if (adminTournamentStatusInput) adminTournamentStatusInput.value = tournament.status || "created";
+  if (adminTournamentFormMeta) adminTournamentFormMeta.textContent = `${tournamentStatusLabel(tournament.status)} · ${tournament.participants || 0}/${tournament.maxPlayers || 0}`;
+  if (adminTournamentSubmit) adminTournamentSubmit.textContent = "Сохранить турнир";
+}
+
+async function saveAdminTournament() {
+  const tournamentId = adminTournamentId?.value || "";
+  const payload = {
+    title: adminTournamentTitle?.value || "",
+    type: adminTournamentType?.value || "mtt",
+    buyIn: Number(adminTournamentBuyIn?.value || 0),
+    fee: Number(adminTournamentFee?.value || 0),
+    startsAt: new Date(adminTournamentStartsAt?.value || Date.now()).toISOString(),
+    registrationOpen: adminTournamentRegistrationOpen?.checked === true,
+    lateRegMinutes: Number(adminTournamentLateRegMinutes?.value || 0),
+    maxPlayers: Number(adminTournamentMaxPlayers?.value || 2),
+    minPlayers: Number(adminTournamentMinPlayers?.value || 2),
+    blindStructure: parseJsonField(adminTournamentBlindStructure?.value, []),
+    payoutStructure: parseJsonField(adminTournamentPayoutStructure?.value, []),
+    reEntryLimit: Number(adminTournamentReEntryLimit?.value || 0),
+    addOnAllowed: adminTournamentAddOnAllowed?.checked === true,
+    description: adminTournamentDescription?.value || "",
+    status: adminTournamentStatusInput?.value || "created"
+  };
+  const key = tournamentId ? `admin-tournament-update-${tournamentId}` : "admin-tournament-create";
+  if (pendingAdminTournamentRequests.has(key)) return;
+  pendingAdminTournamentRequests.add(key);
+  if (adminTournamentSubmit) adminTournamentSubmit.disabled = true;
+  if (adminTournamentUiStatus) adminTournamentUiStatus.textContent = tournamentId ? "Сохраняем турнир..." : "Создаём турнир...";
+  try {
+    const data = await api(tournamentId ? `/api/admin/tournaments/${encodeURIComponent(tournamentId)}` : "/api/admin/tournaments", {
+      method: tournamentId ? "PATCH" : "POST",
+      body: payload,
+      idempotencyKey: requestKey(key)
+    });
+    state.adminTournaments = data.tournaments || state.adminTournaments || [];
+    if (data.tournament) fillAdminTournamentForm(data.tournament);
+    renderAdminTournamentControls(state.adminTournaments, state.adminRewardTournaments);
+    if (adminTournamentUiStatus) adminTournamentUiStatus.textContent = tournamentId ? "Турнир сохранён." : "Турнир создан.";
+    haptic("success");
+  } catch (error) {
+    if (error.status === 409) {
+      if (adminTournamentUiStatus) adminTournamentUiStatus.textContent = error.message;
+      haptic("warning");
+      return;
+    }
+    throw error;
+  } finally {
+    pendingAdminTournamentRequests.delete(key);
+    if (adminTournamentSubmit) adminTournamentSubmit.disabled = false;
+  }
+}
+
+function adminTournamentActionButtons(tournament) {
+  const actions = tournament.actions || {};
+  const mapping = [
+    ["registration-open", "Открыть рег.", actions.canOpenRegistration],
+    ["registration-close", "Закрыть рег.", actions.canCloseRegistration],
+    ["force-start", "Форс-старт", actions.canForceStart],
+    ["force-finish", "Форс-финиш", actions.canForceFinish],
+    ["cancel", "Отменить", actions.canCancel]
+  ];
+  return mapping
+    .filter(([, , allowed]) => allowed)
+    .map(([action, label]) => {
+      const key = `${tournament.id}:${action}`;
+      return `<button type="button" data-admin-tournament-action="${action}" data-admin-tournament-id="${escapeHtml(tournament.id)}" ${pendingAdminTournamentRequests.has(key) ? "disabled" : ""}>${label}</button>`;
+    })
+    .join("");
+}
+
+function renderAdminTournamentControls(tournaments, rewardTournaments) {
+  state.adminTournaments = Array.isArray(tournaments) ? tournaments : [];
+  state.adminRewardTournaments = Array.isArray(rewardTournaments) ? rewardTournaments : [];
+  if (adminTournamentCount) adminTournamentCount.textContent = `${state.adminTournaments.length}`;
+  if (adminRewardTournamentCount) adminRewardTournamentCount.textContent = `${state.adminRewardTournaments.length}`;
+
+  if (adminTournamentList) {
+    adminTournamentList.replaceChildren();
+    if (!state.adminTournaments.length) {
+      const empty = document.createElement("p");
+      empty.className = "empty";
+      empty.textContent = "Обычных cash-турниров пока нет.";
+      adminTournamentList.append(empty);
+    } else {
+      state.adminTournaments.forEach((tournament) => {
+        const card = document.createElement("article");
+        card.className = "admin-tournament-card";
+        card.dataset.selected = state.selectedAdminTournamentId === tournament.id ? "true" : "false";
+        card.innerHTML = `
+          <div class="admin-tournament-head">
+            <div>
+              <span>${escapeHtml(tournamentTypeLabel(tournament.type))} · USDT</span>
+              <strong>${escapeHtml(tournament.title)}</strong>
+              <small>${escapeHtml(tournamentStatusLabel(tournament.status))} · ${escapeHtml(formatDateTime(tournament.startsAt) || "без даты")} · ${tournament.participants}/${tournament.maxPlayers}</small>
+            </div>
+            <button type="button" data-admin-tournament-edit="${escapeHtml(tournament.id)}">Редактировать</button>
+          </div>
+          <div class="admin-tournament-meta">
+            <span>Buy-in<strong>${escapeHtml(formatTournamentAmountText(tournament.buyIn, "cash"))}</strong></span>
+            <span>Fee<strong>${escapeHtml(formatTournamentAmountText(tournament.fee, "cash"))}</strong></span>
+            <span>Prize pool<strong>${escapeHtml(formatTournamentAmountText(tournament.prizePool, "cash"))}</strong></span>
+            <span>Late reg<strong>${escapeHtml(tournament.lateRegMinutes ? `${tournament.lateRegMinutes}м` : "нет")}</strong></span>
+          </div>
+          <div class="admin-tournament-actions">${adminTournamentActionButtons(tournament)}</div>
+          <details class="admin-tournament-details">
+            <summary>Участники и payout</summary>
+            <div class="admin-tournament-participants">
+              ${(tournament.participantsList || []).length
+                ? tournament.participantsList.map((entry) => `<div><span>${escapeHtml(entry.name || entry.username || entry.userId)}</span><small>${escapeHtml(entry.registeredAt ? formatDateTime(entry.registeredAt) : entry.userId)}</small></div>`).join("")
+                : "<p class=\"empty\">Участников пока нет.</p>"}
+            </div>
+            <div class="admin-tournament-payouts">
+              ${(tournament.payoutPreview || []).length
+                ? tournament.payoutPreview.map((entry) => `<div><span>#${entry.place}</span><strong>${escapeHtml(formatTournamentAmountText(entry.amount, "cash"))}</strong><small>${escapeHtml(String(entry.percent || 0))}%</small></div>`).join("")
+                : "<p class=\"empty\">Payout preview появится после регистраций.</p>"}
+            </div>
+          </details>
+        `;
+        adminTournamentList.append(card);
+      });
+    }
+  }
+
+  if (adminRewardTournamentList) {
+    adminRewardTournamentList.replaceChildren();
+    if (!state.adminRewardTournaments.length) {
+      const empty = document.createElement("p");
+      empty.className = "empty";
+      empty.textContent = "Reward tournaments пока не созданы.";
+      adminRewardTournamentList.append(empty);
+    } else {
+      state.adminRewardTournaments.forEach((event) => {
+        const item = document.createElement("article");
+        item.className = "admin-reward-card";
+        item.innerHTML = `
+          <div>
+            <span>Reward tournament</span>
+            <strong>${escapeHtml(event.title || "Reward event")}</strong>
+            <small>${escapeHtml(event.status || "tickets_issued")} · сезон ${escapeHtml(event.seasonId || "—")}</small>
+          </div>
+          <div class="admin-reward-meta">
+            <span>Tickets<strong>${escapeHtml(String(event.ticketCount || 0))}</strong></span>
+            <span>Used<strong>${escapeHtml(String(event.usedTicketCount || 0))}</strong></span>
+          </div>
+          <button type="button" data-admin-reward-view="${escapeHtml(event.id)}">Показать tickets</button>
+        `;
+        adminRewardTournamentList.append(item);
+      });
+    }
+  }
+}
+
+async function onAdminTournamentAction(event) {
+  const editButton = event.target.closest("[data-admin-tournament-edit]");
+  if (editButton) {
+    const tournament = state.adminTournaments.find((item) => item.id === editButton.dataset.adminTournamentEdit);
+    if (tournament) fillAdminTournamentForm(tournament);
+    return;
+  }
+  const actionButton = event.target.closest("[data-admin-tournament-action]");
+  if (!actionButton) return;
+  const tournamentId = actionButton.dataset.adminTournamentId;
+  const action = actionButton.dataset.adminTournamentAction;
+  const key = `${tournamentId}:${action}`;
+  if (pendingAdminTournamentRequests.has(key)) return;
+  pendingAdminTournamentRequests.add(key);
+  actionButton.disabled = true;
+  if (adminTournamentUiStatus) adminTournamentUiStatus.textContent = "Отправляем действие...";
+  try {
+    const data = await api(`/api/admin/tournaments/${encodeURIComponent(tournamentId)}/${action}`, {
+      method: "POST",
+      idempotencyKey: requestKey(`admin-tournament-action-${tournamentId}-${action}`)
+    });
+    state.adminTournaments = data.tournaments || state.adminTournaments || [];
+    if (data.tournament && state.selectedAdminTournamentId === data.tournament.id) fillAdminTournamentForm(data.tournament);
+    renderAdminTournamentControls(state.adminTournaments, state.adminRewardTournaments);
+    if (adminTournamentUiStatus) adminTournamentUiStatus.textContent = "Действие выполнено.";
+    haptic("success");
+  } catch (error) {
+    if (error.status === 409) {
+      if (adminTournamentUiStatus) adminTournamentUiStatus.textContent = error.message;
+      haptic("warning");
+      return;
+    }
+    throw error;
+  } finally {
+    pendingAdminTournamentRequests.delete(key);
+    renderAdminTournamentControls(state.adminTournaments, state.adminRewardTournaments);
+  }
+}
+
+async function onAdminRewardTournamentAction(event) {
+  const button = event.target.closest("[data-admin-reward-view]");
+  if (!button) return;
+  const data = await api(`/api/admin/reward-tournaments/${encodeURIComponent(button.dataset.adminRewardView)}`);
+  const tickets = data.rewardTournament?.tickets || [];
+  if (adminTournamentUiStatus) {
+    adminTournamentUiStatus.textContent = tickets.length
+      ? tickets.map((ticket) => `#${ticket.leaderboardRank} ${ticket.name || ticket.username || ticket.userId} · ${ticket.status}`).join(" | ")
+      : "У event пока нет tickets.";
+  }
+}
+
 async function loadAdminDashboard() {
   if (!ADMIN_MODE || !state.token) return;
   if (adminOperationalStatus) adminOperationalStatus.textContent = "Обновляем данные...";
@@ -1889,6 +2175,7 @@ function renderAdminDashboard(admin) {
   renderAdminHands(admin?.recentHands || []);
   renderAdminRiskSignals({ diagnostics, database, stats, reconciliation });
   renderAdminSettings({ diagnostics, database, roles, stats, notes: admin?.audit?.notes || [] });
+  renderAdminTournamentControls(admin?.tournaments || [], admin?.rewardTournaments || []);
   renderAdminEvents(admin?.recentEvents || []);
 }
 
@@ -3126,13 +3413,20 @@ async function loadTables() {
 
 async function loadTournaments() {
   if (!tournamentList) return;
-  const [data, historyData] = await Promise.all([
-    api("/api/tournaments"),
-    api("/api/tournaments/history").catch(() => ({ history: state.tournamentHistory || state.homeStats?.tournamentHistory || [] }))
-  ]);
-  state.tournaments = data.tournaments || [];
-  state.tournamentHistory = historyData.history || state.tournamentHistory || [];
-  renderTournaments();
+  if (tournamentStatus) tournamentStatus.textContent = "Загружаем турниры...";
+  try {
+    const [data, historyData] = await Promise.all([
+      api("/api/tournaments"),
+      api("/api/tournaments/history").catch(() => ({ history: state.tournamentHistory || state.homeStats?.tournamentHistory || [] }))
+    ]);
+    state.tournaments = (data.tournaments || []).filter((tournament) => (tournament.currency || "USDT") === "USDT");
+    state.tournamentHistory = historyData.history || state.tournamentHistory || [];
+    renderTournaments();
+    if (tournamentStatus) tournamentStatus.textContent = "";
+  } catch (error) {
+    if (tournamentStatus) tournamentStatus.textContent = "Не удалось загрузить турниры.";
+    throw error;
+  }
 }
 
 function renderTournaments() {
@@ -3152,7 +3446,7 @@ function renderTournaments() {
   if (!state.tournaments.length) {
     const empty = document.createElement("p");
     empty.className = "empty";
-    empty.textContent = "Турниров пока нет.";
+    empty.textContent = "Cash-турниров пока нет.";
     tournamentList.append(empty);
     return;
   }
@@ -3174,7 +3468,7 @@ function renderTournaments() {
         <div class="tournament-card-copy">
           <div class="tournament-card-kickers">
             <span>${escapeHtml(tournamentTypeLabel(tournament.type))}</span>
-            <span>${tournament.balanceBucket === "cash" ? "USDT" : "PLAY"}</span>
+            <span>USDT</span>
           </div>
           <strong>${escapeHtml(tournament.title)}</strong>
           <small>${formatTournamentStartLabel(tournament)} · ${tournament.participants}/${tournament.maxPlayers} игроков</small>
@@ -3197,7 +3491,7 @@ function renderTournaments() {
         data-tournament-action="${action.action}"
         data-tournament-id="${tournament.id}"
         ${action.tableId ? `data-table-id="${action.tableId}"` : ""}
-        ${action.disabled ? "disabled" : ""}
+        ${action.disabled || pendingTournamentRequests.has(tournament.id) ? "disabled" : ""}
       >${escapeHtml(action.text)}</button>
     `;
     tournamentList.append(node);
@@ -3213,30 +3507,53 @@ async function onTournamentAction(event) {
   }
   const id = button.dataset.tournamentId;
   const action = button.dataset.tournamentAction;
-  const endpoint = action === "cancel" ? "cancel" : "register";
-  const data = await api(`/api/tournaments/${id}/${endpoint}`, {
-    method: "POST",
-    idempotencyKey: requestKey(`tournament-${endpoint}-${id}`)
-  });
-  state.tournaments = data.tournaments || [];
-  state.tournamentHistory = data.profile?.tournamentHistory || state.tournamentHistory || [];
-  if (data.profile) {
-    state.user.balance = Number(data.profile.balance || state.user?.balance || 0);
-    state.user.cashBalanceMicros = Number(data.profile.cashBalanceMicros || state.user?.cashBalanceMicros || 0);
-    renderProfile(data.profile);
-  }
-  if (data.cashier) renderCashier(data.cashier);
-  renderModeBalance();
-  renderHomeCta();
-  renderTournaments();
+  if (!id || !["register", "cancel"].includes(action)) return;
+  const tournament = state.tournaments.find((item) => item.id === id);
+  const totalCost = tournament ? formatTournamentAmountText(Number(tournament.buyIn || 0) + Number(tournament.fee || 0), "cash") : "сумма из API";
+  const confirmed = window.confirm(action === "cancel"
+    ? `Отменить регистрацию и вернуть ${totalCost}?`
+    : `Подтвердить регистрацию в cash-турнир? Будет списано ${totalCost} (buy-in + fee).`);
+  if (!confirmed) return;
+  pendingTournamentRequests.add(id);
+  button.disabled = true;
   if (tournamentStatus) {
-    const tournament = state.tournaments.find((item) => item.id === id);
-    const asset = tournament?.balanceBucket === "cash" ? "USDT" : "фишки";
-    tournamentStatus.textContent = action === "cancel"
-      ? `Регистрация отменена, ${asset} возвращены.`
-      : "Вы зарегистрированы в турнире.";
+    tournamentStatus.textContent = action === "cancel" ? "Отправляем отмену..." : "Отправляем регистрацию...";
   }
-  haptic("success");
+  const endpoint = action === "cancel" ? "cancel" : "register";
+  try {
+    const data = await api(`/api/tournaments/${id}/${endpoint}`, {
+      method: "POST",
+      idempotencyKey: requestKey(`tournament-${endpoint}-${id}`)
+    });
+    state.tournaments = (data.tournaments || []).filter((tournament) => (tournament.currency || "USDT") === "USDT");
+    state.tournamentHistory = data.profile?.tournamentHistory || state.tournamentHistory || [];
+    if (data.profile) {
+      state.user.balance = Number(data.profile.balance || state.user?.balance || 0);
+      state.user.cashBalanceMicros = Number(data.profile.cashBalanceMicros || state.user?.cashBalanceMicros || 0);
+      renderProfile(data.profile);
+    }
+    if (data.cashier) renderCashier(data.cashier);
+    renderModeBalance();
+    renderHomeCta();
+    renderTournaments();
+    if (tournamentStatus) {
+      tournamentStatus.textContent = action === "cancel"
+        ? "Регистрация отменена, buy-in и fee возвращены."
+        : "Регистрация подтверждена: buy-in + fee списаны.";
+    }
+    haptic("success");
+  } catch (error) {
+    if (error.status === 409) {
+      if (tournamentStatus) tournamentStatus.textContent = error.message;
+      await loadTournaments();
+      haptic("warning");
+      return;
+    }
+    throw error;
+  } finally {
+    pendingTournamentRequests.delete(id);
+    renderTournaments();
+  }
 }
 
 async function openTournamentTable(tableId) {
