@@ -239,13 +239,6 @@
                   <small>серии и freeroll</small>
                 </span>
               </button>
-              <button type="button" data-mode-action="sitgo">
-                <span class="format-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4a7 7 0 1 0 7 7"/><path d="M12 8v4l3 2"/><path d="M12 2v3"/><path d="M12 19v3"/></svg></span>
-                <span class="format-copy">
-                  <strong>Sit&Go</strong>
-                  <small>быстрые столы</small>
-                </span>
-              </button>
               <button type="button" data-mode-action="private">
                 <span class="format-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7.5 11V8.5a4.5 4.5 0 0 1 9 0V11"/><path d="M6 11h12v8H6z"/><path d="M12 14v2"/></svg></span>
                 <span class="format-copy">
@@ -275,8 +268,8 @@
                 <strong id="homeRatingPoints">1 000</strong>
               </div>
               <div>
-                <span>Cash Club</span>
-                <strong id="homeCashClub">Starter</strong>
+                <span>Уровень</span>
+                <strong id="homeCashClub">Уровень 1</strong>
               </div>
             </div>
             <div class="leaderboard-list" id="ratingLeaderboardList">
@@ -502,6 +495,30 @@
               <span id="tournamentHistoryMeta">история</span>
             </div>
             <div class="tournament-history-list" id="tournamentHistoryList"></div>
+          </section>
+          <div class="tournament-detail-backdrop" id="tournamentDetailBackdrop" hidden></div>
+          <section class="tournament-detail-sheet" id="tournamentDetailSheet" hidden aria-modal="true" aria-label="Детали турнира">
+            <header class="tournament-detail-head">
+              <div>
+                <p class="eyebrow">Турниры</p>
+                <h2 id="tournamentDetailTitle">Турнир</h2>
+              </div>
+              <button type="button" class="round-control" id="tournamentDetailClose" aria-label="Закрыть">✕</button>
+            </header>
+            <div class="tournament-detail-body">
+              <div class="tournament-detail-status">
+                <span class="tournament-status-pill" id="tournamentDetailBadge" data-state="created">создан</span>
+                <strong id="tournamentDetailSubtitle">MTT · старт уточняется</strong>
+                <small id="tournamentDetailDescription">Описание турнира появится здесь.</small>
+              </div>
+              <div class="tournament-detail-grid" id="tournamentDetailGrid"></div>
+              <div class="tournament-detail-structure" id="tournamentDetailStructure"></div>
+              <div class="tournament-detail-note" id="tournamentDetailNote" hidden></div>
+            </div>
+            <footer class="tournament-detail-footer">
+              <button type="button" class="secondary-pill" id="tournamentDetailSecondary">Закрыть</button>
+              <button type="button" id="tournamentDetailAction" disabled>Ожидание</button>
+            </footer>
           </section>
         </section>
 

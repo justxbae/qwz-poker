@@ -1,5 +1,19 @@
 # QWZ Decisions
 
+## 2026-06-20: Tournament lobby cards follow cash-event pattern with separate details sheet
+
+**Зона:** frontend
+
+**Решение:** В публичном tournament lobby карточка турнира теперь работает как компактный cash-event row: слева короткий time/status блок, справа — название, buy-in, fee, prize pool и participants без перегруза вторичным текстом. Нажатие на саму карточку открывает отдельный details sheet, а CTA-кнопка внутри карточки используется только для `register/cancel/open-table`. `Sit&Go` убран из home format pills до реальной реализации, карусель баннеров расширена до full-width без peek соседнего баннера. Cash progression больше не брендируется как `Cash Club / Starter`, а показывается нейтрально как `Уровень N`.
+
+**Почему:** Старый tournament list выглядел как техническая таблица, а не как игровой lobby feed. Отдельный click-target для деталей и для регистрации повторяет понятный мобильный паттерн конкурентов, но остаётся в визуальном стиле QWZ.
+
+**Влияет на:** `public/index.html`, `public/app.js`, `public/lobby-qa.css`, home lobby geometry, tournament UX.
+
+**Что обновлено:** Турнирные карточки и details sheet, home promo carousel, format pills, copy для cash progression.
+
+**Открытые вопросы:** Если позже появятся ticket-based reward tournaments в публичном UI, для них нужен отдельный card pattern, чтобы не смешивать ticket entry с cash buy-in.
+
 ## 2026-06-20: Tournament policy correction — no spontaneous play-chip tournaments
 
 **Зона:** product

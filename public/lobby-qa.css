@@ -653,3 +653,306 @@ body:not(.in-game) .lobby-view[data-lobby-view="profile"].active .settings-actio
   min-height: 38px !important;
   padding-block: 8px !important;
 }
+
+body:not(.in-game) [data-lobby-view="home"].active .home-promo-banners {
+  gap: 0 !important;
+  padding-top: 4px !important;
+}
+
+body:not(.in-game) [data-lobby-view="home"].active .promo-banner {
+  flex: 0 0 100% !important;
+  min-height: 144px !important;
+  border-radius: 20px !important;
+}
+
+body:not(.in-game) .play-format-grid,
+body[data-game-mode="cash"]:not(.in-game) .play-format-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+body:not(.in-game) .play-format-grid button {
+  min-height: 72px !important;
+}
+
+body:not(.in-game) .tournament-list {
+  gap: 12px !important;
+}
+
+body:not(.in-game) .tournament-card {
+  gap: 12px !important;
+  padding: 14px !important;
+  border-radius: 20px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background:
+    radial-gradient(120% 120% at 0% 0%, rgba(42, 171, 238, 0.08) 0%, transparent 44%),
+    linear-gradient(180deg, rgba(24, 34, 48, 0.98) 0%, rgba(18, 27, 38, 0.98) 100%) !important;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22) !important;
+  cursor: pointer !important;
+}
+
+body:not(.in-game) .tournament-card-shell {
+  display: grid !important;
+  grid-template-columns: 82px minmax(0, 1fr) !important;
+  gap: 12px !important;
+  align-items: stretch !important;
+}
+
+body:not(.in-game) .tournament-card-timebox {
+  display: grid !important;
+  align-content: start !important;
+  gap: 6px !important;
+  padding: 10px 10px 12px !important;
+  border-radius: 18px !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  text-align: center !important;
+}
+
+body:not(.in-game) .tournament-card-time-state {
+  display: inline-flex !important;
+  justify-content: center !important;
+  padding: 5px 8px !important;
+  border-radius: 999px !important;
+  background: rgba(42, 171, 238, 0.14) !important;
+  color: var(--qwz-acc) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+}
+
+body:not(.in-game) .tournament-card-timebox strong {
+  font-size: 20px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  color: var(--qwz-ink) !important;
+}
+
+body:not(.in-game) .tournament-card-timebox small {
+  font-size: 11px !important;
+  color: var(--qwz-dim) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+}
+
+body:not(.in-game) .tournament-card-main {
+  display: grid !important;
+  gap: 10px !important;
+  min-width: 0 !important;
+}
+
+body:not(.in-game) .tournament-card-head {
+  display: flex !important;
+  align-items: start !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+}
+
+body:not(.in-game) .tournament-card-copy {
+  display: grid !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+}
+
+body:not(.in-game) .tournament-card-kickers {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+}
+
+body:not(.in-game) .tournament-card-kickers span {
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 24px !important;
+  padding: 0 9px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--qwz-dim) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+}
+
+body:not(.in-game) .tournament-card-copy strong {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  line-height: 1.16 !important;
+  color: var(--qwz-ink) !important;
+  white-space: normal !important;
+}
+
+body:not(.in-game) .tournament-card-copy > small {
+  font-size: 12px !important;
+  color: var(--qwz-dim) !important;
+}
+
+body:not(.in-game) .tournament-meta-grid--summary {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+body:not(.in-game) .tournament-meta-grid--summary span {
+  gap: 4px !important;
+  padding: 10px !important;
+  border-radius: 14px !important;
+  background: rgba(255, 255, 255, 0.035) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+body:not(.in-game) .tournament-meta-grid--summary small {
+  font-size: 10px !important;
+  color: var(--qwz-dim) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+}
+
+body:not(.in-game) .tournament-meta-grid--summary strong {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--qwz-ink) !important;
+}
+
+body:not(.in-game) .tournament-player-note {
+  margin: 0 !important;
+  padding: 10px 12px !important;
+  border-radius: 14px !important;
+  background: rgba(42, 171, 238, 0.08) !important;
+  color: #cbeeff !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+body:not(.in-game) .tournament-card button {
+  min-height: 46px !important;
+  border-radius: 14px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+
+body:not(.in-game) .tournament-detail-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(8, 12, 18, 0.66) !important;
+  backdrop-filter: blur(10px) !important;
+  z-index: 95 !important;
+}
+
+body:not(.in-game) .tournament-detail-sheet {
+  position: fixed !important;
+  left: 12px !important;
+  right: 12px !important;
+  bottom: calc(12px + env(safe-area-inset-bottom)) !important;
+  max-height: min(78vh, 680px) !important;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) auto !important;
+  gap: 14px !important;
+  padding: 16px !important;
+  border-radius: 24px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: linear-gradient(180deg, #182230 0%, #0e1620 100%) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.46) !important;
+  z-index: 96 !important;
+}
+
+body:not(.in-game) .tournament-detail-head,
+body:not(.in-game) .tournament-detail-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+}
+
+body:not(.in-game) .tournament-detail-head h2 {
+  margin: 2px 0 0 !important;
+  font-size: 22px !important;
+  font-weight: 600 !important;
+}
+
+body:not(.in-game) .tournament-detail-body {
+  display: grid !important;
+  align-content: start !important;
+  gap: 14px !important;
+  overflow-y: auto !important;
+}
+
+body:not(.in-game) .tournament-detail-status {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+body:not(.in-game) .tournament-detail-status strong {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  color: var(--qwz-ink) !important;
+}
+
+body:not(.in-game) .tournament-detail-status small {
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+  color: var(--qwz-dim) !important;
+}
+
+body:not(.in-game) .tournament-detail-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+body:not(.in-game) .tournament-detail-grid div,
+body:not(.in-game) .tournament-detail-levels div {
+  display: grid !important;
+  gap: 4px !important;
+  padding: 11px 12px !important;
+  border-radius: 14px !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+body:not(.in-game) .tournament-detail-grid span,
+body:not(.in-game) .tournament-detail-structure > span {
+  font-size: 10px !important;
+  color: var(--qwz-dim) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+}
+
+body:not(.in-game) .tournament-detail-grid strong,
+body:not(.in-game) .tournament-detail-levels strong {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: var(--qwz-ink) !important;
+}
+
+body:not(.in-game) .tournament-detail-structure {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+body:not(.in-game) .tournament-detail-levels {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+body:not(.in-game) .tournament-detail-levels b {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: var(--qwz-gold) !important;
+}
+
+body:not(.in-game) .tournament-detail-note {
+  padding: 12px !important;
+  border-radius: 14px !important;
+  background: rgba(42, 171, 238, 0.08) !important;
+  color: #cbeeff !important;
+  font-size: 12px !important;
+}
+
+body:not(.in-game) .tournament-detail-footer button {
+  flex: 1 1 0 !important;
+  min-height: 46px !important;
+  border-radius: 14px !important;
+  font-weight: 600 !important;
+}

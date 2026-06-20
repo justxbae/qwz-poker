@@ -26,6 +26,8 @@ const state = {
   dailyPlayClaim: null,
   homeStats: null,
   tournamentHistory: [],
+  selectedTournamentId: "",
+  selectedTournamentDetails: null,
   adminTournaments: [],
   adminRewardTournaments: [],
   selectedAdminTournamentId: "",
@@ -193,6 +195,18 @@ const tournamentList = document.querySelector("#tournamentList");
 const tournamentStatus = document.querySelector("#tournamentStatus");
 const tournamentHistoryList = document.querySelector("#tournamentHistoryList");
 const tournamentHistoryMeta = document.querySelector("#tournamentHistoryMeta");
+const tournamentDetailBackdrop = document.querySelector("#tournamentDetailBackdrop");
+const tournamentDetailSheet = document.querySelector("#tournamentDetailSheet");
+const tournamentDetailClose = document.querySelector("#tournamentDetailClose");
+const tournamentDetailSecondary = document.querySelector("#tournamentDetailSecondary");
+const tournamentDetailTitle = document.querySelector("#tournamentDetailTitle");
+const tournamentDetailBadge = document.querySelector("#tournamentDetailBadge");
+const tournamentDetailSubtitle = document.querySelector("#tournamentDetailSubtitle");
+const tournamentDetailDescription = document.querySelector("#tournamentDetailDescription");
+const tournamentDetailGrid = document.querySelector("#tournamentDetailGrid");
+const tournamentDetailStructure = document.querySelector("#tournamentDetailStructure");
+const tournamentDetailNote = document.querySelector("#tournamentDetailNote");
+const tournamentDetailAction = document.querySelector("#tournamentDetailAction");
 const continueCard = document.querySelector("#continueCard");
 const continueMeta = document.querySelector("#continueMeta");
 const continueGameButton = document.querySelector("#continueGameButton");
@@ -357,6 +371,10 @@ async function boot() {
   cashierMethods?.addEventListener("click", onCashierMethodClick);
   cashierPayButton?.addEventListener("click", () => runAction(payCashierAmount));
   tournamentList?.addEventListener("click", onTournamentAction);
+  tournamentDetailBackdrop?.addEventListener("click", closeTournamentDetails);
+  tournamentDetailClose?.addEventListener("click", closeTournamentDetails);
+  tournamentDetailSecondary?.addEventListener("click", closeTournamentDetails);
+  tournamentDetailAction?.addEventListener("click", onTournamentDetailAction);
   quickPlayButton.addEventListener("click", () => runAction(quickPlay));
   quickPrivateButton?.addEventListener("click", () => runAction(quickCreatePrivateTable));
   homeWalletSideAction?.addEventListener("click", () => runAction(claimDailyPlayBonus));
@@ -1522,11 +1540,9 @@ function renderProfile(profileData) {
   if (profileData.dailyPlayClaim) setDailyPlayClaim(profileData.dailyPlayClaim);
   profileName.textContent = user.name || "Игрок";
   profileUsername.textContent = user.username ? `@${user.username}` : `id ${user.id || ""}`;
-  const cashLevel = Number(profile.cashLevel || 1);
-  const cashStatus = profile.cashStatus || "Новичок";
   const ratingLeagueText = profile.ratingLeague || profile.ratingTier || "Bronze";
   const ratingPointsText = `${formatNumber(profile.ratingPoints || 1000)} RP`;
-  const cashRankText = `${cashStatus} · Cash Club`;
+  const cashRankText = cashLevelLabel(profile);
   if (lobbyRank) lobbyRank.textContent = cashRankText;
   profileBalance.replaceChildren(`${formatUsdtDisplay(profileData.cashBalanceMicros || 0)} `, createTetherMark(), ` · ${formatChips(profileData.balance)} фишек`);
   profileChips.textContent = formatChips(profileData.balance);
@@ -1543,7 +1559,7 @@ function renderProfile(profileData) {
     homeSessionPill.dataset.status = profileData.activeTableCount ? "active" : "idle";
   }
   if (profileCashTitle) profileCashTitle.textContent = cashRankText;
-  if (profileCashXpLabel) profileCashXpLabel.textContent = `${formatNumber(profile.cashClubPoints || profile.cashXpCurrent || 0)} pts · рейк ${formatUsdtDisplay(profile.cashRakeContributed || 0)}`;
+  if (profileCashXpLabel) profileCashXpLabel.textContent = `${cashLevelMeta(profile)} · рейк ${formatUsdtDisplay(profile.cashRakeContributed || 0)}`;
   if (profileCashProgress) profileCashProgress.style.width = `${Math.max(0, Math.min(100, Number(profile.cashXpProgress || 0) * 100))}%`;
   if (profileCashHands) profileCashHands.textContent = formatNumber(profile.cashHandsPlayed || 0);
   if (profileRatingTitle) profileRatingTitle.textContent = ratingLeagueText;
@@ -1569,15 +1585,13 @@ function renderHomeWalletSide(profileData = {}) {
   const cashMode = state.gameMode === "cash";
   const profile = profileData.profile || {};
   const dailyPlayClaim = getDailyPlayClaimState(profileData);
-  const cashClubTitle = profile.cashClubStatus || "Cash Club";
-  const currentPoints = Number(profile.cashXpCurrent || profile.cashClubPoints || 0);
   const progress = Math.max(0, Math.min(1, Number(profile.cashXpProgress || 0)));
 
   homeWalletSideCurrency.hidden = true;
   if (cashMode) {
-    if (homeWalletSideLabel) homeWalletSideLabel.textContent = "Cash Club";
-    homeWalletSideValue.textContent = cashClubTitle;
-    homeWalletSideHint.textContent = `${formatNumber(currentPoints)} pts`;
+    if (homeWalletSideLabel) homeWalletSideLabel.textContent = "Уровень";
+    homeWalletSideValue.textContent = cashLevelLabel(profile);
+    homeWalletSideHint.textContent = cashLevelMeta(profile);
     if (homeWalletSideMeter) homeWalletSideMeter.style.width = `${Math.max(8, Math.round(progress * 100))}%`;
     if (homeWalletSideAction) {
       homeWalletSideAction.textContent = "";
@@ -1623,7 +1637,9 @@ function renderProgression(progression) {
   const ratingPoints = Number(profile.ratingPoints || rating.startingRp || 1000);
   if (homeRatingLeague) homeRatingLeague.textContent = league;
   if (homeRatingPoints) homeRatingPoints.textContent = formatNumber(ratingPoints);
-  if (homeCashClub) homeCashClub.textContent = cashClub.title || profile.cashClubStatus || "Starter";
+  if (homeCashClub) homeCashClub.textContent = cashLevelLabel({
+    cashLevel: cashClub.level || profile.cashLevel || 1
+  });
 
   const rows = Array.isArray(rating.leaderboard) ? rating.leaderboard.slice(0, 5) : [];
   if (ratingLeaderboardMeta) {
@@ -1717,6 +1733,28 @@ function renderProfileTournamentStats(profileData = {}) {
     emptyText: "История участия появится после первого завершённого турнира.",
     limit: 4
   });
+}
+
+function cashLevelLabel(profile = {}) {
+  return `Уровень ${Math.max(1, Number(profile.cashLevel || 1))}`;
+}
+
+function cashLevelMeta(profile = {}) {
+  return `${formatNumber(profile.cashClubPoints || profile.cashXpCurrent || 0)} pts`;
+}
+
+function tournamentStartParts(tournament) {
+  if (!tournament?.startsAt) {
+    return tournament?.type === "sng" || tournament?.type === "sit_and_go"
+      ? { day: "SNG", time: "по набору" }
+      : { day: "скоро", time: "время уточняется" };
+  }
+  const date = new Date(tournament.startsAt);
+  if (Number.isNaN(date.getTime())) return { day: "скоро", time: "время уточняется" };
+  return {
+    day: date.toLocaleDateString("ru-RU", { day: "2-digit", month: "short" }).replace(".", ""),
+    time: date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
+  };
 }
 
 function tournamentTypeLabel(type) {
@@ -3454,38 +3492,44 @@ function renderTournaments() {
   for (const tournament of state.tournaments) {
     const node = document.createElement("article");
     node.className = "tournament-card";
+    node.dataset.tournamentCard = tournament.id;
     node.dataset.status = tournament.status;
     const badge = tournamentBadge(tournament);
     const action = tournamentActionProps(tournament);
     const playerNote = tournamentPlayerNote(tournament);
-    const runtimeBits = tournamentRuntimeBits(tournament);
-    const currentBlinds = tournament.currentBlinds
-      ? `${formatTournamentAmountText(tournament.currentBlinds.smallBlind, tournament.balanceBucket)}/${formatTournamentAmountText(tournament.currentBlinds.bigBlind, tournament.balanceBucket)}${Number(tournament.currentBlinds.ante || 0) > 0 ? ` · ante ${formatTournamentAmountText(tournament.currentBlinds.ante, tournament.balanceBucket)}` : ""}`
-      : "ещё не начались";
+    const timing = tournamentStartParts(tournament);
+    const summaryBits = [
+      { label: "Бай-ин", value: formatTournamentAmountText(tournament.buyIn, tournament.balanceBucket) },
+      { label: "Fee", value: formatTournamentAmountText(tournament.fee, tournament.balanceBucket) },
+      { label: "Призовой", value: formatTournamentAmountText(tournament.prizePool, tournament.balanceBucket) },
+      { label: "Игроки", value: `${tournament.participants}/${tournament.maxPlayers}` }
+    ];
 
     node.innerHTML = `
-      <div class="tournament-card-head">
-        <div class="tournament-card-copy">
-          <div class="tournament-card-kickers">
-            <span>${escapeHtml(tournamentTypeLabel(tournament.type))}</span>
-            <span>USDT</span>
-          </div>
-          <strong>${escapeHtml(tournament.title)}</strong>
-          <small>${formatTournamentStartLabel(tournament)} · ${tournament.participants}/${tournament.maxPlayers} игроков</small>
+      <div class="tournament-card-shell">
+        <div class="tournament-card-timebox">
+          <span class="tournament-card-time-state" data-state="${badge.state}">${escapeHtml(tournamentStatusLabel(tournament.status))}</span>
+          <strong>${escapeHtml(timing.time)}</strong>
+          <small>${escapeHtml(timing.day)}</small>
         </div>
-        <b class="tournament-status-pill" data-state="${badge.state}">${escapeHtml(badge.text)}</b>
+        <div class="tournament-card-main">
+          <div class="tournament-card-head">
+            <div class="tournament-card-copy">
+              <div class="tournament-card-kickers">
+                <span>${escapeHtml(tournamentTypeLabel(tournament.type))}</span>
+                <span>USDT</span>
+              </div>
+              <strong>${escapeHtml(tournament.title)}</strong>
+              <small>${escapeHtml(formatTournamentStartLabel(tournament))}</small>
+            </div>
+            <b class="tournament-status-pill" data-state="${badge.state}">${escapeHtml(badge.text)}</b>
+          </div>
+          <div class="tournament-meta-grid tournament-meta-grid--summary">
+            ${summaryBits.map((item) => `<span><small>${escapeHtml(item.label)}</small><strong>${escapeHtml(item.value)}</strong></span>`).join("")}
+          </div>
+          ${playerNote ? `<p class="tournament-player-note">${escapeHtml(playerNote)}</p>` : ""}
+        </div>
       </div>
-      <div class="tournament-meta-grid">
-        <span>Бай-ин<strong>${escapeHtml(formatTournamentAmountText(tournament.buyIn, tournament.balanceBucket))}</strong></span>
-        <span>Fee<strong>${escapeHtml(formatTournamentAmountText(tournament.fee, tournament.balanceBucket))}</strong></span>
-        <span>Призовой фонд<strong>${escapeHtml(formatTournamentAmountText(tournament.prizePool, tournament.balanceBucket))}</strong></span>
-      </div>
-      <div class="tournament-runtime">
-        <span>Статус<strong>${escapeHtml(tournamentStatusLabel(tournament.status))}</strong></span>
-        <span>Блайнды<strong>${escapeHtml(currentBlinds)}</strong></span>
-        ${runtimeBits.map((item) => `<span>${escapeHtml(item.label)}<strong>${escapeHtml(item.value)}</strong></span>`).join("")}
-      </div>
-      ${playerNote ? `<p class="tournament-player-note">${escapeHtml(playerNote)}</p>` : ""}
       <button
         type="button"
         data-tournament-action="${action.action}"
@@ -3500,8 +3544,21 @@ function renderTournaments() {
 
 async function onTournamentAction(event) {
   const button = event.target.closest("[data-tournament-action]");
+  if (button) {
+    event.preventDefault();
+    event.stopPropagation();
+    await handleTournamentActionButton(button);
+    return;
+  }
+  const card = event.target.closest("[data-tournament-card]");
+  if (!card) return;
+  await openTournamentDetails(card.dataset.tournamentCard);
+}
+
+async function handleTournamentActionButton(button) {
   if (!button) return;
   if (button.dataset.tournamentAction === "open-table") {
+    closeTournamentDetails();
     await openTournamentTable(button.dataset.tableId);
     return;
   }
@@ -3536,6 +3593,9 @@ async function onTournamentAction(event) {
     renderModeBalance();
     renderHomeCta();
     renderTournaments();
+    if (state.selectedTournamentId === id) {
+      await refreshOpenTournamentDetails(id);
+    }
     if (tournamentStatus) {
       tournamentStatus.textContent = action === "cancel"
         ? "Регистрация отменена, buy-in и fee возвращены."
@@ -3546,6 +3606,9 @@ async function onTournamentAction(event) {
     if (error.status === 409) {
       if (tournamentStatus) tournamentStatus.textContent = error.message;
       await loadTournaments();
+      if (state.selectedTournamentId === id) {
+        await refreshOpenTournamentDetails(id).catch(() => {});
+      }
       haptic("warning");
       return;
     }
@@ -3553,6 +3616,105 @@ async function onTournamentAction(event) {
   } finally {
     pendingTournamentRequests.delete(id);
     renderTournaments();
+    syncTournamentDetailAction();
+  }
+}
+
+async function onTournamentDetailAction() {
+  if (!tournamentDetailAction) return;
+  await handleTournamentActionButton(tournamentDetailAction);
+}
+
+function closeTournamentDetails() {
+  state.selectedTournamentId = "";
+  state.selectedTournamentDetails = null;
+  if (tournamentDetailBackdrop) tournamentDetailBackdrop.hidden = true;
+  if (tournamentDetailSheet) tournamentDetailSheet.hidden = true;
+  document.body.classList.remove("sheet-open");
+}
+
+function syncTournamentDetailAction() {
+  if (!tournamentDetailAction || !state.selectedTournamentDetails) return;
+  const tournament = state.selectedTournamentDetails;
+  const action = tournamentActionProps(tournament);
+  tournamentDetailAction.dataset.tournamentAction = action.action;
+  tournamentDetailAction.dataset.tournamentId = tournament.id;
+  if (action.tableId) {
+    tournamentDetailAction.dataset.tableId = action.tableId;
+  } else {
+    delete tournamentDetailAction.dataset.tableId;
+  }
+  tournamentDetailAction.disabled = action.disabled || pendingTournamentRequests.has(tournament.id);
+  tournamentDetailAction.textContent = action.text;
+}
+
+function renderTournamentDetails(tournament) {
+  if (!tournamentDetailSheet || !tournamentDetailGrid || !tournamentDetailStructure) return;
+  const badge = tournamentBadge(tournament);
+  const infoRows = [
+    ["Бай-ин", formatTournamentAmountText(tournament.buyIn, tournament.balanceBucket)],
+    ["Fee", formatTournamentAmountText(tournament.fee, tournament.balanceBucket)],
+    ["Призовой", formatTournamentAmountText(tournament.prizePool, tournament.balanceBucket)],
+    ["Игроки", `${tournament.participants}/${tournament.maxPlayers}`],
+    ["Старт", formatDateTime(tournament.startsAt) || "по набору"],
+    ["Late reg", tournament.lateRegEndsAt ? formatDateTime(tournament.lateRegEndsAt) : "нет"],
+    ["Стек", formatNumber(tournament.startingStack || 0)],
+    ["Стол", `${formatNumber(tournament.maxPlayersPerTable || 0)} max`],
+    ["Re-entry", Number(tournament.reEntryLimit || 0) > 0 ? String(tournament.reEntryLimit) : "нет"],
+    ["Add-on", tournament.addOnAllowed ? "есть" : "нет"]
+  ];
+  const levels = Array.isArray(tournament.blindStructure) ? tournament.blindStructure.slice(0, 4) : [];
+  const playerNote = tournamentPlayerNote(tournament);
+  tournamentDetailTitle.textContent = tournament.title || "Турнир";
+  tournamentDetailBadge.dataset.state = badge.state;
+  tournamentDetailBadge.textContent = badge.text;
+  tournamentDetailSubtitle.textContent = `${tournamentTypeLabel(tournament.type)} · ${formatTournamentStartLabel(tournament)}`;
+  tournamentDetailDescription.textContent = tournament.description || "Cash-турнир с регистрацией по buy-in и fee.";
+  tournamentDetailGrid.innerHTML = infoRows.map(([label, value]) => `
+    <div>
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </div>
+  `).join("");
+  tournamentDetailStructure.innerHTML = levels.length
+    ? `
+      <span>Структура</span>
+      <div class="tournament-detail-levels">
+        ${levels.map((level) => `<div><b>L${escapeHtml(String(level.level || 0))}</b><strong>${escapeHtml(formatTournamentAmountText(level.smallBlind || 0, tournament.balanceBucket))}/${escapeHtml(formatTournamentAmountText(level.bigBlind || 0, tournament.balanceBucket))}</strong></div>`).join("")}
+      </div>
+    `
+    : "";
+  if (tournamentDetailNote) {
+    tournamentDetailNote.hidden = !playerNote;
+    tournamentDetailNote.textContent = playerNote || "";
+  }
+  syncTournamentDetailAction();
+}
+
+async function refreshOpenTournamentDetails(id = state.selectedTournamentId) {
+  if (!id) return;
+  const data = await api(`/api/tournaments/${id}`);
+  state.selectedTournamentId = id;
+  state.selectedTournamentDetails = data.tournament;
+  renderTournamentDetails(data.tournament);
+}
+
+async function openTournamentDetails(id) {
+  if (!id || !tournamentDetailBackdrop || !tournamentDetailSheet) return;
+  if (tournamentDetailTitle) tournamentDetailTitle.textContent = "Загрузка…";
+  if (tournamentDetailDescription) tournamentDetailDescription.textContent = "Подтягиваем детали турнира.";
+  if (tournamentDetailGrid) tournamentDetailGrid.innerHTML = "";
+  if (tournamentDetailStructure) tournamentDetailStructure.innerHTML = "";
+  if (tournamentDetailNote) tournamentDetailNote.hidden = true;
+  tournamentDetailBackdrop.hidden = false;
+  tournamentDetailSheet.hidden = false;
+  document.body.classList.add("sheet-open");
+  try {
+    await refreshOpenTournamentDetails(id);
+  } catch (error) {
+    closeTournamentDetails();
+    if (tournamentStatus) tournamentStatus.textContent = "Не удалось открыть детали турнира.";
+    throw error;
   }
 }
 

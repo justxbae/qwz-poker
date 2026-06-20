@@ -131,6 +131,16 @@ docs/03-architecture.md
 docs/12-tech-roadmap.md
 ```
 
+## Tournament lobby UX
+
+Для обычных cash-турниров в публичном лобби:
+
+- карточка турнира открывает детали по нажатию на сам блок;
+- CTA-кнопка внутри карточки отвечает только за `register` / `cancel` / `open table`;
+- buy-in, fee, prize pool, participants и status берутся только из API;
+- ticket/reward турниры не смешиваются визуально с cash lobby;
+- если режим ещё не реализован технически, не держать его как активный формат в home pills.
+
 ## Что нельзя делать
 
 Нельзя:
