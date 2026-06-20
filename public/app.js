@@ -955,7 +955,7 @@ function setupPromoCarousel() {
   const scrollPromoTo = (item) => {
     if (!item) return;
     promoCarousel.scrollTo({
-      left: Math.max(0, item.offsetLeft - promoCarousel.offsetLeft),
+      left: Math.max(0, item.offsetLeft - items[0].offsetLeft),
       behavior: "smooth",
     });
   };
@@ -3498,45 +3498,40 @@ function renderTournaments() {
     const action = tournamentActionProps(tournament);
     const playerNote = tournamentPlayerNote(tournament);
     const timing = tournamentStartParts(tournament);
-    const summaryBits = [
-      { label: "Бай-ин", value: formatTournamentAmountText(tournament.buyIn, tournament.balanceBucket) },
-      { label: "Fee", value: formatTournamentAmountText(tournament.fee, tournament.balanceBucket) },
-      { label: "Призовой", value: formatTournamentAmountText(tournament.prizePool, tournament.balanceBucket) },
-      { label: "Игроки", value: `${tournament.participants}/${tournament.maxPlayers}` }
-    ];
+    const buyIn = formatTournamentAmountText(tournament.buyIn, tournament.balanceBucket);
+    const fee = formatTournamentAmountText(tournament.fee, tournament.balanceBucket);
 
     node.innerHTML = `
       <div class="tournament-card-shell">
         <div class="tournament-card-timebox">
-          <span class="tournament-card-time-state" data-state="${badge.state}">${escapeHtml(tournamentStatusLabel(tournament.status))}</span>
           <strong>${escapeHtml(timing.time)}</strong>
           <small>${escapeHtml(timing.day)}</small>
         </div>
         <div class="tournament-card-main">
           <div class="tournament-card-head">
             <div class="tournament-card-copy">
-              <div class="tournament-card-kickers">
-                <span>${escapeHtml(tournamentTypeLabel(tournament.type))}</span>
-                <span>USDT</span>
-              </div>
               <strong>${escapeHtml(tournament.title)}</strong>
-              <small>${escapeHtml(formatTournamentStartLabel(tournament))}</small>
+              <small>${escapeHtml(tournamentTypeLabel(tournament.type))} · <span>USDT</span></small>
             </div>
             <b class="tournament-status-pill" data-state="${badge.state}">${escapeHtml(badge.text)}</b>
           </div>
-          <div class="tournament-meta-grid tournament-meta-grid--summary">
-            ${summaryBits.map((item) => `<span><small>${escapeHtml(item.label)}</small><strong>${escapeHtml(item.value)}</strong></span>`).join("")}
+          <div class="tournament-card-facts">
+            <span><small>Призовой</small><strong>${escapeHtml(formatTournamentAmountText(tournament.prizePool, tournament.balanceBucket))}</strong></span>
+            <span><small>Игроки</small><strong>${escapeHtml(`${tournament.participants}/${tournament.maxPlayers}`)}</strong></span>
+          </div>
+          <div class="tournament-card-entry">
+            <span><small>Бай-ин + fee</small><strong>${escapeHtml(buyIn)} <i>+</i> ${escapeHtml(fee)}</strong></span>
+            <button
+              type="button"
+              data-tournament-action="${action.action}"
+              data-tournament-id="${tournament.id}"
+              ${action.tableId ? `data-table-id="${action.tableId}"` : ""}
+              ${action.disabled || pendingTournamentRequests.has(tournament.id) ? "disabled" : ""}
+            >${escapeHtml(action.text)}</button>
           </div>
           ${playerNote ? `<p class="tournament-player-note">${escapeHtml(playerNote)}</p>` : ""}
         </div>
       </div>
-      <button
-        type="button"
-        data-tournament-action="${action.action}"
-        data-tournament-id="${tournament.id}"
-        ${action.tableId ? `data-table-id="${action.tableId}"` : ""}
-        ${action.disabled || pendingTournamentRequests.has(tournament.id) ? "disabled" : ""}
-      >${escapeHtml(action.text)}</button>
     `;
     tournamentList.append(node);
   }
@@ -3663,27 +3658,22 @@ function renderTournamentDetails(tournament) {
     ["Re-entry", Number(tournament.reEntryLimit || 0) > 0 ? String(tournament.reEntryLimit) : "нет"],
     ["Add-on", tournament.addOnAllowed ? "есть" : "нет"]
   ];
-  const levels = Array.isArray(tournament.blindStructure) ? tournament.blindStructure.slice(0, 4) : [];
   const playerNote = tournamentPlayerNote(tournament);
+  const description = /play[\s_-]*chips?|фишк/i.test(String(tournament.description || ""))
+    ? "Cash-турнир с регистрацией в USDT."
+    : tournament.description || "Cash-турнир с регистрацией в USDT.";
   tournamentDetailTitle.textContent = tournament.title || "Турнир";
   tournamentDetailBadge.dataset.state = badge.state;
   tournamentDetailBadge.textContent = badge.text;
   tournamentDetailSubtitle.textContent = `${tournamentTypeLabel(tournament.type)} · ${formatTournamentStartLabel(tournament)}`;
-  tournamentDetailDescription.textContent = tournament.description || "Cash-турнир с регистрацией по buy-in и fee.";
+  tournamentDetailDescription.textContent = description;
   tournamentDetailGrid.innerHTML = infoRows.map(([label, value]) => `
     <div>
       <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(value)}</strong>
     </div>
   `).join("");
-  tournamentDetailStructure.innerHTML = levels.length
-    ? `
-      <span>Структура</span>
-      <div class="tournament-detail-levels">
-        ${levels.map((level) => `<div><b>L${escapeHtml(String(level.level || 0))}</b><strong>${escapeHtml(formatTournamentAmountText(level.smallBlind || 0, tournament.balanceBucket))}/${escapeHtml(formatTournamentAmountText(level.bigBlind || 0, tournament.balanceBucket))}</strong></div>`).join("")}
-      </div>
-    `
-    : "";
+  tournamentDetailStructure.innerHTML = "";
   if (tournamentDetailNote) {
     tournamentDetailNote.hidden = !playerNote;
     tournamentDetailNote.textContent = playerNote || "";
