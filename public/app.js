@@ -207,6 +207,12 @@ const tournamentDetailGrid = document.querySelector("#tournamentDetailGrid");
 const tournamentDetailStructure = document.querySelector("#tournamentDetailStructure");
 const tournamentDetailNote = document.querySelector("#tournamentDetailNote");
 const tournamentDetailAction = document.querySelector("#tournamentDetailAction");
+const tournamentDetailHome = tournamentDetailSheet && tournamentDetailBackdrop ? {
+  sheetParent: tournamentDetailSheet.parentNode,
+  sheetNextSibling: tournamentDetailSheet.nextSibling,
+  backdropParent: tournamentDetailBackdrop.parentNode,
+  backdropNextSibling: tournamentDetailBackdrop.nextSibling
+} : null;
 const continueCard = document.querySelector("#continueCard");
 const continueMeta = document.querySelector("#continueMeta");
 const continueGameButton = document.querySelector("#continueGameButton");
@@ -3625,10 +3631,17 @@ function closeTournamentDetails() {
   state.selectedTournamentDetails = null;
   tournamentDetailSheet?.classList.remove("sheet-visible");
   document.body.classList.remove("sheet-open");
-  window.setTimeout(() => {
+  window.clearTimeout(closeTournamentDetails.timer);
+  closeTournamentDetails.timer = window.setTimeout(() => {
     if (tournamentDetailBackdrop) tournamentDetailBackdrop.hidden = true;
     if (tournamentDetailSheet) tournamentDetailSheet.hidden = true;
-  }, 220);
+    if (tournamentDetailHome?.sheetParent) {
+      tournamentDetailHome.sheetParent.insertBefore(tournamentDetailSheet, tournamentDetailHome.sheetNextSibling);
+    }
+    if (tournamentDetailHome?.backdropParent) {
+      tournamentDetailHome.backdropParent.insertBefore(tournamentDetailBackdrop, tournamentDetailHome.backdropNextSibling);
+    }
+  }, 500);
 }
 
 function syncTournamentDetailAction() {
@@ -3694,15 +3707,20 @@ async function refreshOpenTournamentDetails(id = state.selectedTournamentId) {
 
 async function openTournamentDetails(id) {
   if (!id || !tournamentDetailBackdrop || !tournamentDetailSheet) return;
+  window.clearTimeout(closeTournamentDetails.timer);
   if (tournamentDetailTitle) tournamentDetailTitle.textContent = "Загрузка…";
   if (tournamentDetailDescription) tournamentDetailDescription.textContent = "Подтягиваем детали турнира.";
   if (tournamentDetailGrid) tournamentDetailGrid.innerHTML = "";
   if (tournamentDetailStructure) tournamentDetailStructure.innerHTML = "";
   if (tournamentDetailNote) tournamentDetailNote.hidden = true;
+  document.body.append(tournamentDetailBackdrop, tournamentDetailSheet);
   tournamentDetailBackdrop.hidden = false;
   tournamentDetailSheet.hidden = false;
+  tournamentDetailSheet.classList.remove("sheet-visible");
   document.body.classList.add("sheet-open");
-  window.requestAnimationFrame(() => tournamentDetailSheet.classList.add("sheet-visible"));
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => tournamentDetailSheet.classList.add("sheet-visible"));
+  });
   try {
     await refreshOpenTournamentDetails(id);
   } catch (error) {
