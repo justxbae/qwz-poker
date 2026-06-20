@@ -3623,9 +3623,12 @@ async function onTournamentDetailAction() {
 function closeTournamentDetails() {
   state.selectedTournamentId = "";
   state.selectedTournamentDetails = null;
-  if (tournamentDetailBackdrop) tournamentDetailBackdrop.hidden = true;
-  if (tournamentDetailSheet) tournamentDetailSheet.hidden = true;
+  tournamentDetailSheet?.classList.remove("sheet-visible");
   document.body.classList.remove("sheet-open");
+  window.setTimeout(() => {
+    if (tournamentDetailBackdrop) tournamentDetailBackdrop.hidden = true;
+    if (tournamentDetailSheet) tournamentDetailSheet.hidden = true;
+  }, 220);
 }
 
 function syncTournamentDetailAction() {
@@ -3699,6 +3702,7 @@ async function openTournamentDetails(id) {
   tournamentDetailBackdrop.hidden = false;
   tournamentDetailSheet.hidden = false;
   document.body.classList.add("sheet-open");
+  window.requestAnimationFrame(() => tournamentDetailSheet.classList.add("sheet-visible"));
   try {
     await refreshOpenTournamentDetails(id);
   } catch (error) {

@@ -1182,26 +1182,55 @@ body:not(.in-game) .tournament-detail-backdrop {
   z-index: 1000 !important;
   background: rgba(5, 9, 14, 0.76) !important;
   backdrop-filter: blur(6px) !important;
+  opacity: 0 !important;
+  transition: opacity 180ms ease !important;
 }
+
+body.sheet-open:not(.in-game) .tournament-detail-backdrop { opacity: 1 !important; }
 
 body:not(.in-game) .tournament-detail-sheet {
   top: auto !important;
-  left: max(0px, calc(50vw - 280px)) !important;
-  right: auto !important;
+  left: max(10px, env(safe-area-inset-left)) !important;
+  right: max(10px, env(safe-area-inset-right)) !important;
   bottom: 0 !important;
-  width: min(560px, 100vw) !important;
+  width: auto !important;
+  max-width: 520px !important;
   height: auto !important;
-  max-height: calc(100dvh - 24px) !important;
+  max-height: min(82vh, 720px) !important;
+  margin: 0 auto !important;
   box-sizing: border-box !important;
   gap: 0 !important;
   padding: 0 !important;
   overflow: hidden !important;
   border-radius: 24px 24px 0 0 !important;
   z-index: 1001 !important;
+  transform: translateY(102%) !important;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+  touch-action: pan-y !important;
+  overscroll-behavior: contain !important;
+}
+
+body:not(.in-game) .tournament-detail-sheet.sheet-visible { transform: translateY(0) !important; }
+
+body.sheet-open:not(.in-game) .tournament-detail-grabber {
+  display: block !important;
+  width: 100% !important;
+  height: 24px !important;
+  margin: 0 !important;
+}
+
+body.sheet-open:not(.in-game) .tournament-detail-grabber::before {
+  content: "" !important;
+  display: block !important;
+  width: 38px !important;
+  height: 4px !important;
+  margin: 8px auto 0 !important;
+  border-radius: 999px !important;
+  background: rgba(142, 155, 170, 0.42) !important;
 }
 
 body:not(.in-game) .tournament-detail-head {
-  padding: 16px 16px 13px !important;
+  padding: 2px 16px 13px !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07) !important;
 }
 
