@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="/styles.css" />
-    <link rel="stylesheet" href="/lobby-qa.css" />
+    <link rel="stylesheet" href="/lobby-qa.css?v=20260621-1" />
   </head>
   <body>
     <section class="app-boot" id="appBoot" aria-live="polite" aria-label="Загрузка QWZ Poker">
@@ -231,22 +231,6 @@
                 <small>RP-сезон</small>
               </button>
             </div>
-            <div class="play-format-grid" aria-label="Дополнительные форматы">
-              <button type="button" data-lobby-tab="tournaments">
-                <span class="format-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 5h10v2c0 2.8-1.9 5.1-4.5 5.8V15h2.5l1 2H8l1-2h2.5v-2.2C8.9 12.1 7 9.8 7 7V5Z"/><path d="M6 6H4v1a3 3 0 0 0 3 3"/><path d="M18 6h2v1a3 3 0 0 1-3 3"/></svg></span>
-                <span class="format-copy">
-                  <strong>Турниры</strong>
-                  <small>серии и freeroll</small>
-                </span>
-              </button>
-              <button type="button" data-mode-action="private">
-                <span class="format-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7.5 11V8.5a4.5 4.5 0 0 1 9 0V11"/><path d="M6 11h12v8H6z"/><path d="M12 14v2"/></svg></span>
-                <span class="format-copy">
-                  <strong>Приватный</strong>
-                  <small>игра с друзьями</small>
-                </span>
-              </button>
-            </div>
             <p class="mode-context-copy" id="modeContextCopy">Cash — деньги, турниры и приватные столы. Рейтинг — отдельный сезон с RP, лигами и лидербордом.</p>
           </section>
 
@@ -311,6 +295,22 @@
           </section>
 
           <section class="tg-menu-group home-tools">
+            <button type="button" class="tg-menu-row tournament-registration-notice" id="tournamentRegistrationNotice" data-lobby-tab="tournaments" hidden>
+              <span class="tg-row-icon tg-row-icon--blue" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M7 5h10v2c0 2.8-1.9 5.1-4.5 5.8V15h2.5l1 2H8l1-2h2.5v-2.2C8.9 12.1 7 9.8 7 7V5Z"/><path d="M6 6H4v1a3 3 0 0 0 3 3"/><path d="M18 6h2v1a3 3 0 0 1-3 3"/></svg>
+              </span>
+              <span class="tg-row-main">Вы записаны на турнир</span>
+              <span class="tg-row-value" id="tournamentRegistrationMeta">Открыть</span>
+              <span class="tg-chevron">›</span>
+            </button>
+            <button type="button" class="tg-menu-row" data-mode-action="private">
+              <span class="tg-row-icon tg-row-icon--cyan" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M7.5 11V8.5a4.5 4.5 0 0 1 9 0V11"/><path d="M6 11h12v8H6z"/><path d="M12 14v2"/></svg>
+              </span>
+              <span class="tg-row-main">Приватный стол</span>
+              <span class="tg-row-value">Игра с друзьями</span>
+              <span class="tg-chevron">›</span>
+            </button>
             <button type="button" class="tg-menu-row" data-lobby-tab="cashier" data-cashier-section="history">
               <span class="tg-row-icon tg-row-icon--gray" aria-hidden="true">
                 <svg viewBox="0 0 24 24"><path d="M4 12h3l2-4 4 8 2-4h5"/></svg>
@@ -903,6 +903,11 @@
             <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m4 11 8-7 8 7v9H4Z"/><path d="M9.5 20v-6h5v6"/></svg></span>
             <span class="nav-label">Главная</span>
           </button>
+          <button type="button" class="tournament-nav-button" data-lobby-tab="tournaments">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 5h10v2c0 2.8-1.9 5.1-4.5 5.8V15h2.5l1 2H8l1-2h2.5v-2.2C8.9 12.1 7 9.8 7 7V5Z"/><path d="M6 6H4v1a3 3 0 0 0 3 3"/><path d="M18 6h2v1a3 3 0 0 1-3 3"/></svg></span>
+            <span class="nav-label">Турниры</span>
+            <span class="nav-alert-dot" id="tournamentRegistrationBadge" hidden aria-label="Вы зарегистрированы на турнир"></span>
+          </button>
           <button type="button" data-lobby-tab="profile">
             <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg></span>
             <span class="nav-label">Профиль</span>
@@ -1003,6 +1008,6 @@
       </article>
     </template>
 
-    <script src="/app.js" type="module"></script>
+    <script src="/app.js?v=20260621-1" type="module"></script>
   </body>
 </html>

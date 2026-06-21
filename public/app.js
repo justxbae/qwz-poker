@@ -207,6 +207,9 @@ const tournamentDetailGrid = document.querySelector("#tournamentDetailGrid");
 const tournamentDetailStructure = document.querySelector("#tournamentDetailStructure");
 const tournamentDetailNote = document.querySelector("#tournamentDetailNote");
 const tournamentDetailAction = document.querySelector("#tournamentDetailAction");
+const tournamentRegistrationNotice = document.querySelector("#tournamentRegistrationNotice");
+const tournamentRegistrationMeta = document.querySelector("#tournamentRegistrationMeta");
+const tournamentRegistrationBadge = document.querySelector("#tournamentRegistrationBadge");
 const tournamentDetailHome = tournamentDetailSheet && tournamentDetailBackdrop ? {
   sheetParent: tournamentDetailSheet.parentNode,
   sheetNextSibling: tournamentDetailSheet.nextSibling,
@@ -347,6 +350,7 @@ async function boot() {
   await loadConfig();
   await loadTables();
   await loadProfile();
+  await loadTournaments();
   resetAdminTournamentForm();
   setupScrollReveal();
   setupPromoCarousel();
@@ -368,6 +372,7 @@ async function boot() {
   document.querySelectorAll("[data-cashier-sheet]").forEach((sheet) => {
     wireCashierSheetDrag(sheet);
   });
+  if (tournamentDetailSheet) wireCashierSheetDrag(tournamentDetailSheet, closeTournamentDetails);
   if (lobbyMenuSheet) wireCashierSheetDrag(lobbyMenuSheet, closeLobbyMenu);
   cashierSheetCloseButtons.forEach((button) => {
     button.addEventListener("click", closeCashierSheet);
@@ -381,6 +386,7 @@ async function boot() {
   tournamentDetailClose?.addEventListener("click", closeTournamentDetails);
   tournamentDetailSecondary?.addEventListener("click", closeTournamentDetails);
   tournamentDetailAction?.addEventListener("click", onTournamentDetailAction);
+  document.querySelector(".home-tools")?.addEventListener("click", onGameFormatSelect);
   quickPlayButton.addEventListener("click", () => runAction(quickPlay));
   quickPrivateButton?.addEventListener("click", () => runAction(quickCreatePrivateTable));
   homeWalletSideAction?.addEventListener("click", () => runAction(claimDailyPlayBonus));
@@ -1025,6 +1031,10 @@ async function handleTelegramBack() {
     closeAmountPanel();
     return;
   }
+  if (state.selectedTournamentId) {
+    closeTournamentDetails();
+    return;
+  }
   if (cashierState.sheet) {
     closeCashierSheet();
     return;
@@ -1060,6 +1070,7 @@ async function handleTelegramBack() {
 
 function updateTelegramBackButton() {
   const shouldShow = Boolean(pendingBetAction)
+    || Boolean(state.selectedTournamentId)
     || !buyInOverlay.hidden
     || Boolean(cashierState.sheet)
     || Boolean(lobbyMenuSheet && !lobbyMenuSheet.hidden)
@@ -3476,6 +3487,7 @@ async function loadTournaments() {
 function renderTournaments() {
   if (!tournamentList) return;
   tournamentList.replaceChildren();
+  renderTournamentRegistrationNotice();
   renderTournamentHistoryList(tournamentHistoryList, state.tournamentHistory, {
     emptyText: "История участия появится после первого завершённого турнира.",
     limit: 6
@@ -3540,6 +3552,26 @@ function renderTournaments() {
       </div>
     `;
     tournamentList.append(node);
+  }
+}
+
+function renderTournamentRegistrationNotice() {
+  const registered = state.tournaments.find((tournament) => {
+    const playerStatus = tournament.playerState?.status;
+    return tournament.registered || playerStatus === "registered" || playerStatus === "playing";
+  });
+  if (tournamentRegistrationNotice) {
+    tournamentRegistrationNotice.hidden = !registered;
+    tournamentRegistrationNotice.style.setProperty("display", registered ? "" : "none", registered ? "" : "important");
+  }
+  if (tournamentRegistrationBadge) {
+    tournamentRegistrationBadge.hidden = !registered;
+    tournamentRegistrationBadge.style.setProperty("display", registered ? "" : "none", registered ? "" : "important");
+  }
+  if (tournamentRegistrationMeta) {
+    tournamentRegistrationMeta.textContent = registered
+      ? `${registered.title} · ${formatTournamentStartLabel(registered)}`
+      : "Открыть";
   }
 }
 
@@ -3629,19 +3661,20 @@ async function onTournamentDetailAction() {
 function closeTournamentDetails() {
   state.selectedTournamentId = "";
   state.selectedTournamentDetails = null;
-  tournamentDetailSheet?.classList.remove("sheet-visible");
-  document.body.classList.remove("sheet-open");
-  window.clearTimeout(closeTournamentDetails.timer);
-  closeTournamentDetails.timer = window.setTimeout(() => {
-    if (tournamentDetailBackdrop) tournamentDetailBackdrop.hidden = true;
-    if (tournamentDetailSheet) tournamentDetailSheet.hidden = true;
-    if (tournamentDetailHome?.sheetParent) {
-      tournamentDetailHome.sheetParent.insertBefore(tournamentDetailSheet, tournamentDetailHome.sheetNextSibling);
-    }
-    if (tournamentDetailHome?.backdropParent) {
-      tournamentDetailHome.backdropParent.insertBefore(tournamentDetailBackdrop, tournamentDetailHome.backdropNextSibling);
-    }
-  }, 500);
+  document.body.classList.remove("cashier-sheet-open", "tournament-sheet-open");
+  if (tournamentDetailBackdrop) tournamentDetailBackdrop.hidden = true;
+  if (tournamentDetailSheet) {
+    tournamentDetailSheet.hidden = true;
+    tournamentDetailSheet.classList.remove("sheet-visible", "sheet-open");
+    tournamentDetailSheet.style.removeProperty("--sheet-drag-y");
+  }
+  if (tournamentDetailHome?.sheetParent) {
+    tournamentDetailHome.sheetParent.insertBefore(tournamentDetailSheet, tournamentDetailHome.sheetNextSibling);
+  }
+  if (tournamentDetailHome?.backdropParent) {
+    tournamentDetailHome.backdropParent.insertBefore(tournamentDetailBackdrop, tournamentDetailHome.backdropNextSibling);
+  }
+  updateTelegramBackButton();
 }
 
 function syncTournamentDetailAction() {
@@ -3707,7 +3740,6 @@ async function refreshOpenTournamentDetails(id = state.selectedTournamentId) {
 
 async function openTournamentDetails(id) {
   if (!id || !tournamentDetailBackdrop || !tournamentDetailSheet) return;
-  window.clearTimeout(closeTournamentDetails.timer);
   if (tournamentDetailTitle) tournamentDetailTitle.textContent = "Загрузка…";
   if (tournamentDetailDescription) tournamentDetailDescription.textContent = "Подтягиваем детали турнира.";
   if (tournamentDetailGrid) tournamentDetailGrid.innerHTML = "";
@@ -3717,10 +3749,10 @@ async function openTournamentDetails(id) {
   tournamentDetailBackdrop.hidden = false;
   tournamentDetailSheet.hidden = false;
   tournamentDetailSheet.classList.remove("sheet-visible");
-  document.body.classList.add("sheet-open");
-  window.requestAnimationFrame(() => {
-    window.requestAnimationFrame(() => tournamentDetailSheet.classList.add("sheet-visible"));
-  });
+  tournamentDetailSheet.classList.add("sheet-open");
+  document.body.classList.add("cashier-sheet-open", "tournament-sheet-open");
+  window.requestAnimationFrame(() => tournamentDetailSheet.classList.add("sheet-visible"));
+  updateTelegramBackButton();
   try {
     await refreshOpenTournamentDetails(id);
   } catch (error) {
