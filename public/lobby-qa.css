@@ -1190,10 +1190,11 @@ body:not(.in-game) .tournament-detail-sheet {
   bottom: 0 !important;
   width: auto !important;
   max-width: 520px !important;
-  height: auto !important;
+  height: min(82dvh, 720px) !important;
   max-height: min(82vh, 720px) !important;
   margin: 0 auto !important;
   box-sizing: border-box !important;
+  grid-template-rows: auto auto minmax(0, 1fr) auto !important;
   gap: 0 !important;
   padding: 0 !important;
   overflow: auto !important;
@@ -1223,7 +1224,125 @@ body:not(.in-game) .tournament-detail-body {
   min-height: 0 !important;
   gap: 12px !important;
   padding: 14px 16px !important;
+  overflow-y: auto !important;
 }
+
+body:not(.in-game) .tournament-detail-summary {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+}
+
+body:not(.in-game) .tournament-detail-summary > div {
+  display: grid !important;
+  align-content: center !important;
+  gap: 4px !important;
+  min-height: 62px !important;
+  padding: 10px !important;
+  border-radius: 13px !important;
+  background: rgba(255, 255, 255, 0.045) !important;
+}
+
+body:not(.in-game) .tournament-detail-summary span,
+body:not(.in-game) .tournament-detail-countdown > span {
+  color: var(--qwz-dim) !important;
+  font-size: 9px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+}
+
+body:not(.in-game) .tournament-detail-summary strong {
+  color: var(--qwz-ink) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+body:not(.in-game) .tournament-detail-countdown {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: end !important;
+  gap: 3px 12px !important;
+  padding: 12px 14px !important;
+  border: 1px solid rgba(42, 171, 238, 0.22) !important;
+  border-radius: 14px !important;
+  background: rgba(42, 171, 238, 0.07) !important;
+}
+
+body:not(.in-game) .tournament-detail-countdown strong {
+  grid-row: span 2 !important;
+  color: var(--qwz-acc) !important;
+  font-size: 19px !important;
+  font-weight: 600 !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+body:not(.in-game) .tournament-detail-countdown small { color: var(--qwz-dim) !important; font-size: 10px !important; }
+
+body:not(.in-game) .tournament-detail-tabs {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 4px !important;
+  padding: 4px !important;
+  border-radius: 13px !important;
+  background: rgba(255, 255, 255, 0.045) !important;
+}
+
+body:not(.in-game) .tournament-detail-tabs button {
+  min-height: 34px !important;
+  padding: 0 6px !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: transparent !important;
+  color: var(--qwz-dim) !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+}
+
+body:not(.in-game) .tournament-detail-tabs button.active {
+  background: rgba(42, 171, 238, 0.16) !important;
+  color: var(--qwz-ink) !important;
+}
+
+body:not(.in-game) .tournament-detail-panel { display: none !important; }
+body:not(.in-game) .tournament-detail-panel.active { display: block !important; }
+
+body:not(.in-game) .tournament-payout-list,
+body:not(.in-game) .tournament-blinds-table { display: grid !important; gap: 1px !important; }
+
+body:not(.in-game) .tournament-payout-list > div {
+  display: grid !important;
+  grid-template-columns: 44px 1fr auto !important;
+  align-items: center !important;
+  min-height: 42px !important;
+  padding: 0 12px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+body:not(.in-game) .tournament-payout-list b { color: var(--qwz-gold) !important; }
+body:not(.in-game) .tournament-payout-list span { color: var(--qwz-dim) !important; }
+body:not(.in-game) .tournament-payout-list strong { font-size: 12px !important; font-weight: 600 !important; }
+
+body:not(.in-game) .tournament-blinds-head,
+body:not(.in-game) .tournament-blinds-table > div:not(.tournament-blinds-head) {
+  display: grid !important;
+  grid-template-columns: 34px minmax(92px, 1fr) 58px 54px !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-height: 38px !important;
+  padding: 0 8px !important;
+}
+
+body:not(.in-game) .tournament-blinds-head {
+  color: var(--qwz-dim) !important;
+  font-size: 9px !important;
+  text-transform: uppercase !important;
+}
+
+body:not(.in-game) .tournament-blinds-table > div:not(.tournament-blinds-head) { border-top: 1px solid rgba(255, 255, 255, 0.05) !important; }
+body:not(.in-game) .tournament-blinds-table b { color: var(--qwz-gold) !important; font-size: 11px !important; }
+body:not(.in-game) .tournament-blinds-table strong,
+body:not(.in-game) .tournament-blinds-table span { font-size: 11px !important; font-weight: 500 !important; }
 
 body:not(.in-game) .tournament-detail-status {
   gap: 6px !important;
@@ -1239,7 +1358,7 @@ body:not(.in-game) .tournament-detail-grid div {
 }
 
 body:not(.in-game) .tournament-detail-footer {
-  padding: 12px 16px calc(12px + env(safe-area-inset-bottom)) !important;
+  padding: 12px 16px calc(30px + env(safe-area-inset-bottom)) !important;
   border-top: 1px solid rgba(255, 255, 255, 0.07) !important;
   background: rgba(12, 19, 28, 0.96) !important;
 }
@@ -1256,7 +1375,13 @@ body:not(.in-game) .nav-alert-dot {
   background: var(--qwz-gold) !important;
 }
 
-body:not(.in-game) .tournament-registration-notice .tg-row-main { color: var(--qwz-acc) !important; }
+body:not(.in-game) .tournament-registration-notice {
+  margin: 4px !important;
+  border: 1px solid rgba(42, 171, 238, 0.5) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 0 0 1px rgba(42, 171, 238, 0.08) inset !important;
+}
+body:not(.in-game) .tournament-registration-notice .tg-row-main { color: var(--qwz-ink) !important; }
 body:not(.in-game) .tournament-registration-notice[hidden],
 body:not(.in-game) .nav-alert-dot[hidden] { display: none !important; }
 body:not(.in-game) .tournament-registration-notice .tg-row-value {

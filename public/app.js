@@ -203,11 +203,16 @@ const tournamentDetailTitle = document.querySelector("#tournamentDetailTitle");
 const tournamentDetailBadge = document.querySelector("#tournamentDetailBadge");
 const tournamentDetailSubtitle = document.querySelector("#tournamentDetailSubtitle");
 const tournamentDetailDescription = document.querySelector("#tournamentDetailDescription");
+const tournamentDetailSummary = document.querySelector("#tournamentDetailSummary");
+const tournamentDetailCountdown = document.querySelector("#tournamentDetailCountdown");
+const tournamentDetailStart = document.querySelector("#tournamentDetailStart");
+const tournamentDetailPayout = document.querySelector("#tournamentDetailPayout");
 const tournamentDetailGrid = document.querySelector("#tournamentDetailGrid");
 const tournamentDetailStructure = document.querySelector("#tournamentDetailStructure");
 const tournamentDetailNote = document.querySelector("#tournamentDetailNote");
 const tournamentDetailAction = document.querySelector("#tournamentDetailAction");
 const tournamentRegistrationNotice = document.querySelector("#tournamentRegistrationNotice");
+const tournamentRegistrationTitle = document.querySelector("#tournamentRegistrationTitle");
 const tournamentRegistrationMeta = document.querySelector("#tournamentRegistrationMeta");
 const tournamentRegistrationBadge = document.querySelector("#tournamentRegistrationBadge");
 const tournamentDetailHome = tournamentDetailSheet && tournamentDetailBackdrop ? {
@@ -332,6 +337,7 @@ const pendingTournamentRequests = new Set();
 const pendingAdminTournamentRequests = new Set();
 let currentLobbyTab = "home";
 let fairnessSeedSyncing = false;
+let tournamentCountdownTimer = 0;
 const fairnessSeedSyncedTables = new Set();
 let revealObserver = null;
 
@@ -386,6 +392,7 @@ async function boot() {
   tournamentDetailClose?.addEventListener("click", closeTournamentDetails);
   tournamentDetailSecondary?.addEventListener("click", closeTournamentDetails);
   tournamentDetailAction?.addEventListener("click", onTournamentDetailAction);
+  tournamentDetailSheet?.addEventListener("click", onTournamentDetailTabSelect);
   document.querySelector(".home-tools")?.addEventListener("click", onGameFormatSelect);
   quickPlayButton.addEventListener("click", () => runAction(quickPlay));
   quickPrivateButton?.addEventListener("click", () => runAction(quickCreatePrivateTable));
@@ -3570,9 +3577,10 @@ function renderTournamentRegistrationNotice() {
   }
   if (tournamentRegistrationMeta) {
     tournamentRegistrationMeta.textContent = registered
-      ? `${registered.title} · ${formatTournamentStartLabel(registered)}`
+      ? formatTournamentStartLabel(registered)
       : "Открыть";
   }
+  if (tournamentRegistrationTitle) tournamentRegistrationTitle.textContent = registered?.title || "Турнир";
 }
 
 async function onTournamentAction(event) {
@@ -3659,6 +3667,7 @@ async function onTournamentDetailAction() {
 }
 
 function closeTournamentDetails() {
+  window.clearInterval(tournamentCountdownTimer);
   state.selectedTournamentId = "";
   state.selectedTournamentDetails = null;
   document.body.classList.remove("cashier-sheet-open", "tournament-sheet-open");
@@ -3677,6 +3686,39 @@ function closeTournamentDetails() {
   updateTelegramBackButton();
 }
 
+function onTournamentDetailTabSelect(event) {
+  const button = event.target.closest("[data-tournament-detail-tab]");
+  if (!button) return;
+  const tab = button.dataset.tournamentDetailTab;
+  tournamentDetailSheet.querySelectorAll("[data-tournament-detail-tab]").forEach((item) => {
+    item.classList.toggle("active", item.dataset.tournamentDetailTab === tab);
+  });
+  tournamentDetailSheet.querySelectorAll("[data-tournament-detail-panel]").forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.tournamentDetailPanel === tab);
+  });
+}
+
+function updateTournamentCountdown(tournament) {
+  if (!tournamentDetailCountdown || !tournamentDetailStart) return;
+  tournamentDetailStart.textContent = formatDateTime(tournament.startsAt) || "Старт по набору";
+  const target = new Date(tournament.startsAt || "").getTime();
+  if (!Number.isFinite(target)) {
+    tournamentDetailCountdown.textContent = "По набору";
+    return;
+  }
+  const remaining = Math.max(0, target - Date.now());
+  if (!remaining || ["running", "final_table", "finished"].includes(tournament.status)) {
+    tournamentDetailCountdown.textContent = "Турнир начался";
+    return;
+  }
+  const totalSeconds = Math.floor(remaining / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  tournamentDetailCountdown.textContent = `${days ? `${days}д ` : ""}${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 function syncTournamentDetailAction() {
   if (!tournamentDetailAction || !state.selectedTournamentDetails) return;
   const tournament = state.selectedTournamentDetails;
@@ -3693,14 +3735,11 @@ function syncTournamentDetailAction() {
 }
 
 function renderTournamentDetails(tournament) {
-  if (!tournamentDetailSheet || !tournamentDetailGrid || !tournamentDetailStructure) return;
+  if (!tournamentDetailSheet || !tournamentDetailGrid || !tournamentDetailStructure || !tournamentDetailSummary || !tournamentDetailPayout) return;
   const badge = tournamentBadge(tournament);
   const infoRows = [
-    ["Бай-ин", formatTournamentAmountText(tournament.buyIn, tournament.balanceBucket)],
-    ["Fee", formatTournamentAmountText(tournament.fee, tournament.balanceBucket)],
-    ["Призовой", formatTournamentAmountText(tournament.prizePool, tournament.balanceBucket)],
-    ["Игроки", `${tournament.participants}/${tournament.maxPlayers}`],
-    ["Старт", formatDateTime(tournament.startsAt) || "по набору"],
+    ["Тип", tournamentTypeLabel(tournament.type)],
+    ["Статус", tournamentStatusLabel(tournament.status)],
     ["Late reg", tournament.lateRegEndsAt ? formatDateTime(tournament.lateRegEndsAt) : "нет"],
     ["Стек", formatNumber(tournament.startingStack || 0)],
     ["Стол", `${formatNumber(tournament.maxPlayersPerTable || 0)} max`],
@@ -3716,17 +3755,52 @@ function renderTournamentDetails(tournament) {
   tournamentDetailBadge.textContent = badge.text;
   tournamentDetailSubtitle.textContent = `${tournamentTypeLabel(tournament.type)} · ${formatTournamentStartLabel(tournament)}`;
   tournamentDetailDescription.textContent = description;
+  tournamentDetailSummary.innerHTML = `
+    <div><span>Стоимость</span><strong>${escapeHtml(formatTournamentAmountText(tournament.totalCost ?? tournament.buyIn, "cash"))}</strong></div>
+    <div><span>Игроки</span><strong>${escapeHtml(`${tournament.participants}/${tournament.maxPlayers}`)}</strong></div>
+    <div><span>Призовой фонд</span><strong>${escapeHtml(formatTournamentAmountText(tournament.prizePool, "cash"))}</strong></div>
+  `;
   tournamentDetailGrid.innerHTML = infoRows.map(([label, value]) => `
     <div>
       <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(value)}</strong>
     </div>
   `).join("");
-  tournamentDetailStructure.innerHTML = "";
+  const payoutRows = Array.isArray(tournament.payoutPreview) && tournament.payoutPreview.length
+    ? tournament.payoutPreview.map((entry) => ({
+      place: entry.place,
+      percent: entry.percent,
+      amount: formatTournamentAmountText(entry.amount, "cash")
+    }))
+    : (tournament.payoutStructure || []).map((entry, index) => ({
+      place: index + 1,
+      percent: typeof entry === "object" ? entry.percent : entry,
+      amount: ""
+    }));
+  tournamentDetailPayout.innerHTML = payoutRows.length
+    ? `<div class="tournament-payout-list">${payoutRows.map((entry) => `
+        <div><b>#${escapeHtml(String(entry.place))}</b><span>${escapeHtml(String(entry.percent || 0))}%</span>${entry.amount ? `<strong>${escapeHtml(entry.amount)}</strong>` : ""}</div>
+      `).join("")}</div>`
+    : `<p class="empty">Призовые места появятся после формирования фонда.</p>`;
+  const blindLevels = Array.isArray(tournament.blindStructure) ? tournament.blindStructure : [];
+  tournamentDetailStructure.innerHTML = blindLevels.length
+    ? `<div class="tournament-blinds-table">
+        <div class="tournament-blinds-head"><span>Ур.</span><span>SB / BB</span><span>Ante</span><span>Время</span></div>
+        ${blindLevels.map((level) => `<div>
+          <b>${escapeHtml(String(level.level || "—"))}</b>
+          <strong>${escapeHtml(`${formatNumber(level.smallBlind || 0)} / ${formatNumber(level.bigBlind || 0)}`)}</strong>
+          <span>${escapeHtml(formatNumber(level.ante || 0))}</span>
+          <span>${escapeHtml(`${Math.max(1, Math.round(Number(level.durationSeconds || 0) / 60))} мин`)}</span>
+        </div>`).join("")}
+      </div>`
+    : `<p class="empty">Структура блайндов пока не опубликована.</p>`;
   if (tournamentDetailNote) {
     tournamentDetailNote.hidden = !playerNote;
     tournamentDetailNote.textContent = playerNote || "";
   }
+  window.clearInterval(tournamentCountdownTimer);
+  updateTournamentCountdown(tournament);
+  tournamentCountdownTimer = window.setInterval(() => updateTournamentCountdown(tournament), 1000);
   syncTournamentDetailAction();
 }
 
@@ -3743,8 +3817,18 @@ async function openTournamentDetails(id) {
   if (tournamentDetailTitle) tournamentDetailTitle.textContent = "Загрузка…";
   if (tournamentDetailDescription) tournamentDetailDescription.textContent = "Подтягиваем детали турнира.";
   if (tournamentDetailGrid) tournamentDetailGrid.innerHTML = "";
+  if (tournamentDetailSummary) tournamentDetailSummary.innerHTML = `<div></div><div></div><div></div>`;
+  if (tournamentDetailPayout) tournamentDetailPayout.innerHTML = `<p class="empty">Загружаем данные турнира…</p>`;
+  if (tournamentDetailCountdown) tournamentDetailCountdown.textContent = "--:--:--";
+  if (tournamentDetailStart) tournamentDetailStart.textContent = "Загрузка времени старта";
   if (tournamentDetailStructure) tournamentDetailStructure.innerHTML = "";
   if (tournamentDetailNote) tournamentDetailNote.hidden = true;
+  tournamentDetailSheet.querySelectorAll("[data-tournament-detail-tab]").forEach((item) => {
+    item.classList.toggle("active", item.dataset.tournamentDetailTab === "payout");
+  });
+  tournamentDetailSheet.querySelectorAll("[data-tournament-detail-panel]").forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.tournamentDetailPanel === "payout");
+  });
   document.body.append(tournamentDetailBackdrop, tournamentDetailSheet);
   tournamentDetailBackdrop.hidden = false;
   tournamentDetailSheet.hidden = false;

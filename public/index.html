@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="/styles.css" />
-    <link rel="stylesheet" href="/lobby-qa.css?v=20260621-1" />
+    <link rel="stylesheet" href="/lobby-qa.css?v=20260621-2" />
   </head>
   <body>
     <section class="app-boot" id="appBoot" aria-live="polite" aria-label="Загрузка QWZ Poker">
@@ -299,7 +299,7 @@
               <span class="tg-row-icon tg-row-icon--blue" aria-hidden="true">
                 <svg viewBox="0 0 24 24"><path d="M7 5h10v2c0 2.8-1.9 5.1-4.5 5.8V15h2.5l1 2H8l1-2h2.5v-2.2C8.9 12.1 7 9.8 7 7V5Z"/><path d="M6 6H4v1a3 3 0 0 0 3 3"/><path d="M18 6h2v1a3 3 0 0 1-3 3"/></svg>
               </span>
-              <span class="tg-row-main">Вы записаны на турнир</span>
+              <span class="tg-row-main" id="tournamentRegistrationTitle">Турнир</span>
               <span class="tg-row-value" id="tournamentRegistrationMeta">Открыть</span>
               <span class="tg-chevron">›</span>
             </button>
@@ -506,13 +506,29 @@
               </div>
             </header>
             <div class="tournament-detail-body">
-              <div class="tournament-detail-status">
-                <span class="tournament-status-pill" id="tournamentDetailBadge" data-state="created">создан</span>
-                <strong id="tournamentDetailSubtitle">MTT · старт уточняется</strong>
-                <small id="tournamentDetailDescription">Описание турнира появится здесь.</small>
+              <div class="tournament-detail-summary" id="tournamentDetailSummary"></div>
+              <div class="tournament-detail-countdown">
+                <span>До начала турнира</span>
+                <strong id="tournamentDetailCountdown">--:--:--</strong>
+                <small id="tournamentDetailStart">Время уточняется</small>
               </div>
-              <div class="tournament-detail-grid" id="tournamentDetailGrid"></div>
-              <div class="tournament-detail-structure" id="tournamentDetailStructure"></div>
+              <nav class="tournament-detail-tabs" aria-label="Разделы турнира">
+                <button type="button" class="active" data-tournament-detail-tab="payout">Призовые</button>
+                <button type="button" data-tournament-detail-tab="info">Информация</button>
+                <button type="button" data-tournament-detail-tab="blinds">Блайнды</button>
+              </nav>
+              <section class="tournament-detail-panel active" data-tournament-detail-panel="payout" id="tournamentDetailPayout"></section>
+              <section class="tournament-detail-panel" data-tournament-detail-panel="info">
+                <div class="tournament-detail-status">
+                  <span class="tournament-status-pill" id="tournamentDetailBadge" data-state="created">создан</span>
+                  <strong id="tournamentDetailSubtitle">MTT · старт уточняется</strong>
+                  <small id="tournamentDetailDescription">Описание турнира появится здесь.</small>
+                </div>
+                <div class="tournament-detail-grid" id="tournamentDetailGrid"></div>
+              </section>
+              <section class="tournament-detail-panel" data-tournament-detail-panel="blinds">
+                <div class="tournament-detail-structure" id="tournamentDetailStructure"></div>
+              </section>
               <div class="tournament-detail-note" id="tournamentDetailNote" hidden></div>
             </div>
             <footer class="tournament-detail-footer">
@@ -1008,6 +1024,6 @@
       </article>
     </template>
 
-    <script src="/app.js?v=20260621-1" type="module"></script>
+    <script src="/app.js?v=20260621-2" type="module"></script>
   </body>
 </html>
