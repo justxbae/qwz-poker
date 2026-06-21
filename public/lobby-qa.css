@@ -1376,25 +1376,29 @@ body:not(.in-game) .nav-alert-dot {
 }
 
 body:not(.in-game) .tournament-registration-notice {
-  margin: 5px 4px !important;
-  border: 1px solid transparent !important;
+  position: relative !important;
+  margin: 4px 0 !important;
+  border: 0 !important;
   border-radius: var(--qwz-radius-lg) !important;
-  background:
-    linear-gradient(180deg, rgba(30, 41, 56, 0.98), rgba(23, 32, 44, 0.98)) padding-box,
-    linear-gradient(105deg, rgba(139, 108, 255, 0.58), rgba(42, 171, 238, 0.3) 58%, rgba(255, 255, 255, 0.08)) border-box !important;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12) !important;
+  background: linear-gradient(90deg, rgba(139, 108, 255, 0.1), rgba(42, 171, 238, 0.025) 60%, transparent) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(139, 108, 255, 0.62),
+    inset 0 -1px 0 rgba(42, 171, 238, 0.2),
+    0 5px 16px rgba(51, 37, 112, 0.13) !important;
 }
 body:not(.in-game) .tournament-registration-notice .tg-row-main { color: var(--qwz-ink) !important; }
 body:not(.in-game) .tournament-registration-notice .tg-row-icon {
   display: grid !important;
   place-items: center !important;
   padding: 0 !important;
+  justify-self: center !important;
 }
 body:not(.in-game) .tournament-registration-notice .tg-row-icon svg {
   display: block !important;
   width: 20px !important;
   height: 20px !important;
   margin: 0 !important;
+  transform: translate(0, 0) !important;
 }
 body:not(.in-game) .tournament-registration-notice[hidden],
 body:not(.in-game) .nav-alert-dot[hidden] { display: none !important; }
