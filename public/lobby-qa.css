@@ -1376,12 +1376,26 @@ body:not(.in-game) .nav-alert-dot {
 }
 
 body:not(.in-game) .tournament-registration-notice {
-  margin: 4px !important;
-  border: 1px solid rgba(42, 171, 238, 0.5) !important;
-  border-radius: 14px !important;
-  box-shadow: 0 0 0 1px rgba(42, 171, 238, 0.08) inset !important;
+  margin: 5px 4px !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--qwz-radius-lg) !important;
+  background:
+    linear-gradient(180deg, rgba(30, 41, 56, 0.98), rgba(23, 32, 44, 0.98)) padding-box,
+    linear-gradient(105deg, rgba(139, 108, 255, 0.58), rgba(42, 171, 238, 0.3) 58%, rgba(255, 255, 255, 0.08)) border-box !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12) !important;
 }
 body:not(.in-game) .tournament-registration-notice .tg-row-main { color: var(--qwz-ink) !important; }
+body:not(.in-game) .tournament-registration-notice .tg-row-icon {
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+}
+body:not(.in-game) .tournament-registration-notice .tg-row-icon svg {
+  display: block !important;
+  width: 20px !important;
+  height: 20px !important;
+  margin: 0 !important;
+}
 body:not(.in-game) .tournament-registration-notice[hidden],
 body:not(.in-game) .nav-alert-dot[hidden] { display: none !important; }
 body:not(.in-game) .tournament-registration-notice .tg-row-value {
@@ -1389,4 +1403,5 @@ body:not(.in-game) .tournament-registration-notice .tg-row-value {
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
+  font-variant-numeric: tabular-nums !important;
 }

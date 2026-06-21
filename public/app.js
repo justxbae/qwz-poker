@@ -338,6 +338,7 @@ const pendingAdminTournamentRequests = new Set();
 let currentLobbyTab = "home";
 let fairnessSeedSyncing = false;
 let tournamentCountdownTimer = 0;
+let tournamentRegistrationNoticeTimer = 0;
 const fairnessSeedSyncedTables = new Set();
 let revealObserver = null;
 
@@ -3575,10 +3576,26 @@ function renderTournamentRegistrationNotice() {
     tournamentRegistrationBadge.hidden = !registered;
     tournamentRegistrationBadge.style.setProperty("display", registered ? "" : "none", registered ? "" : "important");
   }
-  if (tournamentRegistrationMeta) {
-    tournamentRegistrationMeta.textContent = registered
-      ? formatTournamentStartLabel(registered)
-      : "Открыть";
+  window.clearInterval(tournamentRegistrationNoticeTimer);
+  const updateMeta = () => {
+    if (!tournamentRegistrationMeta || !registered) return;
+    const startsAt = new Date(registered.startsAt || "").getTime();
+    const remaining = startsAt - Date.now();
+    if (Number.isFinite(startsAt) && remaining > 0 && remaining <= 12 * 60 * 60 * 1000) {
+      const totalSeconds = Math.floor(remaining / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      tournamentRegistrationMeta.textContent = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      return;
+    }
+    tournamentRegistrationMeta.textContent = formatTournamentStartLabel(registered);
+  };
+  if (registered) {
+    updateMeta();
+    tournamentRegistrationNoticeTimer = window.setInterval(updateMeta, 1000);
+  } else if (tournamentRegistrationMeta) {
+    tournamentRegistrationMeta.textContent = "Открыть";
   }
   if (tournamentRegistrationTitle) tournamentRegistrationTitle.textContent = registered?.title || "Турнир";
 }
