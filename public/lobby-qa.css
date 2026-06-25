@@ -1409,3 +1409,373 @@ body:not(.in-game) .tournament-registration-notice .tg-row-value {
   white-space: nowrap !important;
   font-variant-numeric: tabular-nums !important;
 }
+
+/* 2026-06-26: Telegram-native dark lobby pass.
+   Reference geometry: Tab Bar 282x62/r31, active item 78x56/r28, Settings cards r26. */
+:root {
+  --tg-native-bg: #000000;
+  --tg-native-surface: #1c1c1e;
+  --tg-native-surface-2: #2c2c2e;
+  --tg-native-fill: rgba(118, 118, 128, 0.24);
+  --tg-native-separator: rgba(84, 84, 88, 0.44);
+  --tg-native-label: #f5f5f7;
+  --tg-native-secondary: rgba(235, 235, 245, 0.62);
+  --tg-native-tertiary: rgba(235, 235, 245, 0.34);
+  --tg-native-accent: var(--tg-theme-button-color, #0a84ff);
+  --tg-card-r: 26px;
+  --tg-pill-r: 31px;
+}
+
+html:not(.admin-mode) body:not(.in-game),
+html:not(.admin-mode) body:not(.in-game) .app,
+html:not(.admin-mode) body:not(.in-game) .lobby-shell {
+  background: var(--tg-native-bg) !important;
+  color: var(--tg-native-label) !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .topbar {
+  display: none !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .lobby-shell {
+  padding: calc(14px + env(safe-area-inset-top)) 24px calc(112px + env(safe-area-inset-bottom)) !important;
+  max-width: 576px !important;
+  margin: 0 auto !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .lobby-view.active {
+  gap: 20px !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .lobby-card,
+html:not(.admin-mode) body:not(.in-game) .home-wallet,
+html:not(.admin-mode) body:not(.in-game) .product-mode-hub,
+html:not(.admin-mode) body:not(.in-game) .home-games,
+html:not(.admin-mode) body:not(.in-game) .continue-card,
+html:not(.admin-mode) body:not(.in-game) .profile-hero,
+html:not(.admin-mode) body:not(.in-game) .cashier-card,
+html:not(.admin-mode) body:not(.in-game) .tournament-card,
+html:not(.admin-mode) body:not(.in-game) .tg-menu-group,
+html:not(.admin-mode) body:not(.in-game) .lobby-menu-sheet {
+  border: 0 !important;
+  border-radius: var(--tg-card-r) !important;
+  background: var(--tg-native-surface) !important;
+  box-shadow: none !important;
+  color: var(--tg-native-label) !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-wallet {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 14px !important;
+  padding: 20px 24px !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-account {
+  min-height: 48px !important;
+  gap: 14px !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .lobby-avatar,
+html:not(.admin-mode) body:not(.in-game) .profile-avatar {
+  width: 72px !important;
+  height: 72px !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: var(--tg-native-surface-2) !important;
+  box-shadow: none !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-account .lobby-avatar {
+  width: 44px !important;
+  height: 44px !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-identity strong,
+html:not(.admin-mode) body:not(.in-game) .profile-main h2,
+html:not(.admin-mode) body:not(.in-game) .section-title h2 {
+  color: var(--tg-native-label) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.03em !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-identity span,
+html:not(.admin-mode) body:not(.in-game) .home-identity small,
+html:not(.admin-mode) body:not(.in-game) .eyebrow,
+html:not(.admin-mode) body:not(.in-game) small,
+html:not(.admin-mode) body:not(.in-game) .section-title span {
+  color: var(--tg-native-secondary) !important;
+  font-weight: 400 !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-balance {
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-balance span {
+  color: var(--tg-native-secondary) !important;
+  font-size: 15px !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-balance strong {
+  color: var(--tg-native-label) !important;
+  font-size: 34px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.05em !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-wallet-side {
+  min-height: 82px !important;
+  padding: 14px 16px !important;
+  border: 0 !important;
+  border-radius: 22px !important;
+  background: var(--tg-native-fill) !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-wallet-actions {
+  grid-template-columns: 1fr 1fr !important;
+  gap: 12px !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-wallet-actions button,
+html:not(.admin-mode) body:not(.in-game) .cashier-pay-button,
+html:not(.admin-mode) body:not(.in-game) .home-game-actions button,
+html:not(.admin-mode) body:not(.in-game) .tournament-card button,
+html:not(.admin-mode) body:not(.in-game) .secondary-pill {
+  min-height: 50px !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: var(--tg-native-fill) !important;
+  color: var(--tg-native-label) !important;
+  box-shadow: none !important;
+  font-weight: 600 !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) #walletTopupButton,
+html:not(.admin-mode) body:not(.in-game) .cashier-pay-button,
+html:not(.admin-mode) body:not(.in-game) .home-game-actions #quickPlayButton,
+html:not(.admin-mode) body:not(.in-game) .tournament-card button:not(:disabled) {
+  background: var(--tg-native-accent) !important;
+  color: #fff !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-promo-banners {
+  display: flex !important;
+  gap: 12px !important;
+  margin: 0 -24px !important;
+  padding: 0 24px 2px !important;
+  scroll-snap-type: x mandatory !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .promo-banner {
+  min-width: calc(100vw - 48px) !important;
+  max-width: 528px !important;
+  min-height: 132px !important;
+  border: 0 !important;
+  border-radius: var(--tg-card-r) !important;
+  background: var(--tg-native-surface) !important;
+  box-shadow: none !important;
+  scroll-snap-align: center !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .promo-banner strong {
+  font-size: 25px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.04em !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .promo-action {
+  border-radius: 999px !important;
+  background: var(--tg-native-fill) !important;
+  color: var(--tg-native-label) !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .game-mode-switch,
+html:not(.admin-mode) body:not(.in-game) .tournament-detail-tabs,
+html:not(.admin-mode) body:not(.in-game) .limit-pills {
+  height: 54px !important;
+  padding: 3px !important;
+  border: 0 !important;
+  border-radius: 27px !important;
+  background: var(--tg-native-fill) !important;
+  box-shadow: none !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .game-mode-switch button,
+html:not(.admin-mode) body:not(.in-game) .tournament-detail-tabs button,
+html:not(.admin-mode) body:not(.in-game) .limit-pills button {
+  border: 0 !important;
+  border-radius: 24px !important;
+  background: transparent !important;
+  color: var(--tg-native-secondary) !important;
+  box-shadow: none !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .game-mode-switch button.active,
+html:not(.admin-mode) body:not(.in-game) .tournament-detail-tabs button.active,
+html:not(.admin-mode) body:not(.in-game) .limit-pills button.active {
+  background: rgba(235, 235, 245, 0.24) !important;
+  color: var(--tg-native-label) !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .mode-context-copy,
+html:not(.admin-mode) body:not(.in-game) .product-mode-title,
+html:not(.admin-mode) body:not(.in-game) .home-offer-meta {
+  display: none !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .table-row,
+html:not(.admin-mode) body:not(.in-game) .tg-menu-row,
+html:not(.admin-mode) body:not(.in-game) .settings-row,
+html:not(.admin-mode) body:not(.in-game) .lobby-menu-list button {
+  min-height: 64px !important;
+  padding: 10px 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .table-row + .table-row,
+html:not(.admin-mode) body:not(.in-game) .tg-menu-row + .tg-menu-row,
+html:not(.admin-mode) body:not(.in-game) .settings-row + .settings-row,
+html:not(.admin-mode) body:not(.in-game) .lobby-menu-list button + button {
+  border-top: 1px solid var(--tg-native-separator) !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .tg-row-icon,
+html:not(.admin-mode) body:not(.in-game) .menu-icon,
+html:not(.admin-mode) body:not(.in-game) .table-row [data-field="avatar"] {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 12px !important;
+  background: var(--tg-native-accent) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .tg-row-main,
+html:not(.admin-mode) body:not(.in-game) .menu-copy strong,
+html:not(.admin-mode) body:not(.in-game) .settings-row span {
+  color: var(--tg-native-label) !important;
+  font-size: 17px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.02em !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .tg-row-value,
+html:not(.admin-mode) body:not(.in-game) .menu-copy small,
+html:not(.admin-mode) body:not(.in-game) .menu-meta,
+html:not(.admin-mode) body:not(.in-game) .tg-chevron {
+  color: var(--tg-native-secondary) !important;
+  font-weight: 400 !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .bottom-nav {
+  left: 50% !important;
+  right: auto !important;
+  bottom: calc(24px + env(safe-area-inset-bottom)) !important;
+  width: min(78vw, 370px) !important;
+  min-width: 282px !important;
+  height: 62px !important;
+  padding: 3px !important;
+  transform: translateX(-50%) !important;
+  border: 0 !important;
+  border-radius: var(--tg-pill-r) !important;
+  background: rgba(44, 44, 46, 0.74) !important;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.34) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(1.8) !important;
+  backdrop-filter: blur(28px) saturate(1.8) !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .bottom-nav::before,
+html:not(.admin-mode) body:not(.in-game) .bottom-nav::after {
+  display: none !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .bottom-nav button {
+  height: 56px !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 28px !important;
+  background: transparent !important;
+  color: var(--tg-native-secondary) !important;
+  box-shadow: none !important;
+  gap: 2px !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .bottom-nav button.active {
+  background: rgba(235, 235, 245, 0.18) !important;
+  color: var(--tg-native-label) !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .bottom-nav .nav-icon {
+  width: 24px !important;
+  height: 24px !important;
+  color: currentColor !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .bottom-nav .nav-icon svg {
+  width: 23px !important;
+  height: 23px !important;
+  stroke: currentColor !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .bottom-nav .nav-label {
+  color: currentColor !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .profile-hero {
+  display: grid !important;
+  justify-items: center !important;
+  gap: 10px !important;
+  padding: 38px 24px 20px !important;
+  background: transparent !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .profile-main {
+  text-align: center !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .profile-dashboard-stats,
+html:not(.admin-mode) body:not(.in-game) .progression-summary,
+html:not(.admin-mode) body:not(.in-game) .profile-tournament-grid {
+  gap: 12px !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .profile-dashboard-stats div,
+html:not(.admin-mode) body:not(.in-game) .progression-summary div,
+html:not(.admin-mode) body:not(.in-game) .profile-tournament-stat,
+html:not(.admin-mode) body:not(.in-game) .tournament-detail-summary > div {
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: var(--tg-native-fill) !important;
+  box-shadow: none !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .lobby-menu-sheet {
+  left: 24px !important;
+  right: 24px !important;
+  bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+  width: auto !important;
+  max-width: 528px !important;
+  margin: 0 auto !important;
+  padding: 8px 24px 24px !important;
+  border-radius: 30px !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .lobby-menu-head {
+  padding: 10px 0 14px !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .lobby-menu-list {
+  padding: 0 !important;
+  border-radius: var(--tg-card-r) !important;
+  background: var(--tg-native-surface) !important;
+}
