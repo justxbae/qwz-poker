@@ -1779,3 +1779,174 @@ html:not(.admin-mode) body:not(.in-game) .lobby-menu-list {
   border-radius: var(--tg-card-r) !important;
   background: var(--tg-native-surface) !important;
 }
+
+/* 2026-06-26 correction: keep Telegram geometry, restore QWZ spacing/sheets. */
+:root {
+  --tg-native-bg: #0f151d;
+  --tg-native-surface: #172330;
+  --tg-native-surface-2: #223140;
+  --tg-native-fill: rgba(118, 118, 128, 0.18);
+  --tg-native-separator: rgba(122, 162, 194, 0.12);
+}
+
+html:not(.admin-mode) body:not(.in-game),
+html:not(.admin-mode) body:not(.in-game) .app,
+html:not(.admin-mode) body:not(.in-game) .lobby-shell {
+  background:
+    radial-gradient(circle at 50% -12%, rgba(42, 171, 238, 0.1), transparent 34%),
+    var(--tg-native-bg) !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .lobby-shell {
+  width: 100% !important;
+  max-width: 640px !important;
+  padding: calc(14px + env(safe-area-inset-top)) 20px calc(118px + env(safe-area-inset-bottom)) !important;
+  box-sizing: border-box !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .lobby-view.active {
+  gap: 16px !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-wallet,
+html:not(.admin-mode) body:not(.in-game) .lobby-card,
+html:not(.admin-mode) body:not(.in-game) .product-mode-hub,
+html:not(.admin-mode) body:not(.in-game) .home-games,
+html:not(.admin-mode) body:not(.in-game) .cashier-card,
+html:not(.admin-mode) body:not(.in-game) .profile-dashboard,
+html:not(.admin-mode) body:not(.in-game) .tournament-card,
+html:not(.admin-mode) body:not(.in-game) .tg-menu-group {
+  background: linear-gradient(180deg, rgba(28, 41, 54, 0.98), rgba(23, 35, 48, 0.98)) !important;
+  border: 1px solid rgba(122, 162, 194, 0.08) !important;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.18) !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-wallet {
+  grid-template-columns: minmax(0, 1fr) 164px !important;
+  padding: 24px !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-account,
+html:not(.admin-mode) body:not(.in-game) .home-balance,
+html:not(.admin-mode) body:not(.in-game) .home-wallet-actions {
+  grid-column: 1 / 2 !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-wallet-side {
+  grid-column: 2 / 3 !important;
+  grid-row: 1 / 4 !important;
+  align-self: stretch !important;
+  min-height: 136px !important;
+  border-radius: 24px !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-balance strong {
+  font-size: 42px !important;
+  line-height: 0.95 !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-promo-banners {
+  margin: 0 -20px !important;
+  padding: 0 20px 2px !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .promo-banner {
+  min-width: calc(100vw - 40px) !important;
+  max-width: 600px !important;
+  min-height: 150px !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .mode-context-copy {
+  display: block !important;
+  margin: 8px 2px 0 !important;
+  color: var(--tg-native-secondary) !important;
+  font-size: 15px !important;
+  line-height: 1.28 !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .bottom-nav {
+  width: min(calc(100vw - 56px), 520px) !important;
+  height: 72px !important;
+  bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+  z-index: 80 !important;
+  background: rgba(30, 43, 55, 0.86) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .bottom-nav button {
+  height: 66px !important;
+  border-radius: 33px !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .bottom-nav .nav-label {
+  font-size: 12px !important;
+}
+
+body.cashier-sheet-open:not(.in-game) .bottom-nav,
+body.lobby-menu-open:not(.in-game) .bottom-nav,
+body.tournament-sheet-open:not(.in-game) .bottom-nav {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateX(-50%) translateY(20px) !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .lobby-menu-backdrop,
+html:not(.admin-mode) body:not(.in-game) .cashier-sheet-backdrop,
+html:not(.admin-mode) body:not(.in-game) .tournament-detail-backdrop {
+  z-index: 1000 !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .lobby-menu-sheet,
+body.cashier-sheet-open:not(.in-game) [data-cashier-sheet].sheet-open,
+html:not(.admin-mode) body:not(.in-game) .tournament-detail-sheet {
+  z-index: 1001 !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .lobby-menu-sheet {
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  max-width: 640px !important;
+  padding: 8px 20px calc(24px + env(safe-area-inset-bottom)) !important;
+  border-radius: 30px 30px 0 0 !important;
+  background: var(--tg-native-surface) !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .profile-hero {
+  padding: 34px 24px 18px !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .profile-avatar {
+  width: 112px !important;
+  height: 112px !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .profile-main h2 {
+  font-size: 32px !important;
+}
+
+@media (max-width: 430px) {
+  html:not(.admin-mode) body:not(.in-game) .lobby-shell {
+    padding-right: 14px !important;
+    padding-left: 14px !important;
+  }
+
+  html:not(.admin-mode) body:not(.in-game) .home-wallet {
+    grid-template-columns: minmax(0, 1fr) 148px !important;
+    padding: 22px 18px !important;
+  }
+
+  html:not(.admin-mode) body:not(.in-game) .home-balance strong {
+    font-size: 38px !important;
+  }
+
+  html:not(.admin-mode) body:not(.in-game) .home-promo-banners {
+    margin: 0 -14px !important;
+    padding-right: 14px !important;
+    padding-left: 14px !important;
+  }
+
+  html:not(.admin-mode) body:not(.in-game) .promo-banner {
+    min-width: calc(100vw - 28px) !important;
+  }
+}
