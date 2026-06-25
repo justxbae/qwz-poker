@@ -457,9 +457,9 @@ async function boot() {
     botFoldButton.addEventListener("click", () => runAction(() => testBotAct("fold")));
     botCallButton.addEventListener("click", () => runAction(() => testBotAct("call")));
   }
-  standButton.addEventListener("click", () => runAction(standFromTable));
-  sitOutButton.addEventListener("click", openSitOutPopover);
-  quickSitOutButton.addEventListener("click", openSitOutPopover);
+  standButton.addEventListener("click", () => runAction(leaveCurrentTable));
+  sitOutButton.addEventListener("click", () => runAction(sitOut));
+  quickSitOutButton.addEventListener("click", () => runAction(sitOut));
   confirmSitOutButton.addEventListener("click", () => runAction(sitOut));
   sitOutInfoButton.addEventListener("click", () => {
     sitOutInfoText.hidden = !sitOutInfoText.hidden;
@@ -467,7 +467,7 @@ async function boot() {
   buyInButton.addEventListener("click", () => runAction(buyIn));
   inviteButton.addEventListener("click", inviteToTable);
   quickBuyInButton.addEventListener("click", () => runAction(buyIn));
-  backToLobbyButton.addEventListener("click", () => runAction(goToLobby));
+  backToLobbyButton.addEventListener("click", () => runAction(backToLobbyFromTable));
   sitButton.addEventListener("click", () => runAction(sitAtTable));
   observerSitButton.addEventListener("click", () => runAction(returnToSeat));
   menuButton.addEventListener("click", () => openMenu());
@@ -1090,7 +1090,7 @@ async function handleTelegramBack() {
     return;
   }
   if (state.currentTableId || !currentTable.hidden) {
-    await goToLobby();
+    await backToLobbyFromTable();
     return;
   }
   if (currentLobbyTab !== "home") {
@@ -3987,13 +3987,10 @@ function renderTableList(container, tables, emptyText) {
       meta.textContent = `${formatTableLimit(table)} · ${table.seats.length}/${table.maxPlayers} игроков${table.isPrivate ? " · приватный" : ""}`;
     }
     const button = node.querySelector('[data-action="join"]');
-    button.textContent = isFull ? "Заполнен" : "Войти";
-    button.disabled = isFull;
-    button.addEventListener("click", () => openBuyInOverlay({
-      mode: "join",
-      tableId: table.id,
-      table
-    }));
+    const isViewerSeated = Boolean(table.viewer?.isSeated);
+    button.textContent = isViewerSeated ? "За стол" : isFull ? "Заполнен" : "Войти";
+    button.disabled = isFull && !isViewerSeated;
+    button.addEventListener("click", () => joinTable(table.id));
     container.append(node);
   }
 }
@@ -4213,7 +4210,11 @@ async function confirmBuyIn() {
 function buyInAmountValue() {
   const minAmount = Number(buyInAmount.dataset.min || 10000);
   const maxAmount = Number(buyInAmount.dataset.max || minAmount);
-  return clampAmount(Number(String(buyInAmount.value || "").replace(/\s/g, "")), minAmount, maxAmount);
+  const cashMode = buyInAmount.dataset.cashMode === "true";
+  const value = cashMode
+    ? parseUsdtToMicros(buyInAmount.value)
+    : Number(String(buyInAmount.value || "").replace(/\s/g, ""));
+  return clampAmount(value, minAmount, maxAmount);
 }
 
 function syncBuyInSliderFromAmount() {
@@ -4228,9 +4229,9 @@ function setBuyInAmount(amount) {
   const minAmount = Number(buyInAmount.dataset.min || 10000);
   const maxAmount = Number(buyInAmount.dataset.max || minAmount);
   const safeAmount = clampAmount(amount, minAmount, maxAmount);
-  buyInAmount.value = String(safeAmount);
-  buyInSlider.value = String(safeAmount);
   const cashMode = buyInAmount.dataset.cashMode === "true";
+  buyInAmount.value = cashMode ? formatUsdtInput(safeAmount) : String(safeAmount);
+  buyInSlider.value = String(safeAmount);
   renderMoneyValue(buyInDebit, safeAmount, cashMode);
   renderMoneyValue(buyInStackPreview, safeAmount, cashMode);
 }
@@ -4356,6 +4357,34 @@ async function standFromTable() {
   await goToLobby();
 }
 
+async function leaveCurrentTable() {
+  if (!state.currentTableId) return;
+  const table = state.currentTable;
+  const stack = Number(table?.viewer?.stack || 0);
+  const amountText = table ? formatTableAmount(table, stack) : "";
+  const confirmed = await showConfirm(
+    `Покинуть стол?\n\n${amountText ? `Стек ${amountText} будет возвращён на баланс. ` : ""}Если раздача активна, карты будут сброшены по правилам.`
+  );
+  if (!confirmed) return;
+
+  const tableId = state.currentTableId;
+  await api(`/api/tables/${tableId}/leave`, { method: "POST" });
+  closeMenu();
+  state.currentTableId = "";
+  stopTableEventStream();
+  state.currentTable = null;
+  currentTable.hidden = true;
+  lobby.hidden = false;
+  document.body.classList.remove("in-game");
+  closeDrawer();
+  selectLobbyTab("home");
+  await auth();
+  await loadCashier();
+  await loadTables();
+  resetScroll();
+  updateTelegramBackButton();
+}
+
 async function sitAtTable() {
   if (!state.currentTableId) return;
   if (!state.currentTable?.viewer?.isSeated) {
@@ -4368,11 +4397,12 @@ async function sitAtTable() {
 }
 
 async function returnToSeat() {
+  const viewerSeat = (state.currentTable?.seats || []).find((seat) => String(seat.userId) === String(state.user?.id));
   if (state.currentTable?.viewer?.sittingOutReason === "rebuy") {
     await buyIn();
     return;
   }
-  if (state.currentTable?.viewer?.sittingOut) {
+  if (state.currentTable?.viewer?.sittingOut || viewerSeat?.sitOutNextHand) {
     await sitIn();
     return;
   }
@@ -4416,9 +4446,6 @@ async function buyIn() {
 }
 
 async function goToLobby() {
-  if (state.currentTable?.viewer?.isSeated && state.currentTableId) {
-    await api(`/api/tables/${state.currentTableId}/leave`, { method: "POST" });
-  }
   state.currentTableId = "";
   stopTableEventStream();
   state.currentTable = null;
@@ -4433,6 +4460,14 @@ async function goToLobby() {
   await loadTables();
   resetScroll();
   updateTelegramBackButton();
+}
+
+async function backToLobbyFromTable() {
+  if (state.currentTable?.viewer?.isSeated) {
+    const confirmed = await showConfirm("Вернуться в лобби?\n\nВы останетесь за столом. Чтобы забрать стек на баланс, используйте «Покинуть стол».");
+    if (!confirmed) return;
+  }
+  await goToLobby();
 }
 
 function startTableEventStream(tableId) {
@@ -4686,6 +4721,21 @@ function showError(message) {
   window.alert(message);
 }
 
+function showConfirm(message) {
+  return new Promise((resolve) => {
+    if (tg?.showConfirm) {
+      try {
+        tg.showConfirm(message, (confirmed) => resolve(Boolean(confirmed)));
+        return;
+      } catch {
+        resolve(window.confirm(message));
+        return;
+      }
+    }
+    resolve(window.confirm(message));
+  });
+}
+
 function showStatus(message) {
   haptic("success");
   if (tg?.showPopup) {
@@ -4865,12 +4915,19 @@ function renderCurrentTable(table) {
 function renderSeatControls(table) {
   const isSeated = Boolean(table.viewer?.isSeated);
   const isSittingOut = Boolean(table.viewer?.sittingOut);
+  const viewerSeat = (table.seats || []).find((seat) => String(seat.userId) === String(state.user?.id));
+  const sitOutNextHand = Boolean(viewerSeat?.sitOutNextHand);
   const tableIsFull = table.seats.length >= table.maxPlayers;
   const canSit = !isSeated && !tableIsFull;
   sitButton.hidden = true;
-  observerBanner.hidden = isSeated && !isSittingOut;
+  observerBanner.hidden = isSeated && !isSittingOut && !sitOutNextHand;
   observerSitButton.hidden = !canSit && !isSittingOut;
-  if (isSittingOut) {
+  if (sitOutNextHand && !isSittingOut) {
+    observerBanner.querySelector("strong").textContent = "Отойдёте со следующей раздачи";
+    observerHint.textContent = "Текущая раздача доигрывается по правилам. После неё вы будете в sit out.";
+    observerSitButton.textContent = "Вернуться";
+    observerSitButton.hidden = false;
+  } else if (isSittingOut) {
     observerBanner.querySelector("strong").textContent = table.viewer?.sittingOutReason === "rebuy"
       ? "Нужна докупка"
       : "Вы отошли от стола";
@@ -4886,8 +4943,8 @@ function renderSeatControls(table) {
     observerSitButton.textContent = "Сесть за стол";
   }
   standButton.hidden = !isSeated;
-  sitOutButton.hidden = !isSeated || isSittingOut;
-  quickSitOutButton.hidden = !isSeated || isSittingOut;
+  sitOutButton.hidden = !isSeated || isSittingOut || sitOutNextHand;
+  quickSitOutButton.hidden = !isSeated || isSittingOut || sitOutNextHand;
   buyInButton.disabled = !table.viewer?.canBuyIn;
   quickBuyInButton.disabled = !table.viewer?.canBuyIn;
   quickBuyInButton.hidden = !isSeated;
@@ -5693,7 +5750,23 @@ function formatUsdt(value) {
 
 function formatUsdtDisplay(value) {
   const amount = Number(value || 0);
-  return `${amount < 0 ? "-" : ""}$${formatUsdt(Math.abs(amount))}`;
+  return `${amount < 0 ? "-" : ""}${formatUsdt(Math.abs(amount))}`;
+}
+
+function formatUsdtInput(value) {
+  return formatUsdt(value).replace(/,/g, "");
+}
+
+function parseUsdtToMicros(value) {
+  const normalized = String(value || "")
+    .replace(/\s/g, "")
+    .replace(",", ".")
+    .replace(/[^\d.]/g, "");
+  const [wholeRaw = "0", fractionRaw = ""] = normalized.split(".");
+  const whole = Number(wholeRaw || 0);
+  const fraction = Number((fractionRaw + "000000").slice(0, 6));
+  if (!Number.isFinite(whole) || !Number.isFinite(fraction)) return 0;
+  return whole * 1_000_000 + fraction;
 }
 
 function formatPercent(value) {
@@ -5752,7 +5825,7 @@ function renderMoneyValue(node, value, cashMode, { append = false } = {}) {
 function renderLimitValue(node, smallBlind, bigBlind, cashMode, { append = false } = {}) {
   if (!node) return;
   const contents = cashMode
-    ? [`$${formatUsdt(smallBlind)}/$${formatUsdt(bigBlind)}`]
+    ? [`${formatUsdt(smallBlind)}/${formatUsdt(bigBlind)}`]
     : [`${formatChips(smallBlind)}/${formatChips(bigBlind)}`];
   if (append) node.append(...contents);
   else node.replaceChildren(...contents);
