@@ -1,5 +1,15 @@
 # QWZ Decisions
 
+## 2026-06-26: Minimal Launch Mode и clean runtime export
+
+**Зона:** product / frontend / deploy
+
+**Решение:** Для тестового запуска вводится управляемый режим `MINIMAL_LAUNCH=true`. В нём публичный Mini App оставляет только базовый продуктовый контур: cash USDT-столы, play/rating-столы на фишки, кассу, профиль и текущие сессии. Cash levels / Cash Club, публичные турниры, tournament nav, tournament profile stats, affiliate и сырые сезонные формулировки скрываются из пользовательского UI. Backend/admin tournament code не удаляется и остаётся доступен для админки/будущего включения. Добавлена команда `npm run release:clean`, которая создаёт папку `release/` только с runtime-файлами (`server/`, `public/`, package files, `render.yaml`) без docs/tests/markdown.
+**Почему:** Для тестового запуска нужен аккуратный минимальный продукт без ощущения “сырого стартапа”, но нельзя разрушать основной репозиторий, историю решений и уже реализованные backend-наработки.
+**Влияет на:** `/api/config`, `MINIMAL_LAUNCH`, `public/app.js`, `public/styles.css`, `render.yaml`, `.env.example`, `scripts/create-clean-release.js`, `release/`.
+**Что обновлено:** Render contract включает `MINIMAL_LAUNCH=true`; frontend применяет minimal UI; добавлен clean runtime export.
+**Открытые вопросы:** Перед полноценным публичным запуском решить, возвращать ли турниры и cash progression в основной UI или включать их по отдельным флагам.
+
 ## 2026-06-26: Table back, leave and sit-out UX
 
 **Зона:** frontend / product
