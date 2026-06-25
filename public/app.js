@@ -42,6 +42,7 @@ let tableEventLastId = "";
 let tableEventRefreshQueued = false;
 let tableEventReconnectTimer = 0;
 let tableEventProcessing = false;
+let tableEventEverConnected = false;
 let lastPresenceHeartbeatAt = 0;
 let lastTournamentRefreshAt = 0;
 const cashierState = {
@@ -502,7 +503,6 @@ async function boot() {
   setInterval(async () => {
     try {
       if (state.currentTableId && !tableEventStreamId) {
-        currentTable.classList.add("is-reconnecting");
         await loadCurrentTable();
       }
       if (state.currentTableId && Date.now() - lastPresenceHeartbeatAt >= 5_000) {
@@ -4447,10 +4447,10 @@ function startTableEventStream(tableId) {
     if (error.name !== "AbortError") console.error("Table event stream:", error);
     if (tableEventStreamId === tableId) {
       tableEventStreamId = "";
-      currentTable.classList.add("is-reconnecting");
       tableEventReconnectTimer = window.setTimeout(() => {
+        if (tableEventEverConnected && state.currentTableId === tableId) currentTable.classList.add("is-reconnecting");
         if (state.currentTableId === tableId) loadCurrentTable().catch(console.error);
-      }, 1200);
+      }, 2500);
     }
   });
 }
@@ -4460,6 +4460,7 @@ function stopTableEventStream({ preserveLastEventId = false } = {}) {
   tableEventAbortController?.abort();
   tableEventAbortController = null;
   tableEventStreamId = "";
+  tableEventEverConnected = false;
   if (!preserveLastEventId) tableEventLastId = "";
 }
 
@@ -4468,6 +4469,7 @@ async function consumeTableEventStream(tableId, signal) {
   if (tableEventLastId) headers["Last-Event-ID"] = tableEventLastId;
   const response = await fetch(`/api/tables/${tableId}/events`, { headers, signal });
   if (!response.ok || !response.body) throw new Error(`SSE ${response.status}`);
+  tableEventEverConnected = true;
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
