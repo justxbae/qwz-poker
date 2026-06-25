@@ -36,6 +36,14 @@ const state = {
   tables: [],
   tournaments: []
 };
+let tableEventAbortController = null;
+let tableEventStreamId = "";
+let tableEventLastId = "";
+let tableEventRefreshQueued = false;
+let tableEventReconnectTimer = 0;
+let tableEventProcessing = false;
+let lastPresenceHeartbeatAt = 0;
+let lastTournamentRefreshAt = 0;
 const cashierState = {
   deposit: null,
   selectedMethod: "stars",
@@ -335,6 +343,9 @@ let pendingBuyIn = null;
 let pendingDailyPlayClaim = false;
 const pendingTournamentRequests = new Set();
 const pendingAdminTournamentRequests = new Set();
+const tableEventQueue = [];
+const tableEventLastSequence = new Map();
+const tournamentEventLastSequence = new Map();
 let currentLobbyTab = "home";
 let fairnessSeedSyncing = false;
 let tournamentCountdownTimer = 0;
@@ -490,8 +501,19 @@ async function boot() {
 
   setInterval(async () => {
     try {
-      if (state.currentTableId) await loadCurrentTable();
+      if (state.currentTableId && !tableEventStreamId) {
+        currentTable.classList.add("is-reconnecting");
+        await loadCurrentTable();
+      }
+      if (state.currentTableId && Date.now() - lastPresenceHeartbeatAt >= 5_000) {
+        lastPresenceHeartbeatAt = Date.now();
+        await api(`/api/tables/${state.currentTableId}/presence`, { method: "POST" });
+      }
       if (!state.currentTableId) await loadTables();
+      if (!state.currentTableId && currentLobbyTab === "tournaments" && Date.now() - lastTournamentRefreshAt >= 5_000) {
+        lastTournamentRefreshAt = Date.now();
+        await loadTournaments({ silent: true });
+      }
     } catch (error) {
       if (error.message === "Unauthorized" || error.message === "Table not found") {
         state.currentTableId = "";
@@ -3474,9 +3496,9 @@ async function loadTables() {
   renderTables();
 }
 
-async function loadTournaments() {
+async function loadTournaments({ silent = false } = {}) {
   if (!tournamentList) return;
-  if (tournamentStatus) tournamentStatus.textContent = "Загружаем турниры...";
+  if (tournamentStatus && !silent) tournamentStatus.textContent = "Загружаем турниры...";
   try {
     const [data, historyData] = await Promise.all([
       api("/api/tournaments"),
@@ -3484,11 +3506,56 @@ async function loadTournaments() {
     ]);
     state.tournaments = (data.tournaments || []).filter((tournament) => (tournament.currency || "USDT") === "USDT");
     state.tournamentHistory = historyData.history || state.tournamentHistory || [];
+    processTournamentEvents(state.tournaments);
     renderTournaments();
-    if (tournamentStatus) tournamentStatus.textContent = "";
+    if (tournamentStatus && !silent) tournamentStatus.textContent = "";
   } catch (error) {
-    if (tournamentStatus) tournamentStatus.textContent = "Не удалось загрузить турниры.";
+    if (tournamentStatus && !silent) tournamentStatus.textContent = "Не удалось загрузить турниры.";
     throw error;
+  }
+}
+
+function processTournamentEvents(tournaments) {
+  for (const tournament of tournaments || []) {
+    const events = Array.isArray(tournament.events) ? tournament.events : [];
+    if (!tournamentEventLastSequence.has(tournament.id)) {
+      tournamentEventLastSequence.set(tournament.id, Math.max(0, ...events.map((event) => Number(event.sequence || 0))));
+      continue;
+    }
+    const lastSequence = Number(tournamentEventLastSequence.get(tournament.id) || 0);
+    for (const event of events.sort((left, right) => Number(left.sequence || 0) - Number(right.sequence || 0))) {
+      const sequence = Number(event.sequence || 0);
+      if (!sequence || sequence <= lastSequence) continue;
+      tournamentEventLastSequence.set(tournament.id, sequence);
+      handleTournamentEvent(tournament, event);
+    }
+  }
+}
+
+function handleTournamentEvent(tournament, event) {
+  const payload = event.payload || {};
+  const playerId = String(state.user?.id || "");
+  const isForPlayer = !payload.userId || String(payload.userId) === playerId || (payload.payouts || []).some((item) => String(item.userId) === playerId);
+  if (!isForPlayer) return;
+
+  if (event.type === "tournament_started") {
+    showStatus(`Турнир «${tournament.title}» начался`);
+    return;
+  }
+  if (event.type === "tournament_table_move") {
+    const tableId = payload.toTableId || payload.tableId;
+    if (!tableId) return;
+    const openNow = window.confirm(`Турнир «${tournament.title}»: вас пересадили за новый стол. Открыть?`);
+    if (openNow) runAction(() => openTournamentTable(tableId));
+    return;
+  }
+  if (event.type === "payout_complete") {
+    const payout = (payload.payouts || []).find((item) => String(item.userId) === playerId);
+    if (payout?.amount > 0) {
+      showStatus(`Выплата турнира: ${formatTournamentAmountText(payout.amount, "cash")}`);
+    } else if (tournament.playerState?.status === "finished") {
+      showStatus(`Турнир завершён. Место ${tournament.playerState.place || "—"}`);
+    }
   }
 }
 
@@ -3826,6 +3893,7 @@ async function refreshOpenTournamentDetails(id = state.selectedTournamentId) {
   const data = await api(`/api/tournaments/${id}`);
   state.selectedTournamentId = id;
   state.selectedTournamentDetails = data.tournament;
+  processTournamentEvents([data.tournament]);
   renderTournamentDetails(data.tournament);
 }
 
@@ -3956,6 +4024,8 @@ async function joinTable(tableId, buyInAmount = 0) {
       state.currentTableId = table.id;
       enterGameMode();
       renderCurrentTable(table);
+      enqueueTableEvents(table.id, table.events || []);
+      startTableEventStream(table.id);
       return;
     }
     if (table.seats.length >= table.maxPlayers && !table.viewer?.isSeated) {
@@ -3979,7 +4049,9 @@ async function joinTable(tableId, buyInAmount = 0) {
     state.currentTableId = data.table.id;
     enterGameMode();
     renderCurrentTable(data.table);
+    enqueueTableEvents(data.table.id, data.table.events || []);
     await ensurePlayerFairnessSeed(data.table);
+    startTableEventStream(data.table.id);
     haptic("success");
   });
 }
@@ -4106,7 +4178,9 @@ async function confirmBuyIn() {
     state.currentTableId = data.table.id;
     enterGameMode();
     renderCurrentTable(data.table);
+    enqueueTableEvents(data.table.id, data.table.events || []);
     await ensurePlayerFairnessSeed(data.table);
+    startTableEventStream(data.table.id);
     haptic("success");
     await auth();
     await loadCashier();
@@ -4130,6 +4204,7 @@ async function confirmBuyIn() {
     });
     closeMenu();
     renderCurrentTable(data.table);
+    enqueueTableEvents(data.table.id, data.table.events || []);
     await auth();
     await loadCashier();
   }
@@ -4163,7 +4238,9 @@ function setBuyInAmount(amount) {
 async function loadCurrentTable() {
   const data = await api(`/api/tables/${state.currentTableId}`);
   renderCurrentTable(data.table);
+  enqueueTableEvents(data.table.id, data.table.events || []);
   await ensurePlayerFairnessSeed(data.table);
+  startTableEventStream(state.currentTableId);
 }
 
 async function ensurePlayerFairnessSeed(table) {
@@ -4171,18 +4248,26 @@ async function ensurePlayerFairnessSeed(table) {
   if (!["waiting", "starting", "showdown"].includes(table.status)) return;
 
   const viewerSeat = (table.seats || []).find((seat) => seat.userId === state.user.id);
-  if (!viewerSeat || viewerSeat.fairnessSeedSource === "player") return;
+  if (!viewerSeat) return;
 
-  const syncKey = `${table.id}:${viewerSeat.fairnessSeedHash || "missing"}`;
+  const syncKey = `${table.id}:${table.status}:${viewerSeat.fairnessSeedSource}:${viewerSeat.fairnessSeedHash || "missing"}`;
   if (fairnessSeedSyncing || fairnessSeedSyncedTables.has(syncKey)) return;
 
   fairnessSeedSyncing = true;
   fairnessSeedSyncedTables.add(syncKey);
   try {
-    const data = await api(`/api/tables/${table.id}/fairness-seed`, {
-      method: "POST",
-      body: { seed: getLocalFairnessSeed() }
-    });
+    const seed = getLocalFairnessSeed();
+    let data;
+    if (table.status === "starting" && table.fairness?.phase === "commit_reveal" && viewerSeat.fairnessSeedSource === "player-commit-pending") {
+      data = await api(`/api/tables/${table.id}/fairness-reveal`, { method: "POST", body: { seed } });
+    } else if (["waiting", "showdown", "starting"].includes(table.status) && !["player-commit-pending", "player-commit-reveal"].includes(viewerSeat.fairnessSeedSource)) {
+      data = await api(`/api/tables/${table.id}/fairness-commit`, {
+        method: "POST",
+        body: { seedHash: await sha256Hex(seed) }
+      });
+    } else {
+      return;
+    }
     if (data.table) renderCurrentTable(data.table);
   } catch (error) {
     console.warn("Fairness seed sync failed:", error.message);
@@ -4335,6 +4420,7 @@ async function goToLobby() {
     await api(`/api/tables/${state.currentTableId}/leave`, { method: "POST" });
   }
   state.currentTableId = "";
+  stopTableEventStream();
   state.currentTable = null;
   currentTable.hidden = true;
   lobby.hidden = false;
@@ -4347,6 +4433,222 @@ async function goToLobby() {
   await loadTables();
   resetScroll();
   updateTelegramBackButton();
+}
+
+function startTableEventStream(tableId) {
+  if (!tableId || tableEventStreamId === tableId || !state.token) return;
+  window.clearTimeout(tableEventReconnectTimer);
+  const resumeSameTable = tableEventLastId.startsWith(`${tableId}:`);
+  stopTableEventStream({ preserveLastEventId: resumeSameTable });
+  tableEventStreamId = tableId;
+  tableEventAbortController = new AbortController();
+  currentTable.classList.remove("is-reconnecting");
+  consumeTableEventStream(tableId, tableEventAbortController.signal).catch((error) => {
+    if (error.name !== "AbortError") console.error("Table event stream:", error);
+    if (tableEventStreamId === tableId) {
+      tableEventStreamId = "";
+      currentTable.classList.add("is-reconnecting");
+      tableEventReconnectTimer = window.setTimeout(() => {
+        if (state.currentTableId === tableId) loadCurrentTable().catch(console.error);
+      }, 1200);
+    }
+  });
+}
+
+function stopTableEventStream({ preserveLastEventId = false } = {}) {
+  window.clearTimeout(tableEventReconnectTimer);
+  tableEventAbortController?.abort();
+  tableEventAbortController = null;
+  tableEventStreamId = "";
+  if (!preserveLastEventId) tableEventLastId = "";
+}
+
+async function consumeTableEventStream(tableId, signal) {
+  const headers = { authorization: `Bearer ${state.token}` };
+  if (tableEventLastId) headers["Last-Event-ID"] = tableEventLastId;
+  const response = await fetch(`/api/tables/${tableId}/events`, { headers, signal });
+  if (!response.ok || !response.body) throw new Error(`SSE ${response.status}`);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (!signal.aborted) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() || "";
+    for (const chunk of chunks) {
+      const event = parseSseEvent(chunk);
+      if (!event?.id) continue;
+      tableEventLastId = event.id;
+      enqueueTableEvents(tableId, [event]);
+      scheduleTableSnapshotRefresh(tableId);
+    }
+  }
+  if (!signal.aborted) throw new Error("SSE closed");
+}
+
+function parseSseEvent(chunk) {
+  const lines = String(chunk || "").split("\n");
+  const id = lines.find((line) => line.startsWith("id:"))?.replace(/^id:\s*/, "") || "";
+  const data = lines
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.replace(/^data:\s*/, ""))
+    .join("\n");
+  if (!data) return id ? { id } : null;
+  try {
+    return { ...JSON.parse(data), id };
+  } catch {
+    return id ? { id } : null;
+  }
+}
+
+function enqueueTableEvents(tableId, events) {
+  const normalized = (events || [])
+    .filter((event) => event && Number(event.sequence || 0) > Number(tableEventLastSequence.get(tableId) || 0))
+    .sort((left, right) => Number(left.sequence || 0) - Number(right.sequence || 0));
+  if (!normalized.length) return;
+  tableEventQueue.push(...normalized.map((event) => ({ tableId, event })));
+  processTableEventQueue();
+}
+
+async function processTableEventQueue() {
+  if (tableEventProcessing) return;
+  tableEventProcessing = true;
+  try {
+    while (tableEventQueue.length) {
+      const { tableId, event } = tableEventQueue.shift();
+      if (state.currentTableId !== tableId) continue;
+      const sequence = Number(event.sequence || 0);
+      if (!sequence || sequence <= Number(tableEventLastSequence.get(tableId) || 0)) continue;
+      tableEventLastSequence.set(tableId, sequence);
+      tableEventLastId = event.id || `${tableId}:${sequence}`;
+      playTableEvent(event);
+      await tableEventSleep(tableEventDelay(event.type));
+    }
+  } finally {
+    tableEventProcessing = false;
+  }
+}
+
+function scheduleTableSnapshotRefresh(tableId) {
+  if (tableEventRefreshQueued || state.currentTableId !== tableId) return;
+  tableEventRefreshQueued = true;
+  window.setTimeout(async () => {
+    try {
+      if (state.currentTableId === tableId) await loadCurrentTable();
+    } finally {
+      tableEventRefreshQueued = false;
+    }
+  }, 120);
+}
+
+function playTableEvent(event) {
+  const payload = event.payload || {};
+  const table = state.currentTable || {};
+  const text = tableEventText(event, table);
+  currentTable.dataset.realtimeEvent = event.type || "";
+  currentTable.classList.toggle("is-all-in-runout", event.type === "all_in_runout_start" || event.type === "runout_card_revealed");
+  currentTable.classList.toggle("is-showdown", event.type === "showdown_reveal");
+  currentTable.classList.toggle("is-pot-push", event.type === "pot_push" || event.type === "odd_chip_award");
+  if (["seat_disconnected", "seat_return"].includes(event.type)) currentTable.classList.add("presence-pulse");
+  if (text) showTableEventToast(text);
+
+  if (event.type === "street_reveal" || event.type === "runout_card_revealed" || event.type === "showdown_reveal" || event.type === "pot_push") {
+    showStreetEventOverlay(event, text);
+  }
+  if (event.type === "tournament_table_move" && String(payload.userId) === String(state.user?.id) && payload.toTableId) {
+    const openNow = window.confirm("Вас пересадили за новый турнирный стол. Открыть?");
+    if (openNow) runAction(() => openTournamentTable(payload.toTableId));
+  }
+}
+
+function tableEventText(event, table) {
+  const payload = event.payload || {};
+  const seat = (table.seats || []).find((item) => String(item.userId) === String(payload.userId));
+  const name = seat?.name || payload.name || "Игрок";
+  const amount = payload.amount ? formatTableAmount(table, payload.amount) : "";
+  const labels = {
+    hand_start: "Новая раздача",
+    blind_posted: `${name}: ${payload.blind === "small" ? "малый" : "большой"} блайнд ${amount}`,
+    ante_posted: `${name}: ante ${amount}`,
+    hole_cards_dealt: "Карты розданы",
+    action_prompt: String(payload.userId) === String(state.user?.id) ? "Ваш ход" : `${name} думает`,
+    check: `${name}: чек${payload.automatic ? " · авто" : ""}`,
+    call: `${name}: колл ${amount}${payload.automatic ? " · авто" : ""}`,
+    bet: `${name}: ставка ${amount}`,
+    raise: `${name}: рейз ${payload.to ? formatTableAmount(table, payload.to) : amount}`,
+    fold: `${name}: фолд${payload.automatic ? " · авто" : ""}`,
+    street_reveal: `${streetName(payload.street)} ${Array.isArray(payload.cards) ? payload.cards.join(" ") : ""}`.trim(),
+    all_in_runout_start: "All-in runout",
+    runout_card_revealed: `Runout: ${payload.card || ""}`.trim(),
+    showdown_reveal: "Шоудаун: открываем карты",
+    pot_push: `Банк отправлен победителю${amount ? ` · ${amount}` : ""}`,
+    odd_chip_award: `Odd chip: ${name}`,
+    seat_sit_out: `${name}: sit out`,
+    seat_return: `${name}: вернулся`,
+    seat_disconnected: `${name}: reconnect`,
+    seat_busted: `${name}: выбыл`,
+    tournament_level_up: "Новый уровень блайндов",
+    tournament_table_move: "Пересадка за новый стол",
+    final_table_started: "Финальный стол",
+    payout_complete: "Выплаты завершены"
+  };
+  return labels[event.type] || "";
+}
+
+function showTableEventToast(text) {
+  if (!text) return;
+  lastToastText = text;
+  actionToast.hidden = false;
+  actionToast.textContent = text;
+  actionToast.classList.remove("show");
+  void actionToast.offsetWidth;
+  actionToast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => {
+    actionToast.classList.remove("show");
+    window.setTimeout(() => { actionToast.hidden = true; }, 220);
+  }, 1150);
+}
+
+function showStreetEventOverlay(event, text) {
+  if (!streetOverlay) return;
+  const title = event.type === "pot_push" ? "Банк"
+    : event.type === "showdown_reveal" ? "Шоудаун"
+    : event.type === "runout_card_revealed" ? "Runout"
+    : streetName(event.payload?.street) || "Стол";
+  streetOverlay.querySelector("strong").textContent = title;
+  streetOverlay.querySelector("span").textContent = text || "";
+  streetOverlay.hidden = false;
+  streetOverlay.classList.remove("show");
+  void streetOverlay.offsetWidth;
+  streetOverlay.classList.add("show");
+  clearTimeout(streetOverlayTimer);
+  streetOverlayTimer = window.setTimeout(() => {
+    streetOverlay.classList.remove("show");
+    window.setTimeout(() => { streetOverlay.hidden = true; }, 260);
+  }, 900);
+}
+
+function tableEventDelay(type) {
+  if (["street_reveal", "runout_card_revealed", "showdown_reveal", "pot_push"].includes(type)) return 180;
+  if (["hand_start", "hole_cards_dealt", "all_in_runout_start"].includes(type)) return 140;
+  return 80;
+}
+
+function streetName(street) {
+  return { flop: "Флоп", turn: "Терн", river: "Ривер", runout: "Runout" }[street] || "";
+}
+
+function tableEventSleep(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function sha256Hex(value) {
+  const bytes = new TextEncoder().encode(String(value));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function resetScroll() {
@@ -4415,6 +4717,9 @@ function renderCurrentTable(table) {
   currentTable.hidden = false;
   enterGameMode();
   currentTable.dataset.tableStatus = table.status || "";
+  currentTable.classList.remove("is-reconnecting");
+  currentTable.classList.toggle("viewer-disconnected", Boolean(table.viewer?.connected === false));
+  currentTable.classList.toggle("viewer-busted", table.viewer?.status === "busted" || table.viewer?.busted === true);
   tableCode.textContent = `#${table.id.slice(-8)}`;
   renderLimitValue(blinds, table.smallBlind, table.bigBlind, table.gameMode === "cash");
   tableDetails.textContent = `Texas NL · Блайнды ${formatTableLimit(table)} · #${table.handNumber || 1}`;
@@ -4483,6 +4788,9 @@ function renderCurrentTable(table) {
         shouldAnimateTurn ? "turn-in" : "",
         seat.sittingOut ? "sitting-out" : "",
         seat.sitOutNextHand ? "sitout-pending" : "",
+        seat.connected === false ? "disconnected" : "",
+        seat.reconnectDeadline ? "reconnecting" : "",
+        seat.busted ? "busted" : "",
         seat.folded ? "folded" : "",
         becameFolded ? "fold-out" : "",
         seat.userId === state.user?.id ? "viewer-seat" : "",
@@ -4513,7 +4821,9 @@ function renderCurrentTable(table) {
         index === table.bigBlindIndex ? "BB" : "",
         seat.isAllIn ? "All-in" : "",
         seat.sitOutNextHand ? "Away next" : "",
-        seat.sittingOut ? sittingOutLabel(seat) : ""
+        seat.sittingOut ? sittingOutLabel(seat) : "",
+        seat.connected === false ? "Reconnect" : "",
+        seat.busted ? "Busted" : ""
       ].filter(Boolean);
       renderAvatar(node.querySelector(".seat-avatar"), seat);
       node.querySelector(".seat-name").textContent = seat.name;
@@ -5053,7 +5363,8 @@ function renderTableInfo(table) {
     ["Ставки стола", formatTableLimit(table)],
     ["Игроки", `${table.seats.length}/${table.maxPlayers}`],
     ["Время на ход", "20 c."],
-    ["Раздача", `#${table.handNumber || 0}`]
+    ["Раздача", `#${table.handNumber || 0}`],
+    ["Fairness", fairnessProofLabel(table)]
   ];
 
   tableInfo.replaceChildren(
@@ -5085,6 +5396,15 @@ function renderStats(table) {
       return row;
     })
   );
+}
+
+function fairnessProofLabel(table) {
+  const fairness = table?.fairness || {};
+  if (fairness.serverSeed || fairness.revealedServerSeed) return "seed раскрыт";
+  if (fairness.serverSeedHash || fairness.serverCommit) return "server commit";
+  if (fairness.phase === "commit_reveal") return "ожидаем reveal";
+  if (fairness.phase) return fairness.phase;
+  return "commit/reveal";
 }
 
 function winningSeatIdSet(table) {
@@ -5665,8 +5985,14 @@ function enterGameMode() {
 }
 
 function formatStatus(table) {
+  if (currentTable.classList.contains("is-reconnecting")) return "Восстанавливаем соединение…";
+  if (table.viewer?.connected === false) return "Соединение потеряно · окно reconnect активно";
+  if (table.viewer?.status === "busted" || table.viewer?.busted === true) return "Вы выбыли";
+  if (table.viewer?.sittingOut) return "Sit out · нажмите «Вернуться»";
+  if (table.viewer?.canAct) return "Ваш ход";
   const fallback = {
     waiting: "Ожидание игроков",
+    starting: "Раздача начинается",
     preflop: "Префлоп",
     flop: "Флоп",
     turn: "Терн",
