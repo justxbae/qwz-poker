@@ -63,11 +63,7 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-html.minimal-launch [data-lobby-tab="tournaments"],
-html.minimal-launch .promo-banner--event,
 html.minimal-launch .tournament-registration-notice,
-html.minimal-launch .profile-tournament-card,
-html.minimal-launch [data-menu-action="affiliate"],
 html.minimal-launch .profile-mode-card--cash .profile-progress,
 html.minimal-launch .profile-mode-card--cash small,
 html.minimal-launch .profile-mode-card--rating p,
@@ -13692,6 +13688,309 @@ body:not(.in-game) .lobby-menu-list button[data-menu-action="support"] .menu-ico
   color: var(--qwz-teal) !important;
 }
 
+/* ---------- Telegram UI Kit final lobby lock ----------
+   Source references: figma/Tab Bar.svg, Settings - Scroll.svg, Sheet - Gift.svg,
+   Alert.svg, Sliders.svg, Icons - svg.svg. Keep this block last: the legacy
+   stylesheet has many broad lobby overrides above. */
+html.minimal-launch {
+  --tg-kit-bg: #000;
+  --tg-kit-top: #111820;
+  --tg-kit-card: #1c1c1f;
+  --tg-kit-row: #242428;
+  --tg-kit-row-2: #2c2c30;
+  --tg-kit-text: #f4f4f6;
+  --tg-kit-muted: rgba(235, 235, 245, 0.58);
+  --tg-kit-blue: #008bff;
+  --tg-kit-telegram: #2aabee;
+  --tg-kit-green: #34c759;
+  --tg-kit-radius-group: 26px;
+  --tg-kit-radius-row: 26px;
+  --tg-kit-radius-sheet: 30px;
+  --tg-kit-radius-tab: 31px;
+  --tg-kit-radius-button: 24px;
+}
+
+html.minimal-launch,
+html.minimal-launch body,
+html.minimal-launch body:not(.in-game) {
+  background: var(--tg-kit-bg) !important;
+  color: var(--tg-kit-text) !important;
+  overscroll-behavior: none !important;
+}
+
+html.minimal-launch body:not(.in-game) .app {
+  width: 100% !important;
+  max-width: 590px !important;
+  margin: 0 auto !important;
+  padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  background: var(--tg-kit-bg) !important;
+}
+
+html.minimal-launch body:not(.in-game) .topbar {
+  min-height: 116px !important;
+  padding: calc(28px + env(safe-area-inset-top)) 24px 16px !important;
+  border: 0 !important;
+  border-radius: 0 0 30px 30px !important;
+  background: var(--tg-kit-top) !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch body:not(.in-game) .topbar h1 {
+  color: var(--tg-kit-text) !important;
+  font-size: 19px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+}
+
+html.minimal-launch body:not(.in-game) .topbar .eyebrow {
+  color: var(--tg-kit-muted) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.08em !important;
+}
+
+html.minimal-launch body:not(.in-game) #profile,
+html.minimal-launch body:not(.in-game) #moreBtn {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  border-radius: 22px !important;
+}
+
+html.minimal-launch body:not(.in-game) .lobby-shell {
+  width: 100% !important;
+  padding: 14px 22px 0 !important;
+  background: var(--tg-kit-bg) !important;
+}
+
+html.minimal-launch body:not(.in-game) .lobby-view {
+  gap: 22px !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-wallet,
+html.minimal-launch body:not(.in-game) .product-mode-hub,
+html.minimal-launch body:not(.in-game) .home-games,
+html.minimal-launch body:not(.in-game) .lobby-card,
+html.minimal-launch body:not(.in-game) .profile-hero,
+html.minimal-launch body:not(.in-game) .profile-dashboard {
+  border: 0 !important;
+  border-radius: var(--tg-kit-radius-group) !important;
+  background: var(--tg-kit-card) !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-wallet {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  grid-template-areas: "account" "balance" "actions" !important;
+  gap: 18px !important;
+  padding: 24px !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-account {
+  grid-area: account !important;
+  display: grid !important;
+  grid-template-columns: 56px minmax(0, 1fr) !important;
+  gap: 14px !important;
+  align-items: center !important;
+}
+
+html.minimal-launch body:not(.in-game) .lobby-avatar {
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 18px !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-identity strong {
+  color: var(--tg-kit-text) !important;
+  font-size: 18px !important;
+  line-height: 1.1 !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-identity span {
+  color: var(--tg-kit-muted) !important;
+  font-size: 15px !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-wallet-side {
+  display: none !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance {
+  grid-area: balance !important;
+  display: block !important;
+  text-align: left !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance > span {
+  display: block !important;
+  margin-bottom: 4px !important;
+  color: var(--tg-kit-muted) !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance strong {
+  justify-content: flex-start !important;
+  color: #fff !important;
+  font-size: 46px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.05em !important;
+  line-height: 1 !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-wallet-actions {
+  grid-area: actions !important;
+  display: flex !important;
+  gap: 12px !important;
+  margin: 0 !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-wallet-actions button {
+  flex: 0 0 auto !important;
+  min-width: 124px !important;
+  min-height: 58px !important;
+  border-radius: 18px !important;
+  border: 0 !important;
+  background: var(--tg-kit-telegram) !important;
+  color: #fff !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-wallet-actions .home-withdraw {
+  background: var(--tg-kit-row) !important;
+}
+
+html.minimal-launch body:not(.in-game) .product-mode-hub {
+  padding: 3px !important;
+}
+
+html.minimal-launch body:not(.in-game) .product-mode-segment {
+  height: 58px !important;
+  padding: 0 !important;
+  border-radius: 20px !important;
+  background: var(--tg-kit-row) !important;
+}
+
+html.minimal-launch body:not(.in-game) .product-mode-segment button {
+  min-height: 52px !important;
+  border-radius: 18px !important;
+  color: var(--tg-kit-muted) !important;
+  font-size: 17px !important;
+}
+
+html.minimal-launch body:not(.in-game) .product-mode-segment button.active {
+  background: #5a5a63 !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch body:not(.in-game) .mode-context-copy,
+html.minimal-launch body:not(.in-game) .progression-card,
+html.minimal-launch body:not(.in-game) [data-mode-action="sitgo"],
+html.minimal-launch body:not(.in-game) [data-mode-action="private"],
+html.minimal-launch body:not(.in-game) .tournament-registration-notice {
+  display: none !important;
+}
+}
+
+html.minimal-launch body:not(.in-game) .section-title h2 {
+  color: var(--tg-kit-text) !important;
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.03em !important;
+}
+
+html.minimal-launch body:not(.in-game) .section-title span,
+html.minimal-launch body:not(.in-game) .empty-state,
+html.minimal-launch body:not(.in-game) .settings-row small,
+html.minimal-launch body:not(.in-game) .cashier-transaction small {
+  color: var(--tg-kit-muted) !important;
+}
+
+html.minimal-launch body:not(.in-game) .limit-pills {
+  gap: 8px !important;
+  padding-bottom: 10px !important;
+}
+
+html.minimal-launch body:not(.in-game) .limit-pills button {
+  min-height: 42px !important;
+  padding: 0 18px !important;
+  border-radius: 21px !important;
+  background: var(--tg-kit-row) !important;
+  color: var(--tg-kit-muted) !important;
+}
+
+html.minimal-launch body:not(.in-game) .limit-pills button.active {
+  background: var(--tg-kit-telegram) !important;
+  color: #fff !important;
+}
+
+html.minimal-launch body:not(.in-game) .table-item,
+html.minimal-launch body:not(.in-game) .settings-row,
+html.minimal-launch body:not(.in-game) .cashier-transaction {
+  border: 0 !important;
+  border-radius: var(--tg-kit-radius-row) !important;
+  background: var(--tg-kit-row) !important;
+}
+
+html.minimal-launch body:not(.in-game) .profile-hero {
+  padding: 26px !important;
+}
+
+html.minimal-launch body:not(.in-game) .profile-hero .profile-avatar {
+  width: 86px !important;
+  height: 86px !important;
+  border-radius: 28px !important;
+}
+
+html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open,
+html.minimal-launch body:not(.in-game) .lobby-menu-sheet {
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: min(590px, 100vw) !important;
+  margin: 0 auto !important;
+  border: 0 !important;
+  border-radius: var(--tg-kit-radius-sheet) var(--tg-kit-radius-sheet) 0 0 !important;
+  background: var(--tg-kit-card) !important;
+  box-shadow: 0 -18px 44px rgba(0, 0, 0, 0.42) !important;
+}
+
+html.minimal-launch body:not(.in-game) .bottom-nav {
+  left: 50% !important;
+  right: auto !important;
+  bottom: max(14px, env(safe-area-inset-bottom)) !important;
+  width: min(372px, calc(100vw - 48px)) !important;
+  height: 74px !important;
+  padding: 6px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 999px !important;
+  background: rgba(36, 36, 40, 0.88) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42) !important;
+  transform: translateX(-50%) !important;
+}
+
+html.minimal-launch body:not(.in-game) .bottom-nav button {
+  min-height: 62px !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  color: var(--tg-kit-muted) !important;
+}
+
+html.minimal-launch body:not(.in-game) .bottom-nav button.active {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+}
+
+html.minimal-launch body:not(.in-game) .bottom-nav .nav-icon svg {
+  width: 24px !important;
+  height: 24px !important;
+}
+
 /* ---------- FINAL minimal launch cascade lock ---------- */
 html.minimal-launch body:not(.in-game) .app { width: 100% !important; max-width: 590px !important; padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important; background: #000 !important; }
 html.minimal-launch body:not(.in-game) .lobby-shell { width: 100% !important; padding: 14px 22px 0 !important; background: #000 !important; }
@@ -13715,10 +14014,6 @@ html.minimal-launch body:not(.in-game) .product-mode-segment { height: 58px !imp
 html.minimal-launch body:not(.in-game) .product-mode-segment button { min-height: 52px !important; border-radius: 18px !important; color: rgba(235,235,245,.58) !important; font-size: 17px !important; }
 html.minimal-launch body:not(.in-game) .product-mode-segment button.active { background: #5a5a63 !important; color: #fff !important; }
 html.minimal-launch body:not(.in-game) .progression-card,
-html.minimal-launch body:not(.in-game) .profile-tournament-card,
-html.minimal-launch body:not(.in-game) .tournament-nav-button,
-html.minimal-launch body:not(.in-game) .promo-banner--event,
-html.minimal-launch body:not(.in-game) [data-menu-action="affiliate"],
 html.minimal-launch body:not(.in-game) [data-mode-action="sitgo"],
 html.minimal-launch body:not(.in-game) [data-mode-action="private"],
 html.minimal-launch body:not(.in-game) .tournament-registration-notice { display: none !important; }
@@ -14568,10 +14863,6 @@ html.minimal-launch body:not(.in-game) .mode-context-copy {
 }
 
 html.minimal-launch body:not(.in-game) [data-lobby-view="home"].active .progression-card,
-html.minimal-launch body:not(.in-game) .profile-tournament-card,
-html.minimal-launch body:not(.in-game) .tournament-nav-button,
-html.minimal-launch body:not(.in-game) .promo-banner--event,
-html.minimal-launch body:not(.in-game) [data-menu-action="affiliate"],
 html.minimal-launch body:not(.in-game) [data-mode-action="sitgo"],
 html.minimal-launch body:not(.in-game) [data-mode-action="private"],
 html.minimal-launch body:not(.in-game) .tournament-registration-notice {

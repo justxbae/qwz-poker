@@ -371,7 +371,7 @@ async function boot() {
   await loadConfig();
   await loadTables();
   await loadProfile();
-  if (!MINIMAL_LAUNCH || ADMIN_MODE) await loadTournaments();
+  await loadTournaments();
   resetAdminTournamentForm();
   setupScrollReveal();
   setupPromoCarousel();
@@ -621,13 +621,9 @@ async function loadConfig() {
 
 function applyMinimalLaunchMode() {
   if (!MINIMAL_LAUNCH) return;
-  document.querySelectorAll('[data-lobby-tab="tournaments"]').forEach((node) => {
-    node.hidden = true;
-    node.setAttribute("aria-hidden", "true");
-  });
-  document.querySelectorAll('[data-menu-action="affiliate"]').forEach((node) => {
-    node.hidden = true;
-    node.setAttribute("aria-hidden", "true");
+  document.querySelectorAll('[data-lobby-tab="tournaments"], [data-menu-action="affiliate"]').forEach((node) => {
+    node.hidden = false;
+    node.removeAttribute("aria-hidden");
   });
   const ratingButton = gameModeSwitch?.querySelector('[data-game-mode="play"] small');
   if (ratingButton) ratingButton.textContent = "фишки";
@@ -3265,7 +3261,6 @@ function syncLimitSelection() {
 }
 
 function selectLobbyTab(tab, options = {}) {
-  if (MINIMAL_LAUNCH && tab === "tournaments" && !ADMIN_MODE) tab = "home";
   closeLobbyMenu({ silent: true });
   if (cashierState.sheet) closeCashierSheet({ silent: true });
   lobbyMenuButton?.classList.remove("active");
@@ -3287,7 +3282,7 @@ function selectLobbyTab(tab, options = {}) {
   });
   if (tab === "profile") runAction(loadProfile);
   if (tab === "cashier") runAction(loadCashier);
-  if (tab === "tournaments" && (!MINIMAL_LAUNCH || ADMIN_MODE)) runAction(loadTournaments);
+  if (tab === "tournaments") runAction(loadTournaments);
   if (tab === "admin") runAction(loadAdminDashboard);
   if (tabChanged && !options.keepScroll) {
     window.requestAnimationFrame(resetScroll);
@@ -3553,12 +3548,6 @@ async function loadTables() {
 }
 
 async function loadTournaments({ silent = false } = {}) {
-  if (MINIMAL_LAUNCH && !ADMIN_MODE) {
-    state.tournaments = [];
-    state.tournamentHistory = [];
-    renderTournaments?.();
-    return;
-  }
   if (!tournamentList) return;
   if (tournamentStatus && !silent) tournamentStatus.textContent = "Загружаем турниры...";
   try {
