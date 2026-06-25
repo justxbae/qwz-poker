@@ -1950,3 +1950,68 @@ html:not(.admin-mode) body:not(.in-game) .profile-main h2 {
     min-width: calc(100vw - 28px) !important;
   }
 }
+
+/* 2026-06-26 correction 2: prevent wallet side panel from crushing the main column. */
+html:not(.admin-mode) body:not(.in-game) .lobby-shell {
+  padding-bottom: calc(156px + env(safe-area-inset-bottom)) !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-wallet {
+  grid-template-columns: minmax(0, 1fr) 132px !important;
+  column-gap: 14px !important;
+  overflow: hidden !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-account,
+html:not(.admin-mode) body:not(.in-game) .home-balance,
+html:not(.admin-mode) body:not(.in-game) .home-wallet-actions {
+  min-width: 0 !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-identity {
+  min-width: 0 !important;
+  justify-self: start !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-wallet-side {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 132px !important;
+  box-sizing: border-box !important;
+  justify-self: end !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-wallet-side strong,
+html:not(.admin-mode) body:not(.in-game) .home-wallet-side small {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .home-wallet-actions button {
+  min-width: 0 !important;
+  padding-right: 10px !important;
+  padding-left: 10px !important;
+}
+
+html:not(.admin-mode) body:not(.in-game) .bottom-nav {
+  bottom: calc(6px + env(safe-area-inset-bottom)) !important;
+  width: min(calc(100vw - 64px), 500px) !important;
+}
+
+@media (max-width: 430px) {
+  html:not(.admin-mode) body:not(.in-game) .home-wallet {
+    grid-template-columns: minmax(0, 1fr) 118px !important;
+    column-gap: 10px !important;
+  }
+
+  html:not(.admin-mode) body:not(.in-game) .home-wallet-side {
+    max-width: 118px !important;
+    padding: 12px !important;
+  }
+
+  html:not(.admin-mode) body:not(.in-game) .home-balance strong {
+    font-size: 34px !important;
+  }
+}
