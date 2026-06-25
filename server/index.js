@@ -1098,11 +1098,16 @@ async function handleApi(req, res, url) {
         sendJson(res, 409, { error: "Покинуть турнирный стол с возвратом стека нельзя" });
         return;
       }
+      const operationId = req.headers["x-idempotency-key"] || id("table_leave");
       const departingStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
       const result = leaveTable(table, user);
       await persistCompletedHands(table);
       const deleteSnapshot = result.tableEmpty && table.isPrivate;
-      await settleLeftTableStack(user, table, departingStack || result.stack, { returnToWallet: true, deleteSnapshot });
+      await settleLeftTableStack(user, table, departingStack || result.stack, {
+        returnToWallet: true,
+        deleteSnapshot,
+        idempotencyKey: operationId
+      });
       if (deleteSnapshot) {
         tables.delete(table.id);
       }
@@ -1131,11 +1136,12 @@ async function handleApi(req, res, url) {
         sendJson(res, 409, { error: "Встать из-за турнирного стола нельзя" });
         return;
       }
+      const operationId = req.headers["x-idempotency-key"] || id("table_stand");
       const departingStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
       const result = leaveTable(table, user);
       await persistCompletedHands(table);
       const deleteSnapshot = result.tableEmpty && table.isPrivate;
-      await settleLeftTableStack(user, table, departingStack || result.stack, { deleteSnapshot });
+      await settleLeftTableStack(user, table, departingStack || result.stack, { deleteSnapshot, idempotencyKey: operationId });
       if (deleteSnapshot) {
         tables.delete(table.id);
       } else if (table.gameMode !== "cash") {
@@ -4347,7 +4353,7 @@ async function settleLeftTableStack(user, table, stack, options = {}) {
       title: "Возврат со стола",
       amount: stack,
       meta: table.name,
-      idempotencyKey: `cashout:${table.id}:${user.id}:${table.handNumber}:${stack}`
+      idempotencyKey: options.idempotencyKey || `cashout:${table.id}:${user.id}:${table.stateRevision || 0}:${Date.now()}`
     },
     movement: {
       category: "table_to_cash_wallet",
@@ -4372,7 +4378,7 @@ async function returnPlayTableStackToWallet(user, table, stack, options = {}) {
       title: "Возврат со стола",
       amount,
       meta: table.name,
-      idempotencyKey: `play-cashout:${table.id}:${user.id}:${table.handNumber}:${amount}`
+      idempotencyKey: options.idempotencyKey || `play-cashout:${table.id}:${user.id}:${table.stateRevision || 0}:${Date.now()}`
     },
     movement: {
       category: "table_to_wallet",

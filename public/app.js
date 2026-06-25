@@ -748,6 +748,11 @@ function renderLimitOptions() {
 
 function setupTelegramControls() {
   applyTelegramTheme();
+  try {
+    tg?.disableVerticalSwipes?.();
+  } catch {
+    // Older Telegram WebViews do not expose this API.
+  }
   tg?.onEvent?.("themeChanged", applyTelegramTheme);
   setupTelegramHomeScreenInstall();
   tg?.BackButton?.onClick?.(() => {
@@ -4021,7 +4026,7 @@ async function joinTable(tableId, buyInAmount = 0) {
       state.currentTableId = table.id;
       enterGameMode();
       renderCurrentTable(table);
-      enqueueTableEvents(table.id, table.events || []);
+      syncTableEventCursor(table);
       startTableEventStream(table.id);
       return;
     }
@@ -4046,7 +4051,7 @@ async function joinTable(tableId, buyInAmount = 0) {
     state.currentTableId = data.table.id;
     enterGameMode();
     renderCurrentTable(data.table);
-    enqueueTableEvents(data.table.id, data.table.events || []);
+    syncTableEventCursor(data.table);
     await ensurePlayerFairnessSeed(data.table);
     startTableEventStream(data.table.id);
     haptic("success");
@@ -4175,7 +4180,7 @@ async function confirmBuyIn() {
     state.currentTableId = data.table.id;
     enterGameMode();
     renderCurrentTable(data.table);
-    enqueueTableEvents(data.table.id, data.table.events || []);
+    syncTableEventCursor(data.table);
     await ensurePlayerFairnessSeed(data.table);
     startTableEventStream(data.table.id);
     haptic("success");
@@ -4201,7 +4206,7 @@ async function confirmBuyIn() {
     });
     closeMenu();
     renderCurrentTable(data.table);
-    enqueueTableEvents(data.table.id, data.table.events || []);
+    syncTableEventCursor(data.table);
     await auth();
     await loadCashier();
   }
@@ -4239,7 +4244,7 @@ function setBuyInAmount(amount) {
 async function loadCurrentTable() {
   const data = await api(`/api/tables/${state.currentTableId}`);
   renderCurrentTable(data.table);
-  enqueueTableEvents(data.table.id, data.table.events || []);
+  syncTableEventCursor(data.table);
   await ensurePlayerFairnessSeed(data.table);
   startTableEventStream(state.currentTableId);
 }
@@ -4362,15 +4367,17 @@ async function leaveCurrentTable() {
   const table = state.currentTable;
   const stack = Number(table?.viewer?.stack || 0);
   const amountText = table ? formatTableAmount(table, stack) : "";
-  const confirmed = await showConfirm(
-    `Покинуть стол?\n\n${amountText ? `Стек ${amountText} будет возвращён на баланс. ` : ""}Если раздача активна, карты будут сброшены по правилам.`
-  );
+  const confirmed = await showConfirm(`Покинуть стол?${amountText ? `\nСтек ${amountText} вернётся на баланс.` : ""}`);
   if (!confirmed) return;
 
   const tableId = state.currentTableId;
-  await api(`/api/tables/${tableId}/leave`, { method: "POST" });
+  await api(`/api/tables/${tableId}/leave`, {
+    method: "POST",
+    idempotencyKey: requestKey(`table-leave-${tableId}`)
+  });
   closeMenu();
   state.currentTableId = "";
+  resetTableEventCursor(tableId);
   stopTableEventStream();
   state.currentTable = null;
   currentTable.hidden = true;
@@ -4464,7 +4471,7 @@ async function goToLobby() {
 
 async function backToLobbyFromTable() {
   if (state.currentTable?.viewer?.isSeated) {
-    const confirmed = await showConfirm("Вернуться в лобби?\n\nВы останетесь за столом. Чтобы забрать стек на баланс, используйте «Покинуть стол».");
+    const confirmed = await showConfirm("Вернуться в лобби?\nВы останетесь за столом.");
     if (!confirmed) return;
   }
   await goToLobby();
@@ -4497,6 +4504,23 @@ function stopTableEventStream({ preserveLastEventId = false } = {}) {
   tableEventStreamId = "";
   tableEventEverConnected = false;
   if (!preserveLastEventId) tableEventLastId = "";
+}
+
+function syncTableEventCursor(table) {
+  if (!table?.id) return;
+  const lastSequence = Math.max(0, ...(table.events || []).map((event) => Number(event.sequence || 0)));
+  tableEventLastSequence.set(table.id, lastSequence);
+  if (lastSequence > 0) tableEventLastId = `${table.id}:${lastSequence}`;
+  else if (tableEventLastId.startsWith(`${table.id}:`)) tableEventLastId = "";
+}
+
+function resetTableEventCursor(tableId) {
+  if (!tableId) return;
+  tableEventLastSequence.delete(tableId);
+  for (let index = tableEventQueue.length - 1; index >= 0; index -= 1) {
+    if (tableEventQueue[index]?.tableId === tableId) tableEventQueue.splice(index, 1);
+  }
+  if (tableEventLastId.startsWith(`${tableId}:`)) tableEventLastId = "";
 }
 
 async function consumeTableEventStream(tableId, signal) {
