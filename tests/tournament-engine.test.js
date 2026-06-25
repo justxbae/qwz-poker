@@ -106,3 +106,37 @@ test("state machine records terminal timestamps", () => {
   assert.equal(tournament.status, TOURNAMENT_STATUSES.FINISHED);
   assert.equal(tournament.finishedAt, new Date(now + 2000).toISOString());
 });
+
+test("manual registration close locks the tournament until reopened", () => {
+  const now = Date.now();
+  const tournament = createTournamentRuntime({
+    id: "mtt-admin",
+    status: "registration_open",
+    balanceBucket: "play"
+  }, now);
+
+  assert.equal(tournament.balanceBucket, "cash");
+  applyTournamentTransition(tournament, "close_registration", now);
+  assert.equal(tournament.status, TOURNAMENT_STATUSES.CREATED);
+  assert.equal(tournament.registrationLocked, true);
+  assert.equal(schedulerDecision(tournament, now + 5_000), null);
+  applyTournamentTransition(tournament, "open_registration", now + 6_000);
+  assert.equal(tournament.status, TOURNAMENT_STATUSES.REGISTRATION_OPEN);
+  assert.equal(tournament.registrationLocked, false);
+});
+
+test("freeroll payout uses configured guaranteed cash prize pool", () => {
+  const tournament = createTournamentRuntime({
+    id: "freeroll-cash",
+    buyIn: 0,
+    fee: 0,
+    guaranteedPrizePool: 1_000_000
+  });
+  tournament.registrations.set("p1", { userId: "p1" });
+  tournament.registrations.set("p2", { userId: "p2" });
+
+  const result = calculateTournamentPayouts(tournament, [{ userId: "p1" }, { userId: "p2" }]);
+  assert.equal(tournament.balanceBucket, "cash");
+  assert.equal(result.prizePool, 1_000_000);
+  assert.equal(result.payouts.reduce((sum, payout) => sum + payout.amount, 0), 1_000_000);
+});

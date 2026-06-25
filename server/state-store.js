@@ -1,11 +1,14 @@
 import Redis from "ioredis";
+import { randomUUID } from "node:crypto";
 
 const PREFIX = "qwz";
 const TABLE_SET_KEY = `${PREFIX}:tables`;
 const DEFAULT_SESSION_TTL_SECONDS = 24 * 60 * 60;
 
 let redis = null;
+let subscriber = null;
 let lastError = "";
+const tableListeners = new Map();
 
 export function stateStoreEnabled() {
   return Boolean(redis);
@@ -29,6 +32,13 @@ export async function initStateStore() {
   });
   await redis.connect();
   await redis.ping();
+  subscriber = redis.duplicate();
+  await subscriber.connect();
+  await subscriber.psubscribe(`${PREFIX}:table-events:*`);
+  subscriber.on("pmessage", (_pattern, channel, message) => {
+    const tableId = channel.slice(`${PREFIX}:table-events:`.length);
+    for (const listener of tableListeners.get(tableId) || []) listener(message);
+  });
   lastError = "";
   return true;
 }
@@ -66,7 +76,9 @@ export async function stateStoreHealth() {
 
 export async function closeStateStore() {
   if (!redis) return;
+  if (subscriber) await subscriber.quit();
   await redis.quit();
+  subscriber = null;
   redis = null;
 }
 
@@ -116,12 +128,73 @@ export async function updateUserSessions(userId, patch = {}, ttlSeconds = sessio
 }
 
 export async function setTableSnapshot(table) {
-  if (!redis) return false;
+  const payload = JSON.stringify({
+    tableId: table.id,
+    revision: Number(table.stateRevision || 0),
+    events: Array.isArray(table.events) ? table.events.slice(-20) : []
+  });
+  if (!redis) {
+    for (const listener of tableListeners.get(table.id) || []) listener(payload);
+    return false;
+  }
   const transaction = redis.multi();
   transaction.set(tableKey(table.id), JSON.stringify(table));
   transaction.sadd(TABLE_SET_KEY, table.id);
+  transaction.publish(tableEventsChannel(table.id), payload);
   await transaction.exec();
   return true;
+}
+
+export async function getTableSnapshot(tableId) {
+  if (!redis) return null;
+  const raw = await redis.get(tableKey(tableId));
+  return raw ? JSON.parse(raw) : null;
+}
+
+export async function withTableLock(tableId, callback, { ttlMs = 10_000, waitMs = 2_000 } = {}) {
+  if (!redis) return callback();
+  const key = `${PREFIX}:table-lock:${tableId}`;
+  const token = randomUUID();
+  const deadline = Date.now() + waitMs;
+  while (Date.now() <= deadline) {
+    const acquired = await redis.set(key, token, "PX", ttlMs, "NX");
+    if (acquired === "OK") {
+      const renewal = setInterval(() => {
+        redis.eval(
+          "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('pexpire', KEYS[1], ARGV[2]) else return 0 end",
+          1,
+          key,
+          token,
+          ttlMs
+        ).catch((error) => { lastError = error.message; });
+      }, Math.max(250, Math.floor(ttlMs / 3)));
+      try {
+        return await callback();
+      } finally {
+        clearInterval(renewal);
+        await redis.eval(
+          "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+          1,
+          key,
+          token
+        );
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  const error = new Error("Стол занят другим игровым процессом, повторите действие");
+  error.status = 409;
+  throw error;
+}
+
+export function subscribeTableEvents(tableId, listener) {
+  const listeners = tableListeners.get(tableId) || new Set();
+  listeners.add(listener);
+  tableListeners.set(tableId, listeners);
+  return () => {
+    listeners.delete(listener);
+    if (!listeners.size) tableListeners.delete(tableId);
+  };
 }
 
 export async function deleteTableSnapshot(tableId) {
@@ -157,4 +230,8 @@ function userSessionsKey(userId) {
 
 function tableKey(tableId) {
   return `${PREFIX}:table:${tableId}`;
+}
+
+function tableEventsChannel(tableId) {
+  return `${PREFIX}:table-events:${tableId}`;
 }

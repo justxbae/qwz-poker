@@ -397,6 +397,101 @@ export async function addCashWalletEntry(providerUserId, entry, provider = "tele
   }
 }
 
+export async function applyTableWalletMutation(providerUserId, {
+  table,
+  entry,
+  movement = null,
+  deleteSnapshot = false
+} = {}, provider = "telegram") {
+  if (!pool) return null;
+  if (!table?.id || !entry) throw new Error("Table wallet mutation requires table and ledger entry");
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const cashMode = table.gameMode === "cash";
+  const column = cashMode ? "cash_usdt_micros" : "balance";
+  const bucket = cashMode ? "cash_usdt" : "play";
+  const asset = cashMode ? "USDT" : "PLAY_CHIPS";
+  const amount = Math.max(0, Math.round(Number(entry.amount) || 0));
+  const idempotencyKey = normalizeIdempotencyKey(entry.idempotencyKey);
+  const delta = (entry.type === "debit" ? -1 : 1) * amount;
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    if (idempotencyKey) {
+      const existing = await client.query(`
+        select le.balance_after as balance, ats.raw as snapshot
+        from ledger_entries le
+        left join active_table_snapshots ats on ats.id = $2
+        where le.idempotency_key = $1
+        limit 1
+      `, [idempotencyKey, table.id]);
+      if (existing.rowCount) {
+        await client.query("commit");
+        return {
+          balance: Number(existing.rows[0].balance || 0),
+          snapshot: existing.rows[0].snapshot || null,
+          idempotentReplay: true
+        };
+      }
+    }
+    await client.query("insert into wallets (app_user_id) values ($1) on conflict do nothing", [appUserId]);
+    const current = await client.query(`select ${column} as balance from wallets where app_user_id = $1 for update`, [appUserId]);
+    const before = Number(current.rows[0]?.balance || 0);
+    const after = before + delta;
+    if (after < 0) {
+      const error = new Error(cashMode ? "Недостаточно USDT на балансе" : "Недостаточно PLAY_CHIPS на балансе");
+      error.status = 409;
+      throw error;
+    }
+    await client.query(`update wallets set ${column} = $2, updated_at = now() where app_user_id = $1`, [appUserId, after]);
+    await client.query(`
+      insert into ledger_entries (
+        id, app_user_id, provider, provider_user_id, type, category, title, amount, meta,
+        balance_after, idempotency_key, asset, balance_bucket
+      ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+    `, [
+      entry.id || id("ledger"), appUserId, provider, String(providerUserId), entry.type,
+      normalizeLedgerCategory(entry.category), entry.title, amount, entry.meta || "", after,
+      idempotencyKey || null, asset, bucket
+    ]);
+    if (movement && amount > 0) {
+      await client.query(`
+        insert into fund_movements (
+          id, app_user_id, provider, provider_user_id, category, from_bucket, to_bucket,
+          amount, context_id, meta
+        ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      `, [
+        movement.id || id("move"), appUserId, provider, String(providerUserId), movement.category,
+        movement.from, movement.to, Math.max(0, Math.round(Number(movement.amount ?? amount) || 0)),
+        movement.contextId || table.id, movement.meta || ""
+      ]);
+    }
+    if (deleteSnapshot) {
+      await client.query("delete from active_table_snapshots where id = $1", [table.id]);
+    } else {
+      await client.query(`
+        insert into active_table_snapshots (
+          id, table_name, is_private, is_system, small_blind, big_blind, status, hand_number, raw, updated_at
+        ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now())
+        on conflict (id) do update set
+          table_name=excluded.table_name, is_private=excluded.is_private, is_system=excluded.is_system,
+          small_blind=excluded.small_blind, big_blind=excluded.big_blind, status=excluded.status,
+          hand_number=excluded.hand_number, raw=excluded.raw, updated_at=now()
+      `, [
+        table.id, table.name || "", Boolean(table.isPrivate), Boolean(table.isSystem),
+        Number(table.smallBlind || 0), Number(table.bigBlind || 0), table.status || "waiting",
+        Number(table.handNumber || 0), JSON.stringify(table)
+      ]);
+    }
+    await client.query("commit");
+    return { balance: after, before, snapshot: deleteSnapshot ? null : table };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function listLedger(providerUserId, limit = 30, provider = "telegram") {
   if (!pool) return null;
   const appUserId = await ensureIdentity(provider, providerUserId);
@@ -419,7 +514,7 @@ export async function listCashLedger(providerUserId, limit = 30, provider = "tel
   const result = await query(`
     select id, type, category, title, amount, meta, asset, balance_bucket as "balanceBucket", created_at as "createdAt"
     from ledger_entries
-    where app_user_id = $1 and balance_bucket = 'cash_usdt'
+    where app_user_id = $1 and balance_bucket in ('cash_usdt', 'cash')
     order by created_at desc
     limit $2
   `, [appUserId, limit]);
@@ -528,14 +623,11 @@ export async function recordProfileHandProgress({
   const uniqueIds = [...new Set(providerUserIds.map(String).filter(Boolean))];
   if (!uniqueIds.length) return [];
   const cashMode = gameMode === "cash";
-  const ratingEligible = !cashMode && !Boolean(table?.isPrivate) && gameMode !== "private";
+  const ratingEligible = gameMode === "play" && !Boolean(table?.isPrivate) && !Boolean(table?.tournamentId);
   const seasonId = activeRatingSeasonId();
   const handSeats = Array.isArray(hand?.seats) ? hand.seats : [];
   const seatByUserId = new Map(handSeats.map((seat) => [String(seat.userId || ""), seat]));
   const activePlayers = handSeats.filter((seat) => seat.userId).length;
-  const rakeShare = cashMode && activePlayers > 0
-    ? Math.floor(Number(hand?.rake || 0) / activePlayers)
-    : 0;
   const changes = [];
   for (const providerUserId of uniqueIds) {
     const appUserId = await ensureIdentity(provider, providerUserId);
@@ -547,10 +639,11 @@ export async function recordProfileHandProgress({
         values ($1, $2, $3)
         on conflict do nothing
         returning hand_id
-      `, [progressKey, appUserId, cashMode ? "cash" : "play"]);
+      `, [progressKey, appUserId, gameMode === "tournament" ? "tournament" : cashMode ? "cash" : "play"]);
       if (!mark.rowCount) continue;
     }
     const seatResult = seatByUserId.get(String(providerUserId)) || {};
+    const rakeShare = cashMode ? Math.max(0, Number(seatResult.rakeContributed || 0)) : 0;
     const ratingDelta = ratingEligible ? ratingDeltaForHand({
       profit: Number(seatResult.profit || 0),
       bigBlind: Number(table?.bigBlind || 0),
@@ -758,6 +851,27 @@ export async function listActiveTableSnapshots() {
   }));
 }
 
+export async function listTournaments({ includeArchived = true } = {}) {
+  if (!pool) return null;
+  const result = await query(`
+    select id, title, type, status, balance_bucket as "balanceBucket",
+           buy_in as "buyIn", fee, guaranteed_prize_pool as "guaranteedPrizePool",
+           max_players as "maxPlayers", min_players as "minPlayers",
+           max_players_per_table as "maxPlayersPerTable", starting_stack as "startingStack",
+           structure, payout_structure as "payoutStructure",
+           registration_opens_at as "registrationOpensAt", starts_at as "startsAt",
+           late_reg_ends_at as "lateRegEndsAt", re_entry_limit as "reEntryLimit",
+           add_on_allowed as "addOnAllowed", current_level as "currentLevel",
+           started_at as "startedAt", finished_at as "finishedAt", cancelled_at as "cancelledAt",
+           raw, created_at as "createdAt", updated_at as "updatedAt"
+    from tournaments
+    where $1::boolean = true
+       or status not in ('finished', 'cancelled')
+    order by starts_at asc, created_at asc
+  `, [includeArchived]);
+  return result.rows.map(normalizeTournamentDefinitionRow);
+}
+
 export async function listTournamentRegistrations(tournamentIds = []) {
   if (!pool) return null;
   if (!tournamentIds.length) return [];
@@ -866,7 +980,7 @@ export async function upsertTournamentDefinitions(tournaments = []) {
       tournament.reEntryLimit || 0,
       tournament.addOnAllowed === true,
       tournament.currentLevel || 1,
-      JSON.stringify({ prizePoolMode: tournament.prizePoolMode || "buyins" })
+      JSON.stringify(tournamentRawDocument(tournament))
     ]);
   }
   return true;
@@ -891,7 +1005,10 @@ export async function updateTournamentState(tournament) {
     tournament.startedAt || null,
     tournament.finishedAt || null,
     tournament.cancelledAt || null,
-    JSON.stringify({ eliminations: tournament.eliminations || [] })
+    JSON.stringify({
+      ...tournamentRawDocument(tournament),
+      eliminations: tournament.eliminations || []
+    })
   ]);
   return true;
 }
@@ -956,6 +1073,16 @@ export async function settleTournament(tournament, rankedPlayers, payouts, idemp
     `, [tournament.id]);
     const byProviderUserId = new Map(registrations.rows.map((row) => [String(row.provider_user_id), row]));
     const payoutByUserId = new Map(payouts.map((payout) => [String(payout.userId), payout]));
+    const payoutTotal = payouts.reduce((sum, payout) => sum + Math.max(0, Math.round(Number(payout.amount) || 0)), 0);
+    const buyInPool = Math.max(0, Math.round(Number(tournament.buyIn) || 0)) * registrations.rowCount;
+    const guaranteeFunding = Math.max(0, payoutTotal - buyInPool);
+    if (guaranteeFunding > 0) {
+      await client.query(`
+        insert into platform_ledger_entries (
+          id, type, category, title, amount, context_id, meta, idempotency_key, asset, balance_bucket
+        ) values ($1, 'debit', 'tournament_guarantee', 'Гарантия призового фонда', $2, $3, $4, $5, 'USDT', 'cash')
+      `, [id("platform"), guaranteeFunding, tournament.id, tournament.title, `${idempotencyKey}:guarantee`]);
+    }
 
     for (const result of rankedPlayers) {
       const registration = byProviderUserId.get(String(result.userId));
@@ -1044,6 +1171,133 @@ export async function listTournamentHistory(providerUserId, provider = "telegram
     place: Number(row.place || 0),
     prizeAmount: Number(row.prizeAmount || 0)
   }));
+}
+
+export async function listRewardTournamentEvents() {
+  if (!pool) return null;
+  const result = await query(`
+    select rte.id, rte.title, rte.season_id as "seasonId", rte.status,
+           rte.starts_at as "startsAt", rte.description, rte.raw,
+           rte.created_at as "createdAt", rte.updated_at as "updatedAt",
+           count(rt.id)::int as "ticketCount",
+           count(rt.id) filter (where rt.status = 'used')::int as "usedTicketCount"
+    from reward_tournament_events rte
+    left join reward_tickets rt on rt.event_id = rte.id
+    group by rte.id
+    order by coalesce(rte.starts_at, rte.created_at) desc, rte.created_at desc
+  `);
+  return result.rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    seasonId: row.seasonId || "",
+    status: row.status,
+    startsAt: row.startsAt,
+    description: row.description || "",
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    ticketCount: Number(row.ticketCount || 0),
+    usedTicketCount: Number(row.usedTicketCount || 0),
+    raw: row.raw || {}
+  }));
+}
+
+export async function getRewardTournamentEvent(eventId) {
+  if (!pool) return null;
+  const [eventResult, ticketResult] = await Promise.all([
+    query(`
+      select id, title, season_id as "seasonId", status,
+             starts_at as "startsAt", description, raw,
+             created_at as "createdAt", updated_at as "updatedAt"
+      from reward_tournament_events
+      where id = $1
+      limit 1
+    `, [eventId]),
+    query(`
+      select rt.id, rt.provider_user_id as "userId", rt.provider, rt.leaderboard_rank as "leaderboardRank",
+             rt.status, rt.granted_at as "grantedAt", rt.used_at as "usedAt",
+             au.display_name as name, au.username, rt.raw
+      from reward_tickets rt
+      left join app_users au on au.id = rt.app_user_id
+      where rt.event_id = $1
+      order by rt.leaderboard_rank asc, rt.granted_at asc
+    `, [eventId])
+  ]);
+  if (!eventResult.rowCount) return null;
+  const event = eventResult.rows[0];
+  return {
+    id: event.id,
+    title: event.title,
+    seasonId: event.seasonId || "",
+    status: event.status,
+    startsAt: event.startsAt,
+    description: event.description || "",
+    raw: event.raw || {},
+    createdAt: event.createdAt,
+    updatedAt: event.updatedAt,
+    tickets: ticketResult.rows.map((ticket) => ({
+      id: ticket.id,
+      userId: ticket.userId,
+      provider: ticket.provider,
+      leaderboardRank: Number(ticket.leaderboardRank || 0),
+      status: ticket.status,
+      grantedAt: ticket.grantedAt,
+      usedAt: ticket.usedAt,
+      name: ticket.name || "Player",
+      username: ticket.username || "",
+      raw: ticket.raw || {}
+    }))
+  };
+}
+
+export async function createRewardTournamentEvent(event, tickets = []) {
+  if (!pool) return null;
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await client.query(`
+      insert into reward_tournament_events (
+        id, title, season_id, status, starts_at, description, raw, updated_at
+      ) values ($1, $2, $3, $4, $5, $6, $7::jsonb, now())
+    `, [
+      event.id,
+      event.title,
+      event.seasonId || "",
+      event.status || "tickets_issued",
+      event.startsAt ? new Date(event.startsAt) : null,
+      event.description || "",
+      JSON.stringify(event.raw || {})
+    ]);
+    for (const ticket of tickets) {
+      const appUserId = await ensureIdentity(ticket.provider || "telegram", ticket.userId);
+      await client.query(`
+        insert into reward_tickets (
+          id, event_id, app_user_id, provider, provider_user_id, leaderboard_rank,
+          status, granted_at, used_at, raw
+        ) values ($1, $2, $3, $4, $5, $6, 'active', now(), null, $7::jsonb)
+        on conflict (event_id, app_user_id) do update set
+          leaderboard_rank = excluded.leaderboard_rank,
+          status = 'active',
+          granted_at = now(),
+          used_at = null,
+          raw = excluded.raw
+      `, [
+        ticket.id || id("rticket"),
+        event.id,
+        appUserId,
+        ticket.provider || "telegram",
+        String(ticket.userId),
+        Number(ticket.leaderboardRank || 0),
+        JSON.stringify(ticket.raw || {})
+      ]);
+    }
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+  return getRewardTournamentEvent(event.id);
 }
 
 export async function registerTournament(providerUserId, tournament, provider = "telegram", idempotencyKey = "") {
@@ -2420,8 +2674,8 @@ export async function dashboardStats() {
       (select coalesce(sum(stack), 0)::bigint from saved_stacks) as saved_stack_total,
       (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'credit' and balance_bucket = 'play') as ledger_credit_total,
       (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'debit' and balance_bucket = 'play') as ledger_debit_total,
-      (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'credit' and balance_bucket = 'cash_usdt') as cash_ledger_credit_total,
-      (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'debit' and balance_bucket = 'cash_usdt') as cash_ledger_debit_total,
+      (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'credit' and balance_bucket in ('cash_usdt', 'cash')) as cash_ledger_credit_total,
+      (select coalesce(sum(amount), 0)::bigint from ledger_entries where type = 'debit' and balance_bucket in ('cash_usdt', 'cash')) as cash_ledger_debit_total,
       (select coalesce(sum(amount), 0)::bigint from platform_ledger_entries where type = 'credit') as platform_ledger_credit_total,
       (select coalesce(sum(amount), 0)::bigint from platform_ledger_entries where type = 'debit') as platform_ledger_debit_total,
       (select coalesce(sum(amount), 0)::bigint from platform_ledger_entries where type = 'credit' and balance_bucket = 'play') as play_platform_ledger_credit_total,
@@ -2597,6 +2851,59 @@ export async function listRatingLeaderboard({ seasonId = activeRatingSeasonId(),
       && Number(row.ratingActiveDays || 0) >= RATING.minActiveDaysForLeaderboard,
     updatedAt: row.updatedAt
   }));
+}
+
+function normalizeTournamentDefinitionRow(row = {}) {
+  const raw = row.raw && typeof row.raw === "object" ? row.raw : {};
+  return {
+    id: row.id,
+    title: row.title || "Tournament",
+    type: row.type === "sng" ? "sng" : "mtt",
+    status: row.status || "created",
+    balanceBucket: "cash",
+    buyIn: Number(row.buyIn || 0),
+    fee: Number(row.fee || 0),
+    guaranteedPrizePool: Number(row.guaranteedPrizePool || 0),
+    maxPlayers: Number(row.maxPlayers || 2),
+    minPlayers: Number(row.minPlayers || 2),
+    maxPlayersPerTable: Number(row.maxPlayersPerTable || 6),
+    startingStack: Number(row.startingStack || 10_000),
+    structure: Array.isArray(row.structure) ? row.structure : [],
+    payoutStructure: Array.isArray(row.payoutStructure) ? row.payoutStructure : null,
+    registrationOpensAt: row.registrationOpensAt,
+    startsAt: row.startsAt,
+    lateRegEndsAt: row.lateRegEndsAt,
+    lateRegMinutes: Number(raw.lateRegMinutes || 0),
+    reEntryLimit: Number(row.reEntryLimit || 0),
+    addOnAllowed: row.addOnAllowed === true,
+    currentLevel: Number(row.currentLevel || 1),
+    startedAt: row.startedAt || null,
+    finishedAt: row.finishedAt || null,
+    cancelledAt: row.cancelledAt || null,
+    description: String(raw.description || ""),
+    registrationLocked: raw.registrationLocked === true,
+    prizePoolMode: raw.prizePoolMode || "buyins",
+    eventSequence: Number(raw.eventSequence || 0),
+    events: Array.isArray(raw.events) ? raw.events : [],
+    notifications: raw.notifications && typeof raw.notifications === "object" ? raw.notifications : {},
+    raw,
+    createdAt: row.createdAt || null,
+    updatedAt: row.updatedAt || null
+  };
+}
+
+function tournamentRawDocument(tournament = {}) {
+  const raw = tournament.raw && typeof tournament.raw === "object" ? tournament.raw : {};
+  return {
+    ...raw,
+    prizePoolMode: raw.prizePoolMode || tournament.prizePoolMode || "buyins",
+    description: String(tournament.description || raw.description || ""),
+    lateRegMinutes: Math.max(0, Math.round(Number(tournament.lateRegMinutes || raw.lateRegMinutes || 0))),
+    registrationLocked: tournament.registrationLocked === true || raw.registrationLocked === true,
+    eventSequence: Math.max(0, Number(tournament.eventSequence || raw.eventSequence || 0)),
+    events: Array.isArray(tournament.events) ? tournament.events.slice(-160) : (Array.isArray(raw.events) ? raw.events.slice(-160) : []),
+    notifications: tournament.notifications && typeof tournament.notifications === "object" ? tournament.notifications : (raw.notifications || {})
+  };
 }
 
 async function ensureIdentity(provider, providerUserId) {
@@ -2780,9 +3087,7 @@ async function migrate() {
       balance_after bigint,
       idempotency_key text,
       asset text not null default 'PLAY_CHIPS',
-      balance_bucket text not null default 'play' check (balance_bucket in ('play', 'cash')),
-      asset text not null default 'PLAY_CHIPS',
-      balance_bucket text not null default 'play',
+      balance_bucket text not null default 'play' check (balance_bucket in ('play', 'cash', 'cash_usdt', 'bonus_usdt')),
       reversal_of text references ledger_entries(id) on delete set null,
       created_at timestamptz not null default now()
     );
@@ -2792,6 +3097,9 @@ async function migrate() {
     alter table ledger_entries add column if not exists idempotency_key text;
     alter table ledger_entries add column if not exists asset text not null default 'PLAY_CHIPS';
     alter table ledger_entries add column if not exists balance_bucket text not null default 'play';
+    alter table ledger_entries drop constraint if exists ledger_entries_balance_bucket_check;
+    alter table ledger_entries add constraint ledger_entries_balance_bucket_check
+      check (balance_bucket in ('play', 'cash', 'cash_usdt', 'bonus_usdt'));
     alter table ledger_entries add column if not exists reversal_of text references ledger_entries(id) on delete set null;
     create index if not exists idx_ledger_entries_category_created on ledger_entries(category, created_at desc);
     create unique index if not exists idx_ledger_entries_idempotency_key on ledger_entries(idempotency_key) where idempotency_key is not null;
@@ -2857,7 +3165,7 @@ async function migrate() {
       title text not null,
       type text not null check (type in ('mtt', 'sng')),
       status text not null check (status in ('created', 'registration_open', 'late_registration', 'running', 'final_table', 'finished', 'cancelled')),
-      balance_bucket text not null default 'play' check (balance_bucket in ('play', 'cash')),
+      balance_bucket text not null default 'cash' check (balance_bucket in ('play', 'cash')),
       buy_in bigint not null default 0 check (buy_in >= 0),
       fee bigint not null default 0 check (fee >= 0),
       guaranteed_prize_pool bigint not null default 0 check (guaranteed_prize_pool >= 0),
@@ -2940,6 +3248,37 @@ async function migrate() {
       paid_at timestamptz not null default now(),
       unique (tournament_id, app_user_id)
     );
+
+    create table if not exists reward_tournament_events (
+      id text primary key,
+      title text not null,
+      season_id text not null default '',
+      status text not null default 'tickets_issued',
+      starts_at timestamptz,
+      description text not null default '',
+      raw jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_reward_tournament_events_season on reward_tournament_events(season_id, created_at desc);
+
+    create table if not exists reward_tickets (
+      id text primary key,
+      event_id text not null references reward_tournament_events(id) on delete cascade,
+      app_user_id text not null references app_users(id) on delete cascade,
+      provider text not null default 'telegram',
+      provider_user_id text not null,
+      leaderboard_rank integer not null check (leaderboard_rank > 0),
+      status text not null default 'active' check (status in ('active', 'used', 'revoked')),
+      granted_at timestamptz not null default now(),
+      used_at timestamptz,
+      raw jsonb not null default '{}'::jsonb,
+      unique (event_id, app_user_id)
+    );
+
+    create index if not exists idx_reward_tickets_event_rank on reward_tickets(event_id, leaderboard_rank asc);
+    create index if not exists idx_reward_tickets_user on reward_tickets(app_user_id, granted_at desc);
 
     create table if not exists hand_histories (
       id text primary key,
@@ -3368,6 +3707,7 @@ async function migrate() {
     create index if not exists idx_analytics_events_name_created on analytics_events(event_name, created_at desc);
     create index if not exists idx_analytics_events_user_created on analytics_events(app_user_id, created_at desc) where app_user_id is not null;
     create index if not exists idx_analytics_events_context on analytics_events(context_id, created_at desc) where context_id <> '';
+    update tournaments set balance_bucket = 'cash' where balance_bucket <> 'cash';
     `);
     await client.query("commit");
   } catch (error) {

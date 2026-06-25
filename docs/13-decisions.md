@@ -1,5 +1,47 @@
 # QWZ Decisions
 
+## 2026-06-21: Real-money table hardening и realtime contract
+
+**Зона:** architecture / frontend / development
+
+**Решение:** Active table mutation сериализуется Redis lock-ом и revision refresh; wallet ledger, fund movement и durable PostgreSQL table snapshot для buy-in/rebuy/return фиксируются одной транзакцией. Redis является realtime cache после commit. Table events доставляются через authenticated SSE с `Last-Event-ID`; presence heartbeat даёт 30-second reconnect window. Fairness переведён на player commit → server commit → reveal. Tournament lifecycle отправляет пользовательские Telegram notifications.
+**Почему:** Process-local mutation, polling и раздельный commit wallet/snapshot недопустимы для публичного real-money режима.
+**Влияет на:** `server/state-store.js`, `server/db.js`, `server/index.js`, `server/poker-engine.js`, `public/app.js`, integration tests.
+**Что обновлено:** Добавлены distributed locks, atomic table wallet mutation, SSE replay, presence/reconnect, two-phase fairness, tournament notifications и frontend handoff.
+**Открытые вопросы:** Визуальный animation queue по server events остаётся frontend quality pass; live infrastructure suite требует отдельные test PostgreSQL/Redis URLs.
+
+## 2026-06-21: Approved gameplay ruleset for cash, rating, tournaments and animation model
+
+**Зона:** product / architecture / frontend / development
+
+**Решение:** Базовая игровая механика QWZ утверждена как единый NL Hold'em core с режимными надстройками. `cash` и `rating` используют одну логику улиц, all-in, side pots, showdown, sit-out и reconnect, но разные buckets и разные продуктовые ограничения. Во всех режимах действует strict table-stakes rule: mid-hand нельзя докладывать деньги/фишки из wallet, top-up и rebuy выполняются только между руками. `cash` остаётся основным “полным” режимом: USDT-only, normal table buy-in flow, table selection/listing как сейчас, top-up между руками, optional auto top-up до целевого стека, строгий rake/no-flop-no-drop, hand history и provably-fair audit. `rating` остаётся облегчённым competitive mode: только PLAY_CHIPS, никакой конвертации в cash, никакого обычного tournament buy-in, без insurance/cash-out и без отдельных спонтанных play tournaments; сезон и leaderboard живут поверх cash-like table flow.
+
+По темпу игры: базовый action clock для cash/rating сохраняется быстрым, а quality-pass должен довести его до server-configurable model с optional time bank, auto-check если check legal и auto-fold иначе. Tournament mode получает отдельную disconnected/tournament timing policy и blind-clock events. Для showdown/muck остаётся действующая логика: обычный проигравший hand может быть скрыт, но all-in runout раскрывает карты всем участникам. Rabbit hunt, Run It Twice и All-in Cash Out не входят в default gameplay: Rabbit Hunt запрещён в cash и турнирах; Run It Twice и All-in Cash Out рассматриваются только как optional cash-only features после отдельного решения и только без дополнительного rake distortion.
+
+Турниры утверждены так: обычные MTT/SNG и freerolls работают как cash-event flow, создаются админкой, используют wall-clock late registration, blind structure, table balancing, final table и atomic payout в `cash_usdt_micros`. Re-entry/add-on/time-bank допустимы как per-event настройки, но default-off до отдельной валидации. Post-season reward tournaments для топов leaderboard живут отдельно через tickets и не смешиваются с обычными buy-in турнирами. Фронтовые анимации считаются частью механики, поэтому backend обязан отдавать стабильную server-driven event timeline для всех ключевых стадий руки и турнира; фронт не должен угадывать анимации по diff snapshot’ов.
+
+**Почему:** В проекте уже есть рабочий покерный core, но не было утверждённого target ruleset, что именно считается “идеальным” для QWZ, а что остаётся optional. Без этого backend дорабатывает механику фрагментами и легко уходит либо в лишние фичи, либо в конфликт между cash/rating/tournament мирами.
+
+**Влияет на:** `server/poker-engine.js`, `server/index.js`, `server/tournament-engine.js`, config/env, hand history, fairness proof, admin tournament tooling, SSE/event protocol и frontend animation layer.
+
+**Что обновлено:** Зафиксирован утверждённый gameplay ruleset для quality pass и границы optional market-facing features.
+
+**Открытые вопросы:** Анти hit-and-run penalty, seat-me / active waiting list, paid time-bank cards, public rabbit-hunt on play/private tables и table chat/emoji остаются отдельными продуктами и не входят в базовый rollout.
+
+## 2026-06-21: Gameplay quality bar for cash, rating, tournaments and animation hooks
+
+**Зона:** product / architecture / frontend / development
+
+**Решение:** Следующая итерация table gameplay в QWZ считается не feature-spike, а quality pass по трём режимам: `cash` на USDT, `rating` на PLAY_CHIPS и `cash tournaments / freerolls`. Backend делает не только проверку корректности математики, но и проверку полноты игровой механики: table stakes, blind/ante flow, reconnection, sit-out, auto-actions, showdown, payout, audit trail, ticket-based reward tournaments, anti-abuse ограничения и server-driven event model для анимаций. Обычные cash-столы и турниры должны оставаться максимально близкими к зрелым онлайн-румам по базовым правилам и UX, без смешивания buckets. Анимации считаются частью механики: сервер должен отдавать стабильные события и тайминги для `hand_start`, `blind_posted`, `hole_cards_dealt`, `action_prompt`, `check/call/bet/raise/fold`, `street_reveal`, `all_in_runout`, `showdown_reveal`, `pot_push`, `odd_chip`, `seat_busted`, `tournament_level_up`, `tournament_table_move`, `final_table`, `payout_complete`.
+
+**Почему:** В коде уже много работающей логики, но до целевого уровня покерного рума не хватает качества по краевым сценариям, настройкам и presentation hooks. Без явного quality bar backend будет закрывать отдельные баги, но не доведёт систему до предсказуемого продуктового стандарта.
+
+**Влияет на:** `server/poker-engine.js`, `server/index.js`, `server/tournament-engine.js`, snapshots/SSE, hand history, fairness proof, admin tournament tools, frontend in-game renderer и tournament lobby.
+
+**Что обновлено:** Зафиксирован единый gameplay check-up для cash, rating, tournaments, freerolls и анимационных event hooks.
+
+**Открытые вопросы:** Rabbit hunt, Run It Twice, All-in Cash Out, anti-hit-and-run penalties, chat/emoji и bounty mechanics оцениваются отдельно как optional/market-facing features и не должны silently появляться без продуктового решения.
+
 ## 2026-06-20: Tournament lobby cards follow cash-event pattern with separate details sheet
 
 **Зона:** frontend

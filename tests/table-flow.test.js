@@ -151,6 +151,36 @@ test("metrics endpoint exposes prometheus text", async () => {
   }
 });
 
+test("table SSE replays events and presence heartbeat marks the seat connected", async () => {
+  const server = await startServer({ ADMIN_USER_IDS: "dev-user" });
+  const controller = new AbortController();
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await topUp(auth.token, 2);
+    let table = (await request("/api/tables", {
+      method: "POST",
+      token: auth.token,
+      body: { name: "SSE", maxPlayers: 2, smallBlind: 25, buyInAmount: 10_000 }
+    })).table;
+    table = (await request(`/api/tables/${table.id}/add-test-player`, { method: "POST", token: auth.token })).table;
+    const response = await fetch(`${BASE_URL}/api/tables/${table.id}/events`, {
+      headers: { authorization: `Bearer ${auth.token}` },
+      signal: controller.signal
+    });
+    assert.equal(response.status, 200);
+    const { value } = await response.body.getReader().read();
+    const chunk = new TextDecoder().decode(value);
+    assert.match(chunk, /event: fairness_server_commit|event: hand_start/);
+    const presence = await request(`/api/tables/${table.id}/presence`, { method: "POST", token: auth.token });
+    assert.equal(presence.ok, true);
+    const refreshed = (await request(`/api/tables/${table.id}`, { token: auth.token })).table;
+    assert.equal(refreshed.seats.find((seat) => seat.userId === auth.user.id).connected, true);
+  } finally {
+    controller.abort();
+    server.kill();
+  }
+});
+
 test("production real-money mode refuses to start without PostgreSQL and Redis", async () => {
   const result = await startServerAndWaitForExit({
     NODE_ENV: "production",
@@ -1294,15 +1324,16 @@ test("admin api rejects non-admin sessions", async () => {
   }
 });
 
-test("tournament registration spends chips and cancellation refunds them", async () => {
-  const server = await startServer({ ADMIN_USER_IDS: "dev-user" });
+test("cash tournament registration debits cash balance and cancellation refunds it", async () => {
+  const server = await startServer({ ADMIN_USER_IDS: "dev-user", ADMIN_FINANCE_IDS: "dev-user" });
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
-    await topUp(auth.token, 2);
+    await adminAdjust(auth.token, { type: "grant", amount: 2_000_000, balanceBucket: "cash" });
 
     let data = await request("/api/tournaments", { token: auth.token });
-    const tournament = data.tournaments.find((item) => item.canRegister && item.balanceBucket === "play");
+    const tournament = data.tournaments.find((item) => item.canRegister && item.type === "sng");
     assert.ok(tournament);
+    assert.equal(tournament.balanceBucket, "cash");
     assert.equal(tournament.status, "registration_open");
     assert.equal(tournament.registered, false);
 
@@ -1316,30 +1347,22 @@ test("tournament registration spends chips and cancellation refunds them", async
     let registered = data.tournaments.find((item) => item.id === tournament.id);
     assert.equal(registered.registered, true);
     assert.equal(registered.participants, tournament.participants + 1);
-    assert.equal(data.profile.balance, 10000 - tournament.totalCost);
-    assert.equal(data.cashier.transactions[0].title, "Вход в турнир");
-    assert.equal(data.cashier.transactions[0].category, "tournament_buyin");
+    assert.equal(data.profile.cashBalanceMicros, 2_000_000 - tournament.totalCost);
 
     const replayedRegistration = await request(registerPath, {
       method: "POST",
       token: auth.token,
       idempotencyKey: "same-tournament-register"
     });
-    assert.equal(replayedRegistration.profile.balance, data.profile.balance);
-    assert.equal(
-      replayedRegistration.cashier.transactions.filter((entry) => entry.category === "tournament_buyin").length,
-      1
-    );
+    assert.equal(replayedRegistration.profile.cashBalanceMicros, data.profile.cashBalanceMicros);
 
     const dashboard = (await request("/api/admin", { token: auth.token })).admin;
-    assert.equal(dashboard.stats.walletTotal, 10000 - tournament.totalCost);
-    assert.equal(dashboard.stats.tournamentEscrowTotal, tournament.buyIn);
-    assert.equal(dashboard.stats.tournamentPrizePoolTotal, tournament.buyIn);
-    assert.equal(dashboard.stats.tournamentFeeReserveTotal, tournament.fee);
-    assert.equal(dashboard.stats.playerFundsTotal, 10000 - tournament.fee);
+    assert.equal(dashboard.stats.cashTournamentEscrowMicros, tournament.buyIn);
+    assert.equal(dashboard.stats.cashTournamentPrizePoolMicros, tournament.buyIn);
+    assert.equal(dashboard.stats.cashTournamentFeeReserveMicros, tournament.fee);
     assert.ok(dashboard.recentFundMovements.some((movement) => (
       movement.category === "wallet_to_tournament_escrow"
-      && movement.from === "play_wallet"
+      && movement.from === "cash_wallet"
       && movement.amount === tournament.buyIn
     )));
     assert.ok(dashboard.recentFundMovements.some((movement) => (
@@ -1357,23 +1380,17 @@ test("tournament registration spends chips and cancellation refunds them", async
     registered = data.tournaments.find((item) => item.id === tournament.id);
     assert.equal(registered.registered, false);
     assert.equal(registered.participants, tournament.participants);
-    assert.equal(data.profile.balance, 10000);
-    assert.equal(data.cashier.transactions[0].title, "Возврат турнирного бай-ина");
-    assert.equal(data.cashier.transactions[0].category, "tournament_refund");
+    assert.equal(data.profile.cashBalanceMicros, 2_000_000);
     const replayedCancellation = await request(cancelPath, {
       method: "POST",
       token: auth.token,
       idempotencyKey: "same-tournament-cancel"
     });
-    assert.equal(replayedCancellation.profile.balance, data.profile.balance);
-    assert.equal(
-      replayedCancellation.cashier.transactions.filter((entry) => entry.category === "tournament_refund").length,
-      1
-    );
+    assert.equal(replayedCancellation.profile.cashBalanceMicros, data.profile.cashBalanceMicros);
     const afterCancelDashboard = (await request("/api/admin", { token: auth.token })).admin;
     assert.ok(afterCancelDashboard.recentFundMovements.some((movement) => (
       movement.category === "tournament_escrow_to_wallet"
-      && movement.to === "play_wallet"
+      && movement.to === "cash_wallet"
       && movement.amount === tournament.buyIn
     )));
   } finally {
@@ -1382,15 +1399,15 @@ test("tournament registration spends chips and cancellation refunds them", async
 });
 
 test("full SNG starts automatically, seats players, and protects tournament stacks", async () => {
-  const server = await startServer({ TOURNAMENT_TEST_MODE: "true" });
+  const server = await startServer({ TOURNAMENT_TEST_MODE: "true", ADMIN_USER_IDS: "dev-user", ADMIN_FINANCE_IDS: "dev-user" });
   try {
     const first = await request("/api/auth", { method: "POST", body: { initData: "" } });
     const second = await request("/api/auth", {
       method: "POST",
       body: { initData: telegramInitData({ id: 991, first_name: "Second", username: "second" }) }
     });
-    await topUp(first.token, 2);
-    await topUp(second.token, 2);
+    await adminAdjust(first.token, { type: "grant", amount: 2_000_000, balanceBucket: "cash" });
+    await adminAdjust(first.token, { telegramId: "991", type: "grant", amount: 2_000_000, balanceBucket: "cash" });
 
     const lobby = await request("/api/tournaments", { token: first.token });
     const sng = lobby.tournaments.find((item) => item.type === "sng" && item.canRegister);
@@ -1424,6 +1441,131 @@ test("full SNG starts automatically, seats players, and protects tournament stac
       request(`/api/tables/${tableId}/rebuy`, { method: "POST", token: first.token }),
       /не входят в MVP/
     );
+  } finally {
+    server.kill();
+  }
+});
+
+test("admin can create and toggle a cash tournament and it appears in public lobby", async () => {
+  const server = await startServer({ ADMIN_USER_IDS: "dev-user" });
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    const startsAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const created = await request("/api/admin/tournaments", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "admin-create-cash-mtt",
+      body: {
+        title: "Admin Cash Major",
+        type: "mtt",
+        buyIn: 2_000_000,
+        fee: 200_000,
+        startsAt,
+        registrationOpen: true,
+        lateRegMinutes: 45,
+        maxPlayers: 27,
+        minPlayers: 3,
+        blindStructure: [
+          { level: 1, durationSeconds: 300, smallBlind: 50, bigBlind: 100, ante: 0 },
+          { level: 2, durationSeconds: 300, smallBlind: 100, bigBlind: 200, ante: 25 }
+        ],
+        payoutStructure: [60, 30, 10],
+        reEntryLimit: 0,
+        addOnAllowed: false,
+        description: "Cash-only admin created tournament",
+        status: "registration_open"
+      }
+    });
+
+    assert.equal(created.tournament.balanceBucket, "cash");
+    assert.equal(created.tournament.currency, "USDT");
+    assert.equal(created.tournament.description, "Cash-only admin created tournament");
+    assert.equal(created.tournament.blindStructure.length, 2);
+    assert.equal(created.tournament.payoutPreview.length, 0);
+
+    const lobby = await request("/api/tournaments", { token: auth.token });
+    const publicTournament = lobby.tournaments.find((item) => item.id === created.tournament.id);
+    assert.ok(publicTournament);
+    assert.equal(publicTournament.balanceBucket, "cash");
+    assert.equal(publicTournament.description, "Cash-only admin created tournament");
+
+    const closed = await request(`/api/admin/tournaments/${created.tournament.id}/registration-close`, {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "admin-close-registration"
+    });
+    assert.equal(closed.tournament.status, "created");
+    assert.equal(closed.tournament.registrationLocked, true);
+
+    const reopened = await request(`/api/admin/tournaments/${created.tournament.id}/registration-open`, {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "admin-open-registration"
+    });
+    assert.equal(reopened.tournament.status, "registration_open");
+    assert.equal(reopened.tournament.registrationLocked, false);
+  } finally {
+    server.kill();
+  }
+});
+
+test("admin can issue post-season reward tickets from leaderboard", async () => {
+  const server = await startServer({ ADMIN_USER_IDS: "dev-user" });
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await topUp(auth.token, 2);
+    const lobby = await request("/api/tables", { token: auth.token });
+    const publicTable = lobby.tables.find((table) => !table.isPrivate && table.smallBlind === 25);
+    assert.ok(publicTable);
+    let table = (await request(`/api/tables/${publicTable.id}/join`, {
+      method: "POST",
+      token: auth.token,
+      body: { buyInAmount: 10000 }
+    })).table;
+    table = (await request(`/api/tables/${publicTable.id}/add-test-player`, {
+      method: "POST",
+      token: auth.token
+    })).table;
+    table = (await request(`/api/tables/${publicTable.id}/start-hand`, {
+      method: "POST",
+      token: auth.token
+    })).table;
+    while (table.status !== "showdown") {
+      if (table.viewer.canAct) {
+        table = (await request(`/api/tables/${table.id}/act`, {
+          method: "POST",
+          token: auth.token,
+          body: { action: table.viewer.canCall ? "call" : "check" }
+        })).table;
+      } else {
+        table = (await request(`/api/tables/${table.id}/auto-act`, {
+          method: "POST",
+          token: auth.token
+        })).table;
+      }
+    }
+
+    const reward = await request("/api/admin/reward-tournaments", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "reward-ticket-create",
+      body: {
+        title: "Season Reward Invitational",
+        ticketCount: 1,
+        eligibleOnly: false,
+        description: "Leaderboard ticket test"
+      }
+    });
+
+    assert.equal(reward.rewardTournament.title, "Season Reward Invitational");
+    assert.equal(reward.rewardTournament.tickets.length, 1);
+    assert.equal(reward.rewardTournament.tickets[0].userId, auth.user.id);
+
+    const listed = await request("/api/admin/reward-tournaments", { token: auth.token });
+    assert.ok(listed.rewardTournaments.some((event) => event.id === reward.rewardTournament.id));
+
+    const detailed = await request(`/api/admin/reward-tournaments/${reward.rewardTournament.id}`, { token: auth.token });
+    assert.equal(detailed.rewardTournament.tickets[0].leaderboardRank, 1);
   } finally {
     server.kill();
   }
@@ -1649,6 +1791,20 @@ async function topUp(token, count = 1) {
     })).cashier;
   }
   return cashier;
+}
+
+async function adminAdjust(token, body = {}) {
+  return request("/api/admin/wallet-adjust", {
+    method: "POST",
+    token,
+    body: {
+      telegramId: "dev-user",
+      type: "grant",
+      amount: 0,
+      reason: "test_adjust",
+      ...body
+    }
+  });
 }
 
 async function startServer(extraEnv = {}) {

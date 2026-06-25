@@ -1,5 +1,9 @@
 # QWZ Poker — технический roadmap (до запуска и далее)
 
+## 2026-06-21 real-money gameplay hardening
+
+Выполнено: Redis single-writer locks/revisions, atomic PostgreSQL wallet+ledger+table snapshot, SSE replay с `Last-Event-ID`, presence/reconnect window, two-phase fairness commit/reveal, tournament user notifications и opt-in PostgreSQL/Redis failure tests. Frontend transport/heartbeat подключён; визуальная event-driven animation queue описана в `docs/FRONTEND_REALTIME_HANDOFF.md`.
+
 Документ описывает, **что добавить и переделать**, чтобы из текущего MVP получить production-grade покерный клуб с реальными деньгами. Упорядочено по приоритету и фазам. Каждый пункт привязан к конкретному файлу/функции в текущем коде.
 
 ---
@@ -264,6 +268,8 @@ paid    → reversed         (chargeback / возврат)
 7. **Late registration window**.
 8. **Cancel-with-refund** если меньше `minPlayers` к старту.
 
+**Важное ограничение:** обычные турниры cash-only. Play chips не используются как турнирный buy-in и не получают spontaneous tournament flow. Reward-турниры по билетам после сезона — отдельный post-season flow, не часть базового MVP runtime.
+
 Следующая итерация:
 
 1. **Re-entry / Rebuy / Add-on**.
@@ -274,6 +280,7 @@ paid    → reversed         (chargeback / возврат)
 - **Spin & Go** (3-max, лотерейный prize pool — 5x/10x/100x/1000x от buy-in)
 - **Heads-up Sit & Go** (1v1, быстрый)
 - **Knockout / Bounty** (часть buy-in за головы)
+- **Post-season ticketed reward tournaments** — отдельный поток для топов leaderboard после завершения сезона.
 
 **Файлы:** `server/tournament-engine.js` (новый), миграции для `tournament_levels`, `tournament_tables`, `tournament_payouts`.
 
@@ -475,6 +482,23 @@ create table user_risk_scores (
   - poker_active_sessions gauge
   - db_query_duration_seconds histogram
 - Grafana дашборд + Telegram алёрты.
+
+### 3.7. Gameplay quality pass for table runtime
+
+Отдельная backend/frontend итерация на доведение существующих режимов до product-grade качества:
+
+- cash tables: auto-rebuy / top-up rules, table-stakes invariants, reconnect and timeout policy, anti-hit-and-run policy, waiting list / seat policy;
+- rating tables: isolated PLAY_CHIPS economy, leaderboard hooks, season-end ticket issuance for reward events;
+- tournaments/freerolls: admin-created cash events, level clock edge cases, move-table/final-table flow, payout audit, ticket-based post-season reward events;
+- animation hooks: server-driven action/event timeline для `hand_start`, blinds, card dealing, street reveal, showdown, pot push, bust-out, tournament level-up и payout completion;
+- optional feature review: rabbit hunt, Run It Twice, All-in Cash Out, chat/emoji, bounty/re-entry/add-on, table themes/sounds.
+
+Утверждённые ограничения этой итерации:
+
+- обычные cash tables и tournament events не смешиваются с PLAY_CHIPS;
+- rating tables не получают spontaneous tournament flow;
+- Rabbit Hunt запрещён в cash и турнирах;
+- Run It Twice и All-in Cash Out допустимы только как отдельные cash-only decisions после rollout базового quality pass.
 
 ---
 

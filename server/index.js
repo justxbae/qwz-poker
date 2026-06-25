@@ -42,6 +42,7 @@ import {
 import {
   addCashWalletEntry as dbAddCashWalletEntry,
   addWalletEntry as dbAddWalletEntry,
+  applyTableWalletMutation as dbApplyTableWalletMutation,
   applyBonusWagering as dbApplyBonusWagering,
   completePaymentOrder as dbCompletePaymentOrder,
   createPaymentOrder as dbCreatePaymentOrder,
@@ -67,6 +68,7 @@ import {
   listAdminEvents as dbListAdminEvents,
   listCashLedger as dbListCashLedger,
   listLedger as dbListLedger,
+  listTournaments as dbListTournaments,
   listTournamentRegistrations as dbListTournamentRegistrations,
   listTournamentStates as dbListTournamentStates,
   listTournamentHistory as dbListTournamentHistory,
@@ -77,6 +79,7 @@ import {
   listRatingLeaderboard as dbListRatingLeaderboard,
   listAdminAuditLogs as dbListAdminAuditLogs,
   listRiskFlags as dbListRiskFlags,
+  listRewardTournamentEvents as dbListRewardTournamentEvents,
   listWithdrawalOrders as dbListWithdrawalOrders,
   markPaymentOrderPaid as dbMarkPaymentOrderPaid,
   recordAnalyticsEvent as dbRecordAnalyticsEvent,
@@ -94,6 +97,8 @@ import {
   settleTournament as dbSettleTournament,
   updateTournamentState as dbUpdateTournamentState,
   upsertTournamentDefinitions as dbUpsertTournamentDefinitions,
+  getRewardTournamentEvent as dbGetRewardTournamentEvent,
+  createRewardTournamentEvent as dbCreateRewardTournamentEvent,
   saveIdempotencyResult as dbSaveIdempotencyResult,
   cancelTournamentRegistration as dbCancelTournamentRegistration,
   setSavedStack as dbSetSavedStack,
@@ -105,14 +110,17 @@ import {
 } from "./db.js";
 import {
   deleteTableSnapshot as stateDeleteTableSnapshot,
+  getTableSnapshot as stateGetTableSnapshot,
   getSession as stateGetSession,
   initStateStore,
   listTableSnapshots as stateListTableSnapshots,
   setSession as stateSetSession,
   setTableSnapshot as stateSetTableSnapshot,
+  subscribeTableEvents as stateSubscribeTableEvents,
   stateStoreEnabled,
   stateStoreHealth,
-  updateUserSessions as stateUpdateUserSessions
+  updateUserSessions as stateUpdateUserSessions,
+  withTableLock as stateWithTableLock
 } from "./state-store.js";
 import {
   ACTION_TIMEOUT_MS,
@@ -122,18 +130,22 @@ import {
   act,
   addBuyIn,
   autoAct,
+  commitPlayerFairnessSeed,
   createTable,
   createTestUser,
+  emitTableEvent,
   joinTable,
   leaveTable,
   maybeStartHand,
   publicTable,
+  revealPlayerFairnessSeed,
   setPlayerFairnessSeed,
   sitIn,
   sitOut,
   startHand,
   testBotAct,
-  tickTables
+  tickTables,
+  touchTablePresence
 } from "./poker-engine.js";
 import {
   TOURNAMENT_STATUSES,
@@ -213,6 +225,7 @@ const withdrawalOrders = new Map();
 const adminEvents = [];
 const analyticsEvents = [];
 const platformLedgerEntries = [];
+const rewardTournamentEvents = new Map();
 const loggedAppOpens = new Set();
 const persistedHandIds = new Set();
 const recentHandHistories = [];
@@ -244,7 +257,15 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url || "/", `http://${req.headers.host}`);
 
     if (url.pathname.startsWith("/api/")) {
-      await handleApi(req, res, url);
+      const tableMutation = req.method === "POST" ? url.pathname.match(/^\/api\/tables\/([^/]+)\//) : null;
+      if (tableMutation) {
+        await stateWithTableLock(tableMutation[1], async () => {
+          await refreshTableFromState(tableMutation[1]);
+          await handleApi(req, res, url);
+        });
+      } else {
+        await handleApi(req, res, url);
+      }
       return;
     }
 
@@ -257,9 +278,11 @@ const server = createServer(async (req, res) => {
 
 await initDatabase();
 await dbUpsertTournamentDefinitions([...tournaments.values()]);
+await hydrateTournamentDefinitions();
 await initStateStore();
 await hydrateActiveTables();
 await hydrateTournamentRegistrations();
+await hydrateRewardTournamentEvents();
 
 server.listen(PORT, HOST, () => {
   const displayHost = HOST === "0.0.0.0" ? "127.0.0.1" : HOST;
@@ -279,13 +302,35 @@ server.listen(PORT, HOST, () => {
 
 setInterval(async () => {
   try {
-    tickTables(tables);
-    await tickTournaments();
+    await tickActiveTables();
+    await stateWithTableLock("__tournaments__", () => tickTournaments(), { ttlMs: 15_000, waitMs: 100 });
     await persistAllCompletedHands();
   } catch (error) {
     console.error("Table tick failed:", error);
   }
 }, 1000);
+
+async function tickActiveTables() {
+  for (const tableId of [...tables.keys()]) {
+    try {
+      await stateWithTableLock(tableId, async () => {
+        const table = await refreshTableFromState(tableId);
+        if (!table) return;
+        const beforeRevision = Number(table.stateRevision || 0);
+        const beforeEventSequence = Number(table.eventSequence || 0);
+        const beforeStatus = table.status;
+        tickTables(new Map([[tableId, table]]));
+        if (beforeEventSequence !== Number(table.eventSequence || 0) || beforeStatus !== table.status) {
+          await persistActiveTableSnapshot(table);
+        } else {
+          table.stateRevision = beforeRevision;
+        }
+      }, { ttlMs: 5_000, waitMs: 100 });
+    } catch (error) {
+      if (error.status !== 409) throw error;
+    }
+  }
+}
 
 setInterval(async () => {
   try {
@@ -908,10 +953,10 @@ async function handleApi(req, res, url) {
       const body = await readJson(req);
       body.visibility = "private";
       const table = createTable(user, body, { joinOwner: false });
-      await prepareInitialStack(user, body, idempotencyKey, table);
+      const buyInMutation = await prepareInitialStack(user, body, idempotencyKey, table, { deferTableCommit: true });
       joinTable(table, user);
       tables.set(table.id, table);
-      await persistActiveTableSnapshot(table);
+      await commitTableWalletMutation(user, table, buyInMutation);
       await trackAnalytics("table_join", {
         user,
         category: "gameplay",
@@ -939,6 +984,48 @@ async function handleApi(req, res, url) {
     return;
   }
 
+  const tableEventsMatch = url.pathname.match(/^\/api\/tables\/([^/]+)\/events$/);
+  if (req.method === "GET" && tableEventsMatch) {
+    const tableId = tableEventsMatch[1];
+    let table = tables.get(tableId);
+    if (!table) {
+      sendJson(res, 404, { error: "Table not found" });
+      return;
+    }
+    await stateWithTableLock(tableId, async () => {
+      table = await refreshTableFromState(tableId) || table;
+      if (touchTablePresence(table, user)) await persistActiveTableSnapshot(table);
+    });
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no"
+    });
+    res.write("retry: 1500\n\n");
+    let lastSequence = eventSequenceFromId(req.headers["last-event-id"] || url.searchParams.get("lastEventId"));
+    const sendEvent = (event) => {
+      if (Number(event.sequence || 0) <= lastSequence) return;
+      lastSequence = Number(event.sequence || lastSequence);
+      res.write(`id: ${event.id}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+    };
+    for (const event of table.events || []) sendEvent(event);
+    const unsubscribe = stateSubscribeTableEvents(tableId, (raw) => {
+      try {
+        const update = JSON.parse(raw);
+        for (const event of update.events || []) sendEvent(event);
+      } catch (error) {
+        reportError(error, { kind: "table_sse", tableId });
+      }
+    });
+    const heartbeat = setInterval(() => res.write(": heartbeat\n\n"), 15_000);
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      unsubscribe();
+    });
+    return;
+  }
+
   const tableMatch = url.pathname.match(/^\/api\/tables\/([^/]+)(?:\/([^/]+))?$/);
   if (tableMatch) {
     const [, tableId, action] = tableMatch;
@@ -953,6 +1040,13 @@ async function handleApi(req, res, url) {
       return;
     }
 
+    if (req.method === "POST" && action === "presence") {
+      touchTablePresence(table, user);
+      await persistActiveTableSnapshot(table);
+      sendJson(res, 200, { ok: true, now: Date.now() });
+      return;
+    }
+
     if (req.method === "POST" && action === "join") {
       if (table.tournamentId) {
         sendJson(res, 409, { error: "Посадкой за турнирный стол управляет сервер" });
@@ -961,12 +1055,14 @@ async function handleApi(req, res, url) {
       await sendIdempotentJson(req, res, user, `table_join:${table.id}`, async (idempotencyKey) => {
         const body = await readJson(req);
         const wasSeated = table.seats.some((seat) => seat.userId === user.id);
+        let buyInMutation = null;
         if (!wasSeated) {
-          await prepareInitialStack(user, body, idempotencyKey, table);
+          buyInMutation = await prepareInitialStack(user, body, idempotencyKey, table, { deferTableCommit: true });
         }
         joinTable(table, user);
         maybeStartHand(table);
-        await persistActiveTableSnapshot(table);
+        if (buyInMutation) await commitTableWalletMutation(user, table, buyInMutation);
+        else await persistActiveTableSnapshot(table);
         if (!wasSeated) {
           await trackAnalytics("table_join", {
             user,
@@ -1005,12 +1101,10 @@ async function handleApi(req, res, url) {
       const departingStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
       const result = leaveTable(table, user);
       await persistCompletedHands(table);
-      await settleLeftTableStack(user, table, departingStack || result.stack, { returnToWallet: true });
-      if (result.tableEmpty && table.isPrivate) {
+      const deleteSnapshot = result.tableEmpty && table.isPrivate;
+      await settleLeftTableStack(user, table, departingStack || result.stack, { returnToWallet: true, deleteSnapshot });
+      if (deleteSnapshot) {
         tables.delete(table.id);
-        await deleteActiveTableSnapshot(table.id);
-      } else {
-        await persistActiveTableSnapshot(table);
       }
       notifyAdmin("table_leave", "Игрок вышел из стола", {
         user,
@@ -1040,11 +1134,11 @@ async function handleApi(req, res, url) {
       const departingStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
       const result = leaveTable(table, user);
       await persistCompletedHands(table);
-      await settleLeftTableStack(user, table, departingStack || result.stack);
-      if (result.tableEmpty && table.isPrivate) {
+      const deleteSnapshot = result.tableEmpty && table.isPrivate;
+      await settleLeftTableStack(user, table, departingStack || result.stack, { deleteSnapshot });
+      if (deleteSnapshot) {
         tables.delete(table.id);
-        await deleteActiveTableSnapshot(table.id);
-      } else {
+      } else if (table.gameMode !== "cash") {
         await persistActiveTableSnapshot(table);
       }
       notifyAdmin("table_stand", "Игрок встал из-за стола", {
@@ -1100,21 +1194,23 @@ async function handleApi(req, res, url) {
         const afterStack = addBuyIn(table, user, amount);
         const actualAmount = afterStack - beforeStack;
         if (actualAmount > 0) {
-          await recordTableTransaction(user, table, {
+          await commitTableWalletMutation(user, table, {
+            transaction: {
             type: "debit",
             category: "table_rebuy",
             title: "Докупка за столом",
             amount: actualAmount,
             meta: `${table.smallBlind}/${table.bigBlind} · ${table.name}`,
             idempotencyKey
-          });
-          await recordFundMovement(user, {
+            },
+            movement: {
             category: "wallet_to_table_rebuy",
             from: "wallet",
             to: "table",
             amount: actualAmount,
             contextId: table.id,
             meta: `${table.smallBlind}/${table.bigBlind} · ${table.name}`
+            }
           });
           notifyAdmin("rebuy", "Докупка за столом", {
             user,
@@ -1135,7 +1231,7 @@ async function handleApi(req, res, url) {
           });
         }
         maybeStartHand(table);
-        await persistActiveTableSnapshot(table);
+        if (actualAmount <= 0) await persistActiveTableSnapshot(table);
         return { table: tableView(table, user), balance: user.balance };
       });
       return;
@@ -1151,6 +1247,22 @@ async function handleApi(req, res, url) {
     if (req.method === "POST" && action === "fairness-seed") {
       const body = await readJson(req);
       const fairnessSeed = setPlayerFairnessSeed(table, user, body.seed);
+      await persistActiveTableSnapshot(table);
+      sendJson(res, 200, { fairnessSeed, table: tableView(table, user) });
+      return;
+    }
+
+    if (req.method === "POST" && action === "fairness-commit") {
+      const body = await readJson(req);
+      const fairnessSeed = commitPlayerFairnessSeed(table, user, body.seedHash);
+      await persistActiveTableSnapshot(table);
+      sendJson(res, 200, { fairnessSeed, table: tableView(table, user) });
+      return;
+    }
+
+    if (req.method === "POST" && action === "fairness-reveal") {
+      const body = await readJson(req);
+      const fairnessSeed = revealPlayerFairnessSeed(table, user, body.seed);
       await persistActiveTableSnapshot(table);
       sendJson(res, 200, { fairnessSeed, table: tableView(table, user) });
       return;
@@ -1217,9 +1329,127 @@ async function handleAdminApi(req, res, url, adminUser) {
   const userMatch = url.pathname.match(/^\/api\/admin\/users\/([^/]+)$/);
   const paymentActionMatch = url.pathname.match(/^\/api\/admin\/payments\/([^/]+)\/(approve|reject)$/);
   const withdrawalActionMatch = url.pathname.match(/^\/api\/admin\/withdrawals\/([^/]+)\/(approve|reject)$/);
+  const tournamentMatch = url.pathname.match(/^\/api\/admin\/tournaments\/([^/]+)$/);
+  const tournamentActionMatch = url.pathname.match(/^\/api\/admin\/tournaments\/([^/]+)\/(registration-open|registration-close|cancel|force-start|force-finish)$/);
+  const rewardTournamentMatch = url.pathname.match(/^\/api\/admin\/reward-tournaments\/([^/]+)$/);
 
   if (req.method === "GET" && url.pathname === "/api/admin") {
     sendJson(res, 200, { admin: await adminDashboardView({ analyticsDays: url.searchParams.get("days") }) });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/admin/tournaments") {
+    requireAdminRole(adminUser.id, "support");
+    sendJson(res, 200, { tournaments: adminTournamentList() });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/admin/tournaments") {
+    requireAdminRole(adminUser.id, "support");
+    await sendIdempotentJson(req, res, adminUser, "admin_tournament_create", async () => {
+      const body = await readJson(req);
+      const tournament = await createAdminTournament(adminUser, body);
+      await recordAdminAudit({
+        req,
+        admin: adminUser,
+        action: "tournament_create",
+        targetType: "tournament",
+        targetId: tournament.id,
+        result: "ok",
+        reason: tournament.title,
+        meta: { type: tournament.type, status: tournament.status }
+      });
+      return { tournament: adminTournamentView(tournament), tournaments: adminTournamentList() };
+    });
+    return;
+  }
+
+  if (req.method === "GET" && tournamentMatch) {
+    requireAdminRole(adminUser.id, "support");
+    const tournament = tournaments.get(tournamentMatch[1]);
+    if (!tournament) {
+      sendJson(res, 404, { error: "Турнир не найден" });
+      return;
+    }
+    sendJson(res, 200, { tournament: adminTournamentView(tournament) });
+    return;
+  }
+
+  if ((req.method === "PUT" || req.method === "PATCH") && tournamentMatch) {
+    requireAdminRole(adminUser.id, "support");
+    const tournamentId = tournamentMatch[1];
+    await sendIdempotentJson(req, res, adminUser, `admin_tournament_update:${tournamentId}`, async () => {
+      const body = await readJson(req);
+      const tournament = await updateAdminTournament(adminUser, tournamentId, body);
+      await recordAdminAudit({
+        req,
+        admin: adminUser,
+        action: "tournament_update",
+        targetType: "tournament",
+        targetId: tournament.id,
+        result: "ok",
+        reason: tournament.title,
+        meta: { type: tournament.type, status: tournament.status }
+      });
+      return { tournament: adminTournamentView(tournament), tournaments: adminTournamentList() };
+    });
+    return;
+  }
+
+  if (req.method === "POST" && tournamentActionMatch) {
+    requireAdminRole(adminUser.id, "support");
+    const [, tournamentId, action] = tournamentActionMatch;
+    await sendIdempotentJson(req, res, adminUser, `admin_tournament_action:${tournamentId}:${action}`, async () => {
+      const tournament = await runAdminTournamentAction(adminUser, tournamentId, action);
+      await recordAdminAudit({
+        req,
+        admin: adminUser,
+        action: `tournament_${action.replaceAll("-", "_")}`,
+        targetType: "tournament",
+        targetId: tournament.id,
+        result: "ok",
+        reason: tournament.title,
+        meta: { status: tournament.status }
+      });
+      return { tournament: adminTournamentView(tournament), tournaments: adminTournamentList() };
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/admin/reward-tournaments") {
+    requireAdminRole(adminUser.id, "support");
+    sendJson(res, 200, { rewardTournaments: adminRewardTournamentList() });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/admin/reward-tournaments") {
+    requireAdminRole(adminUser.id, "support");
+    await sendIdempotentJson(req, res, adminUser, "admin_reward_tournament_create", async () => {
+      const body = await readJson(req);
+      const event = await createAdminRewardTournament(adminUser, body);
+      await recordAdminAudit({
+        req,
+        admin: adminUser,
+        action: "reward_tournament_create",
+        targetType: "reward_tournament_event",
+        targetId: event.id,
+        result: "ok",
+        reason: event.title,
+        meta: { seasonId: event.seasonId, ticketCount: event.tickets.length }
+      });
+      return { rewardTournament: event, rewardTournaments: adminRewardTournamentList() };
+    });
+    return;
+  }
+
+  if (req.method === "GET" && rewardTournamentMatch) {
+    requireAdminRole(adminUser.id, "support");
+    const event = rewardTournamentEvents.get(rewardTournamentMatch[1]);
+    if (!event) {
+      sendJson(res, 404, { error: "Reward event не найден" });
+      return;
+    }
+    sendJson(res, 200, { rewardTournament: event });
     return;
   }
 
@@ -1236,6 +1466,7 @@ async function handleAdminApi(req, res, url, adminUser) {
       targetId: body.telegramId,
       type: body.type,
       amount: body.amount,
+      balanceBucket: body.balanceBucket || "play",
       reason: body.reason,
       requestId: body.requestId || req.headers["x-idempotency-key"] || ""
     });
@@ -1251,6 +1482,7 @@ async function handleAdminApi(req, res, url, adminUser) {
         amount: result.amount,
         before: result.before,
         balance: result.balance,
+        balanceBucket: result.balanceBucket,
         requestId: result.requestId || ""
       }
     });
@@ -1461,6 +1693,8 @@ async function adminDashboardView(options = {}) {
     recentWithdrawals: recentWithdrawals || [...withdrawalOrders.values()]
       .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
       .slice(0, 30),
+    tournaments: adminTournamentList(),
+    rewardTournaments: adminRewardTournamentList(),
     recentEvents: recentEvents || adminEvents.slice(0, 20),
     recentAdminAudit: recentAdminAudit || adminAuditLogs.slice(0, 50),
     recentRiskFlags: recentRiskFlags || riskFlags.slice(0, 50)
@@ -1671,25 +1905,25 @@ function enrichAdminUserListItem(user, tableStacks) {
   };
 }
 
-function tournamentEscrow(bucket = "play") {
+function tournamentEscrow(bucket = null) {
   return [...tournaments.values()].reduce((sum, tournament) => (
-    sum + (tournament.balanceBucket === bucket && ![TOURNAMENT_STATUSES.FINISHED, TOURNAMENT_STATUSES.CANCELLED].includes(tournament.status)
+    sum + ((!bucket || tournament.balanceBucket === bucket) && ![TOURNAMENT_STATUSES.FINISHED, TOURNAMENT_STATUSES.CANCELLED].includes(tournament.status)
       ? tournament.registrations.size * Number(tournament.buyIn || 0)
       : 0)
   ), 0);
 }
 
-function tournamentPrizePool(bucket = "play") {
+function tournamentPrizePool(bucket = null) {
   return [...tournaments.values()].reduce((sum, tournament) => (
-    sum + (tournament.balanceBucket === bucket && ![TOURNAMENT_STATUSES.FINISHED, TOURNAMENT_STATUSES.CANCELLED].includes(tournament.status)
+    sum + ((!bucket || tournament.balanceBucket === bucket) && ![TOURNAMENT_STATUSES.FINISHED, TOURNAMENT_STATUSES.CANCELLED].includes(tournament.status)
       ? tournament.registrations.size * Number(tournament.buyIn || 0)
       : 0)
   ), 0);
 }
 
-function tournamentFeeReserve(bucket = "play") {
+function tournamentFeeReserve(bucket = null) {
   return [...tournaments.values()].reduce((sum, tournament) => (
-    sum + (tournament.balanceBucket === bucket && ![TOURNAMENT_STATUSES.FINISHED, TOURNAMENT_STATUSES.CANCELLED].includes(tournament.status)
+    sum + ((!bucket || tournament.balanceBucket === bucket) && ![TOURNAMENT_STATUSES.FINISHED, TOURNAMENT_STATUSES.CANCELLED].includes(tournament.status)
       ? tournament.registrations.size * Number(tournament.fee || 0)
       : 0)
   ), 0);
@@ -1892,14 +2126,17 @@ async function persistCompletedHands(table) {
           table
         });
         if (table.gameMode === "cash" && Number(hand.rake || 0) > 0) {
-          const rakeShare = Math.floor(Number(hand.rake || 0) / progressUserIds.length);
-          const dbUnlocks = await dbApplyBonusWagering({
-            providerUserIds: progressUserIds,
-            rakeAmountMicros: rakeShare,
-            handId: hand.id
-          });
-          const unlocks = dbUnlocks ?? applyMemoryBonusWagering(progressUserIds, rakeShare, hand.id);
-          for (const unlock of unlocks) notifyBonusUnlocked(unlock);
+          for (const seat of hand.seats || []) {
+            const contributed = Math.max(0, Number(seat.rakeContributed || 0));
+            if (!seat.userId || contributed <= 0) continue;
+            const dbUnlocks = await dbApplyBonusWagering({
+              providerUserIds: [seat.userId],
+              rakeAmountMicros: contributed,
+              handId: hand.id
+            });
+            const unlocks = dbUnlocks ?? applyMemoryBonusWagering([seat.userId], contributed, hand.id);
+            for (const unlock of unlocks) notifyBonusUnlocked(unlock);
+          }
         }
       }
       await trackAnalytics("hand_completed", {
@@ -1971,8 +2208,10 @@ function normalizeHydratedTable(table, now = Date.now()) {
   table.runoutQueue = Array.isArray(table.runoutQueue) ? table.runoutQueue : [];
   table.deck = Array.isArray(table.deck) ? table.deck : [];
   table.status = table.status || "waiting";
-  table.gameMode = table.gameMode === "cash" ? "cash" : "play";
-  table.currency = table.gameMode === "cash" ? ASSETS.CASH : ASSETS.PLAY;
+  table.gameMode = table.gameMode === "cash" ? "cash" : table.gameMode === "tournament" || table.tournamentId ? "tournament" : "play";
+  table.currency = table.gameMode === "cash" ? ASSETS.CASH : table.gameMode === "tournament" ? "TOURNAMENT_CHIPS" : ASSETS.PLAY;
+  table.events = Array.isArray(table.events) ? table.events : [];
+  table.eventSequence = Math.max(Number(table.eventSequence || 0), Number(table.events.at(-1)?.sequence || 0));
   table.minBuyIn = Math.max(table.bigBlind || 1, Number(table.minBuyIn || table.bigBlind * (table.gameMode === "cash" ? 40 : 50)));
   table.maxBuyIn = Math.max(table.minBuyIn, Number(table.maxBuyIn || table.bigBlind * (table.gameMode === "cash" ? 100 : 400)));
   table.startIntroUntil = 0;
@@ -2010,13 +2249,21 @@ function normalizeHydratedTable(table, now = Date.now()) {
 }
 
 async function persistActiveTableSnapshots() {
-  for (const table of tables.values()) {
-    await persistActiveTableSnapshot(table);
+  for (const tableId of [...tables.keys()]) {
+    try {
+      await stateWithTableLock(tableId, async () => {
+        const table = await refreshTableFromState(tableId);
+        if (table) await persistActiveTableSnapshot(table);
+      }, { ttlMs: 5_000, waitMs: 100 });
+    } catch (error) {
+      if (error.status !== 409) throw error;
+    }
   }
 }
 
 async function persistActiveTableSnapshot(table) {
   try {
+    table.stateRevision = Math.max(0, Number(table.stateRevision || 0)) + 1;
     await Promise.all([
       stateSetTableSnapshot(table),
       dbUpsertActiveTableSnapshot(table)
@@ -2025,6 +2272,19 @@ async function persistActiveTableSnapshot(table) {
     console.error("Active table snapshot persist failed:", error.message);
     reportError(error, { kind: "active_table_snapshot", tableId: table.id });
   }
+}
+
+async function refreshTableFromState(tableId) {
+  const latest = await stateGetTableSnapshot(tableId);
+  if (!latest) return tables.get(tableId) || null;
+  const current = tables.get(tableId);
+  if (!current || Number(latest.stateRevision || 0) >= Number(current.stateRevision || 0)) {
+    tables.set(tableId, latest);
+    const tournament = latest.tournamentId ? tournaments.get(latest.tournamentId) : null;
+    if (tournament) tournament.tables.set(tableId, latest);
+    return latest;
+  }
+  return current;
 }
 
 async function deleteActiveTableSnapshot(tableId) {
@@ -2408,11 +2668,10 @@ function defaultPlayerProfile() {
 
 function updateMemoryProfileProgress(userIds, gameMode, hand = null, table = null) {
   const cashMode = gameMode === "cash";
-  const ratingEligible = !cashMode && !Boolean(table?.isPrivate) && gameMode !== "private";
+  const ratingEligible = gameMode === "play" && !Boolean(table?.isPrivate) && !Boolean(table?.tournamentId);
   const handSeats = Array.isArray(hand?.seats) ? hand.seats : [];
   const seatByUserId = new Map(handSeats.map((seat) => [String(seat.userId || ""), seat]));
   const activePlayers = handSeats.filter((seat) => seat.userId).length;
-  const rakeShare = cashMode && activePlayers > 0 ? Math.floor(Number(hand?.rake || 0) / activePlayers) : 0;
   for (const id of [...new Set(userIds.map(String).filter(Boolean))]) {
     const profileUser = userProfiles.get(id);
     if (!profileUser) continue;
@@ -2420,6 +2679,7 @@ function updateMemoryProfileProgress(userIds, gameMode, hand = null, table = nul
     profile.handsPlayed += 1;
     if (cashMode) {
       profile.cashHandsPlayed += 1;
+      const rakeShare = Math.max(0, Number(seatByUserId.get(id)?.rakeContributed || 0));
       const clubPointsDelta = cashClubPointsFromRake(rakeShare);
       profile.cashClubPoints = Number(profile.cashClubPoints ?? profile.cashXp ?? 0) + clubPointsDelta;
       profile.cashXp = profile.cashClubPoints;
@@ -2836,17 +3096,18 @@ function seedTournaments() {
   const fastTournamentTest = process.env.NODE_ENV === "test" && process.env.TOURNAMENT_TEST_MODE === "true";
   const entries = [
     {
-      id: "sng-25-evening",
-      title: "QWZ Sit&Go 25/50",
+      id: "sng-nightly-cash",
+      title: "Nightly Cash SNG",
       type: "sng",
       status: "registration_open",
-      balanceBucket: "play",
-      buyIn: 5000,
-      fee: 250,
+      balanceBucket: "cash",
+      buyIn: 500_000,
+      fee: 50_000,
       minPlayers: 2,
       maxPlayers: fastTournamentTest ? 2 : 6,
       maxPlayersPerTable: 6,
       startingStack: fastTournamentTest ? 50 : 10_000,
+      description: "Ежедневный cash Sit&Go без play chips.",
       registrationOpensAt: new Date(now - 60 * 1000).toISOString(),
       startsAt: new Date(now + 30 * 60 * 1000).toISOString(),
       prizePoolMode: "buyins"
@@ -2863,6 +3124,7 @@ function seedTournaments() {
       maxPlayers: 36,
       maxPlayersPerTable: 6,
       startingStack: 10_000,
+      description: "Классический cash freezeout с поздней регистрацией.",
       registrationOpensAt: new Date(now - 60 * 1000).toISOString(),
       startsAt: new Date(now + 3 * 60 * 60 * 1000).toISOString(),
       lateRegEndsAt: new Date(now + 3.5 * 60 * 60 * 1000).toISOString(),
@@ -2880,6 +3142,7 @@ function seedTournaments() {
       maxPlayers: 72,
       maxPlayersPerTable: 6,
       startingStack: 15_000,
+      description: "Еженедельный cash MTT.",
       registrationOpensAt: new Date(now + 12 * 60 * 60 * 1000).toISOString(),
       startsAt: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
       prizePoolMode: "buyins"
@@ -2893,7 +3156,34 @@ function seedTournaments() {
 }
 
 function tournamentListView(user) {
-  return [...tournaments.values()].map((tournament) => tournamentView(tournament, user));
+  return [...tournaments.values()]
+    .sort((left, right) => new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime())
+    .map((tournament) => tournamentView(tournament, user));
+}
+
+async function notifyUpcomingTournament(tournament, now = Date.now()) {
+  tournament.notifications ||= {};
+  if (![TOURNAMENT_STATUSES.REGISTRATION_OPEN, TOURNAMENT_STATUSES.LATE_REGISTRATION].includes(tournament.status)) return;
+  const startsIn = new Date(tournament.startsAt).getTime() - now;
+  if (!tournament.notifications.startSoon && startsIn > 0 && startsIn <= 10 * 60 * 1000) {
+    await Promise.all([...tournament.registrations.keys()].map((userId) => sendBotMessage(
+      userId,
+      `Турнир «${tournament.title}» начнётся примерно через ${Math.max(1, Math.ceil(startsIn / 60_000))} мин.`
+    )));
+    tournament.notifications.startSoon = true;
+    await dbUpdateTournamentState(tournament);
+  }
+  if (tournament.status === TOURNAMENT_STATUSES.LATE_REGISTRATION && tournament.lateRegEndsAt) {
+    const closesIn = new Date(tournament.lateRegEndsAt).getTime() - now;
+    if (!tournament.notifications.lateRegClosing && closesIn > 0 && closesIn <= 5 * 60 * 1000) {
+      await Promise.all([...tournament.registrations.keys()].map((userId) => sendBotMessage(
+        userId,
+        `Late registration в турнире «${tournament.title}» закроется примерно через ${Math.max(1, Math.ceil(closesIn / 60_000))} мин.`
+      )));
+      tournament.notifications.lateRegClosing = true;
+      await dbUpdateTournamentState(tournament);
+    }
+  }
 }
 
 async function tickTournaments(now = Date.now()) {
@@ -2901,6 +3191,7 @@ async function tickTournaments(now = Date.now()) {
   tournamentTickRunning = true;
   try {
     for (const tournament of tournaments.values()) {
+      await notifyUpcomingTournament(tournament, now);
       const decision = schedulerDecision(tournament, now);
       if (decision === "open_registration") {
         applyTournamentTransition(tournament, decision, now);
@@ -2933,6 +3224,18 @@ async function startTournament(tournament, now = Date.now()) {
   applyTournamentTransition(tournament, "start", now);
   const seating = seatTournamentPlayers([...tournament.registrations.values()], tournament.maxPlayersPerTable);
   for (const group of seating) createTournamentTable(tournament, group.players, group.index + 1);
+  emitTournamentEvent(tournament, "tournament_started", {
+    tables: tournament.tables.size,
+    players: tournament.registrations.size
+  }, now);
+  await Promise.all([...tournament.registrations.values()].map((registration) => {
+    const table = [...tournament.tables.values()].find((candidate) => candidate.seats.some((seat) => String(seat.userId) === String(registration.userId)));
+    return sendBotMessage(registration.userId, [
+      `Турнир «${tournament.title}» начался.`,
+      table ? `Вы посажены за стол ${table.tournamentTableNumber}.` : "Откройте приложение для посадки."
+    ].join("\n"));
+  }));
+  tournament.notifications.started = true;
   await persistTournamentRuntime(tournament);
 }
 
@@ -2945,7 +3248,7 @@ function createTournamentTable(tournament, players, tableNumber) {
     bigBlind: level.bigBlind,
     minBuyIn: tournament.startingStack,
     maxBuyIn: tournament.startingStack,
-    gameMode: "play",
+    gameMode: "tournament",
     isSystem: true,
     isPrivate: true
   });
@@ -2990,7 +3293,20 @@ async function advanceRunningTournament(tournament, now) {
       table.bigBlind = level.bigBlind;
       table.minRaise = level.bigBlind;
       table.ante = level.ante;
+      emitTableEvent(table, "tournament_level_up", {
+        tournamentId: tournament.id,
+        level: level.level,
+        smallBlind: level.smallBlind,
+        bigBlind: level.bigBlind,
+        ante: level.ante
+      });
     }
+    emitTournamentEvent(tournament, "tournament_level_up", {
+      level: level.level,
+      smallBlind: level.smallBlind,
+      bigBlind: level.bigBlind,
+      ante: level.ante
+    }, now);
     await dbUpdateTournamentState(tournament);
   }
 
@@ -3008,6 +3324,7 @@ async function advanceRunningTournament(tournament, now) {
       place: survivors + busted.length - index,
       eliminatedAt: new Date(now).toISOString()
     });
+    await sendBotMessage(seat.userId, `Вы завершили турнир «${tournament.title}» на ${survivors + busted.length - index}-м месте.`);
     leaveTable(table, { id: seat.userId });
   }
 
@@ -3021,6 +3338,7 @@ async function advanceRunningTournament(tournament, now) {
   const desiredTables = Math.ceil(active.length / tournament.maxPlayersPerTable);
   if (active.length <= tournament.maxPlayersPerTable && tournament.status === TOURNAMENT_STATUSES.RUNNING) {
     applyTournamentTransition(tournament, "final_table", now);
+    emitTournamentEvent(tournament, "final_table_started", { players: active.length }, now);
   }
   const sizes = [...tournament.tables.values()].filter((table) => table.seats.length).map((table) => table.seats.length);
   const needsBalance = sizes.length !== desiredTables || (sizes.length > 1 && Math.max(...sizes) - Math.min(...sizes) > 1);
@@ -3044,6 +3362,10 @@ function activeTournamentPlayers(tournament) {
 }
 
 async function rebuildTournamentTables(tournament, players) {
+  const previousTables = new Map();
+  for (const table of tournament.tables.values()) {
+    for (const seat of table.seats) previousTables.set(String(seat.userId), table.id);
+  }
   for (const table of tournament.tables.values()) {
     tables.delete(table.id);
     await deleteActiveTableSnapshot(table.id);
@@ -3051,24 +3373,26 @@ async function rebuildTournamentTables(tournament, players) {
   tournament.tables.clear();
   const seating = balancedSeating(players, tournament.maxPlayersPerTable);
   seating.forEach((group, index) => createTournamentTable(tournament, group.players, index + 1));
+  for (const table of tournament.tables.values()) {
+    for (const seat of table.seats) {
+      const fromTableId = previousTables.get(String(seat.userId));
+      if (!fromTableId || fromTableId === table.id) continue;
+      const payload = { userId: seat.userId, fromTableId, toTableId: table.id, tableNumber: table.tournamentTableNumber };
+      emitTournamentEvent(tournament, "tournament_table_move", payload);
+      emitTableEvent(table, "tournament_table_move", payload);
+      await sendBotMessage(seat.userId, `Пересадка в турнире «${tournament.title}»: стол ${table.tournamentTableNumber}.`);
+    }
+  }
   await persistTournamentRuntime(tournament);
 }
 
-async function finishTournament(tournament, winner, now) {
-  const rankedPlayers = [
-    { ...winner, place: 1 },
-    ...[...tournament.eliminations].sort((left, right) => left.place - right.place)
-  ];
+async function settleTournamentRanking(tournament, rankedPlayers, now) {
   const { prizePool, payouts } = calculateTournamentPayouts(tournament, rankedPlayers);
   const payoutKey = `tournament-payout:${tournament.id}`;
   const dbResult = await dbSettleTournament(tournament, rankedPlayers, payouts, payoutKey);
   if (dbResult) {
     for (const payout of payouts) {
-      if (tournament.balanceBucket === "cash") {
-        setCashWalletBalanceLocal(payout.userId, await getCashWallet(payout.userId));
-      } else {
-        setWalletBalanceLocal(payout.userId, await getWallet(payout.userId));
-      }
+      setCashWalletBalanceLocal(payout.userId, await getCashWallet(payout.userId));
       const sessionUser = userProfiles.get(String(payout.userId));
       if (sessionUser) sessionUser.profile = await getProfileForUser(sessionUser);
     }
@@ -3083,8 +3407,7 @@ async function finishTournament(tournament, winner, now) {
         balance: getWalletLocal(String(payout.userId)),
         cashBalanceMicros: getCashWalletLocal(String(payout.userId))
       };
-      const record = tournament.balanceBucket === "cash" ? recordCashTransaction : recordTransaction;
-      await record(payoutUser, {
+      await recordCashTransaction(payoutUser, {
         type: "credit",
         category: "tournament_payout",
         title: "Приз турнира",
@@ -3099,12 +3422,36 @@ async function finishTournament(tournament, winner, now) {
         amount: payouts.find((payout) => String(payout.userId) === String(result.userId))?.amount || 0
       });
     }
+    const guaranteeFunding = Math.max(0, prizePool - tournament.buyIn * tournament.registrations.size);
+    if (guaranteeFunding > 0) {
+      await recordPlatformLedger({
+        type: "debit",
+        category: "tournament_guarantee",
+        title: "Гарантия призового фонда",
+        amount: guaranteeFunding,
+        contextId: tournament.id,
+        meta: tournament.title,
+        idempotencyKey: `${payoutKey}:guarantee`,
+        asset: "USDT",
+        balanceBucket: "cash"
+      });
+    }
   }
   tournament.results = rankedPlayers.map((result) => ({
     ...result,
     prizeAmount: payouts.find((payout) => String(payout.userId) === String(result.userId))?.amount || 0
   }));
   tournament.prizePool = prizePool;
+  emitTournamentEvent(tournament, "payout_complete", {
+    prizePool,
+    payouts: payouts.map((payout) => ({ userId: payout.userId, place: payout.place, amount: payout.amount }))
+  }, now);
+  await Promise.all(rankedPlayers.map((result) => {
+    const amount = payouts.find((payout) => String(payout.userId) === String(result.userId))?.amount || 0;
+    return sendBotMessage(result.userId, amount > 0
+      ? `Турнир «${tournament.title}» завершён. Место ${result.place}, приз ${formatUsdtMicros(amount)} USDT.`
+      : `Турнир «${tournament.title}» завершён. Ваше место: ${result.place}.`);
+  }));
   applyTournamentTransition(tournament, "finish", now);
   for (const table of tournament.tables.values()) {
     tables.delete(table.id);
@@ -3112,6 +3459,14 @@ async function finishTournament(tournament, winner, now) {
   }
   tournament.tables.clear();
   await dbUpdateTournamentState(tournament);
+}
+
+async function finishTournament(tournament, winner, now) {
+  const rankedPlayers = [
+    { ...winner, place: 1 },
+    ...[...tournament.eliminations].sort((left, right) => left.place - right.place)
+  ];
+  await settleTournamentRanking(tournament, rankedPlayers, now);
 }
 
 async function cancelTournamentAndRefund(tournament, now) {
@@ -3153,6 +3508,21 @@ function tournamentPlayerState(tournament, userId) {
   return null;
 }
 
+function emitTournamentEvent(tournament, type, payload = {}, at = Date.now()) {
+  tournament.events = Array.isArray(tournament.events) ? tournament.events : [];
+  tournament.eventSequence = Math.max(0, Number(tournament.eventSequence || 0)) + 1;
+  const event = {
+    id: `${tournament.id}:${tournament.eventSequence}`,
+    sequence: tournament.eventSequence,
+    type,
+    at: Number(at || Date.now()),
+    payload
+  };
+  tournament.events.push(event);
+  tournament.events = tournament.events.slice(-160);
+  return event;
+}
+
 function memoryTournamentHistory(userId) {
   return [...tournaments.values()].flatMap((tournament) => tournament.results
     .filter((result) => String(result.userId) === String(userId))
@@ -3190,6 +3560,25 @@ function applyMemoryTournamentResult(user, tournament, payout) {
   }
   const stored = userProfiles.get(String(user.id));
   if (stored) stored.profile = profile;
+}
+
+async function hydrateTournamentDefinitions() {
+  const definitions = await dbListTournaments({ includeArchived: true });
+  if (!definitions) return;
+  tournaments.clear();
+  for (const definition of definitions) {
+    tournaments.set(definition.id, createTournamentRuntime(definition));
+  }
+}
+
+async function hydrateRewardTournamentEvents() {
+  const summaries = await dbListRewardTournamentEvents();
+  if (!summaries) return;
+  rewardTournamentEvents.clear();
+  for (const summary of summaries) {
+    const detailed = await dbGetRewardTournamentEvent(summary.id);
+    rewardTournamentEvents.set(summary.id, detailed || { ...summary, tickets: [] });
+  }
 }
 
 async function hydrateTournamentRegistrations() {
@@ -3238,32 +3627,419 @@ async function hydrateTournamentRegistrations() {
 function tournamentView(tournament, user) {
   const participants = tournament.registrations.size;
   const totalCost = tournament.buyIn + tournament.fee;
-  const prizePool = tournament.buyIn * participants;
+  const prizePool = Math.max(tournament.buyIn * participants, Number(tournament.guaranteedPrizePool || 0));
   return {
     id: tournament.id,
     title: tournament.title,
     type: tournament.type,
     status: tournament.status,
     balanceBucket: tournament.balanceBucket,
-    currency: tournament.balanceBucket === "cash" ? "USDT" : "PLAY_CHIPS",
+    currency: "USDT",
+    description: tournament.description || "",
     buyIn: tournament.buyIn,
     fee: tournament.fee,
     totalCost,
     maxPlayers: tournament.maxPlayers,
+    minPlayers: tournament.minPlayers,
+    maxPlayersPerTable: tournament.maxPlayersPerTable,
+    startingStack: tournament.startingStack,
     participants,
     prizePool,
+    registrationOpen: !tournament.registrationLocked && tournament.status === TOURNAMENT_STATUSES.REGISTRATION_OPEN,
+    registrationOpensAt: tournament.registrationOpensAt,
+    registrationLocked: tournament.registrationLocked === true,
     startsAt: tournament.startsAt,
     lateRegEndsAt: tournament.lateRegEndsAt,
+    lateRegMinutes: tournament.lateRegMinutes || 0,
     structure: tournament.structure,
+    blindStructure: tournament.structure,
+    payoutStructure: tournament.payoutStructure,
+    guaranteedPrizePool: Number(tournament.guaranteedPrizePool || 0),
     currentLevel: tournament.currentLevel,
     currentBlinds: tournament.startedAt ? currentBlindLevel(tournament) : tournament.structure[0],
-    playerState: tournamentPlayerState(tournament, user.id),
+    playerState: user?.id ? tournamentPlayerState(tournament, user.id) : null,
     results: tournament.results,
     tableIds: [...tournament.tables.keys()],
-    registered: tournament.registrations.has(user.id),
-    canRegister: registrationAllowed(tournament, user.id),
-    canCancel: cancellationAllowed(tournament, user.id)
+    registered: user?.id ? tournament.registrations.has(user.id) : false,
+    canRegister: user?.id ? registrationAllowed(tournament, user.id) : false,
+    canCancel: user?.id ? cancellationAllowed(tournament, user.id) : false,
+    reEntryLimit: tournament.reEntryLimit || 0,
+    addOnAllowed: tournament.addOnAllowed === true,
+    events: Array.isArray(tournament.events) ? tournament.events : []
   };
+}
+
+function adminTournamentList() {
+  return [...tournaments.values()]
+    .sort((left, right) => new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime())
+    .map((tournament) => adminTournamentView(tournament));
+}
+
+function adminTournamentView(tournament) {
+  const prizePool = Math.max(tournament.buyIn * tournament.registrations.size, Number(tournament.guaranteedPrizePool || 0));
+  return {
+    ...tournamentView(tournament, null),
+    participantsList: [...tournament.registrations.values()]
+      .sort((left, right) => String(left.registeredAt || "").localeCompare(String(right.registeredAt || "")))
+      .map((registration) => ({
+        userId: registration.userId,
+        name: registration.name || "Player",
+        username: registration.username || "",
+        registeredAt: registration.registeredAt || null
+      })),
+    payoutPreview: tournamentPayoutPreview(tournament),
+    prizePool,
+    actions: {
+      canOpenRegistration: tournament.status === TOURNAMENT_STATUSES.CREATED,
+      canCloseRegistration: tournament.status === TOURNAMENT_STATUSES.REGISTRATION_OPEN,
+      canCancel: [TOURNAMENT_STATUSES.CREATED, TOURNAMENT_STATUSES.REGISTRATION_OPEN].includes(tournament.status),
+      canForceStart: [TOURNAMENT_STATUSES.CREATED, TOURNAMENT_STATUSES.REGISTRATION_OPEN].includes(tournament.status),
+      canForceFinish: [TOURNAMENT_STATUSES.LATE_REGISTRATION, TOURNAMENT_STATUSES.RUNNING, TOURNAMENT_STATUSES.FINAL_TABLE].includes(tournament.status)
+    }
+  };
+}
+
+function tournamentPayoutPreview(tournament) {
+  const participants = tournament.registrations.size;
+  if (participants <= 0 || tournament.buyIn <= 0) return [];
+  const rankedPlayers = Array.from({ length: participants }, (_, index) => ({ userId: `preview-${index + 1}` }));
+  const preview = calculateTournamentPayouts(tournament, rankedPlayers);
+  return preview.payouts.map((payout) => ({
+    place: payout.place,
+    percent: Number((payout.percent || 0).toFixed(2)),
+    amount: payout.amount
+  }));
+}
+
+function adminRewardTournamentList() {
+  return [...rewardTournamentEvents.values()]
+    .sort((left, right) => String(right.createdAt || "").localeCompare(String(left.createdAt || "")))
+    .map((event) => ({
+      id: event.id,
+      title: event.title,
+      seasonId: event.seasonId || "",
+      status: event.status,
+      startsAt: event.startsAt || null,
+      description: event.description || "",
+      ticketCount: event.tickets?.length || event.ticketCount || 0,
+      usedTicketCount: event.tickets?.filter((ticket) => ticket.status === "used").length || event.usedTicketCount || 0
+    }));
+}
+
+async function createAdminTournament(adminUser, body = {}) {
+  const now = Date.now();
+  const tournament = createTournamentRuntime({
+    id: uniqueTournamentId(body.id || body.slug || body.title || "tournament", now),
+    ...normalizeAdminTournamentPayload(body),
+    raw: {
+      ...(body.raw && typeof body.raw === "object" ? body.raw : {}),
+      createdBy: String(adminUser.id || "admin"),
+      createdAt: new Date(now).toISOString()
+    }
+  }, now);
+  tournaments.set(tournament.id, tournament);
+  await dbUpsertTournamentDefinitions([tournament]);
+  return tournament;
+}
+
+async function updateAdminTournament(adminUser, tournamentId, body = {}) {
+  const existing = tournaments.get(tournamentId);
+  if (!existing) {
+    const error = new Error("Турнир не найден");
+    error.status = 404;
+    throw error;
+  }
+  if (![TOURNAMENT_STATUSES.CREATED, TOURNAMENT_STATUSES.REGISTRATION_OPEN].includes(existing.status)) {
+    const error = new Error("Редактирование доступно только до старта турнира");
+    error.status = 409;
+    throw error;
+  }
+  const next = createTournamentRuntime({
+    ...existing,
+    ...normalizeAdminTournamentPayload({ ...existing, ...body }, existing),
+    id: existing.id,
+    startedAt: existing.startedAt,
+    finishedAt: existing.finishedAt,
+    cancelledAt: existing.cancelledAt,
+    registrations: existing.registrations,
+    tables: existing.tables,
+    eliminations: existing.eliminations,
+    results: existing.results,
+    raw: {
+      ...(existing.raw || {}),
+      updatedBy: String(adminUser.id || "admin"),
+      updatedAt: new Date().toISOString()
+    }
+  });
+  tournaments.set(existing.id, next);
+  await dbUpsertTournamentDefinitions([next]);
+  await dbUpdateTournamentState(next);
+  return next;
+}
+
+async function runAdminTournamentAction(adminUser, tournamentId, action) {
+  const tournament = tournaments.get(tournamentId);
+  if (!tournament) {
+    const error = new Error("Турнир не найден");
+    error.status = 404;
+    throw error;
+  }
+  const now = Date.now();
+  if (action === "registration-open") {
+    if (tournament.status === TOURNAMENT_STATUSES.REGISTRATION_OPEN) return tournament;
+    if (tournament.status !== TOURNAMENT_STATUSES.CREATED) {
+      const error = new Error("Открыть регистрацию можно только до старта");
+      error.status = 409;
+      throw error;
+    }
+    tournament.registrationLocked = false;
+    applyTournamentTransition(tournament, "open_registration", now);
+    await dbUpsertTournamentDefinitions([tournament]);
+    await dbUpdateTournamentState(tournament);
+    return tournament;
+  }
+  if (action === "registration-close") {
+    if (tournament.status === TOURNAMENT_STATUSES.CREATED) return tournament;
+    if (tournament.status !== TOURNAMENT_STATUSES.REGISTRATION_OPEN) {
+      const error = new Error("Закрыть регистрацию можно только до старта");
+      error.status = 409;
+      throw error;
+    }
+    applyTournamentTransition(tournament, "close_registration", now);
+    await dbUpsertTournamentDefinitions([tournament]);
+    await dbUpdateTournamentState(tournament);
+    return tournament;
+  }
+  if (action === "cancel") {
+    if (![TOURNAMENT_STATUSES.CREATED, TOURNAMENT_STATUSES.REGISTRATION_OPEN].includes(tournament.status)) {
+      const error = new Error("После старта турнир не отменяется, используйте форс-финиш");
+      error.status = 409;
+      throw error;
+    }
+    await cancelTournamentAndRefund(tournament, now);
+    tournament.raw = { ...(tournament.raw || {}), cancelledBy: String(adminUser.id || "admin") };
+    await dbUpdateTournamentState(tournament);
+    return tournament;
+  }
+  if (action === "force-start") {
+    if (![TOURNAMENT_STATUSES.CREATED, TOURNAMENT_STATUSES.REGISTRATION_OPEN].includes(tournament.status)) {
+      const error = new Error("Форс-старт доступен только до старта");
+      error.status = 409;
+      throw error;
+    }
+    if (tournament.registrations.size < 2) {
+      const error = new Error("Для форс-старта нужно минимум 2 игрока");
+      error.status = 409;
+      throw error;
+    }
+    if (tournament.status === TOURNAMENT_STATUSES.CREATED) {
+      tournament.registrationLocked = false;
+      applyTournamentTransition(tournament, "open_registration", now);
+    }
+    await startTournament(tournament, now);
+    tournament.raw = { ...(tournament.raw || {}), forceStartedBy: String(adminUser.id || "admin") };
+    await dbUpdateTournamentState(tournament);
+    return tournament;
+  }
+  if (action === "force-finish") {
+    if (![TOURNAMENT_STATUSES.LATE_REGISTRATION, TOURNAMENT_STATUSES.RUNNING, TOURNAMENT_STATUSES.FINAL_TABLE].includes(tournament.status)) {
+      const error = new Error("Форс-финиш доступен только для идущего турнира");
+      error.status = 409;
+      throw error;
+    }
+    const rankedPlayers = rankTournamentPlayersForForcedFinish(tournament, now);
+    if (rankedPlayers.length < 2) {
+      const error = new Error("Недостаточно активных игроков для завершения");
+      error.status = 409;
+      throw error;
+    }
+    await settleTournamentRanking(tournament, rankedPlayers, now);
+    tournament.raw = { ...(tournament.raw || {}), forceFinishedBy: String(adminUser.id || "admin") };
+    await dbUpdateTournamentState(tournament);
+    return tournament;
+  }
+  const error = new Error("Неизвестное действие турнира");
+  error.status = 400;
+  throw error;
+}
+
+async function createAdminRewardTournament(adminUser, body = {}) {
+  const seasonId = String(body.seasonId || activeRatingSeasonId());
+  const eligibleOnly = body.eligibleOnly !== false;
+  const requestedRanks = normalizeTicketRanks(body.ticketRanks);
+  const requestedCount = Math.max(requestedRanks.length, Math.max(1, Math.round(Number(body.ticketCount) || 3)));
+  const leaderboard = (await dbListRatingLeaderboard({ seasonId, limit: Math.max(requestedCount, 50) })) || memoryRatingLeaderboard(Math.max(requestedCount, 50));
+  const source = eligibleOnly ? leaderboard.filter((row) => row.eligible) : leaderboard;
+  const selected = requestedRanks.length
+    ? requestedRanks.map((rank) => source.find((row) => Number(row.rank) === rank)).filter(Boolean)
+    : source.slice(0, requestedCount);
+  if (!selected.length) {
+    const error = new Error("Для reward event нет подходящих игроков в лидерборде");
+    error.status = 409;
+    throw error;
+  }
+  const now = Date.now();
+  const event = {
+    id: `reward-${slugify(body.title || seasonId)}-${Math.floor(now / 1000)}`,
+    title: String(body.title || `Reward Tournament ${seasonId}`),
+    seasonId,
+    status: "tickets_issued",
+    startsAt: parseOptionalDate(body.startsAt),
+    description: String(body.description || ""),
+    raw: {
+      createdBy: String(adminUser.id || "admin"),
+      eligibleOnly,
+      requestedRanks: requestedRanks.length ? requestedRanks : selected.map((row) => row.rank)
+    }
+  };
+  const tickets = selected.map((row) => ({
+    id: `ticket-${event.id}-${row.rank}`,
+    userId: String(row.id),
+    provider: "telegram",
+    leaderboardRank: Number(row.rank || 0),
+    raw: {
+      ratingPoints: row.ratingPoints,
+      name: row.name || "Player",
+      username: row.username || ""
+    }
+  }));
+  const persisted = await dbCreateRewardTournamentEvent(event, tickets);
+  const stored = persisted || { ...event, tickets: tickets.map((ticket) => ({ ...ticket, status: "active", grantedAt: new Date(now).toISOString(), usedAt: null })) };
+  rewardTournamentEvents.set(stored.id, stored);
+  return stored;
+}
+
+function normalizeAdminTournamentPayload(body = {}, existing = null) {
+  const startsAt = requiredDate(body.startsAt ?? existing?.startsAt, "startsAt");
+  const structure = normalizeStructureInput(body.blindStructure ?? body.structure ?? existing?.structure);
+  const lateRegMinutes = Math.max(0, Math.round(Number(body.lateRegMinutes ?? existing?.lateRegMinutes ?? 0) || 0));
+  const status = normalizeAdminTournamentStatus(body.status ?? existing?.status ?? "created");
+  const registrationOpenInput = body.registrationOpen;
+  let registrationOpensAt = parseOptionalDate(body.registrationOpensAt ?? existing?.registrationOpensAt) || startsAt;
+  let registrationLocked = existing?.registrationLocked === true;
+  let effectiveStatus = status;
+  if (registrationOpenInput === true) {
+    effectiveStatus = TOURNAMENT_STATUSES.REGISTRATION_OPEN;
+    registrationLocked = false;
+    registrationOpensAt = new Date().toISOString();
+  } else if (registrationOpenInput === false) {
+    effectiveStatus = TOURNAMENT_STATUSES.CREATED;
+    registrationLocked = true;
+  } else if (effectiveStatus === TOURNAMENT_STATUSES.REGISTRATION_OPEN) {
+    registrationLocked = false;
+  }
+  return {
+    title: String(body.title || existing?.title || "Tournament").trim(),
+    type: String(body.type || existing?.type || "mtt").toLowerCase() === "sng" ? "sng" : "mtt",
+    status: effectiveStatus,
+    balanceBucket: "cash",
+    buyIn: Math.max(0, Math.round(Number(body.buyIn ?? existing?.buyIn ?? 0) || 0)),
+    fee: Math.max(0, Math.round(Number(body.fee ?? existing?.fee ?? 0) || 0)),
+    guaranteedPrizePool: Math.max(0, Math.round(Number(body.guaranteedPrizePool ?? body.prizePool ?? existing?.guaranteedPrizePool ?? 0) || 0)),
+    minPlayers: Math.max(2, Math.round(Number(body.minPlayers ?? existing?.minPlayers ?? 2) || 2)),
+    maxPlayers: Math.max(2, Math.round(Number(body.maxPlayers ?? existing?.maxPlayers ?? 6) || 6)),
+    maxPlayersPerTable: Math.max(2, Math.min(6, Math.round(Number(body.maxPlayersPerTable ?? existing?.maxPlayersPerTable ?? 6) || 6))),
+    startingStack: Math.max(1, Math.round(Number(body.startingStack ?? existing?.startingStack ?? 10_000) || 10_000)),
+    registrationOpensAt,
+    startsAt,
+    lateRegMinutes,
+    lateRegEndsAt: lateRegMinutes > 0 ? new Date(new Date(startsAt).getTime() + lateRegMinutes * 60 * 1000).toISOString() : null,
+    structure,
+    payoutStructure: normalizePayoutStructureInput(body.payoutStructure ?? existing?.payoutStructure),
+    reEntryLimit: Math.max(0, Math.round(Number(body.reEntryLimit ?? existing?.reEntryLimit ?? 0) || 0)),
+    addOnAllowed: body.addOnAllowed === true || (body.addOnAllowed == null && existing?.addOnAllowed === true),
+    description: String(body.description ?? existing?.description ?? ""),
+    registrationLocked
+  };
+}
+
+function normalizeAdminTournamentStatus(value) {
+  const normalized = String(value || TOURNAMENT_STATUSES.CREATED).trim().toLowerCase();
+  return [TOURNAMENT_STATUSES.CREATED, TOURNAMENT_STATUSES.REGISTRATION_OPEN].includes(normalized)
+    ? normalized
+    : TOURNAMENT_STATUSES.CREATED;
+}
+
+function normalizeStructureInput(value) {
+  const parsed = parsePossiblyJson(value);
+  return Array.isArray(parsed) && parsed.length ? parsed : undefined;
+}
+
+function normalizePayoutStructureInput(value) {
+  const parsed = parsePossiblyJson(value);
+  return Array.isArray(parsed) && parsed.length ? parsed : null;
+}
+
+function normalizeTicketRanks(value) {
+  const parsed = parsePossiblyJson(value);
+  if (!Array.isArray(parsed)) return [];
+  return [...new Set(parsed
+    .map((entry) => Math.round(Number(entry) || 0))
+    .filter((entry) => entry > 0))].sort((left, right) => left - right);
+}
+
+function parsePossiblyJson(value) {
+  if (Array.isArray(value) || (value && typeof value === "object")) return value;
+  if (typeof value !== "string" || !value.trim()) return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+function requiredDate(value, field) {
+  const normalized = parseOptionalDate(value);
+  if (!normalized) {
+    const error = new Error(`Некорректное поле ${field}`);
+    error.status = 400;
+    throw error;
+  }
+  return normalized;
+}
+
+function parseOptionalDate(value) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null;
+}
+
+function uniqueTournamentId(seed, now = Date.now()) {
+  const base = slugify(seed || "tournament");
+  let candidate = base;
+  let index = 1;
+  while (tournaments.has(candidate)) {
+    index += 1;
+    candidate = `${base}-${Math.floor(now / 1000)}-${index}`;
+  }
+  return candidate;
+}
+
+function slugify(value) {
+  return String(value || "tournament")
+    .toLowerCase()
+    .trim()
+    .replaceAll(/[^a-z0-9а-яё]+/gi, "-")
+    .replaceAll(/^-+|-+$/g, "")
+    .slice(0, 48) || "tournament";
+}
+
+function rankTournamentPlayersForForcedFinish(tournament, now = Date.now()) {
+  const active = activeTournamentPlayers(tournament)
+    .sort((left, right) => Number(right.stack || 0) - Number(left.stack || 0) || String(left.userId).localeCompare(String(right.userId)))
+    .map((player, index) => ({
+      ...player,
+      place: index + 1,
+      eliminatedAt: new Date(now).toISOString()
+    }));
+  const offset = active.length;
+  const eliminated = [...tournament.eliminations]
+    .sort((left, right) => left.place - right.place)
+    .map((player, index) => ({
+      ...player,
+      place: offset + index + 1
+    }));
+  return [...active, ...eliminated];
 }
 
 async function registerTournament(tournament, user, idempotencyKey = "") {
@@ -3477,7 +4253,7 @@ async function getSavedStack(user) {
   return savedStacks.get(user.id) || DEFAULT_STACK;
 }
 
-async function prepareInitialStack(user, body = {}, idempotencyKey = "", table = null) {
+async function prepareInitialStack(user, body = {}, idempotencyKey = "", table = null, options = {}) {
   const requested = Number(body.buyInAmount || 0);
   if (!requested) {
     if (table?.gameMode === "cash") {
@@ -3510,21 +4286,26 @@ async function prepareInitialStack(user, body = {}, idempotencyKey = "", table =
     throw error;
   }
   user.stack = Math.min(amount, maximumBuyIn);
-  await recordTableTransaction(user, table, {
+  const mutation = {
+    transaction: {
     type: "debit",
     category: "table_buyin",
     title: "Бай-ин за стол",
     amount: user.stack,
     meta: "Texas NL",
     idempotencyKey
-  });
-  await recordFundMovement(user, {
+    },
+    movement: {
     category: "wallet_to_table",
     from: "wallet",
     to: "table",
     amount: user.stack,
     meta: "Texas NL buy-in"
-  });
+    }
+  };
+  if (options.deferTableCommit) return mutation;
+  await commitTableWalletMutation(user, table, mutation);
+  return mutation;
 }
 
 async function saveStack(user, stack) {
@@ -3547,50 +4328,60 @@ async function saveStack(user, stack) {
 async function settleLeftTableStack(user, table, stack, options = {}) {
   if (table.gameMode !== "cash") {
     if (options.returnToWallet) {
-      await returnPlayTableStackToWallet(user, table, stack);
+      await returnPlayTableStackToWallet(user, table, stack, options);
       return;
     }
     await saveStack(user, stack);
     return;
   }
-  if (stack <= 0) return;
-  await recordCashTransaction(user, {
-    type: "credit",
-    category: "table_cashout",
-    title: "Возврат со стола",
-    amount: stack,
-    meta: table.name,
-    idempotencyKey: `cashout:${table.id}:${user.id}:${table.handNumber}:${stack}`
-  });
-  await recordFundMovement(user, {
-    category: "table_to_cash_wallet",
-    from: "table",
-    to: "cash_usdt",
-    amount: stack,
-    contextId: table.id,
-    meta: table.name
+  if (stack <= 0) {
+    if (options.deleteSnapshot) await deleteActiveTableSnapshot(table.id);
+    else await persistActiveTableSnapshot(table);
+    return;
+  }
+  await commitTableWalletMutation(user, table, {
+    deleteSnapshot: options.deleteSnapshot,
+    transaction: {
+      type: "credit",
+      category: "table_cashout",
+      title: "Возврат со стола",
+      amount: stack,
+      meta: table.name,
+      idempotencyKey: `cashout:${table.id}:${user.id}:${table.handNumber}:${stack}`
+    },
+    movement: {
+      category: "table_to_cash_wallet",
+      from: "table",
+      to: "cash_usdt",
+      amount: stack,
+      contextId: table.id,
+      meta: table.name
+    }
   });
 }
 
-async function returnPlayTableStackToWallet(user, table, stack) {
+async function returnPlayTableStackToWallet(user, table, stack, options = {}) {
   const amount = Math.max(0, Math.round(Number(stack) || 0));
   await saveStack(user, 0);
   if (amount <= 0) return;
-  await recordTransaction(user, {
-    type: "credit",
-    category: "table_cashout",
-    title: "Возврат со стола",
-    amount,
-    meta: table.name,
-    idempotencyKey: randomId("play-cashout")
-  });
-  await recordFundMovement(user, {
-    category: "table_to_wallet",
-    from: "table",
-    to: "wallet",
-    amount,
-    contextId: table.id,
-    meta: table.name
+  await commitTableWalletMutation(user, table, {
+    deleteSnapshot: options.deleteSnapshot,
+    transaction: {
+      type: "credit",
+      category: "table_cashout",
+      title: "Возврат со стола",
+      amount,
+      meta: table.name,
+      idempotencyKey: `play-cashout:${table.id}:${user.id}:${table.handNumber}:${amount}`
+    },
+    movement: {
+      category: "table_to_wallet",
+      from: "table",
+      to: "wallet",
+      amount,
+      contextId: table.id,
+      meta: table.name
+    }
   });
 }
 
@@ -3762,6 +4553,7 @@ function getCashWalletLocal(userId) {
 }
 
 function tableWalletBalance(user, table) {
+  if (table?.gameMode === "tournament" || table?.tournamentId) return 0;
   return table?.gameMode === "cash" ? Number(user.cashBalanceMicros || 0) : Number(user.balance || 0);
 }
 
@@ -3771,6 +4563,32 @@ async function recordTableTransaction(user, table, transaction) {
   }
   user.balance = await recordTransaction(user, transaction);
   return user.balance;
+}
+
+async function commitTableWalletMutation(user, table, { transaction, movement, deleteSnapshot = false } = {}) {
+  table.stateRevision = Math.max(0, Number(table.stateRevision || 0)) + 1;
+  const dbResult = await dbApplyTableWalletMutation(user.id, {
+    table,
+    entry: transaction,
+    movement,
+    deleteSnapshot
+  });
+  if (dbResult) {
+    if (dbResult.idempotentReplay && dbResult.snapshot) {
+      for (const key of Object.keys(table)) delete table[key];
+      Object.assign(table, dbResult.snapshot);
+      tables.set(table.id, table);
+    }
+    if (table.gameMode === "cash") user.cashBalanceMicros = setCashWalletBalanceLocal(user.id, dbResult.balance);
+    else user.balance = setWalletBalanceLocal(user.id, dbResult.balance);
+  } else {
+    await recordTableTransaction(user, table, transaction);
+    if (movement) await recordFundMovement(user, movement);
+    if (!deleteSnapshot) await dbUpsertActiveTableSnapshot(table);
+  }
+  if (deleteSnapshot) await stateDeleteTableSnapshot(table.id);
+  else await stateSetTableSnapshot(table);
+  return dbResult;
 }
 
 function formatTableAmount(table, amount) {
@@ -3847,6 +4665,12 @@ function parseChipAmount(value) {
   if (amount > ADMIN_GRANT_MAX_CHIPS) {
     throw new Error(`Лимит одной операции: ${formatNumber(ADMIN_GRANT_MAX_CHIPS)} chips`);
   }
+  return Math.round(amount);
+}
+
+function parseUsdtMicrosAmount(value) {
+  const amount = Number(String(value || "").replace(/\s+/g, ""));
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("Укажите положительную сумму USDT micros");
   return Math.round(amount);
 }
 
@@ -3958,10 +4782,11 @@ async function handleAdminWalletCommand(message, command, args) {
   ].join("\n"));
 }
 
-async function adjustWalletManually({ admin, targetId, type, amount, reason, requestId = "" }) {
+async function adjustWalletManually({ admin, targetId, type, amount, balanceBucket = "play", reason, requestId = "" }) {
   const normalizedType = type === "deduct" ? "deduct" : "grant";
+  const normalizedBucket = balanceBucket === "cash" ? "cash" : "play";
   const normalizedTargetId = normalizeTargetUserId(targetId);
-  const normalizedAmount = parseChipAmount(amount);
+  const normalizedAmount = normalizedBucket === "cash" ? parseUsdtMicrosAmount(amount) : parseChipAmount(amount);
   const normalizedReason = String(reason || "").trim() || "manual_adjustment";
   const adminProfile = admin || { id: "system", name: "Admin", username: "" };
   const idempotencyKey = normalizeIdempotencyKey({
@@ -3978,17 +4803,22 @@ async function adjustWalletManually({ admin, targetId, type, amount, reason, req
   }
 
   const sign = normalizedType === "grant" ? 1 : -1;
-  const before = await getWallet(normalizedTargetId);
+  const before = normalizedBucket === "cash"
+    ? await getCashWallet(normalizedTargetId)
+    : await getWallet(normalizedTargetId);
   const after = before + sign * normalizedAmount;
 
   if (after < 0) {
-    throw new Error(`Недостаточно chips. Баланс игрока: ${formatNumber(before)}`);
+    const printable = normalizedBucket === "cash"
+      ? `${formatUsdtMicros(before)} USDT`
+      : `${formatNumber(before)} chips`;
+    throw new Error(`Недостаточно средств. Баланс игрока: ${printable}`);
   }
 
   const targetProfile = userProfiles.get(normalizedTargetId) || { id: normalizedTargetId };
   const title = normalizedType === "grant" ? "Ручное начисление" : "Ручное списание";
-
-  const balance = await recordTransaction(targetProfile, {
+  const record = normalizedBucket === "cash" ? recordCashTransaction : recordTransaction;
+  const balance = await record(targetProfile, {
     type: normalizedType === "grant" ? "credit" : "debit",
     category: normalizedType === "grant" ? "admin_grant" : "admin_deduct",
     title,
@@ -4001,9 +4831,15 @@ async function adjustWalletManually({ admin, targetId, type, amount, reason, req
     user: targetProfile,
     lines: [
       `Админ: ${formatUser(adminProfile)}`,
-      `Сумма: ${formatNumber(normalizedAmount)} chips`,
-      `До: ${formatNumber(before)} chips`,
-      `После: ${formatNumber(balance)} chips`,
+      normalizedBucket === "cash"
+        ? `Сумма: ${formatUsdtMicros(normalizedAmount)} USDT`
+        : `Сумма: ${formatNumber(normalizedAmount)} chips`,
+      normalizedBucket === "cash"
+        ? `До: ${formatUsdtMicros(before)} USDT`
+        : `До: ${formatNumber(before)} chips`,
+      normalizedBucket === "cash"
+        ? `После: ${formatUsdtMicros(balance)} USDT`
+        : `После: ${formatNumber(balance)} chips`,
       `Причина: ${normalizedReason}`
     ]
   });
@@ -4014,12 +4850,13 @@ async function adjustWalletManually({ admin, targetId, type, amount, reason, req
     amount: normalizedAmount,
     before,
     balance,
+    balanceBucket: normalizedBucket,
     reason: normalizedReason,
     type: normalizedType,
     requestId: requestId || ""
   };
   if (idempotencyKey) idempotencyResults.set(idempotencyKey, result);
-  if (normalizedType === "grant" && normalizedAmount >= RISK_LARGE_ADMIN_ADJUST_CHIPS) {
+  if (normalizedBucket === "play" && normalizedType === "grant" && normalizedAmount >= RISK_LARGE_ADMIN_ADJUST_CHIPS) {
     await recordRiskFlag({
       userId: normalizedTargetId,
       type: "large_admin_grant",
@@ -5016,6 +5853,12 @@ function tableView(table, user) {
 function clamp(value, min, max) {
   if (!Number.isFinite(value)) return min;
   return Math.max(min, Math.min(max, Math.round(value)));
+}
+
+function eventSequenceFromId(value) {
+  const raw = String(value || "");
+  const parsed = Number(raw.includes(":") ? raw.slice(raw.lastIndexOf(":") + 1) : raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
 async function requireSession(req) {

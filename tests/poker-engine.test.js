@@ -1,14 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import {
   act,
   addBuyIn,
+  commitPlayerFairnessSeed,
   createTable,
   createProvablyFairDeck,
   joinTable,
   leaveTable,
   maybeStartHand,
   publicTable,
+  revealPlayerFairnessSeed,
   setPlayerFairnessSeed,
   sitIn,
   sitOut,
@@ -605,4 +608,57 @@ test("sit out keeps the seat but skips future hands until sit in", () => {
   assert.equal(table.seats[1].sittingOut, false);
   maybeStartHand(table);
   assert.equal(table.status, "starting");
+});
+
+test("top-up is capped by the table maximum stack", () => {
+  const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
+  assert.equal(addBuyIn(table, owner, 50_000), table.maxBuyIn);
+  assert.throws(() => addBuyIn(table, owner, 1), /максимума стола/);
+});
+
+test("hand timeline exposes ordered server-driven gameplay events", () => {
+  const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
+  joinTable(table, player2);
+  maybeStartHand(table);
+  startHand(table);
+  act(table, owner, { action: "fold" });
+
+  const events = publicTable(table, owner.id).events;
+  const types = events.map((event) => event.type);
+  assert.deepEqual(types.slice(0, 6), ["fairness_server_commit", "hand_start", "hole_cards_dealt", "blind_posted", "blind_posted", "action_prompt"]);
+  assert.ok(types.includes("fold"));
+  assert.ok(types.includes("pot_push"));
+  assert.ok(events.every((event, index) => index === 0 || event.sequence > events[index - 1].sequence));
+});
+
+test("contributed rake excludes an uncalled excess and preserves total rake", () => {
+  const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
+  joinTable(table, player2);
+  maybeStartHand(table);
+  startHand(table);
+  act(table, owner, { action: "call" });
+  act(table, player2, { action: "check" });
+  act(table, player2, { action: "bet", amount: 100 });
+  act(table, owner, { action: "fold" });
+
+  const hand = table.handHistory[0];
+  assert.equal(hand.seats.reduce((sum, seat) => sum + seat.rakeContributed, 0), hand.rake);
+  assert.ok(hand.seats.every((seat) => seat.rakeContributed >= 0));
+});
+
+test("two-phase fairness validates player reveal after server commit", () => {
+  const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
+  joinTable(table, player2);
+  const seed = "player-secret-seed-for-two-phase-fairness";
+  const seedHash = createHash("sha256").update(seed).digest("hex");
+  commitPlayerFairnessSeed(table, owner, seedHash);
+  maybeStartHand(table);
+  assert.equal(table.status, "starting");
+  assert.equal(publicTable(table, owner.id).fairness.phase, "commit_reveal");
+  revealPlayerFairnessSeed(table, owner, seed);
+  assert.throws(() => revealPlayerFairnessSeed(table, player2, "wrong"), /Сначала отправьте fairness commit/);
+  startHand(table);
+  const playerProof = table.fairnessProof.playerSeeds.find((item) => item.userId === owner.id);
+  assert.equal(playerProof.source, "player-commit-reveal");
+  assert.equal(playerProof.seedHash, seedHash);
 });

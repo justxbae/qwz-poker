@@ -1011,7 +1011,11 @@ Add-on (перерыв после ранних уровней):
 
 Backend поддерживает MTT и базовый SNG в текущем монолите. Канонический state machine: `created → registration_open → late_registration → running → final_table → finished`, с терминальным `cancelled`. SNG стартует при заполнении, MTT — по `startsAt`; при нехватке `minPlayers` регистрации возвращаются.
 
-У турнира обязателен `balanceBucket`: `cash` списывает и выплачивает только USDT micros, `play` — только PLAY_CHIPS. Конвертация между buckets запрещена. Турнирные игровые стеки не являются wallet balance и не участвуют в cash/play table-stack reconciliation. Re-entry, add-on, freeroll, satellites и bounty не входят в первый MVP.
+Обычные турниры в MVP cash-only: buy-in и payout идут только через `cash_usdt_micros`. Play chips не используются как вход в спонтанные турниры и не участвуют в tournament escrow. Турнирные игровые стеки не являются wallet balance и не участвуют в cash/play table-stack reconciliation. Re-entry, add-on, freeroll, satellites и bounty не входят в первый MVP.
+
+### 13.7. Сезонные reward-турниры по билетам
+
+После завершения рейтингового сезона топы leaderboard могут получать tickets на отдельные приглашённые турниры или freeroll-формат. Билет — это не валюта и не buy-in; он выдаётся админкой или системой по месту в leaderboard, а участие проходит по списку ticket holders. Эти турниры не смешиваются с обычным cash MTT/SNG runtime и описываются отдельно как post-season reward flow.
 
 ---
 

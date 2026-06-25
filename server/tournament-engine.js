@@ -24,9 +24,14 @@ export const DEFAULT_TOURNAMENT_STRUCTURE = Object.freeze([
 export function createTournamentRuntime(config, now = Date.now()) {
   const startsAt = timestamp(config.startsAt, now);
   const registrationOpensAt = timestamp(config.registrationOpensAt, now);
+  const lateRegMinutes = nonNegativeInteger(config.lateRegMinutes);
+  const lateRegEndsAt = config.lateRegEndsAt
+    ? timestamp(config.lateRegEndsAt, startsAt)
+    : (lateRegMinutes > 0 ? startsAt + lateRegMinutes * 60 * 1000 : null);
   const status = normalizeStatus(config.status || (
     registrationOpensAt <= now ? TOURNAMENT_STATUSES.REGISTRATION_OPEN : TOURNAMENT_STATUSES.CREATED
   ));
+  const registrationLocked = config.registrationLocked === true || config.raw?.registrationLocked === true;
   const structure = normalizeStructure(config.structure);
   return {
     ...config,
@@ -42,20 +47,35 @@ export function createTournamentRuntime(config, now = Date.now()) {
     startingStack: positiveInteger(config.startingStack, 10_000),
     structure,
     payoutStructure: Array.isArray(config.payoutStructure) ? config.payoutStructure : null,
-    balanceBucket: config.balanceBucket === "cash" ? "cash" : "play",
+    balanceBucket: "cash",
+    currency: "USDT",
+    description: String(config.description || config.raw?.description || ""),
     startsAt: new Date(startsAt).toISOString(),
     registrationOpensAt: new Date(registrationOpensAt).toISOString(),
-    lateRegEndsAt: config.lateRegEndsAt ? new Date(timestamp(config.lateRegEndsAt, startsAt)).toISOString() : null,
+    lateRegEndsAt: lateRegEndsAt ? new Date(lateRegEndsAt).toISOString() : null,
+    lateRegMinutes,
     reEntryLimit: nonNegativeInteger(config.reEntryLimit),
     addOnAllowed: config.addOnAllowed === true,
+    registrationLocked,
     registrations: config.registrations instanceof Map ? config.registrations : new Map(),
     tables: config.tables instanceof Map ? config.tables : new Map(),
     eliminations: Array.isArray(config.eliminations) ? config.eliminations : [],
     results: Array.isArray(config.results) ? config.results : [],
+    eventSequence: Math.max(0, Number(config.eventSequence || config.raw?.eventSequence || 0)),
+    events: Array.isArray(config.events || config.raw?.events) ? [...(config.events || config.raw.events)] : [],
+    notifications: config.notifications && typeof config.notifications === "object"
+      ? { ...config.notifications }
+      : { ...(config.raw?.notifications || {}) },
     startedAt: config.startedAt || null,
     finishedAt: config.finishedAt || null,
     cancelledAt: config.cancelledAt || null,
-    currentLevel: positiveInteger(config.currentLevel, 1)
+    currentLevel: positiveInteger(config.currentLevel, 1),
+    raw: {
+      ...(config.raw && typeof config.raw === "object" ? config.raw : {}),
+      description: String(config.description || config.raw?.description || ""),
+      lateRegMinutes,
+      registrationLocked
+    }
   };
 }
 
@@ -75,6 +95,7 @@ export function cancellationAllowed(tournament, userId) {
 export function schedulerDecision(tournament, now = Date.now()) {
   const participants = tournament.registrations.size;
   if (tournament.status === TOURNAMENT_STATUSES.CREATED
+    && !tournament.registrationLocked
     && timestamp(tournament.registrationOpensAt, now) <= now) return "open_registration";
 
   if (tournament.status !== TOURNAMENT_STATUSES.REGISTRATION_OPEN) return null;
@@ -87,6 +108,7 @@ export function schedulerDecision(tournament, now = Date.now()) {
 export function applyTournamentTransition(tournament, transition, now = Date.now()) {
   const allowedFrom = {
     open_registration: [TOURNAMENT_STATUSES.CREATED],
+    close_registration: [TOURNAMENT_STATUSES.REGISTRATION_OPEN],
     start: [TOURNAMENT_STATUSES.REGISTRATION_OPEN],
     close_late_registration: [TOURNAMENT_STATUSES.LATE_REGISTRATION],
     final_table: [TOURNAMENT_STATUSES.LATE_REGISTRATION, TOURNAMENT_STATUSES.RUNNING],
@@ -96,13 +118,21 @@ export function applyTournamentTransition(tournament, transition, now = Date.now
   if (!allowedFrom?.includes(tournament.status)) {
     throw new Error(`Invalid tournament transition: ${tournament.status} -> ${transition}`);
   }
-  if (transition === "open_registration") tournament.status = TOURNAMENT_STATUSES.REGISTRATION_OPEN;
+  if (transition === "open_registration") {
+    tournament.status = TOURNAMENT_STATUSES.REGISTRATION_OPEN;
+    tournament.registrationLocked = false;
+  }
+  if (transition === "close_registration") {
+    tournament.status = TOURNAMENT_STATUSES.CREATED;
+    tournament.registrationLocked = true;
+  }
   if (transition === "start") {
     tournament.startedAt = new Date(now).toISOString();
     tournament.status = tournament.lateRegEndsAt && timestamp(tournament.lateRegEndsAt, now) > now
       ? TOURNAMENT_STATUSES.LATE_REGISTRATION
       : TOURNAMENT_STATUSES.RUNNING;
     tournament.currentLevel = 1;
+    tournament.registrationLocked = true;
   }
   if (transition === "close_late_registration" && tournament.status === TOURNAMENT_STATUSES.LATE_REGISTRATION) {
     tournament.status = TOURNAMENT_STATUSES.RUNNING;
@@ -162,7 +192,8 @@ export function payoutPercentages(playerCount) {
 }
 
 export function calculateTournamentPayouts(tournament, rankedPlayers) {
-  const prizePool = nonNegativeInteger(tournament.buyIn) * tournament.registrations.size;
+  const buyInPool = nonNegativeInteger(tournament.buyIn) * tournament.registrations.size;
+  const prizePool = Math.max(buyInPool, nonNegativeInteger(tournament.guaranteedPrizePool));
   const configured = normalizePayoutStructure(tournament.payoutStructure);
   const rawPercentages = configured.length ? configured : payoutPercentages(rankedPlayers.length);
   const percentageTotal = rawPercentages.reduce((sum, percent) => sum + percent, 0);
