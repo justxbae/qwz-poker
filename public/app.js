@@ -409,6 +409,11 @@ async function boot() {
   tournamentDetailAction?.addEventListener("click", onTournamentDetailAction);
   tournamentDetailSheet?.addEventListener("click", onTournamentDetailTabSelect);
   document.querySelector(".home-tools")?.addEventListener("click", onGameFormatSelect);
+  document.querySelector(".home-tools")?.addEventListener("click", onFooterLobbyAction);
+  document.querySelector(".home-tools")?.addEventListener("pointerdown", onFooterLobbyPress, { passive: true });
+  document.querySelector(".home-tools")?.addEventListener("pointermove", onFooterLobbyPointerMove, { passive: true });
+  document.querySelector(".home-tools")?.addEventListener("pointerup", onFooterLobbyPointerEnd, { passive: true });
+  document.querySelector(".home-tools")?.addEventListener("pointercancel", onFooterLobbyPointerEnd, { passive: true });
   quickPlayButton.addEventListener("click", () => runAction(quickPlay));
   quickPrivateButton?.addEventListener("click", () => runAction(quickCreatePrivateTable));
   homeWalletSideAction?.addEventListener("click", () => runAction(claimDailyPlayBonus));
@@ -651,6 +656,7 @@ function onGameModeSelect(event) {
 function onGameFormatSelect(event) {
   const actionButton = event.target.closest("[data-mode-action]");
   if (!actionButton) return;
+  if (consumeFooterCancelledClick(actionButton)) return;
   const action = actionButton.dataset.modeAction;
   haptic("selection");
   if (action === "private") {
@@ -669,6 +675,63 @@ function onGameFormatSelect(event) {
     showStatus("Sit&Go: быстрые столы будут открываться из турнирного раздела.");
     return;
   }
+}
+
+function onFooterLobbyAction(event) {
+  const button = event.target.closest("[data-footer-action]");
+  if (!button) return;
+  if (consumeFooterCancelledClick(button)) return;
+  const action = button.dataset.footerAction;
+  haptic("selection");
+  if (action === "telegram") {
+    openPaymentUrl("https://t.me/qwzpoker");
+    return;
+  }
+  if (action === "support") {
+    showStatus("Поддержку подключим отдельной ссылкой.");
+    return;
+  }
+  if (action === "terms") {
+    showStatus("Пользовательское соглашение добавим отдельным документом.");
+  }
+}
+
+function onFooterLobbyPress(event) {
+  const row = event.target.closest(".footer-lobby-row");
+  if (!row) return;
+  row._pressStartX = event.clientX;
+  row._pressStartY = event.clientY;
+  row.dataset.pressCancelled = "";
+  row.classList.add("is-pressing");
+  window.clearTimeout(row._pressTimer);
+}
+
+function onFooterLobbyPointerMove(event) {
+  const row = event.target.closest(".footer-lobby-row.is-pressing");
+  if (!row) return;
+  const dx = Math.abs(event.clientX - Number(row._pressStartX || event.clientX));
+  const dy = Math.abs(event.clientY - Number(row._pressStartY || event.clientY));
+  if (dx > 8 || dy > 8) {
+    row.dataset.pressCancelled = "1";
+    row.classList.remove("is-pressing");
+  }
+}
+
+function onFooterLobbyPointerEnd(event) {
+  const row = event.target.closest(".footer-lobby-row");
+  if (!row) return;
+  window.clearTimeout(row._pressTimer);
+  row._pressTimer = window.setTimeout(() => row.classList.remove("is-pressing"), 120);
+}
+
+function consumeFooterCancelledClick(button) {
+  const row = button.closest(".footer-lobby-row");
+  if (row?.dataset.pressCancelled === "1") {
+    row.dataset.pressCancelled = "";
+    row.classList.remove("is-pressing");
+    return true;
+  }
+  return false;
 }
 
 function currentLimits() {
@@ -843,7 +906,8 @@ function updateHomeScreenInstallRow(status) {
 }
 
 function applyTelegramTheme() {
-  const fixedTheme = {
+  const themeParams = tg?.themeParams || {};
+  const fallbackTheme = {
     bg: "#17212b",
     secondaryBg: "#17212b",
     surface: "#202b36",
@@ -853,16 +917,40 @@ function applyTelegramTheme() {
     button: "#2aabee",
     buttonText: "#ffffff",
   };
-  document.documentElement.style.setProperty("--tg-bg", fixedTheme.bg);
-  document.documentElement.style.setProperty("--tg-secondary-bg", fixedTheme.secondaryBg);
-  document.documentElement.style.setProperty("--tg-surface", fixedTheme.surface);
-  document.documentElement.style.setProperty("--tg-text", fixedTheme.text);
-  document.documentElement.style.setProperty("--tg-hint", fixedTheme.hint);
-  document.documentElement.style.setProperty("--tg-link", fixedTheme.link);
-  document.documentElement.style.setProperty("--tg-button", fixedTheme.button);
-  document.documentElement.style.setProperty("--tg-button-text", fixedTheme.buttonText);
-  tg?.setHeaderColor?.(fixedTheme.bg);
-  tg?.setBackgroundColor?.(fixedTheme.bg);
+  const theme = {
+    bg: themeParams.bg_color || fallbackTheme.bg,
+    secondaryBg: themeParams.secondary_bg_color || themeParams.bg_color || fallbackTheme.secondaryBg,
+    surface: themeParams.section_bg_color || themeParams.secondary_bg_color || fallbackTheme.surface,
+    text: themeParams.text_color || fallbackTheme.text,
+    hint: themeParams.hint_color || fallbackTheme.hint,
+    link: themeParams.link_color || fallbackTheme.link,
+    button: themeParams.button_color || themeParams.link_color || fallbackTheme.button,
+    buttonText: themeParams.button_text_color || fallbackTheme.buttonText,
+  };
+  if (DEV_MODE) {
+    theme.bg = params.get("tgBg") || theme.bg;
+    theme.secondaryBg = params.get("tgSecondaryBg") || params.get("tgBg") || theme.secondaryBg;
+    theme.surface = params.get("tgSurface") || params.get("tgSecondaryBg") || theme.surface;
+    theme.text = params.get("tgText") || theme.text;
+    theme.hint = params.get("tgHint") || theme.hint;
+    theme.link = params.get("tgAccent") || params.get("tgLink") || theme.link;
+    theme.button = params.get("tgAccent") || params.get("tgButton") || theme.button;
+    theme.buttonText = params.get("tgButtonText") || theme.buttonText;
+  }
+  const themeTargets = [document.documentElement, document.body].filter(Boolean);
+  for (const target of themeTargets) {
+    target.style.setProperty("--tg-bg", theme.bg);
+    target.style.setProperty("--tg-secondary-bg", theme.secondaryBg);
+    target.style.setProperty("--tg-surface", theme.surface);
+    target.style.setProperty("--tg-surface-soft", theme.surface);
+    target.style.setProperty("--tg-text", theme.text);
+    target.style.setProperty("--tg-hint", theme.hint);
+    target.style.setProperty("--tg-link", theme.link);
+    target.style.setProperty("--tg-button", theme.button);
+    target.style.setProperty("--tg-button-text", theme.buttonText);
+  }
+  tg?.setHeaderColor?.(theme.secondaryBg);
+  tg?.setBackgroundColor?.(theme.secondaryBg);
 }
 
 function setupTapGuards() {
@@ -1624,9 +1712,11 @@ function renderProfile(profileData) {
   lobbyTableStack.textContent = formatChips(profileData.tableStack);
   lobbyActiveTables.textContent = String(profileData.activeTableCount || 0);
   renderHomeWalletSide(profileData);
-  homeActivityText.textContent = profileData.activeTableCount
-    ? `${profileData.activeTableCount} ${plural(profileData.activeTableCount, "стол", "стола", "столов")} · ${formatChips(profileData.tableStack)} за столами`
-    : "Выберите стол и начните игру.";
+  if (homeActivityText) {
+    homeActivityText.textContent = profileData.activeTableCount
+      ? `${profileData.activeTableCount} ${plural(profileData.activeTableCount, "стол", "стола", "столов")} · ${formatChips(profileData.tableStack)} за столами`
+      : "Выберите стол и начните игру.";
+  }
   if (homeSessionPill) {
     homeSessionPill.textContent = profileData.activeTableCount ? "активно" : "нет активных";
     homeSessionPill.dataset.status = profileData.activeTableCount ? "active" : "idle";

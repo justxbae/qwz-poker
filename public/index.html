@@ -5,11 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>QWZ Poker</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="/styles.css?v=20260625-1" />
     <link rel="stylesheet" href="/lobby-qa.css?v=20260626-1" />
+    <link rel="stylesheet" href="/telegram-ui-kit-overrides.css?v=20260627-9" />
   </head>
   <body>
     <section class="app-boot" id="appBoot" aria-live="polite" aria-label="Загрузка QWZ Poker">
@@ -171,7 +169,7 @@
               <button type="button" class="home-profile-link" data-lobby-tab="profile" aria-label="Открыть профиль">›</button>
             </div>
             <div class="home-balance">
-              <span>Доступный баланс</span>
+              <span>Баланс</span>
               <strong><b id="lobbyBalance">0</b><small id="lobbyBalanceCurrency"> фишек</small></strong>
             </div>
             <div class="home-wallet-side" id="homeWalletSide">
@@ -183,10 +181,12 @@
             </div>
             <div class="home-wallet-actions">
               <button type="button" id="walletTopupButton" aria-label="Депозит" title="Депозит">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                <img src="/assets/nav/circlearrowdown.svg" alt="" aria-hidden="true" />
+                <span>Пополнить</span>
               </button>
               <button type="button" class="home-withdraw" data-lobby-tab="cashier" data-cashier-section="withdraw" aria-label="Вывести" title="Вывести">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6.5 10.5 12 5l5.5 5.5"/><path d="M5 20h14"/></svg>
+                <img src="/assets/nav/circlearrowup.svg" alt="" aria-hidden="true" />
+                <span>Вывести</span>
               </button>
             </div>
           </section>
@@ -294,38 +294,28 @@
             <button id="continueGameButton" type="button">Вернуться</button>
           </section>
 
-          <section class="tg-menu-group home-tools">
-            <button type="button" class="tg-menu-row tournament-registration-notice" id="tournamentRegistrationNotice" data-lobby-tab="tournaments" hidden>
-              <span class="tg-row-icon tg-row-icon--blue" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M7 5h10v2c0 2.8-1.9 5.1-4.5 5.8V15h2.5l1 2H8l1-2h2.5v-2.2C8.9 12.1 7 9.8 7 7V5Z"/><path d="M6 6H4v1a3 3 0 0 0 3 3"/><path d="M18 6h2v1a3 3 0 0 1-3 3"/></svg>
-              </span>
-              <span class="tg-row-main" id="tournamentRegistrationTitle">Турнир</span>
-              <span class="tg-row-value" id="tournamentRegistrationMeta">Открыть</span>
-              <span class="tg-chevron">›</span>
+          <section class="tg-menu-group home-tools footer-lobby" aria-label="Быстрые действия">
+            <button type="button" class="footer-lobby-row footer-lobby-row--private" data-mode-action="private">
+              <span class="footer-lobby-icon" aria-hidden="true"><img src="/assets/footer/ic_largegroup.svg" alt="" /></span>
+              <span class="footer-lobby-main">Приватный стол</span>
+              <span class="footer-lobby-value">Создать</span>
+              <span class="footer-lobby-chevron">›</span>
             </button>
-            <button type="button" class="tg-menu-row" data-mode-action="private">
-              <span class="tg-row-icon tg-row-icon--cyan" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M7.5 11V8.5a4.5 4.5 0 0 1 9 0V11"/><path d="M6 11h12v8H6z"/><path d="M12 14v2"/></svg>
-              </span>
-              <span class="tg-row-main">Приватный стол</span>
-              <span class="tg-row-value">Игра с друзьями</span>
-              <span class="tg-chevron">›</span>
+            <button type="button" class="footer-lobby-row footer-lobby-row--telegram" data-footer-action="telegram">
+              <span class="footer-lobby-icon" aria-hidden="true"><img src="/assets/footer/telegram.svg" alt="" /></span>
+              <span class="footer-lobby-main">QWZ Poker</span>
+              <span class="footer-lobby-value">t.me/qwzpoker</span>
+              <span class="footer-lobby-chevron">›</span>
             </button>
-            <button type="button" class="tg-menu-row" data-lobby-tab="cashier" data-cashier-section="history">
-              <span class="tg-row-icon tg-row-icon--gray" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M4 12h3l2-4 4 8 2-4h5"/></svg>
-              </span>
-              <span class="tg-row-main">История операций</span>
-              <span class="tg-row-value" id="homeActivityText">Баланс и платежи</span>
-              <span class="session-pill" id="homeSessionPill">нет активных</span>
+            <button type="button" class="footer-lobby-row footer-lobby-row--support" data-footer-action="support">
+              <span class="footer-lobby-icon" aria-hidden="true"><img src="/assets/footer/Icon-17.svg" alt="" /></span>
+              <span class="footer-lobby-main">Поддержка</span>
+              <span class="footer-lobby-chevron">›</span>
             </button>
-            <button type="button" class="tg-menu-row" id="homeScreenInstallButton" hidden>
-              <span class="tg-row-icon tg-row-icon--blue" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><rect x="6" y="3.5" width="12" height="17" rx="2.4"/><path d="M9.5 17.5h5"/><path d="M12 12.8V7.4"/><path d="M9.7 9.6 12 7.3l2.3 2.3"/></svg>
-              </span>
-              <span class="tg-row-main">Добавить на экран</span>
-              <span class="tg-row-value" id="homeScreenInstallStatus">быстрый вход</span>
-              <span class="tg-chevron">›</span>
+            <button type="button" class="footer-lobby-row footer-lobby-row--terms" data-footer-action="terms">
+              <span class="footer-lobby-icon" aria-hidden="true"><img src="/assets/footer/mynotes.svg" alt="" /></span>
+              <span class="footer-lobby-main">Пользовательское соглашение</span>
+              <span class="footer-lobby-chevron">›</span>
             </button>
           </section>
           <div class="home-metrics" hidden><strong id="lobbyTableStack">0</strong><strong id="lobbyActiveTables">0</strong></div>
@@ -916,20 +906,20 @@
 
         <nav class="bottom-nav" aria-label="Главное меню">
           <button type="button" class="active" data-lobby-tab="home">
-            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m4 11 8-7 8 7v9H4Z"/><path d="M9.5 20v-6h5v6"/></svg></span>
+            <span class="nav-icon" aria-hidden="true"><img src="/assets/nav/playing-cards.svg" alt="" /></span>
             <span class="nav-label">Главная</span>
           </button>
           <button type="button" class="tournament-nav-button" data-lobby-tab="tournaments">
-            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 5h10v2c0 2.8-1.9 5.1-4.5 5.8V15h2.5l1 2H8l1-2h2.5v-2.2C8.9 12.1 7 9.8 7 7V5Z"/><path d="M6 6H4v1a3 3 0 0 0 3 3"/><path d="M18 6h2v1a3 3 0 0 1-3 3"/></svg></span>
+            <span class="nav-icon" aria-hidden="true"><img src="/assets/nav/poker-chip.svg" alt="" /></span>
             <span class="nav-label">Турниры</span>
             <span class="nav-alert-dot" id="tournamentRegistrationBadge" hidden aria-label="Вы зарегистрированы на турнир"></span>
           </button>
           <button type="button" data-lobby-tab="profile">
-            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg></span>
+            <span class="nav-icon" aria-hidden="true"><img src="/assets/nav/botprofile.svg" alt="" /></span>
             <span class="nav-label">Профиль</span>
           </button>
           <button type="button" id="lobbyMenuButton" data-lobby-menu-trigger>
-            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/></svg></span>
+            <span class="nav-icon" aria-hidden="true"><img src="/assets/nav/ic_bot2.svg" alt="" /></span>
             <span class="nav-label">Меню</span>
           </button>
           <button type="button" class="admin-nav-button" data-lobby-tab="admin" hidden>
