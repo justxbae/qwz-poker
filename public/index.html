@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>QWZ Poker</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="/styles.css?v=20260625-1" />
+    <link rel="stylesheet" href="/styles.css?v=20260628-2" />
     <link rel="stylesheet" href="/lobby-qa.css?v=20260626-1" />
-    <link rel="stylesheet" href="/telegram-ui-kit-overrides.css?v=20260627-9" />
+    <link rel="stylesheet" href="/telegram-ui-kit-overrides.css?v=20260628-16" />
   </head>
   <body>
     <section class="app-boot" id="appBoot" aria-live="polite" aria-label="Загрузка QWZ Poker">
@@ -223,8 +223,8 @@
             </div>
             <div class="game-mode-switch product-mode-segment" id="gameModeSwitch" aria-label="Режим игры">
               <button type="button" class="active" data-game-mode="cash">
-                <span>Cash <svg class="tether-mark" viewBox="0 0 24 24" aria-label="USDT"><circle cx="12" cy="12" r="12"/><path d="M13.55 10.18V8.56h3.8V6H6.65v2.56h3.8v1.62C7.36 10.34 5 10.96 5 11.71c0 .75 2.36 1.37 5.45 1.53V18h3.1v-4.76c3.09-.16 5.45-.78 5.45-1.53 0-.75-2.36-1.37-5.45-1.53Zm0 2.07v-.01c-.49.03-1 .04-1.55.04s-1.06-.01-1.55-.04v.01c-2.21-.12-3.87-.51-3.87-.98 0-.39 1.18-.73 2.91-.9v.86c.78.07 1.63.11 2.51.11.88 0 1.73-.04 2.51-.11v-.86c1.73.17 2.91.51 2.91.9 0 .47-1.66.86-3.87.98Z"/></svg></span>
-                <small>USDT-столы</small>
+                <span>Cash</span>
+                <small>$-столы</small>
               </button>
               <button type="button" data-game-mode="play">
                 <span>Рейтинг</span>
@@ -296,7 +296,7 @@
 
           <section class="tg-menu-group home-tools footer-lobby" aria-label="Быстрые действия">
             <button type="button" class="footer-lobby-row footer-lobby-row--private" data-mode-action="private">
-              <span class="footer-lobby-icon" aria-hidden="true"><img src="/assets/footer/ic_largegroup.svg" alt="" /></span>
+              <span class="footer-lobby-icon" aria-hidden="true"><img src="/assets/footer/ic_largegroup.svg?v=20260628-1" alt="" /></span>
               <span class="footer-lobby-main">Приватный стол</span>
               <span class="footer-lobby-value">Создать</span>
               <span class="footer-lobby-chevron">›</span>
@@ -390,7 +390,7 @@
           <section class="wallet-card cashier-card">
             <div class="miniapp-title">
               <span>Касса</span>
-              <small id="cashierAssetLabel">USDT balance</small>
+              <small id="cashierAssetLabel">$ balance</small>
             </div>
             <div class="wallet-label">Доступно</div>
             <div class="wallet-balance money-value" id="cashierBalance">0</div>
@@ -414,12 +414,12 @@
               </div>
               <span id="cashierDepositNetwork">TON</span>
             </div>
-            <p class="cashier-note" id="cashierNote">Введите сумму в USDT. Счет в TON фиксирует курс, а после подтверждения сети на баланс поступает USDT.</p>
+            <p class="cashier-note" id="cashierNote">Введите сумму в $. Счет в TON фиксирует курс, а после подтверждения сети на баланс поступает $.</p>
             <div class="cashier-calculator">
               <label class="cashier-amount-field">
                 <span>Сумма пополнения</span>
                 <input id="cashierRubAmount" type="number" min="1" max="5000" step="1" value="5" inputmode="decimal" />
-                <small id="cashierAmountAsset"><svg class="tether-mark" viewBox="0 0 24 24" aria-label="USDT"><circle cx="12" cy="12" r="12"/><path d="M13.55 10.18V8.56h3.8V6H6.65v2.56h3.8v1.62C7.36 10.34 5 10.96 5 11.71c0 .75 2.36 1.37 5.45 1.53V18h3.1v-4.76c3.09-.16 5.45-.78 5.45-1.53 0-.75-2.36-1.37-5.45-1.53Zm0 2.07v-.01c-.49.03-1 .04-1.55.04s-1.06-.01-1.55-.04v.01c-2.21-.12-3.87-.51-3.87-.98 0-.39 1.18-.73 2.91-.9v.86c.78.07 1.63.11 2.51.11.88 0 1.73-.04 2.51-.11v-.86c1.73.17 2.91.51 2.91.9 0 .47-1.66.86-3.87.98Z"/></svg></small>
+                <small id="cashierAmountAsset">$</small>
               </label>
               <div class="cashier-presets" id="cashierPresets"></div>
               <div class="cashier-quote">
@@ -448,7 +448,7 @@
               <button type="button" class="cashier-sheet-close" data-cashier-sheet-close aria-label="Закрыть">×</button>
             </div>
             <div class="cashier-withdraw-state">
-              <strong id="cashierWithdrawTitle">Вывод USDT пока закрыт</strong>
+              <strong id="cashierWithdrawTitle">Вывод $ пока закрыт</strong>
               <span id="cashierWithdrawText">Сначала запускаем честную экономику пополнений, открытые столы и историю операций. Методы вывода добавим после отдельной настройки правил и комиссий.</span>
             </div>
           </section>
@@ -458,7 +458,7 @@
                 <p class="eyebrow">Операции</p>
                 <h2>История</h2>
               </div>
-              <span>USDT</span>
+              <span>$</span>
             </div>
             <div class="cashier-history" id="cashierHistory"></div>
           </section>
@@ -938,7 +938,7 @@
             <button type="button" data-menu-action="cashier">
               <span class="menu-icon menu-icon--cashier" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h16v10H4Z"/><path d="M8 7V5h8v2"/><path d="M8 17v2h8v-2"/><path d="M12 10v4M10 12h4"/></svg></span>
               <span class="menu-copy"><strong>Касса</strong><small>депозит, вывод и способы оплаты</small></span>
-              <span class="menu-meta">USDT</span>
+              <span class="menu-meta">$</span>
               <span class="tg-chevron">›</span>
             </button>
             <button type="button" data-menu-action="details">
@@ -1014,6 +1014,6 @@
       </article>
     </template>
 
-    <script src="/app.js?v=20260625-1" type="module"></script>
+    <script src="/app.js?v=20260628-5" type="module"></script>
   </body>
 </html>

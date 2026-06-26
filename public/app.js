@@ -35,9 +35,12 @@ const state = {
   selectedAdminTournamentId: "",
   gameMode: "cash",
   selectedSmallBlind: 25,
+  homeSelectedSmallBlinds: [25],
   tables: [],
   tournaments: []
 };
+const RATING_FIXED_SMALL_BLIND = 100;
+const RATING_FIXED_BIG_BLIND = 200;
 let tableEventAbortController = null;
 let tableEventStreamId = "";
 let tableEventLastId = "";
@@ -414,6 +417,10 @@ async function boot() {
   document.querySelector(".home-tools")?.addEventListener("pointermove", onFooterLobbyPointerMove, { passive: true });
   document.querySelector(".home-tools")?.addEventListener("pointerup", onFooterLobbyPointerEnd, { passive: true });
   document.querySelector(".home-tools")?.addEventListener("pointercancel", onFooterLobbyPointerEnd, { passive: true });
+  homeTableList?.addEventListener("pointerdown", onFooterLobbyPress, { passive: true });
+  homeTableList?.addEventListener("pointermove", onFooterLobbyPointerMove, { passive: true });
+  homeTableList?.addEventListener("pointerup", onFooterLobbyPointerEnd, { passive: true });
+  homeTableList?.addEventListener("pointercancel", onFooterLobbyPointerEnd, { passive: true });
   quickPlayButton.addEventListener("click", () => runAction(quickPlay));
   quickPrivateButton?.addEventListener("click", () => runAction(quickCreatePrivateTable));
   homeWalletSideAction?.addEventListener("click", () => runAction(claimDailyPlayBonus));
@@ -583,7 +590,7 @@ async function auth() {
   profileName.textContent = data.user.name;
   profileUsername.textContent = data.user.username ? `@${data.user.username}` : `id ${data.user.id}`;
   profileBalance.textContent = state.gameMode === "cash"
-    ? `${formatUsdtDisplay(data.user.cashBalanceMicros || 0)} USDT`
+    ? formatUsdtDisplay(data.user.cashBalanceMicros || 0)
     : `${data.user.balance.toLocaleString("ru-RU")} фишек`;
   profileChips.textContent = data.user.balance.toLocaleString("ru-RU");
   renderHomeCta();
@@ -609,12 +616,13 @@ async function loadConfig() {
     cashButton.disabled = false;
     cashButton.title = state.config.realMoneyEnabled
       ? ""
-      : "USDT-игра доступна только если сервер запущен с REAL_MONEY_ENABLED=true";
+      : "$-игра доступна только если сервер запущен с REAL_MONEY_ENABLED=true";
   }
   if (state.config.realMoneyEnabled) {
     state.gameMode = "cash";
     const limits = currentLimits();
     state.selectedSmallBlind = Number(limits[0]?.smallBlind || 25);
+    state.homeSelectedSmallBlinds = normalizeHomeSelectedBlinds([state.selectedSmallBlind]);
   }
   gameModeSwitch?.querySelectorAll("[data-game-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.gameMode === state.gameMode);
@@ -633,15 +641,21 @@ function applyMinimalLaunchMode() {
   const ratingButton = gameModeSwitch?.querySelector('[data-game-mode="play"] small');
   if (ratingButton) ratingButton.textContent = "фишки";
   const modeCopy = document.querySelector("#modeContextCopy");
-  if (modeCopy) modeCopy.textContent = "Cash — USDT-столы. Рейтинг — игра на фишки без денежных операций.";
+  if (modeCopy) modeCopy.textContent = "Cash — $-столы. Рейтинг — игра на фишки без денежных операций.";
 }
 
 function onGameModeSelect(event) {
   const button = event.target.closest("[data-game-mode]");
   if (!button) return;
   state.gameMode = button.dataset.gameMode === "cash" ? "cash" : "play";
-  const limits = currentLimits();
-  state.selectedSmallBlind = Number(limits[0]?.smallBlind || 25);
+  if (state.gameMode === "play") {
+    state.selectedSmallBlind = RATING_FIXED_SMALL_BLIND;
+  } else {
+    const limits = currentLimits();
+    const selected = Number(state.homeSelectedSmallBlinds.at(-1) || limits[0]?.smallBlind || 25);
+    state.selectedSmallBlind = selected;
+    state.homeSelectedSmallBlinds = normalizeHomeSelectedBlinds(state.homeSelectedSmallBlinds.length ? state.homeSelectedSmallBlinds : [selected]);
+  }
   gameModeSwitch.querySelectorAll("[data-game-mode]").forEach((item) => {
     item.classList.toggle("active", item.dataset.gameMode === state.gameMode);
   });
@@ -697,7 +711,7 @@ function onFooterLobbyAction(event) {
 }
 
 function onFooterLobbyPress(event) {
-  const row = event.target.closest(".footer-lobby-row");
+  const row = event.target.closest(".footer-lobby-row, .home-table-list .table-item");
   if (!row) return;
   row._pressStartX = event.clientX;
   row._pressStartY = event.clientY;
@@ -707,7 +721,7 @@ function onFooterLobbyPress(event) {
 }
 
 function onFooterLobbyPointerMove(event) {
-  const row = event.target.closest(".footer-lobby-row.is-pressing");
+  const row = event.target.closest(".footer-lobby-row.is-pressing, .home-table-list .table-item.is-pressing");
   if (!row) return;
   const dx = Math.abs(event.clientX - Number(row._pressStartX || event.clientX));
   const dy = Math.abs(event.clientY - Number(row._pressStartY || event.clientY));
@@ -718,14 +732,14 @@ function onFooterLobbyPointerMove(event) {
 }
 
 function onFooterLobbyPointerEnd(event) {
-  const row = event.target.closest(".footer-lobby-row");
+  const row = event.target.closest(".footer-lobby-row, .home-table-list .table-item");
   if (!row) return;
   window.clearTimeout(row._pressTimer);
   row._pressTimer = window.setTimeout(() => row.classList.remove("is-pressing"), 120);
 }
 
 function consumeFooterCancelledClick(button) {
-  const row = button.closest(".footer-lobby-row");
+  const row = button.closest(".footer-lobby-row, .home-table-list .table-item");
   if (row?.dataset.pressCancelled === "1") {
     row.dataset.pressCancelled = "";
     row.classList.remove("is-pressing");
@@ -735,8 +749,23 @@ function consumeFooterCancelledClick(button) {
 }
 
 function currentLimits() {
+  if (state.gameMode === "play") {
+    return [{ smallBlind: RATING_FIXED_SMALL_BLIND, bigBlind: RATING_FIXED_BIG_BLIND, minBuyIn: 0, maxBuyIn: 0 }];
+  }
   const configured = state.gameMode === "cash" ? state.config?.cash?.limits : state.config?.play?.limits;
   return configured?.length ? configured : [{ smallBlind: 25, bigBlind: 50 }];
+}
+
+function normalizeHomeSelectedBlinds(values = []) {
+  const allowed = new Set(currentLimits().map((limit) => Number(limit.smallBlind)));
+  const result = [];
+  for (const value of values) {
+    const blind = Number(value);
+    if (!allowed.has(blind) || result.includes(blind)) continue;
+    result.push(blind);
+  }
+  if (!result.length) result.push(Number(currentLimits()[0]?.smallBlind || 25));
+  return result;
 }
 
 function activeBalance() {
@@ -785,11 +814,11 @@ function tickDailyPlayClaim() {
 function renderModeBalance() {
   if (!lobbyBalance) return;
   const cashMode = state.gameMode === "cash";
-  lobbyBalance.textContent = cashMode ? formatUsdt(activeBalance()) : formatChips(activeBalance());
+  lobbyBalance.textContent = cashMode ? formatUsdtDisplay(activeBalance()) : formatChips(activeBalance());
   if (!lobbyBalanceCurrency) return;
   if (cashMode) {
-    lobbyBalanceCurrency.replaceChildren(createTetherMark("tether-mark--hero"));
-    lobbyBalanceCurrency.setAttribute("aria-label", "USDT");
+    lobbyBalanceCurrency.textContent = "";
+    lobbyBalanceCurrency.removeAttribute("aria-label");
   } else {
     lobbyBalanceCurrency.textContent = " фишек";
     lobbyBalanceCurrency.removeAttribute("aria-label");
@@ -801,14 +830,14 @@ function renderModeContext() {
   const cashMode = state.gameMode === "cash";
   document.body.dataset.gameMode = cashMode ? "cash" : "play";
   if (modeBanner) {
-    if (modeBannerKicker) modeBannerKicker.textContent = cashMode ? "USDT" : "Рейтинг";
+    if (modeBannerKicker) modeBannerKicker.textContent = cashMode ? "$" : "Рейтинг";
     if (modeBannerTitle) {
-      if (cashMode) modeBannerTitle.replaceChildren("Денежная игра ", createTetherMark());
+      if (cashMode) modeBannerTitle.textContent = "Денежная игра";
       else modeBannerTitle.textContent = "Рейтинговый режим";
     }
     modeBanner.dataset.mode = cashMode ? "cash" : "play";
   }
-  if (homeGamesTitle) homeGamesTitle.textContent = cashMode ? "Cash-столы" : "Рейтинговые столы";
+  if (homeGamesTitle) homeGamesTitle.textContent = "Техасский холдем";
   if (publicGamesTitle) publicGamesTitle.textContent = cashMode ? "Cash-столы" : "Рейтинговые столы";
   if (privateGamesTitle) privateGamesTitle.textContent = cashMode ? "Приватные cash-столы" : "Приватные рейтинговые столы";
   if (walletWithdrawButton) walletWithdrawButton.disabled = !cashMode;
@@ -817,8 +846,24 @@ function renderModeContext() {
 
 function renderLimitOptions() {
   const limits = currentLimits();
-  for (const container of [limitPills, tableLimitPills]) {
-    if (!container) continue;
+  if (state.gameMode === "cash") {
+    state.homeSelectedSmallBlinds = normalizeHomeSelectedBlinds(state.homeSelectedSmallBlinds);
+  }
+  if (limitPills) {
+    limitPills.hidden = state.gameMode === "play";
+    limitPills.replaceChildren(...limits.map((limit) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.smallBlind = String(limit.smallBlind);
+      button.classList.toggle("active", state.homeSelectedSmallBlinds.includes(Number(limit.smallBlind)));
+      button.classList.toggle("last-active", Number(limit.smallBlind) === Number(state.selectedSmallBlind));
+      renderLimitValue(button, limit.smallBlind, limit.bigBlind, state.gameMode === "cash");
+      return button;
+    }));
+  }
+  if (tableLimitPills) {
+    tableLimitPills.hidden = state.gameMode === "play";
+    const container = tableLimitPills;
     container.replaceChildren(...limits.map((limit) => {
       const button = document.createElement("button");
       button.type = "button";
@@ -1260,19 +1305,19 @@ function renderCashier(cashier) {
     renderModeBalance();
     renderHomeCta();
   }
-  if (cashierAssetLabel) cashierAssetLabel.textContent = cashMode ? "Баланс USDT" : "Игровые фишки";
+  if (cashierAssetLabel) cashierAssetLabel.textContent = cashMode ? "Баланс $" : "Игровые фишки";
   if (cashierTopupTitle) cashierTopupTitle.textContent = cashMode ? "Пополнить баланс" : "Тестовый баланс";
-  if (cashierDepositNetwork) cashierDepositNetwork.textContent = cashMode ? "USDT" : "DEV";
+  if (cashierDepositNetwork) cashierDepositNetwork.textContent = cashMode ? "$" : "DEV";
   if (cashierAmountAsset) {
-    if (cashMode) cashierAmountAsset.replaceChildren(createTetherMark());
+    if (cashMode) cashierAmountAsset.textContent = "$";
     else cashierAmountAsset.textContent = "₽";
   }
   if (cashierNote) {
     cashierNote.textContent = cashMode
-      ? "Введите сумму в USDT, выберите способ оплаты и откройте счет. Баланс пополнится после подтверждения платежа."
+      ? "Введите сумму в $, выберите способ оплаты и откройте счет. Баланс пополнится после подтверждения платежа."
       : "Игровые фишки используются только в игровом режиме и не выводятся. Тестовое начисление доступно только в режиме разработчика.";
   }
-  if (cashierWithdrawTitle) cashierWithdrawTitle.textContent = cashMode ? "Вывод USDT пока закрыт" : "У игровых фишек нет вывода";
+  if (cashierWithdrawTitle) cashierWithdrawTitle.textContent = cashMode ? "Вывод $ пока закрыт" : "У игровых фишек нет вывода";
   if (cashierWithdrawText) {
     cashierWithdrawText.textContent = cashMode
       ? "Сначала запускаем честную экономику пополнений, открытые столы и историю операций. Методы вывода добавим после отдельной настройки правил и комиссий."
@@ -1325,7 +1370,7 @@ function renderCashierControls(deposit) {
     button.type = "button";
     button.dataset.rubAmount = String(amount);
     if (playDemo) button.textContent = `${formatChips(amount)} ₽`;
-    else button.replaceChildren(String(amount), " ", createTetherMark());
+    else button.textContent = `$${Number(amount).toFixed(2)}`;
     return button;
   }));
 
@@ -1364,7 +1409,7 @@ function syncCashierQuote() {
   if (!cashierState.demoTopup) updateCashierMethodCopy(cashierState.selectedMethod);
   if (cashierQuoteChips) {
     if (cashierState.demoTopup) cashierQuoteChips.textContent = `${formatChips(quote.chips)} фишек`;
-    else cashierQuoteChips.replaceChildren(Number(quote.usdtAmount).toFixed(2), " ", createTetherMark());
+    else cashierQuoteChips.textContent = `$${Number(quote.usdtAmount).toFixed(2)}`;
   }
   if (cashierQuoteStars) {
     if (cashierState.demoTopup) {
@@ -1374,7 +1419,7 @@ function syncCashierQuote() {
     } else if (cashierState.selectedMethod === "ton") {
       cashierQuoteStars.textContent = `${Number(quote.cryptoAmount || 0).toFixed(6)} TON`;
     } else {
-      cashierQuoteStars.replaceChildren(Number(quote.usdtAmount || 0).toFixed(2), " ", createTetherMark());
+      cashierQuoteStars.textContent = `$${Number(quote.usdtAmount || 0).toFixed(2)}`;
     }
   }
   if (!cashierPayButton) return;
@@ -1393,22 +1438,22 @@ function updateCashierMethodCopy(method) {
   if (cashierDepositNetwork) cashierDepositNetwork.textContent = paymentMethodTitleShort(method);
   if (!cashierNote) return;
   if (method === "stars") {
-    cashierNote.textContent = "Оплата пройдет через Telegram Stars. Баланс USDT начислится после успешного платежа в Telegram.";
+    cashierNote.textContent = "Оплата пройдет через Telegram Stars. Баланс $ начислится после успешного платежа в Telegram.";
     return;
   }
   if (method === "cryptobot") {
-    cashierNote.textContent = "Откроется счет Crypto Bot. После оплаты webhook подтвердит платеж и зачислит USDT на баланс.";
+    cashierNote.textContent = "Откроется счет Crypto Bot. После оплаты webhook подтвердит платеж и зачислит $ на баланс.";
     return;
   }
   if (method === "xrocket") {
-    cashierNote.textContent = "Откроется счет xRocket. USDT зачисляются только после подтверждения платежа провайдером.";
+    cashierNote.textContent = "Откроется счет xRocket. $ зачисляются только после подтверждения платежа провайдером.";
     return;
   }
   if (method === "ton") {
-    cashierNote.textContent = "Счет TON фиксирует сумму перевода. USDT поступят на баланс после подтверждения сети.";
+    cashierNote.textContent = "Счет TON фиксирует сумму перевода. $ поступят на баланс после подтверждения сети.";
     return;
   }
-  cashierNote.textContent = "Введите сумму в USDT, выберите способ оплаты и откройте счет.";
+  cashierNote.textContent = "Введите сумму в $, выберите способ оплаты и откройте счет.";
 }
 
 function paymentMethodTitleShort(method) {
@@ -1416,7 +1461,7 @@ function paymentMethodTitleShort(method) {
   if (method === "cryptobot") return "Crypto Bot";
   if (method === "xrocket") return "xRocket";
   if (method === "ton") return "TON";
-  return "USDT";
+  return "$";
 }
 
 function cashierQuote() {
@@ -1502,7 +1547,6 @@ function renderCashierHistory(transactions, cashMode = false) {
 
     const amount = document.createElement("b");
     amount.append(`${transaction.type === "credit" ? "+" : "-"}${cashMode ? formatUsdtDisplay(transaction.amount) : formatChips(transaction.amount)}`);
-    if (cashMode) amount.append(" ", createTetherMark());
 
     row.append(main, amount);
     cashierHistory.append(row);
@@ -1604,7 +1648,7 @@ function renderCryptoPaymentInstructions(order) {
   const comment = order.payload ? `\nКомментарий: ${order.payload}` : "";
   cashierStatus.textContent = [
     `Счёт TON создан: ${Number(order.cryptoAmount || 0).toFixed(6)} ${order.asset}.`,
-    `${Number(order.usdtAmount || 0).toFixed(2)} USDT будут начислены только после подтверждения сети.`,
+    `$${Number(order.usdtAmount || 0).toFixed(2)} будут начислены только после подтверждения сети.`,
     address,
     comment
   ].join("").trim();
@@ -1624,7 +1668,7 @@ async function openStarsInvoice(order) {
         const confirmed = await waitForPaymentConfirmation(order);
         if (confirmed) {
           cashierStatus.textContent = "Баланс пополнен";
-          showStatus(`Баланс пополнен на ${Number(order.usdtAmount || 0).toFixed(2)} USDT`);
+          showStatus(`Баланс пополнен на $${Number(order.usdtAmount || 0).toFixed(2)}`);
           haptic("success");
           return;
         }
@@ -1705,9 +1749,9 @@ function renderProfile(profileData) {
   const ratingPointsText = `${formatNumber(profile.ratingPoints || 1000)} RP`;
   const cashRankText = MINIMAL_LAUNCH ? "Cash" : cashLevelLabel(profile);
   if (lobbyRank) lobbyRank.textContent = cashRankText;
-  profileBalance.replaceChildren(`${formatUsdtDisplay(profileData.cashBalanceMicros || 0)} `, createTetherMark(), ` · ${formatChips(profileData.balance)} фишек`);
+  profileBalance.replaceChildren(`${formatUsdtDisplay(profileData.cashBalanceMicros || 0)} · ${formatChips(profileData.balance)} фишек`);
   profileChips.textContent = formatChips(profileData.balance);
-  profileTableStack.replaceChildren(`${formatUsdtDisplay(profileData.cashTableStackMicros || 0)} `, createTetherMark());
+  profileTableStack.textContent = formatUsdtDisplay(profileData.cashTableStackMicros || 0);
   profileSavedStack.textContent = formatChips(profileData.savedStack);
   lobbyTableStack.textContent = formatChips(profileData.tableStack);
   lobbyActiveTables.textContent = String(profileData.activeTableCount || 0);
@@ -1758,8 +1802,8 @@ function renderHomeWalletSide(profileData = {}) {
     if (MINIMAL_LAUNCH) {
       const tableStack = Number(profileData.cashTableStackMicros || 0);
       homeWalletSideValue.textContent = formatUsdtDisplay(tableStack);
-      homeWalletSideCurrency.hidden = false;
-      homeWalletSideCurrency.replaceChildren(createTetherMark("tether-mark--mini"));
+      homeWalletSideCurrency.hidden = true;
+      homeWalletSideCurrency.replaceChildren();
       homeWalletSideHint.textContent = tableStack > 0 ? "в игре" : "нет активных";
       if (homeWalletSideMeter) homeWalletSideMeter.style.width = tableStack > 0 ? "100%" : "8%";
     } else {
@@ -1907,8 +1951,8 @@ function renderProfileTournamentStats(profileData = {}) {
       ["ITM", formatNumber(stats.itm)],
       ["Финалки", formatNumber(stats.finalTables)],
       ["Победы", formatNumber(stats.wins)],
-      ["Fee cash", `${formatUsdt(stats.cashFeesPaidMicros)} USDT`],
-      ["Призы cash", `${formatUsdt(stats.cashPrizeWonMicros)} USDT`]
+      ["Fee cash", formatUsdtDisplay(stats.cashFeesPaidMicros)],
+      ["Призы cash", formatUsdtDisplay(stats.cashPrizeWonMicros)]
     ];
     items.forEach(([label, value]) => {
       const item = document.createElement("div");
@@ -1970,7 +2014,7 @@ function tournamentStatusLabel(status) {
 }
 
 function formatTournamentAmountText(value, balanceBucket) {
-  return `${formatUsdt(value)} USDT`;
+  return formatUsdtDisplay(value);
 }
 
 function formatTournamentStartLabel(tournament) {
@@ -2237,7 +2281,7 @@ function renderAdminTournamentControls(tournaments, rewardTournaments) {
         card.innerHTML = `
           <div class="admin-tournament-head">
             <div>
-              <span>${escapeHtml(tournamentTypeLabel(tournament.type))} · USDT</span>
+              <span>${escapeHtml(tournamentTypeLabel(tournament.type))} · $</span>
               <strong>${escapeHtml(tournament.title)}</strong>
               <small>${escapeHtml(tournamentStatusLabel(tournament.status))} · ${escapeHtml(formatDateTime(tournament.startsAt) || "без даты")} · ${tournament.participants}/${tournament.maxPlayers}</small>
             </div>
@@ -3290,8 +3334,8 @@ function renderHomeCta() {
     return;
   }
 
-  if (quickPlayTitle) quickPlayTitle.textContent = cashMode ? "Начать игру USDT" : "Начать игру";
-  else quickPlayButton.textContent = cashMode ? "Начать игру USDT" : "Начать игру";
+  if (quickPlayTitle) quickPlayTitle.textContent = cashMode ? "Начать игру $" : "Начать игру";
+  else quickPlayButton.textContent = cashMode ? "Начать игру $" : "Начать игру";
   renderHomeOfferMeta(limit, balance, "balance", cashMode);
   if (balance < minBuyIn && cashMode) {
     quickPlayHint.replaceChildren("Баланс ниже минимального бай-ина ");
@@ -3327,14 +3371,24 @@ function onLimitSelect(event) {
 
   haptic("selection");
   state.selectedSmallBlind = Number(button.dataset.smallBlind);
+  if (button.closest("#limitPills") && state.gameMode === "cash") {
+    state.homeSelectedSmallBlinds = normalizeHomeSelectedBlinds([...state.homeSelectedSmallBlinds, state.selectedSmallBlind]);
+  }
   createTableForm.elements.smallBlind.value = String(state.selectedSmallBlind);
   syncLimitSelection();
+  renderLimitOptions();
   renderTables();
 }
 
 function syncLimitSelection() {
   document.querySelectorAll("[data-small-blind]").forEach((item) => {
-    item.classList.toggle("active", Number(item.dataset.smallBlind) === state.selectedSmallBlind);
+    const blind = Number(item.dataset.smallBlind);
+    const isHome = Boolean(item.closest("#limitPills"));
+    const isActive = state.gameMode === "cash" && isHome
+      ? state.homeSelectedSmallBlinds.includes(blind)
+      : blind === state.selectedSmallBlind;
+    item.classList.toggle("active", isActive);
+    item.classList.toggle("last-active", blind === state.selectedSmallBlind);
   });
   if (tablesFilterStatus) {
     const limit = currentLimits().find((item) => Number(item.smallBlind) === state.selectedSmallBlind);
@@ -3343,7 +3397,7 @@ function syncLimitSelection() {
       tablesFilterStatus.append(" · cash");
     } else {
       tablesFilterStatus.textContent = limit
-        ? `${formatLimit(limit)} · play`
+        ? formatLimit(limit)
         : formatGameLimit(state.selectedSmallBlind, state.selectedSmallBlind * 2);
     }
   }
@@ -3745,7 +3799,7 @@ function renderTournaments() {
           <div class="tournament-card-head">
             <div class="tournament-card-copy">
               <strong>${escapeHtml(tournament.title)}</strong>
-              <small>${escapeHtml(tournamentTypeLabel(tournament.type))} · <span>USDT</span></small>
+              <small>${escapeHtml(tournamentTypeLabel(tournament.type))} · <span>$</span></small>
             </div>
             <b class="tournament-status-pill" data-state="${badge.state}">${escapeHtml(badge.text)}</b>
           </div>
@@ -3973,8 +4027,8 @@ function renderTournamentDetails(tournament) {
   ];
   const playerNote = tournamentPlayerNote(tournament);
   const description = /play[\s_-]*chips?|фишк/i.test(String(tournament.description || ""))
-    ? "Cash-турнир с регистрацией в USDT."
-    : tournament.description || "Cash-турнир с регистрацией в USDT.";
+    ? "Cash-турнир с регистрацией в $."
+    : tournament.description || "Cash-турнир с регистрацией в $.";
   tournamentDetailTitle.textContent = tournament.title || "Турнир";
   tournamentDetailBadge.dataset.state = badge.state;
   tournamentDetailBadge.textContent = badge.text;
@@ -4083,20 +4137,33 @@ async function openTournamentTable(tableId) {
 function renderTables() {
   syncLimitSelection();
   const selectedBlind = Number(state.selectedSmallBlind);
-  const publicTables = state.tables.filter((table) => !table.isPrivate && (table.gameMode || "play") === state.gameMode && Number(table.smallBlind) === selectedBlind);
-  const privateTables = state.tables.filter((table) => table.isPrivate && (table.gameMode || "play") === state.gameMode && Number(table.smallBlind) === selectedBlind);
+  const tableBlind = state.gameMode === "play" ? RATING_FIXED_SMALL_BLIND : selectedBlind;
+  const homeBlinds = state.gameMode === "cash"
+    ? normalizeHomeSelectedBlinds(state.homeSelectedSmallBlinds)
+    : [RATING_FIXED_SMALL_BLIND];
+  const publicTables = state.tables.filter((table) => !table.isPrivate && (table.gameMode || "play") === state.gameMode && Number(table.smallBlind) === tableBlind);
+  const privateTables = state.tables.filter((table) => table.isPrivate && (table.gameMode || "play") === state.gameMode && Number(table.smallBlind) === tableBlind);
+  const homePublicTables = state.tables.filter((table) => !table.isPrivate && (table.gameMode || "play") === state.gameMode && homeBlinds.includes(Number(table.smallBlind)));
   const availablePublicTables = publicTables.filter((table) => table.seats.length < table.maxPlayers);
-  onlineStatus.textContent = `${availablePublicTables.length} ${plural(availablePublicTables.length, "стол", "стола", "столов")}`;
+  const availableHomeTables = homePublicTables.filter((table) => table.seats.length < table.maxPlayers);
+  onlineStatus.textContent = state.gameMode === "play"
+    ? `${availableHomeTables.length} ${plural(availableHomeTables.length, "стол", "стола", "столов")} · 100/200`
+    : `${availableHomeTables.length} ${plural(availableHomeTables.length, "стол", "стола", "столов")}`;
   publicTablesStatus.textContent = `${publicTables.length} ${plural(publicTables.length, "стол", "стола", "столов")}`;
   privateTablesStatus.textContent = `${privateTables.length} ${plural(privateTables.length, "стол", "стола", "столов")}`;
   renderContinueCard();
-  const limitText = formatGameLimit(selectedBlind, Number(currentLimits().find((item) => Number(item.smallBlind) === selectedBlind)?.bigBlind || selectedBlind * 2));
-  renderTableList(homeTableList, availablePublicTables.slice(0, 2), `На лимите ${limitText} сейчас нет свободных столов.`);
+  const limitText = state.gameMode === "play"
+    ? `${RATING_FIXED_SMALL_BLIND}/${RATING_FIXED_BIG_BLIND}`
+    : formatGameLimit(selectedBlind, Number(currentLimits().find((item) => Number(item.smallBlind) === selectedBlind)?.bigBlind || selectedBlind * 2));
+  const homeEmpty = state.gameMode === "play"
+    ? "Рейтинговых столов 100/200 сейчас нет. Скоро добавим 9 max."
+    : `На выбранных лимитах сейчас нет свободных столов.`;
+  renderTableList(homeTableList, availableHomeTables, homeEmpty, { home: true });
   renderTableList(publicTableList, publicTables, `На лимите ${limitText} свободных общих столов пока нет.`);
   renderTableList(privateTableList, privateTables, `Приватных столов ${limitText} пока нет. Создай игру для друзей.`);
 }
 
-function renderTableList(container, tables, emptyText) {
+function renderTableList(container, tables, emptyText, options = {}) {
   container.replaceChildren();
 
   if (!tables.length) {
@@ -4109,31 +4176,79 @@ function renderTableList(container, tables, emptyText) {
 
   for (const table of tables) {
     const node = tableItemTemplate.content.cloneNode(true);
+    const article = node.querySelector(".table-item");
     const isFull = table.seats.length >= table.maxPlayers;
     const isActive = table.status !== "waiting" && table.status !== "starting";
     const statusText = isFull ? "занят" : isActive ? "идёт" : "свободно";
     const avatar = node.querySelector('[data-field="avatar"]');
     avatar.textContent = table.isPrivate ? "🔒" : "♠";
     avatar.classList.toggle("private", Boolean(table.isPrivate));
-    node.querySelector('[data-field="name"]').textContent = table.name;
+    const tableNumber = table.name?.match(/#\s*([0-9]+)/)?.[1]
+      || String((tables.indexOf(table) || 0) + 1);
+    node.querySelector('[data-field="name"]').textContent = `#${tableNumber}`;
     const status = node.querySelector('[data-field="status"]');
     status.textContent = statusText;
     status.dataset.status = isFull ? "full" : isActive ? "live" : "open";
     const meta = node.querySelector('[data-field="meta"]');
     if (table.gameMode === "cash") {
-      renderLimitValue(meta, table.smallBlind, table.bigBlind, true);
-      meta.append(` · бай-ин ${formatUsdtDisplay(table.minBuyIn || table.bigBlind * 50)}-${formatUsdtDisplay(table.maxBuyIn || table.bigBlind * 250)} USDT`);
-      meta.append(` · ${table.seats.length}/${table.maxPlayers} игроков${table.isPrivate ? " · приватный" : ""}`);
+      meta.replaceChildren(
+        tableColumn(`${formatUsdtDisplay(table.smallBlind)}\n${formatUsdtDisplay(table.bigBlind)}`, "blinds"),
+        tableColumn(`${formatUsdtDisplay(table.minBuyIn || table.bigBlind * 50)}\n${formatUsdtDisplay(table.maxBuyIn || table.bigBlind * 250)}`, "buyin"),
+        tableColumn(`${table.seats.length}/${table.maxPlayers}`, "players")
+      );
     } else {
-      meta.textContent = `${formatTableLimit(table)} · ${table.seats.length}/${table.maxPlayers} игроков${table.isPrivate ? " · приватный" : ""}`;
+      meta.replaceChildren(
+        tableColumn(`${table.smallBlind}\n${table.bigBlind}`, "blinds"),
+        tableColumn("5000\n20000", "buyin"),
+        tableColumn(`${table.seats.length}/${table.maxPlayers}`, "players")
+      );
     }
     const button = node.querySelector('[data-action="join"]');
     const isViewerSeated = Boolean(table.viewer?.isSeated);
     button.textContent = isViewerSeated ? "За стол" : isFull ? "Заполнен" : "Войти";
     button.disabled = isFull && !isViewerSeated;
-    button.addEventListener("click", () => joinTable(table.id));
+    button.addEventListener("click", () => {
+      if (options.home && consumeFooterCancelledClick(button)) return;
+      joinTable(table.id);
+    });
+    if (options.home && article) {
+      article.tabIndex = 0;
+      article.dataset.tableId = table.id;
+      article.dataset.joinable = button.disabled ? "0" : "1";
+      article.addEventListener("click", (event) => {
+        if (event.target.closest('[data-action="join"]')) return;
+        if (button.disabled || consumeFooterCancelledClick(article)) return;
+        joinTable(table.id);
+      });
+      article.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        if (!button.disabled) joinTable(table.id);
+      });
+    }
     container.append(node);
   }
+}
+
+function tableColumn(value, type = "") {
+  const span = document.createElement("span");
+  span.className = ["table-column", type && `table-column--${type}`].filter(Boolean).join(" ");
+  if (type === "blinds" || type === "players") {
+    const icon = document.createElement("img");
+    icon.className = "table-column-icon";
+    icon.src = type === "blinds" ? "/assets/tables/flat.svg" : "/assets/tables/delmsgusers.svg";
+    icon.alt = "";
+    icon.setAttribute("aria-hidden", "true");
+    span.append(icon);
+  }
+  const valueNode = document.createElement("span");
+  valueNode.className = "table-column-value";
+  String(value).split("\n").forEach((line, index) => {
+    if (index) valueNode.append(document.createElement("br"));
+    valueNode.append(line);
+  });
+  span.append(valueNode);
+  return span;
 }
 
 function renderContinueCard() {
@@ -4236,8 +4351,7 @@ function openBuyInOverlay(intent) {
     renderLimitValue(buyInModeLabel, smallBlind, bigBlind, cashMode, { append: true });
     buyInModeLabel.append(" · ");
     if (cashMode) {
-      buyInModeLabel.append("USDT ");
-      buyInModeLabel.append(createTetherMark());
+      buyInModeLabel.append("$");
     } else {
       buyInModeLabel.append("фишки");
     }
@@ -5910,7 +6024,7 @@ function formatUsdt(value) {
 
 function formatUsdtDisplay(value) {
   const amount = Number(value || 0);
-  return `${amount < 0 ? "-" : ""}${formatUsdt(Math.abs(amount))}`;
+  return `${amount < 0 ? "-" : ""}$${formatUsdt(Math.abs(amount))}`;
 }
 
 function formatUsdtInput(value) {
@@ -5937,7 +6051,7 @@ function formatPercent(value) {
 }
 
 function formatModeAmount(value, cashMode) {
-  return cashMode ? `${formatUsdtDisplay(value)} USDT` : `${formatChips(value)} фишек`;
+  return cashMode ? formatUsdtDisplay(value) : `${formatChips(value)} фишек`;
 }
 
 function formatGameAmount(value) {
@@ -5946,7 +6060,7 @@ function formatGameAmount(value) {
 
 function formatGameLimit(smallBlind, bigBlind, cashMode = state.gameMode === "cash") {
   return cashMode
-    ? `${formatUsdtDisplay(smallBlind)}/${formatUsdtDisplay(bigBlind)} USDT`
+    ? `${formatUsdtDisplay(smallBlind)}/${formatUsdtDisplay(bigBlind)}`
     : `${formatChips(smallBlind)}/${formatChips(bigBlind)}`;
 }
 
@@ -5962,21 +6076,10 @@ function formatTableAmount(table, value) {
   return formatModeAmount(value, table?.gameMode === "cash");
 }
 
-function createTetherMark(className = "") {
-  const namespace = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(namespace, "svg");
-  svg.classList.add("tether-mark");
-  if (className) svg.classList.add(className);
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("aria-label", "USDT");
-  svg.innerHTML = '<circle cx="12" cy="12" r="12"/><path d="M13.55 10.18V8.56h3.8V6H6.65v2.56h3.8v1.62C7.36 10.34 5 10.96 5 11.71c0 .75 2.36 1.37 5.45 1.53V18h3.1v-4.76c3.09-.16 5.45-.78 5.45-1.53 0-.75-2.36-1.37-5.45-1.53Zm0 2.07v-.01c-.49.03-1 .04-1.55.04s-1.06-.01-1.55-.04v.01c-2.21-.12-3.87-.51-3.87-.98 0-.39 1.18-.73 2.91-.9v.86c.78.07 1.63.11 2.51.11.88 0 1.73-.04 2.51-.11v-.86c1.73.17 2.91.51 2.91.9 0 .47-1.66.86-3.87.98Z"/>';
-  return svg;
-}
-
 function renderMoneyValue(node, value, cashMode, { append = false } = {}) {
   if (!node) return;
   const contents = cashMode
-    ? [formatUsdtDisplay(value), " ", createTetherMark()]
+    ? [formatUsdtDisplay(value)]
     : [`${formatChips(value)} фишек`];
   if (append) node.append(...contents);
   else node.replaceChildren(...contents);
@@ -5985,7 +6088,7 @@ function renderMoneyValue(node, value, cashMode, { append = false } = {}) {
 function renderLimitValue(node, smallBlind, bigBlind, cashMode, { append = false } = {}) {
   if (!node) return;
   const contents = cashMode
-    ? [`${formatUsdt(smallBlind)}/${formatUsdt(bigBlind)}`]
+    ? [`${formatUsdtDisplay(smallBlind)}/${formatUsdtDisplay(bigBlind)}`]
     : [`${formatChips(smallBlind)}/${formatChips(bigBlind)}`];
   if (append) node.append(...contents);
   else node.replaceChildren(...contents);
@@ -5994,8 +6097,7 @@ function renderLimitValue(node, smallBlind, bigBlind, cashMode, { append = false
 function renderHomeOfferMeta(limit, value, kind, cashMode) {
   if (!homeOfferMeta) return;
   if (!cashMode) {
-    const descriptor = kind === "entry" ? "вход от" : "баланс";
-    homeOfferMeta.textContent = `${formatLimit(limit)} · игровые фишки · ${descriptor} ${formatGameAmount(value)}`;
+    homeOfferMeta.textContent = `${RATING_FIXED_SMALL_BLIND}/${RATING_FIXED_BIG_BLIND} · 9 max · daily claim 35 000 фишек`;
     return;
   }
   renderLimitValue(homeOfferMeta, limit.smallBlind, limit.bigBlind, true);
@@ -6006,7 +6108,7 @@ function renderHomeOfferMeta(limit, value, kind, cashMode) {
 function renderTableValue(node, table, value, { append = false } = {}) {
   if (!node) return;
   const contents = table?.gameMode === "cash"
-    ? [formatUsdtDisplay(value), " ", createTetherMark()]
+    ? [formatUsdtDisplay(value)]
     : [formatChips(value)];
   if (append) node.append(...contents);
   else node.replaceChildren(...contents);

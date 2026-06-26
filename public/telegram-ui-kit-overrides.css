@@ -1152,7 +1152,7 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-value {
   min-width: 0 !important;
   grid-column: 3 !important;
   overflow: hidden !important;
-  color: var(--tg-hint, rgba(235, 235, 245, .58)) !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 30%, transparent) !important;
   font-size: 17px !important;
   font-weight: 400 !important;
   line-height: 1.12 !important;
@@ -1170,7 +1170,7 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-row--terms
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-chevron {
   justify-self: end !important;
   grid-column: 4 !important;
-  color: color-mix(in srgb, var(--tg-hint, rgba(235, 235, 245, .58)) 72%, #fff 16%) !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 26%, transparent) !important;
   font-size: 34px !important;
   font-weight: 300 !important;
   line-height: .8 !important;
@@ -1201,11 +1201,492 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-games .table-limit
   font-weight: 700 !important;
 }
 
+/* 2026-06-28: table lobby block aligned with Telegram footer rows. */
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-games {
+  padding: 18px 14px 14px !important;
+  gap: 14px !important;
+  border-radius: 26px !important;
+  background: var(--qwz-card-bg, var(--tg-surface, #202b36)) !important;
+  background-color: var(--qwz-card-bg, var(--tg-surface, #202b36)) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-games .section-title {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin: 0 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-games .section-title .eyebrow {
+  display: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-games .section-title h2 {
+  margin: 0 !important;
+  color: var(--tg-text, #fff) !important;
+  font-size: 21px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.018em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-games .section-title span {
+  color: var(--tg-hint, rgba(235, 235, 245, .58)) !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-limit-pills[hidden],
+html.minimal-launch:not(.admin-mode) body[data-game-mode="play"]:not(.in-game) .home-limit-pills,
+html.minimal-launch:not(.admin-mode) body[data-game-mode="play"]:not(.in-game) .table-limit-pills {
+  display: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-limit-pills {
+  display: flex !important;
+  gap: 8px !important;
+  padding: 2px 0 !important;
+  margin: 0 !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-limit-pills::-webkit-scrollbar {
+  display: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-limit-pills button {
+  flex: 0 0 auto !important;
+  min-width: 72px !important;
+  min-height: 34px !important;
+  height: 34px !important;
+  padding: 0 14px !important;
+  border: 0 !important;
+  border-radius: 17px !important;
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 78%, #fff 16%) !important;
+  color: var(--tg-hint, rgba(235, 235, 245, .58)) !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-limit-pills button.active {
+  background: color-mix(in srgb, var(--tg-button, #2aabee) 88%, #fff 8%) !important;
+  color: var(--tg-button-text, #fff) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-limit-pills button.last-active {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list {
+  display: grid !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border-radius: 22px !important;
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 90%, #000 4%) !important;
+  background-color: color-mix(in srgb, var(--tg-surface, #202b36) 90%, #000 4%) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item {
+  position: relative !important;
+  isolation: isolate !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 18px !important;
+  gap: 12px !important;
+  align-items: center !important;
+  min-height: 68px !important;
+  padding: 12px 14px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+  transform: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: -1 !important;
+  background: rgba(255, 255, 255, .08) !important;
+  opacity: 0 !important;
+  transition: opacity 120ms ease !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item:active,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item.is-pressing {
+  transform: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item:active::before,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item.is-pressing::before {
+  opacity: 1 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item:first-child::before {
+  border-radius: 22px 22px 0 0 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item:last-child::before {
+  border-radius: 0 0 22px 22px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item:first-child:last-child::before {
+  border-radius: 22px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item + .table-item::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 14px !important;
+  right: 14px !important;
+  height: 1px !important;
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 68%, #fff 18%) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-avatar {
+  display: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-summary {
+  min-width: 0 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-summary strong {
+  color: var(--tg-text, #fff) !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-summary > span,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-summary .table-row + span {
+  display: block !important;
+  margin-top: 7px !important;
+  color: var(--tg-hint, rgba(235, 235, 245, .58)) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1.18 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-row small {
+  display: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item > button {
+  grid-column: 2 !important;
+  justify-self: end !important;
+  align-self: center !important;
+  width: 18px !important;
+  min-width: 18px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item > button::after {
+  content: "›" !important;
+  color: color-mix(in srgb, var(--tg-hint, rgba(235, 235, 245, .58)) 72%, #fff 16%) !important;
+  font-size: 34px !important;
+  font-weight: 300 !important;
+  line-height: .8 !important;
+  text-indent: 0 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-offer-meta {
+  display: block !important;
+  color: var(--tg-hint, rgba(235, 235, 245, .58)) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+/* 2026-06-28: compact TonPoker-like table rows. */
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-games {
+  padding: 17px 14px 14px !important;
+  gap: 12px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-games .section-title h2 {
+  max-width: 190px !important;
+  font-size: 26px !important;
+  line-height: 1.08 !important;
+  letter-spacing: -0.035em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-games .section-title span {
+  max-width: 130px !important;
+  text-align: left !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 46%, transparent) !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  line-height: 1.12 !important;
+  letter-spacing: -0.02em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list {
+  gap: 8px !important;
+  overflow: visible !important;
+  border-radius: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item {
+  grid-template-columns: minmax(0, 1fr) 16px !important;
+  min-height: 58px !important;
+  padding: 10px 13px 10px 15px !important;
+  border-radius: 19px !important;
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 84%, #fff 12%) !important;
+  background-color: color-mix(in srgb, var(--tg-surface, #202b36) 84%, #fff 12%) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item::before {
+  border-radius: inherit !important;
+  background: rgba(0, 0, 0, .18) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item:first-child::before,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item:last-child::before,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item:first-child:last-child::before {
+  border-radius: inherit !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item + .table-item::after {
+  display: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item:first-child,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item:first-child::before,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item:first-child::after {
+  border-top: 0 !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-summary {
+  display: grid !important;
+  grid-template-columns: 38px minmax(0, 1fr) !important;
+  column-gap: 12px !important;
+  align-items: center !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-row {
+  display: block !important;
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  align-self: center !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  padding: 0 !important;
+  min-width: 0 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-summary strong {
+  display: block !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 42%, transparent) !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.025em !important;
+  line-height: 1 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-summary > span,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-summary .table-row + span {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  align-self: center !important;
+  display: grid !important;
+  grid-template-columns: 1fr 1.22fr .72fr !important;
+  gap: 10px !important;
+  align-items: center !important;
+  margin: 0 !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 52%, transparent) !important;
+  font-size: 14px !important;
+  font-weight: 650 !important;
+  line-height: 1.08 !important;
+  letter-spacing: -0.018em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column {
+  display: block !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--buyin {
+  text-align: left !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--players {
+  text-align: right !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item > button {
+  width: 16px !important;
+  min-width: 16px !important;
+  height: 28px !important;
+  position: relative !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item > button::after {
+  content: "" !important;
+  display: block !important;
+  width: 9px !important;
+  height: 9px !important;
+  border-top: 2.2px solid color-mix(in srgb, var(--tg-text, #fff) 34%, transparent) !important;
+  border-right: 2.2px solid color-mix(in srgb, var(--tg-text, #fff) 34%, transparent) !important;
+  transform: rotate(45deg) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-chevron {
+  position: relative !important;
+  width: 16px !important;
+  height: 22px !important;
+  overflow: hidden !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-chevron::before {
+  content: "" !important;
+  position: absolute !important;
+  top: 50% !important;
+  right: 2px !important;
+  width: 10px !important;
+  height: 10px !important;
+  border-top: 2.2px solid color-mix(in srgb, var(--tg-text, #fff) 26%, transparent) !important;
+  border-right: 2.2px solid color-mix(in srgb, var(--tg-text, #fff) 26%, transparent) !important;
+  transform: translateY(-50%) rotate(45deg) !important;
+}
+
 /* 2026-06-27: use SF Pro everywhere. */
 :root {
   --qwz-font: "SF Pro Text", "SF Pro Display", "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
   --qwz-ui-font: var(--qwz-font);
   --tg-font: var(--qwz-font);
+}
+
+/* 2026-06-28: table rows final pass with icons and clean chevrons. */
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-games .section-title {
+  border: 0 !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+  padding-bottom: 0 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-games .section-title::before,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-games .section-title::after {
+  display: none !important;
+  content: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-games .home-offer-meta,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-game-actions {
+  display: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item {
+  grid-template-columns: minmax(0, 1fr) 18px !important;
+  min-height: 58px !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-summary {
+  grid-template-columns: 38px minmax(0, 1fr) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-summary > span,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-summary .table-row + span {
+  grid-template-columns: 1.18fr .96fr .78fr !important;
+  gap: 12px !important;
+  color: var(--tg-text, #fff) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-items: center !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+  color: #fff !important;
+  line-height: 1 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--buyin {
+  justify-content: center !important;
+  text-align: center !important;
+  transform: translateX(-6px) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--players {
+  justify-content: flex-end !important;
+  text-align: right !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column-icon {
+  display: block !important;
+  flex: 0 0 auto !important;
+  width: 22px !important;
+  height: 22px !important;
+  object-fit: contain !important;
+  filter: brightness(0) invert(1) !important;
+  opacity: 1 !important;
+  align-self: center !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--blinds .table-column-icon {
+  width: 24px !important;
+  height: 24px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--players .table-column-icon {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column-value {
+  display: block !important;
+  min-width: 0 !important;
+  color: #fff !important;
+  opacity: 1 !important;
+  line-height: 1 !important;
+  transform: translateY(-2px) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item > button::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 50% !important;
+  right: 2px !important;
+  display: block !important;
+  width: 10px !important;
+  height: 10px !important;
+  border-top: 2.2px solid color-mix(in srgb, var(--tg-text, #fff) 34%, transparent) !important;
+  border-right: 2.2px solid color-mix(in srgb, var(--tg-text, #fff) 34%, transparent) !important;
+  background: none !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  text-indent: 0 !important;
+  transform: translateY(-50%) rotate(45deg) !important;
 }
 
 html,

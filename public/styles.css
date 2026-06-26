@@ -7809,22 +7809,6 @@ body:not(.in-game) .bottom-nav button.active {
   background: var(--native-surface);
 }
 
-.tether-mark {
-  display: inline-block;
-  flex: 0 0 auto;
-  width: 17px;
-  height: 17px;
-  vertical-align: -3px;
-}
-
-.tether-mark circle {
-  fill: #26a17b;
-}
-
-.tether-mark path {
-  fill: #fff;
-}
-
 .game-mode-switch button,
 .limit-pills button,
 .money-value,
@@ -7865,15 +7849,6 @@ body:not(.in-game) .bottom-nav button.active {
 
 .cashier-card .wallet-balance::after {
   display: none;
-}
-
-.tg-row-value .tether-mark,
-.limit-pills .tether-mark,
-.seat-meta .tether-mark,
-.bet-amount .tether-mark {
-  width: 14px;
-  height: 14px;
-  vertical-align: -2px;
 }
 
 .lobby-view.active {
@@ -7999,11 +7974,6 @@ body:not(.in-game) {
   color: var(--tg-hint);
   font-size: 16px;
   font-weight: 500;
-}
-
-.home-balance .tether-mark {
-  width: 20px;
-  height: 20px;
 }
 
 .home-wallet-actions {
@@ -8697,11 +8667,6 @@ body:not(.in-game) .training-switcher .game-mode-switch button:disabled {
   opacity: 0.46;
 }
 
-body:not(.in-game) .training-switcher .game-mode-switch .tether-mark {
-  width: 17px;
-  height: 17px;
-}
-
 body:not(.in-game) .product-mode-hub {
   display: grid;
   gap: 11px;
@@ -8799,11 +8764,6 @@ body:not(.in-game) .product-mode-segment button span {
   font-size: 15px;
   font-weight: 700;
   line-height: 1.1;
-}
-
-body:not(.in-game) .product-mode-segment .tether-mark {
-  width: 14px;
-  height: 14px;
 }
 
 .play-format-grid {
@@ -12318,11 +12278,6 @@ body:not(.in-game) .home-balance strong small {
   color: var(--qwz-ink-mute);
 }
 
-body:not(.in-game) .home-balance .tether-mark {
-  width: 18px;
-  height: 18px;
-}
-
 body:not(.in-game) .home-wallet-actions {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
@@ -13203,11 +13158,6 @@ body:not(.in-game) .product-mode-hub button strong {
 }
 body:not(.in-game) .product-mode-hub button small,
 body:not(.in-game) .product-mode-hub button .format-icon { display: none !important; }
-body:not(.in-game) .product-mode-hub button .tether-mark {
-  width: 12px !important;
-  height: 12px !important;
-}
-
 /* ---------- Tables block: open, no card-in-card, list rows ---------- */
 body:not(.in-game) .home-games {
   background: transparent !important;
@@ -14098,9 +14048,6 @@ body:not(.in-game) .game-mode-switch.product-mode-segment button.active {
   box-shadow: 0 4px 14px rgba(42, 171, 238, 0.3) !important;
 }
 body:not(.in-game) .game-mode-switch.product-mode-segment button small { display: none !important; }
-body:not(.in-game) .game-mode-switch.product-mode-segment button .tether-mark {
-  width: 14px !important; height: 14px !important;
-}
 /* secondary format pills, 3 equal, fit 390 */
 body:not(.in-game) .play-format-grid,
 body[data-game-mode="play"]:not(.in-game) .play-format-grid,
@@ -14367,11 +14314,6 @@ body:not(.in-game) .home-wallet-side small {
   color: var(--qwz-dim) !important;
 }
 
-body:not(.in-game) .home-wallet-side .tether-mark {
-  width: 16px !important;
-  height: 16px !important;
-}
-
 body:not(.in-game) .home-wallet-side[data-active="false"] {
   opacity: 0.9 !important;
 }
@@ -14389,16 +14331,6 @@ body:not(.in-game) .home-balance strong small {
   line-height: 0 !important;
   padding: 0 !important;
   min-width: 0 !important;
-}
-
-body:not(.in-game) .tether-mark--hero {
-  width: 22px !important;
-  height: 22px !important;
-}
-
-body:not(.in-game) .tether-mark--mini {
-  width: 16px !important;
-  height: 16px !important;
 }
 
 body:not(.in-game) .bottom-nav {
@@ -14698,11 +14630,6 @@ html.minimal-launch body:not(.in-game) .home-balance strong {
   font-weight: 500 !important;
   letter-spacing: -0.05em !important;
   line-height: 1 !important;
-}
-
-html.minimal-launch body:not(.in-game) .home-balance .tether-mark {
-  width: 26px !important;
-  height: 26px !important;
 }
 
 html.minimal-launch body:not(.in-game) .home-wallet-side {

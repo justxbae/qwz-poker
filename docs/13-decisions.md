@@ -1,5 +1,15 @@
 # QWZ Decisions
 
+## 2026-06-28: Cash UI uses dollar display instead of Tether mark
+
+**Зона:** product / frontend
+
+**Решение:** В пользовательском Mini App cash-баланс, ставки, бай-ины, турниры и касса отображаются через `$` перед числом без Tether-иконки и без текстового `USDT` в основных продуктовых экранах. Внутренние backend-поля, ledger/storage unit и админские технические подписи `USDT micros` остаются без переименования, потому что это контракт хранения и платежей.
+**Почему:** Для MVP нужен единый понятный денежный display, а конвертация/объяснение USDT → `$` будет оформляться отдельно в платежном flow.
+**Влияет на:** `public/app.js`, `public/index.html`, `public/styles.css`, lobby/cashier/profile/tournament UI.
+**Что обновлено:** Убран Tether visual marker из cash UI, денежные значения форматируются как `$0.00`, cache-bust обновлён.
+**Открытые вопросы:** Позже нужно отдельно оформить текст конвертации USDT → `$` в deposit flow и платежных инструкциях.
+
 ## 2026-06-26: Minimal Launch Mode и clean runtime export
 
 **Зона:** product / frontend / deploy
