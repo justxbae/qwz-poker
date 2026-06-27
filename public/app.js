@@ -1312,8 +1312,7 @@ function renderCashier(cashier) {
   if (cashierTopupTitle) cashierTopupTitle.textContent = cashMode ? "Пополнить баланс" : "Тестовый баланс";
   if (cashierDepositNetwork) cashierDepositNetwork.textContent = cashMode ? "$" : "DEV";
   if (cashierAmountAsset) {
-    if (cashMode) cashierAmountAsset.textContent = "$";
-    else cashierAmountAsset.textContent = "₽";
+    cashierAmountAsset.textContent = "$";
   }
   if (cashierNote) {
     cashierNote.textContent = cashMode
@@ -1360,20 +1359,25 @@ function renderCashierControls(deposit) {
   cashierRubAmount.placeholder = "";
   cashierRubAmount.min = String(playDemo ? (deposit.minRub || 100) : ((deposit.minUsdtMicros || 1_000_000) / 1_000_000));
   cashierRubAmount.max = String(playDemo ? (deposit.maxRub || 5000) : ((deposit.maxUsdtMicros || 5_000_000_000) / 1_000_000));
-  cashierRubAmount.step = playDemo ? "50" : "1";
-  cashierRubAmount.value = playDemo ? String(deposit.minRub || 100) : Number(5).toFixed(2);
+  cashierRubAmount.step = playDemo ? "0.01" : "0.01";
+  cashierRubAmount.value = Number(1).toFixed(2);
 
-  const methods = playDemo ? [] : (deposit.methods || []);
+  const methods = playDemo ? [
+    { id: "stars", enabled: true },
+    { id: "cryptobot", enabled: true },
+    { id: "xrocket", enabled: true },
+    { id: "ton", enabled: false }
+  ] : (deposit.methods || []);
   if (methods.length && !methods.some((method) => method.id === cashierState.selectedMethod && method.enabled)) {
     cashierState.selectedMethod = methods.find((method) => method.enabled)?.id || methods[0].id || "stars";
   }
 
-  cashierPresets.replaceChildren(...(playDemo ? (deposit.presetsRub || []) : (deposit.presetsUsdt || [])).map((amount) => {
+  const presetAmounts = [5, 10, 50, 100];
+  cashierPresets.replaceChildren(...presetAmounts.map((amount) => {
     const button = document.createElement("button");
     button.type = "button";
     button.dataset.rubAmount = String(amount);
-    if (playDemo) button.textContent = `${formatChips(amount)} ₽`;
-    else button.textContent = `$${Number(amount).toFixed(2)}`;
+    button.textContent = `$${Number(amount).toFixed(0)}`;
     return button;
   }));
 
@@ -1383,7 +1387,7 @@ function renderCashierControls(deposit) {
     button.dataset.method = method.id;
     button.disabled = !method.enabled;
     button.className = method.id === cashierState.selectedMethod ? "active" : "";
-    button.innerHTML = `<strong>${method.title}</strong><span>${method.speed}</span>`;
+    button.innerHTML = `<strong>${paymentMethodTitleShort(method.id)}</strong><span>${method.speed || ""}</span>`;
     return button;
   }));
 
@@ -1468,7 +1472,7 @@ function updateCashierMethodCopy(method) {
 
 function paymentMethodTitleShort(method) {
   if (method === "stars") return "Stars";
-  if (method === "cryptobot") return "Crypto Bot";
+  if (method === "cryptobot") return "Crypto bot";
   if (method === "xrocket") return "xRocket";
   if (method === "ton") return "TON";
   return "$";
