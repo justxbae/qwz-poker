@@ -508,6 +508,8 @@ async function boot() {
   closeBuyInOverlay.addEventListener("click", hideBuyInOverlay);
   buyInAmount.addEventListener("input", syncBuyInSliderFromAmount);
   buyInSlider.addEventListener("input", syncBuyInAmountFromSlider);
+  buyInSlider.addEventListener("pointerdown", (event) => event.stopPropagation());
+  buyInSlider.addEventListener("touchstart", (event) => event.stopPropagation(), { passive: true });
   buyInMinButton.addEventListener("click", () => setBuyInAmount(Number(buyInAmount.dataset.min || 10000)));
   buyInMaxButton.addEventListener("click", () => setBuyInAmount(Number(buyInAmount.dataset.max || 40000)));
   confirmBuyInButton.addEventListener("click", () => runAction(confirmBuyIn));
@@ -820,7 +822,7 @@ function renderModeBalance() {
     lobbyBalanceCurrency.textContent = "";
     lobbyBalanceCurrency.removeAttribute("aria-label");
   } else {
-    lobbyBalanceCurrency.textContent = " фишек";
+    lobbyBalanceCurrency.textContent = "";
     lobbyBalanceCurrency.removeAttribute("aria-label");
   }
   renderHomeWalletSide(state.homeStats || {});
@@ -3370,9 +3372,19 @@ function onLimitSelect(event) {
   if (!button) return;
 
   haptic("selection");
-  state.selectedSmallBlind = Number(button.dataset.smallBlind);
+  const blind = Number(button.dataset.smallBlind);
   if (button.closest("#limitPills") && state.gameMode === "cash") {
-    state.homeSelectedSmallBlinds = normalizeHomeSelectedBlinds([...state.homeSelectedSmallBlinds, state.selectedSmallBlind]);
+    const selected = normalizeHomeSelectedBlinds(state.homeSelectedSmallBlinds);
+    if (selected.includes(blind)) {
+      state.homeSelectedSmallBlinds = selected.length > 1 ? selected.filter((item) => item !== blind) : selected;
+    } else {
+      state.homeSelectedSmallBlinds = normalizeHomeSelectedBlinds([...selected, blind]);
+    }
+    state.selectedSmallBlind = state.homeSelectedSmallBlinds.includes(blind)
+      ? blind
+      : Number(state.homeSelectedSmallBlinds.at(-1) || blind);
+  } else {
+    state.selectedSmallBlind = blind;
   }
   createTableForm.elements.smallBlind.value = String(state.selectedSmallBlind);
   syncLimitSelection();
@@ -4236,7 +4248,7 @@ function tableColumn(value, type = "") {
   if (type === "blinds" || type === "players") {
     const icon = document.createElement("img");
     icon.className = "table-column-icon";
-    icon.src = type === "blinds" ? "/assets/tables/flat.svg" : "/assets/tables/delmsgusers.svg";
+    icon.src = type === "blinds" ? "/assets/nav/poker-chip.svg" : "/assets/tables/delmsgusers.svg";
     icon.alt = "";
     icon.setAttribute("aria-hidden", "true");
     span.append(icon);
@@ -4347,17 +4359,10 @@ function openBuyInOverlay(intent) {
   const maxAmount = bounds.max;
   const defaultAmount = clampAmount(Number(intent.defaultAmount || bounds.defaultAmount), minAmount, maxAmount);
   if (buyInModeLabel) {
-    buyInModeLabel.replaceChildren("Texas Hold'em ");
-    renderLimitValue(buyInModeLabel, smallBlind, bigBlind, cashMode, { append: true });
-    buyInModeLabel.append(" · ");
-    if (cashMode) {
-      buyInModeLabel.append("$");
-    } else {
-      buyInModeLabel.append("фишки");
-    }
+    buyInModeLabel.replaceChildren("Texas Hold'em");
   }
 
-  document.querySelector(".buyin-title").textContent = intent.mode === "rebuy" ? "Re-buy" : "Buy-in";
+  document.querySelector(".buyin-title").textContent = intent.mode === "rebuy" ? "Re-buy" : "Вход за стол";
   buyInGameType.textContent = "";
   renderMoneyValue(buyInBalance, balance, cashMode);
   buyInAmount.dataset.cashMode = cashMode ? "true" : "false";
@@ -4487,6 +4492,8 @@ function setBuyInAmount(amount) {
   const cashMode = buyInAmount.dataset.cashMode === "true";
   buyInAmount.value = cashMode ? formatUsdtInput(safeAmount) : String(safeAmount);
   buyInSlider.value = String(safeAmount);
+  const fill = maxAmount > minAmount ? ((safeAmount - minAmount) / (maxAmount - minAmount)) * 100 : 100;
+  buyInSlider.style.setProperty("--buyin-fill", `${Math.max(0, Math.min(100, fill))}%`);
   renderMoneyValue(buyInDebit, safeAmount, cashMode);
   renderMoneyValue(buyInStackPreview, safeAmount, cashMode);
 }
