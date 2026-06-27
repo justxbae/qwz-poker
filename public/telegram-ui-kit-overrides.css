@@ -1731,6 +1731,301 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-
   transform: translateY(-50%) !important;
 }
 
+/* 2026-06-28: true final override after all legacy duplicates. */
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-chevron,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list button .tg-chevron,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-profile-link {
+  background: color-mix(in srgb, var(--tg-text, #fff) 48%, transparent) !important;
+  -webkit-mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
+  mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item > button::after,
+html.minimal-launch body.cashier-sheet-open .cashier-methods button::after {
+  width: 14px !important;
+  height: 14px !important;
+  background: color-mix(in srgb, var(--tg-text, #fff) 48%, transparent) !important;
+  -webkit-mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
+  mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment button {
+  display: grid !important;
+  place-items: center !important;
+  grid-auto-flow: column !important;
+  grid-template-columns: auto auto !important;
+  justify-content: center !important;
+  column-gap: 7px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment button::before {
+  position: static !important;
+  width: 21px !important;
+  height: 21px !important;
+  background: color-mix(in srgb, var(--tg-text, #fff) 48%, transparent) !important;
+  transform: none !important;
+  opacity: 1 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment button.active::before {
+  background: var(--tg-button-text, #fff) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-topup-card {
+  padding-bottom: calc(22px + env(safe-area-inset-bottom)) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-calculator {
+  padding-top: 0 !important;
+  background: transparent !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-amount-field {
+  display: contents !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-amount-field > span {
+  display: block !important;
+  max-width: 320px !important;
+  margin: 0 0 8px !important;
+  font-size: 28px !important;
+  line-height: 1.08 !important;
+  letter-spacing: -0.035em !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-amount-field input,
+html.minimal-launch body.cashier-sheet-open .cashier-presets {
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 76%, #fff 15%) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-presets {
+  padding: 10px !important;
+  border-radius: 22px !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-pay-button {
+  position: static !important;
+  width: 100% !important;
+  margin-top: 2px !important;
+  justify-self: stretch !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance {
+  align-items: flex-end !important;
+  text-align: right !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance > span {
+  display: block !important;
+  width: 100% !important;
+  text-align: right !important;
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance strong {
+  justify-content: flex-end !important;
+  text-align: right !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment {
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment::after {
+  content: "" !important;
+  position: absolute !important;
+  z-index: 0 !important;
+  top: 4px !important;
+  left: 4px !important;
+  width: calc(50% - 4px) !important;
+  height: calc(100% - 8px) !important;
+  border-radius: 20px !important;
+  background: color-mix(in srgb, var(--tg-button, #2aabee) 88%, #fff 8%) !important;
+  transition: transform 220ms cubic-bezier(.2, .8, .2, 1) !important;
+  pointer-events: none !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .product-mode-segment::after {
+  transform: translateX(100%) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment button {
+  z-index: 1 !important;
+  background: transparent !important;
+  transition: color 180ms ease !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment button.active {
+  background: transparent !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-chevron,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list button .tg-chevron,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-profile-link,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item > button::after,
+html.minimal-launch body.cashier-sheet-open .cashier-methods button::after {
+  background: color-mix(in srgb, var(--tg-text, #fff) 48%, transparent) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-chevron,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list button .tg-chevron,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-profile-link {
+  position: relative !important;
+  top: 2px !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-calculator {
+  position: relative !important;
+  z-index: 0 !important;
+  gap: 12px !important;
+  padding: 0 18px 18px !important;
+  background: transparent !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-calculator::before {
+  content: "" !important;
+  position: absolute !important;
+  z-index: -1 !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 186px !important;
+  bottom: 0 !important;
+  border-radius: 28px !important;
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 80%, #fff 12%) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-amount-field > span {
+  max-width: 340px !important;
+  margin: 0 0 16px !important;
+  font-size: 38px !important;
+  line-height: .98 !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.045em !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-amount-field input {
+  background: transparent !important;
+}
+
+html.minimal-launch body.cashier-sheet-open #cashierRubAmount {
+  background: transparent !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-presets {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border-radius: 22px !important;
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 72%, #fff 16%) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-presets button {
+  min-width: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-presets button + button {
+  border-left: 1px solid #333333 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods {
+  padding: 8px 18px !important;
+  border-radius: 28px !important;
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 88%, #fff 6%) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods button {
+  min-height: 54px !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods button + button {
+  border-top: 1px solid #1a1a1a !important;
+}
+
+/* 2026-06-28: SVG chevrons + final deposit/mode polish. */
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-chevron,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list button .tg-chevron,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-profile-link {
+  background: color-mix(in srgb, var(--tg-text, #fff) 48%, transparent) !important;
+  -webkit-mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
+  mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item > button::after,
+html.minimal-launch body.cashier-sheet-open .cashier-methods button::after {
+  width: 14px !important;
+  height: 14px !important;
+  background: color-mix(in srgb, var(--tg-text, #fff) 48%, transparent) !important;
+  -webkit-mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
+  mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment button {
+  display: grid !important;
+  place-items: center !important;
+  grid-auto-flow: column !important;
+  grid-template-columns: auto auto !important;
+  justify-content: center !important;
+  column-gap: 7px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment button::before {
+  position: static !important;
+  width: 21px !important;
+  height: 21px !important;
+  background: color-mix(in srgb, var(--tg-text, #fff) 48%, transparent) !important;
+  transform: none !important;
+  opacity: 1 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment button.active::before {
+  background: var(--tg-button-text, #fff) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-topup-card {
+  padding-bottom: calc(22px + env(safe-area-inset-bottom)) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-calculator {
+  padding-top: 0 !important;
+  background: transparent !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-amount-field {
+  display: contents !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-amount-field > span {
+  display: block !important;
+  max-width: 320px !important;
+  margin: 0 0 8px !important;
+  font-size: 28px !important;
+  line-height: 1.08 !important;
+  letter-spacing: -0.035em !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-amount-field input,
+html.minimal-launch body.cashier-sheet-open .cashier-presets {
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 76%, #fff 15%) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-presets {
+  padding: 10px !important;
+  border-radius: 22px !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-pay-button {
+  position: static !important;
+  width: 100% !important;
+  margin-top: 2px !important;
+  justify-self: stretch !important;
+}
+
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment button {
   position: relative !important;
 }
@@ -2081,9 +2376,36 @@ html.minimal-launch body.cashier-sheet-open .cashier-methods button::after {
   width: 14px !important;
   height: 14px !important;
   background: color-mix(in srgb, var(--tg-text, #fff) 48%, transparent) !important;
-  -webkit-mask: url("/assets/ui/chevronright.jpg?v=20260628-1") center / 14px 14px no-repeat !important;
-  mask: url("/assets/ui/chevronright.jpg?v=20260628-1") center / 14px 14px no-repeat !important;
+  -webkit-mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
+  mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
   transform: translateY(-50%) !important;
+}
+
+/* 2026-06-28: align home balance label with amount. */
+html.minimal-launch body:not(.in-game) .home-balance {
+  align-items: flex-start !important;
+  text-align: left !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance > span {
+  display: block !important;
+  width: 100% !important;
+  text-align: left !important;
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance {
+  align-items: flex-start !important;
+  text-align: left !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance > span {
+  display: block !important;
+  width: 100% !important;
+  text-align: left !important;
+  padding-left: 0 !important;
+  margin-left: 0 !important;
 }
 
 html.minimal-launch body.cashier-sheet-open .cashier-methods button span {
@@ -2102,10 +2424,13 @@ html.minimal-launch body.cashier-sheet-open .cashier-methods button strong {
 }
 
 html.minimal-launch body.cashier-sheet-open .cashier-pay-button {
-  position: fixed !important;
-  left: max(18px, env(safe-area-inset-left)) !important;
-  right: max(18px, env(safe-area-inset-right)) !important;
-  bottom: calc(18px + env(safe-area-inset-bottom)) !important;
+  position: static !important;
+  width: 100% !important;
+  margin-top: 2px !important;
+  justify-self: stretch !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
   z-index: 1300 !important;
   min-height: 56px !important;
   border: 0 !important;
@@ -2141,6 +2466,25 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .bottom-nav .nav-label {
   font-weight: 450 !important;
 }
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment button {
+  display: grid !important;
+  place-items: center !important;
+  grid-auto-flow: column !important;
+  grid-template-columns: auto auto !important;
+  justify-content: center !important;
+  column-gap: 7px !important;
+}
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment button::before {
+  position: static !important;
+  width: 21px !important;
+  height: 21px !important;
+  background: color-mix(in srgb, var(--tg-text, #fff) 48%, transparent) !important;
+  transform: none !important;
+  opacity: 1 !important;
+}
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment button.active::before {
+  background: var(--tg-button-text, #fff) !important;
+}
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-chevron,
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list button .tg-chevron,
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-profile-link {
@@ -2152,8 +2496,8 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-profile-link {
   line-height: 0 !important;
   text-indent: -999px !important;
   background: color-mix(in srgb, var(--tg-text, #fff) 48%, transparent) !important;
-  -webkit-mask: url("/assets/ui/chevronright.jpg?v=20260628-1") center / 14px 14px no-repeat !important;
-  mask: url("/assets/ui/chevronright.jpg?v=20260628-1") center / 14px 14px no-repeat !important;
+  -webkit-mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
+  mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
 }
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-chevron::before,
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-chevron::after,
@@ -2174,7 +2518,140 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-
   height: 14px !important;
   border: 0 !important;
   background: color-mix(in srgb, var(--tg-text, #fff) 48%, transparent) !important;
-  -webkit-mask: url("/assets/ui/chevronright.jpg?v=20260628-1") center / 14px 14px no-repeat !important;
-  mask: url("/assets/ui/chevronright.jpg?v=20260628-1") center / 14px 14px no-repeat !important;
+  -webkit-mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
+  mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
   transform: translateY(-50%) !important;
+}
+
+/* 2026-06-28: final lobby/deposit polish after all legacy duplicates. */
+html.minimal-launch body:not(.in-game) .home-balance {
+  align-items: flex-end !important;
+  text-align: right !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance > span {
+  display: block !important;
+  width: 100% !important;
+  text-align: right !important;
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance strong {
+  justify-content: flex-end !important;
+  text-align: right !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment {
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment::after {
+  content: "" !important;
+  position: absolute !important;
+  z-index: 0 !important;
+  top: 4px !important;
+  left: 4px !important;
+  width: calc(50% - 4px) !important;
+  height: calc(100% - 8px) !important;
+  border-radius: 20px !important;
+  background: color-mix(in srgb, var(--tg-button, #2aabee) 88%, #fff 8%) !important;
+  transition: transform 220ms cubic-bezier(.2, .8, .2, 1) !important;
+  pointer-events: none !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .product-mode-segment::after {
+  transform: translateX(100%) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment button {
+  z-index: 1 !important;
+  background: transparent !important;
+  transition: color 180ms ease !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment button.active {
+  background: transparent !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-chevron,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list button .tg-chevron,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-profile-link {
+  position: relative !important;
+  top: 2px !important;
+  background: color-mix(in srgb, var(--tg-text, #fff) 30%, transparent) !important;
+  transform: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item > button::after,
+html.minimal-launch body.cashier-sheet-open .cashier-methods button::after {
+  background: color-mix(in srgb, var(--tg-text, #fff) 30%, transparent) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-calculator {
+  position: static !important;
+  z-index: auto !important;
+  gap: 12px !important;
+  padding: 18px !important;
+  border-radius: 28px !important;
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 80%, #fff 12%) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-calculator::before {
+  display: none !important;
+  content: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-amount-title {
+  display: block !important;
+  margin: 0 0 -4px !important;
+  padding: 0 18px !important;
+  color: var(--tg-text, #fff) !important;
+  font-size: 30px !important;
+  line-height: 1.05 !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.035em !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-amount-field > span {
+  display: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-amount-field input {
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 72%, #fff 16%) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-presets {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border-radius: 22px !important;
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 72%, #fff 16%) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-presets button {
+  min-width: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-presets button + button {
+  border-left: 1px solid color-mix(in srgb, #fff 34%, transparent) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods {
+  padding: 8px 18px !important;
+  border-radius: 28px !important;
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 88%, #fff 6%) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods button {
+  min-height: 54px !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods button + button {
+  border-top: 1px solid color-mix(in srgb, #fff 34%, transparent) !important;
 }
