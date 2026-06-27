@@ -1747,11 +1747,15 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-limit-pills {
 }
 
 .buyin-sheet {
-  bottom: calc(88px + env(safe-area-inset-bottom)) !important;
+  bottom: 0 !important;
   max-height: min(76vh, 620px) !important;
   border-radius: 28px !important;
   background: var(--qwz-card-bg, var(--tg-surface, #202b36)) !important;
   padding: 10px 16px 16px !important;
+}
+
+body.buyin-sheet-open .bottom-nav {
+  z-index: 900 !important;
 }
 
 .buyin-kicker,
@@ -1852,6 +1856,142 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-limit-pills {
   content: "Texas Hold'em" !important;
   color: var(--tg-text, #fff) !important;
   font-size: 14px !important;
+}
+
+html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-topup-card {
+  display: grid !important;
+  gap: 14px !important;
+  padding: 10px 16px calc(92px + env(safe-area-inset-bottom)) !important;
+  border-radius: 28px 28px 0 0 !important;
+  background: var(--qwz-card-bg, var(--tg-surface, #202b36)) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .section-title {
+  margin: 0 !important;
+  align-items: center !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .section-title div {
+  display: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open #cashierDepositNetwork {
+  justify-self: end !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 54%, transparent) !important;
+  font-size: 17px !important;
+  font-weight: 600 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open #cashierNote,
+html.minimal-launch body.cashier-sheet-open .cashier-quote {
+  display: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-calculator {
+  display: grid !important;
+  gap: 12px !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-amount-field {
+  position: relative !important;
+  display: grid !important;
+  gap: 8px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-amount-field > span {
+  color: var(--tg-text, #fff) !important;
+  font-size: 28px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.035em !important;
+}
+
+html.minimal-launch body.cashier-sheet-open #cashierRubAmount {
+  width: 100% !important;
+  min-height: 62px !important;
+  padding: 0 54px 0 18px !important;
+  border: 0 !important;
+  border-radius: 20px !important;
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 84%, #fff 12%) !important;
+  color: var(--tg-text, #fff) !important;
+  font-size: 30px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.03em !important;
+}
+
+html.minimal-launch body.cashier-sheet-open #cashierAmountAsset {
+  position: absolute !important;
+  right: 18px !important;
+  bottom: 19px !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 52%, transparent) !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-presets {
+  display: flex !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+  padding: 0 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-presets button {
+  min-width: 74px !important;
+  min-height: 38px !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 84%, #fff 12%) !important;
+  color: var(--tg-text, #fff) !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods {
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 6px !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods button {
+  min-height: 32px !important;
+  padding: 0 10px !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: transparent !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 54%, transparent) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods button span {
+  display: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods button.active {
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 84%, #fff 12%) !important;
+  color: var(--tg-text, #fff) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-pay-button {
+  position: fixed !important;
+  left: max(18px, env(safe-area-inset-left)) !important;
+  right: max(18px, env(safe-area-inset-right)) !important;
+  bottom: calc(18px + env(safe-area-inset-bottom)) !important;
+  z-index: 1300 !important;
+  min-height: 56px !important;
+  border: 0 !important;
+  border-radius: 20px !important;
+  background: var(--tg-button, #2aabee) !important;
+  color: var(--tg-button-text, #fff) !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open #cashierStatus {
+  min-height: 0 !important;
 }
 
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--blinds .table-column-icon {

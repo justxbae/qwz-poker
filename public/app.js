@@ -402,6 +402,7 @@ async function boot() {
     button.addEventListener("click", closeCashierSheet);
   });
   cashierRubAmount?.addEventListener("input", syncCashierQuote);
+  cashierRubAmount?.addEventListener("blur", normalizeCashierAmountInput);
   cashierPresets?.addEventListener("click", onCashierPresetClick);
   cashierMethods?.addEventListener("click", onCashierMethodClick);
   cashierPayButton?.addEventListener("click", () => runAction(payCashierAmount));
@@ -1360,7 +1361,7 @@ function renderCashierControls(deposit) {
   cashierRubAmount.min = String(playDemo ? (deposit.minRub || 100) : ((deposit.minUsdtMicros || 1_000_000) / 1_000_000));
   cashierRubAmount.max = String(playDemo ? (deposit.maxRub || 5000) : ((deposit.maxUsdtMicros || 5_000_000_000) / 1_000_000));
   cashierRubAmount.step = playDemo ? "50" : "1";
-  cashierRubAmount.value = String(playDemo ? (deposit.minRub || 100) : 5);
+  cashierRubAmount.value = playDemo ? String(deposit.minRub || 100) : Number(5).toFixed(2);
 
   const methods = playDemo ? [] : (deposit.methods || []);
   if (methods.length && !methods.some((method) => method.id === cashierState.selectedMethod && method.enabled)) {
@@ -1392,7 +1393,7 @@ function renderCashierControls(deposit) {
 function onCashierPresetClick(event) {
   const button = event.target.closest("[data-rub-amount]");
   if (!button || !cashierRubAmount) return;
-  cashierRubAmount.value = button.dataset.rubAmount;
+  cashierRubAmount.value = cashierState.demoTopup ? button.dataset.rubAmount : Number(button.dataset.rubAmount || 0).toFixed(2);
   syncCashierQuote();
 }
 
@@ -1403,6 +1404,13 @@ function onCashierMethodClick(event) {
   cashierMethods.querySelectorAll("button").forEach((item) => {
     item.classList.toggle("active", item.dataset.method === cashierState.selectedMethod);
   });
+  syncCashierQuote();
+}
+
+function normalizeCashierAmountInput() {
+  if (!cashierRubAmount || cashierState.demoTopup) return;
+  const quote = cashierQuote();
+  cashierRubAmount.value = Number(quote.usdtAmount || 0).toFixed(2);
   syncCashierQuote();
 }
 
@@ -1428,9 +1436,9 @@ function syncCashierQuote() {
   const enabledMethod = (cashierState.deposit?.methods || []).find((method) => method.id === cashierState.selectedMethod && method.enabled);
   cashierPayButton.disabled = !cashierState.demoTopup && !enabledMethod;
   if (cashierState.demoTopup) {
-    cashierPayButton.textContent = `Dev: начислить ${formatChips(quote.chips)} игровых фишек`;
+    cashierPayButton.textContent = "Пополнить";
   } else if (enabledMethod) {
-    cashierPayButton.textContent = paymentButtonLabel(cashierState.selectedMethod, quote);
+    cashierPayButton.textContent = "Пополнить";
   } else {
     cashierPayButton.textContent = "Пополнение скоро";
   }
