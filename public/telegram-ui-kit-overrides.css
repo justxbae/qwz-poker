@@ -1657,6 +1657,76 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-
   height: 24px !important;
 }
 
+/* 2026-06-28: normalize Telegram-like text weights and chevrons. */
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-main {
+  font-weight: 400 !important;
+  letter-spacing: -0.022em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-value {
+  font-weight: 400 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-icon img {
+  width: 22px !important;
+  height: 22px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-summary strong {
+  font-weight: 500 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column-value {
+  font-weight: 500 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .bottom-nav .nav-label {
+  font-weight: 450 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment button,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment button.active {
+  font-weight: 600 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-chevron,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list button .tg-chevron,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-profile-link {
+  position: relative !important;
+  width: 14px !important;
+  height: 14px !important;
+  overflow: hidden !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  text-indent: -999px !important;
+  background: transparent url("/assets/ui/chevronright.jpg?v=20260628-1") center / 14px 14px no-repeat !important;
+  filter: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-chevron::before,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-chevron::after,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list button .tg-chevron::before,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list button .tg-chevron::after,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-profile-link::before,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-profile-link::after {
+  display: none !important;
+  content: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item > button::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 50% !important;
+  right: 0 !important;
+  display: block !important;
+  width: 14px !important;
+  height: 14px !important;
+  border: 0 !important;
+  background: transparent url("/assets/ui/chevronright.jpg?v=20260628-1") center / 14px 14px no-repeat !important;
+  transform: translateY(-50%) !important;
+}
+
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--players .table-column-icon {
   width: 20px !important;
   height: 20px !important;
@@ -1997,4 +2067,54 @@ html.minimal-launch body.cashier-sheet-open #cashierStatus {
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--blinds .table-column-icon {
   width: 24px !important;
   height: 24px !important;
+}
+
+/* 2026-06-28: final chevron/font override after legacy table rules. */
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-main {
+  font-weight: 400 !important;
+  letter-spacing: -0.022em !important;
+}
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-icon img {
+  width: 22px !important;
+  height: 22px !important;
+}
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-summary strong,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column-value {
+  font-weight: 500 !important;
+}
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .bottom-nav .nav-label {
+  font-weight: 450 !important;
+}
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-chevron,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list button .tg-chevron,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-profile-link {
+  width: 14px !important;
+  height: 14px !important;
+  overflow: hidden !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  text-indent: -999px !important;
+  background: transparent url("/assets/ui/chevronright.jpg?v=20260628-1") center / 14px 14px no-repeat !important;
+}
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-chevron::before,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-chevron::after,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list button .tg-chevron::before,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list button .tg-chevron::after,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-profile-link::before,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-profile-link::after {
+  display: none !important;
+  content: none !important;
+}
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-item > button::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 50% !important;
+  right: 0 !important;
+  display: block !important;
+  width: 14px !important;
+  height: 14px !important;
+  border: 0 !important;
+  background: transparent url("/assets/ui/chevronright.jpg?v=20260628-1") center / 14px 14px no-repeat !important;
+  transform: translateY(-50%) !important;
 }
