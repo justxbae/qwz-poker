@@ -4257,10 +4257,10 @@ function renderTableList(container, tables, emptyText, options = {}) {
 function tableColumn(value, type = "") {
   const span = document.createElement("span");
   span.className = ["table-column", type && `table-column--${type}`].filter(Boolean).join(" ");
-  if (type === "blinds" || type === "players") {
+  if (type === "blinds" || type === "buyin" || type === "players") {
     const icon = document.createElement("img");
     icon.className = "table-column-icon";
-    icon.src = type === "blinds" ? "/assets/nav/poker-chip.svg" : "/assets/tables/delmsgusers.svg";
+    icon.src = type === "blinds" ? "/assets/nav/poker-chip.svg" : type === "buyin" ? "/assets/tables/buyin.svg" : "/assets/tables/delmsgusers.svg";
     icon.alt = "";
     icon.setAttribute("aria-hidden", "true");
     span.append(icon);
