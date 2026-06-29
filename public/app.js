@@ -1491,8 +1491,8 @@ function paymentMethodTitleShort(method) {
 function cashierMethodMeta(method) {
   if (!method?.enabled) return "скоро";
   if (method.id === "stars") return "Telegram";
-  if (method.id === "cryptobot") return "invoice";
-  if (method.id === "xrocket") return "invoice";
+  if (method.id === "cryptobot") return "USDT";
+  if (method.id === "xrocket") return "USDT";
   if (method.id === "ton") return "TON";
   return method.speed || "";
 }

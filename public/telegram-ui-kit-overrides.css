@@ -3855,3 +3855,430 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list.footer-
   background: var(--qwz-card-bg, var(--tg-surface, #202b36)) !important;
   background-color: var(--qwz-card-bg, var(--tg-surface, #202b36)) !important;
 }
+
+/* 2026-06-30: requested profile finance removal + table icon alignment. */
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance > span,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance strong,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance #lobbyBalance,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance #lobbyBalance > span {
+  color: var(--tg-text, #fff) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance strong,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance #lobbyBalance {
+  font-size: 46px !important;
+  line-height: .94 !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.055em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance .usd-inline-icon {
+  width: 1em !important;
+  height: 1em !important;
+  color: var(--tg-text, #fff) !important;
+  vertical-align: -0.11em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance #lobbyBalance,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance #lobbyBalance > span,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats strong,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats strong > span {
+  font-family: "SF Pro Rounded", "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif !important;
+  font-variant-numeric: proportional-nums lining-nums !important;
+  font-feature-settings: "lnum" 1, "tnum" 0 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-balance-row {
+  display: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard {
+  margin-top: -4px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats {
+  padding: 10px !important;
+  gap: 8px !important;
+  background: var(--qwz-card-bg, var(--tg-surface, #202b36)) !important;
+  background-color: var(--qwz-card-bg, var(--tg-surface, #202b36)) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats div {
+  min-height: 70px !important;
+  padding: 12px 12px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats span {
+  color: color-mix(in srgb, var(--tg-text, #fff) 58%, transparent) !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats strong,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats strong > span,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats .usd-inline-icon {
+  color: var(--tg-text, #fff) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats strong {
+  font-size: 21px !important;
+  line-height: 1 !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.03em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--blinds {
+  gap: 1px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--blinds .table-column-icon {
+  width: 18px !important;
+  height: 22px !important;
+  margin-right: -4px !important;
+  clip-path: inset(0 50% 0 0) !important;
+  object-fit: cover !important;
+  object-position: left center !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--buyin {
+  justify-content: flex-start !important;
+  text-align: left !important;
+  gap: 2px !important;
+  transform: translateX(-2px) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--buyin .table-column-icon {
+  width: 18px !important;
+  height: 18px !important;
+  margin-right: 0 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--buyin .table-column-value {
+  min-width: 52px !important;
+  text-align: left !important;
+}
+
+/* 2026-06-30: opaque Telegram-themed menu hierarchy. */
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-sheet {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  background: var(--tg-bg, #191317) !important;
+  background-color: var(--tg-bg, #191317) !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list.footer-lobby.tg-menu-group,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list.footer-lobby .footer-lobby-row {
+  background: var(--tg-surface, #261b20) !important;
+  background-color: var(--tg-surface, #261b20) !important;
+  opacity: 1 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list.footer-lobby.tg-menu-group {
+  margin: 0 auto !important;
+  flex: 0 0 auto !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list--secondary.footer-lobby.tg-menu-group {
+  min-height: 104px !important;
+  grid-template-rows: repeat(2, 52px) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list--secondary .footer-lobby-row:disabled {
+  opacity: 1 !important;
+  cursor: default !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list--secondary .footer-lobby-value,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list--secondary .footer-lobby-chevron {
+  color: color-mix(in srgb, var(--tg-text, #fff) 34%, transparent) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-backdrop {
+  background: rgba(0, 0, 0, .56) !important;
+  backdrop-filter: blur(10px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(120%) !important;
+}
+
+/* 2026-06-30: restore large cash balance typography. */
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance > span {
+  color: color-mix(in srgb, var(--tg-text, #fff) 48%, transparent) !important;
+  font-size: 15px !important;
+  line-height: 1.1 !important;
+  font-weight: 500 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance strong {
+  justify-content: flex-end !important;
+  align-items: center !important;
+  color: var(--tg-text, #fff) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance #lobbyBalance,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance #lobbyBalance > span {
+  color: var(--tg-text, #fff) !important;
+  font-family: "SF Pro Rounded", "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif !important;
+  font-size: 36px !important;
+  line-height: .94 !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.055em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance #lobbyBalance {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: .18em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance .usd-inline-icon {
+  width: .92em !important;
+  height: .92em !important;
+  flex: 0 0 .92em !important;
+  transform: translateY(.04em) !important;
+  vertical-align: middle !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats strong {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: .18em !important;
+  color: var(--tg-text, #fff) !important;
+  font-family: "SF Pro Rounded", "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif !important;
+  font-size: 26px !important;
+  line-height: .96 !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.045em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats strong > span {
+  color: var(--tg-text, #fff) !important;
+  font: inherit !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats .usd-inline-icon {
+  width: .88em !important;
+  height: .88em !important;
+  flex: 0 0 .88em !important;
+  transform: translateY(.04em) !important;
+}
+
+/* 2026-06-30: final grid/alignment cleanup for balance, tables, cashier and menu sheets. */
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance > span {
+  color: color-mix(in srgb, var(--tg-text, #fff) 48%, transparent) !important;
+  transform: translateX(-6px) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance strong {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance #lobbyBalance,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance #lobbyBalance > span {
+  color: var(--tg-text, #fff) !important;
+  font-size: 42px !important;
+  line-height: .9 !important;
+  font-weight: 500 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance #lobbyBalance {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: .13em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-balance .usd-inline-icon {
+  width: .86em !important;
+  height: .86em !important;
+  flex: 0 0 .86em !important;
+  transform: translateY(0) !important;
+  align-self: center !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--buyin {
+  gap: 0 !important;
+  transform: translateX(-4px) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--buyin .table-column-icon {
+  width: 17px !important;
+  height: 17px !important;
+  margin-right: -6px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--buyin .table-column-value {
+  text-align: left !important;
+  min-width: 50px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-backdrop {
+  background: rgba(0, 0, 0, .42) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-sheet {
+  background: var(--qwz-card-bg, var(--tg-surface, #261b20)) !important;
+  background-color: var(--qwz-card-bg, var(--tg-surface, #261b20)) !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list.footer-lobby.tg-menu-group,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list.footer-lobby .footer-lobby-row {
+  background: var(--qwz-soft-bg, color-mix(in srgb, var(--tg-surface, #261b20) 86%, var(--tg-text, #fff) 10%)) !important;
+  background-color: var(--qwz-soft-bg, color-mix(in srgb, var(--tg-surface, #261b20) 86%, var(--tg-text, #fff) 10%)) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-calculator,
+html.minimal-launch body.cashier-sheet-open .cashier-method-list {
+  background: var(--qwz-soft-bg, color-mix(in srgb, var(--tg-surface, #261b20) 86%, var(--tg-text, #fff) 10%)) !important;
+  background-color: var(--qwz-soft-bg, color-mix(in srgb, var(--tg-surface, #261b20) 86%, var(--tg-text, #fff) 10%)) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-presets {
+  overflow: hidden !important;
+  border-radius: 999px !important;
+  background: color-mix(in srgb, var(--tg-text, #fff) 8%, transparent) !important;
+  background-color: color-mix(in srgb, var(--tg-text, #fff) 8%, transparent) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-presets button {
+  position: relative !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-presets button + button::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 9px !important;
+  bottom: 9px !important;
+  width: 1px !important;
+  background: color-mix(in srgb, var(--tg-text, #fff) 42%, transparent) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-pay-button {
+  width: 100% !important;
+  min-height: 58px !important;
+  margin: 22px 0 0 !important;
+  border-radius: 24px !important;
+  background: var(--tg-button, #2aabee) !important;
+  background-color: var(--tg-button, #2aabee) !important;
+  color: var(--tg-button-text, #fff) !important;
+  box-shadow: none !important;
+}
+
+/* 2026-06-30: cashier/table polish after device pass. */
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--buyin {
+  gap: 2px !important;
+  transform: translateX(-7px) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--buyin .table-column-icon {
+  width: 18px !important;
+  height: 26px !important;
+  margin-right: -1px !important;
+  transform: translateY(0) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-table-list .table-column--buyin .table-column-value {
+  line-height: .9 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open {
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-calculator,
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby.tg-menu-group {
+  background: var(--qwz-soft-bg, color-mix(in srgb, var(--tg-surface, #261b20) 82%, var(--tg-text, #fff) 12%)) !important;
+  background-color: var(--qwz-soft-bg, color-mix(in srgb, var(--tg-surface, #261b20) 82%, var(--tg-text, #fff) 12%)) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-presets button + button {
+  border-left: 0 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-presets button + button::before {
+  top: 8px !important;
+  bottom: 8px !important;
+  width: 1px !important;
+  background: color-mix(in srgb, var(--tg-text, #fff) 42%, transparent) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row + .footer-lobby-row {
+  border-top: 0 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row + .footer-lobby-row::after {
+  display: block !important;
+  content: "" !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 74px !important;
+  right: 24px !important;
+  height: 1px !important;
+  background: color-mix(in srgb, var(--tg-text, #fff) 24%, transparent) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row:first-child::after {
+  display: none !important;
+  content: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row.active::before {
+  opacity: 0 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row:active::before {
+  opacity: .28 !important;
+}
+
+/* 2026-06-30: payment-method separators must not share ::after with legacy chevrons. */
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row {
+  background-color: transparent !important;
+  background-image: none !important;
+  background-repeat: no-repeat !important;
+  background-position: 74px 0 !important;
+  background-size: calc(100% - 98px) 1px !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row + .footer-lobby-row {
+  background-image: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--tg-text, #fff) 28%, transparent),
+    color-mix(in srgb, var(--tg-text, #fff) 28%, transparent)
+  ) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row::after,
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row + .footer-lobby-row::after {
+  display: none !important;
+  content: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-chevron {
+  display: block !important;
+}
