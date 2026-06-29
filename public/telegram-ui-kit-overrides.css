@@ -2655,3 +2655,648 @@ html.minimal-launch body.cashier-sheet-open .cashier-methods button {
 html.minimal-launch body.cashier-sheet-open .cashier-methods button + button {
   border-top: 1px solid color-mix(in srgb, #fff 34%, transparent) !important;
 }
+
+/* 2026-06-29: profile view rebuilt from the same Telegram lobby primitives. */
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active {
+  gap: 14px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-hero,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .lobby-card {
+  border: 0 !important;
+  border-radius: 28px !important;
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 88%, transparent) !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-hero {
+  min-height: 112px !important;
+  padding: 20px 24px !important;
+  display: grid !important;
+  grid-template-columns: 72px minmax(0, 1fr) !important;
+  gap: 16px !important;
+  align-items: center !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-avatar {
+  width: 72px !important;
+  height: 72px !important;
+  border-radius: 24px !important;
+  background: color-mix(in srgb, var(--tg-link, #2aabee) 20%, var(--tg-surface, #202b36)) !important;
+  color: var(--tg-text, #fff) !important;
+  font-size: 28px !important;
+  font-weight: 650 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-main {
+  min-width: 0 !important;
+  align-items: flex-start !important;
+  text-align: left !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-main .eyebrow {
+  margin: 0 0 4px !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 48%, transparent) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  letter-spacing: .22em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-main h2 {
+  margin: 0 !important;
+  color: var(--tg-text, #fff) !important;
+  font-size: 28px !important;
+  line-height: 1.05 !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.028em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-main span {
+  margin-top: 4px !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 52%, transparent) !important;
+  font-size: 16px !important;
+  font-weight: 400 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard {
+  padding: 22px 24px 24px !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-balance-row {
+  grid-column: 1 / -1 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: end !important;
+  gap: 8px 14px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-balance-row > span {
+  grid-column: 1 !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 46%, transparent) !important;
+  font-size: 13px !important;
+  font-weight: 520 !important;
+  letter-spacing: .18em !important;
+  text-transform: uppercase !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-balance-row strong {
+  grid-column: 1 !important;
+  color: var(--tg-text, #fff) !important;
+  font-size: 48px !important;
+  line-height: .95 !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.055em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-balance-row small {
+  grid-column: 2 !important;
+  grid-row: 1 / span 2 !important;
+  align-self: center !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 48%, transparent) !important;
+  font-size: 16px !important;
+  font-weight: 420 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats {
+  grid-column: 1 / -1 !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats div,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-mode-card,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-tournament-stat {
+  min-height: 72px !important;
+  padding: 14px 16px !important;
+  border: 0 !important;
+  border-radius: 22px !important;
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 72%, #fff 14%) !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats span,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-mode-card span,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-tournament-stat span {
+  color: color-mix(in srgb, var(--tg-link, #2aabee) 42%, var(--tg-text, #fff) 32%) !important;
+  font-size: 13px !important;
+  line-height: 1.1 !important;
+  font-weight: 450 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats strong,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-mode-card strong,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-tournament-stat strong {
+  margin-top: 6px !important;
+  color: var(--tg-text, #fff) !important;
+  font-size: 20px !important;
+  line-height: 1.05 !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.02em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-mode-card {
+  position: relative !important;
+  min-height: 94px !important;
+  display: grid !important;
+  align-content: center !important;
+  gap: 5px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-mode-card::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 16px !important;
+  right: 16px !important;
+  width: 9px !important;
+  height: 9px !important;
+  border-radius: 50% !important;
+  background: #34d399 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-mode-card--rating::after {
+  background: #8b5cf6 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-mode-card small,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-mode-card p {
+  margin: 0 !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 52%, transparent) !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-progress {
+  display: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .lobby-card {
+  padding: 22px 24px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .section-title {
+  margin-bottom: 14px !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: end !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .section-title .eyebrow {
+  display: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .section-title h2 {
+  margin: 0 !important;
+  color: var(--tg-text, #fff) !important;
+  font-size: 25px !important;
+  line-height: 1.05 !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.032em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .section-title > span {
+  color: color-mix(in srgb, var(--tg-text, #fff) 42%, transparent) !important;
+  font-size: 16px !important;
+  font-weight: 450 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .settings-list {
+  overflow: hidden !important;
+  border-radius: 24px !important;
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 88%, #fff 5%) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .settings-row,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .settings-action {
+  position: relative !important;
+  min-height: 62px !important;
+  padding: 0 18px !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--tg-text, #fff) !important;
+  text-align: left !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .settings-row + .settings-row,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .settings-action + .settings-action {
+  border-top: 1px solid color-mix(in srgb, #fff 26%, transparent) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .settings-row span,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .settings-action span {
+  color: var(--tg-text, #fff) !important;
+  font-size: 20px !important;
+  line-height: 1.08 !important;
+  font-weight: 430 !important;
+  letter-spacing: -0.025em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .settings-row strong,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .settings-action strong {
+  color: color-mix(in srgb, var(--tg-text, #fff) 42%, transparent) !important;
+  font-size: 16px !important;
+  line-height: 1.1 !important;
+  font-weight: 400 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .settings-action {
+  grid-template-columns: 44px minmax(0, 1fr) auto !important;
+  gap: 14px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .settings-action::before {
+  content: "" !important;
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 14px !important;
+  background: linear-gradient(180deg, #21d7b6, #0ea47e) !important;
+  -webkit-mask: none !important;
+  mask: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-action--cashier::before {
+  background:
+    url("/assets/mode/monetization.svg") center / 22px 22px no-repeat,
+    linear-gradient(180deg, #28d996, #0f8b5f) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-action--tables::before {
+  background:
+    url("/assets/nav/playing-cards.svg") center / 22px 22px no-repeat,
+    linear-gradient(180deg, #2aabee, #1f6fe5) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .settings-action::after,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .settings-row-button::after {
+  content: "" !important;
+  width: 14px !important;
+  height: 14px !important;
+  background: color-mix(in srgb, var(--tg-text, #fff) 30%, transparent) !important;
+  -webkit-mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
+  mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-tournament-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-tournament-history {
+  margin-top: 12px !important;
+  padding: 18px !important;
+  border-radius: 22px !important;
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 74%, #fff 8%) !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 56%, transparent) !important;
+  font-size: 18px !important;
+  line-height: 1.25 !important;
+}
+
+@media (max-width: 430px) {
+  html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard {
+    padding: 20px !important;
+  }
+
+  html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active .profile-balance-row strong {
+    font-size: 42px !important;
+  }
+
+}
+
+/* 2026-06-29: exact footer_lobby component inside Menu sheet. */
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-sheet {
+  width: min(402px, calc(100vw - 24px)) !important;
+  max-height: none !important;
+  padding: 14px 16px 18px !important;
+  border: 0 !important;
+  border-radius: 30px 30px 0 0 !important;
+  background: color-mix(in srgb, var(--tg-bg, #121212) 84%, transparent) !important;
+  box-shadow: 0 -18px 48px rgba(0, 0, 0, 0.54) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body.lobby-menu-open:not(.in-game) .lobby-menu-sheet > .cashier-sheet-grabber {
+  display: block !important;
+  width: 100% !important;
+  height: 30px !important;
+  margin: 0 0 4px !important;
+  touch-action: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body.lobby-menu-open:not(.in-game) .lobby-menu-sheet > .cashier-sheet-grabber::before {
+  content: "" !important;
+  display: block !important;
+  width: 38px !important;
+  height: 4px !important;
+  margin: 8px auto 0 !important;
+  border-radius: 999px !important;
+  background: rgba(142, 155, 170, 0.42) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list.footer-lobby.tg-menu-group {
+  width: 100% !important;
+  max-width: 370px !important;
+  min-height: 204px !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  grid-template-rows: repeat(4, 52px) !important;
+  gap: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 26px !important;
+  background: var(--qwz-card-bg, var(--tg-surface, #202b36)) !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .10) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list.footer-lobby .footer-lobby-row {
+  position: relative !important;
+  isolation: isolate !important;
+  width: 100% !important;
+  min-height: 52px !important;
+  height: 52px !important;
+  padding: 0 14px !important;
+  display: grid !important;
+  grid-template-columns: 30px minmax(0, 1fr) auto 12px !important;
+  grid-template-areas: none !important;
+  align-items: center !important;
+  column-gap: 12px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--qwz-card-bg, var(--tg-surface, #202b36)) !important;
+  box-shadow: none !important;
+  color: var(--tg-text, #fff) !important;
+  text-align: left !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list.footer-lobby .footer-lobby-row + .footer-lobby-row::before {
+  display: none !important;
+  content: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list.footer-lobby .footer-lobby-row + .footer-lobby-row::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 56px !important;
+  right: 14px !important;
+  height: 1px !important;
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 68%, #fff 18%) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list.footer-lobby .footer-lobby-icon {
+  grid-column: 1 !important;
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  min-height: 30px !important;
+  margin: 0 !important;
+  border-radius: 8px !important;
+  display: grid !important;
+  place-items: center !important;
+  overflow: hidden !important;
+  color: #fff !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list.footer-lobby .footer-lobby-icon img {
+  width: 20px !important;
+  height: 20px !important;
+  display: block !important;
+  object-fit: contain !important;
+  filter: brightness(0) invert(1) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list.footer-lobby .footer-lobby-main {
+  grid-column: 2 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  color: var(--tg-text, #fff) !important;
+  font-size: 17px !important;
+  line-height: 1.12 !important;
+  font-weight: 400 !important;
+  letter-spacing: -0.022em !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list.footer-lobby .footer-lobby-value {
+  grid-column: 3 !important;
+  justify-self: end !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 30%, transparent) !important;
+  font-size: 17px !important;
+  line-height: 1.12 !important;
+  font-weight: 400 !important;
+  letter-spacing: -0.022em !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list.footer-lobby .footer-lobby-chevron {
+  grid-column: 4 !important;
+  justify-self: end !important;
+  align-self: center !important;
+  width: 14px !important;
+  height: 14px !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  background: color-mix(in srgb, var(--tg-text, #fff) 30%, transparent) !important;
+  -webkit-mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
+  mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
+  transform: none !important;
+}
+
+/* 2026-06-29: deposit payment methods reuse footer_lobby.svg geometry exactly. */
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby.tg-menu-group {
+  width: 100% !important;
+  max-width: 370px !important;
+  min-height: 204px !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  grid-template-rows: repeat(4, 52px) !important;
+  gap: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 26px !important;
+  background: var(--qwz-card-bg, var(--tg-surface, #202b36)) !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .10) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row {
+  position: relative !important;
+  isolation: isolate !important;
+  width: 100% !important;
+  min-height: 52px !important;
+  height: 52px !important;
+  padding: 0 14px !important;
+  display: grid !important;
+  grid-template-columns: 30px minmax(0, 1fr) auto 12px !important;
+  grid-template-areas: none !important;
+  align-items: center !important;
+  column-gap: 12px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--qwz-card-bg, var(--tg-surface, #202b36)) !important;
+  box-shadow: none !important;
+  color: var(--tg-text, #fff) !important;
+  text-align: left !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row + .footer-lobby-row {
+  border-top: 0 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row + .footer-lobby-row::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 56px !important;
+  right: 14px !important;
+  height: 1px !important;
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 68%, #fff 18%) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: -1 !important;
+  background: rgba(255, 255, 255, .08) !important;
+  opacity: 0 !important;
+  transition: opacity 130ms ease !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row:active::before,
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row.active::before {
+  opacity: .45 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-icon {
+  grid-column: 1 !important;
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  min-height: 30px !important;
+  margin: 0 !important;
+  border-radius: 8px !important;
+  display: grid !important;
+  place-items: center !important;
+  overflow: hidden !important;
+  color: #fff !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-icon img {
+  width: 20px !important;
+  height: 20px !important;
+  display: block !important;
+  object-fit: contain !important;
+  filter: brightness(0) invert(1) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-main {
+  grid-column: 2 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  color: var(--tg-text, #fff) !important;
+  font-size: 17px !important;
+  line-height: 1.12 !important;
+  font-weight: 400 !important;
+  letter-spacing: -0.022em !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-value {
+  grid-column: 3 !important;
+  justify-self: end !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 30%, transparent) !important;
+  font-size: 17px !important;
+  line-height: 1.12 !important;
+  font-weight: 400 !important;
+  letter-spacing: -0.022em !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-chevron {
+  grid-column: 4 !important;
+  justify-self: end !important;
+  align-self: center !important;
+  width: 14px !important;
+  height: 14px !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  background: color-mix(in srgb, var(--tg-text, #fff) 30%, transparent) !important;
+  -webkit-mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
+  mask: url("/assets/ui/chevronright.svg?v=20260628-1") center / 14px 14px no-repeat !important;
+  transform: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row:disabled {
+  opacity: .46 !important;
+}
+
+/* 2026-06-29: cashier footer_lobby visibility fix after legacy span hiding. */
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby.tg-menu-group {
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 88%, #fff 6%) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row {
+  background: color-mix(in srgb, var(--tg-surface, #202b36) 88%, #fff 6%) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row:first-child::after {
+  display: none !important;
+  content: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-icon {
+  display: grid !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-main,
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-value,
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-chevron {
+  display: block !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-icon img {
+  display: block !important;
+}
+
+html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-topup-card {
+  height: calc(100dvh - 34px) !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  padding-bottom: calc(28px + env(safe-area-inset-bottom)) !important;
+  grid-template-rows: auto auto auto auto minmax(28px, 1fr) auto auto !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-pay-button {
+  margin-top: auto !important;
+  align-self: end !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row.active::before {
+  opacity: 0 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row:active::before {
+  background: rgba(0, 0, 0, .10) !important;
+  opacity: 1 !important;
+}

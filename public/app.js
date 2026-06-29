@@ -1346,6 +1346,7 @@ function renderCashierControls(deposit) {
     cashierRubAmount.value = "";
     cashierRubAmount.placeholder = "Недоступно";
     cashierPresets.replaceChildren();
+    cashierMethods.className = "cashier-methods footer-lobby tg-menu-group";
     cashierMethods.replaceChildren();
     if (cashierQuoteChips) cashierQuoteChips.textContent = "—";
     if (cashierQuoteStars) cashierQuoteStars.textContent = "Без оплаты";
@@ -1381,13 +1382,19 @@ function renderCashierControls(deposit) {
     return button;
   }));
 
+  cashierMethods.className = "cashier-methods footer-lobby tg-menu-group";
   cashierMethods.replaceChildren(...methods.map((method) => {
     const button = document.createElement("button");
     button.type = "button";
     button.dataset.method = method.id;
     button.disabled = !method.enabled;
-    button.className = method.id === cashierState.selectedMethod ? "active" : "";
-    button.innerHTML = `<strong>${paymentMethodTitleShort(method.id)}</strong><span>${method.speed || ""}</span>`;
+    button.className = `footer-lobby-row ${cashierMethodRowClass(method.id)}${method.id === cashierState.selectedMethod ? " active" : ""}`;
+    button.innerHTML = `
+      <span class="footer-lobby-icon" aria-hidden="true"><img src="${cashierMethodIcon(method.id)}" alt="" /></span>
+      <span class="footer-lobby-main">${escapeHtml(paymentMethodTitleShort(method.id))}</span>
+      <span class="footer-lobby-value">${escapeHtml(cashierMethodMeta(method))}</span>
+      <span class="footer-lobby-chevron">›</span>
+    `;
     return button;
   }));
 
@@ -1476,6 +1483,31 @@ function paymentMethodTitleShort(method) {
   if (method === "xrocket") return "xRocket";
   if (method === "ton") return "TON";
   return "$";
+}
+
+function cashierMethodMeta(method) {
+  if (!method?.enabled) return "скоро";
+  if (method.id === "stars") return "Telegram";
+  if (method.id === "cryptobot") return "invoice";
+  if (method.id === "xrocket") return "invoice";
+  if (method.id === "ton") return "TON";
+  return method.speed || "";
+}
+
+function cashierMethodIcon(method) {
+  if (method === "stars") return "/assets/footer/Icon-17.svg";
+  if (method === "cryptobot") return "/assets/footer/telegram.svg";
+  if (method === "xrocket") return "/assets/footer/ic_largegroup.svg?v=20260628-1";
+  if (method === "ton") return "/assets/footer/mynotes.svg";
+  return "/assets/mode/monetization.svg";
+}
+
+function cashierMethodRowClass(method) {
+  if (method === "stars") return "footer-lobby-row--support";
+  if (method === "cryptobot") return "footer-lobby-row--telegram";
+  if (method === "xrocket") return "footer-lobby-row--private";
+  if (method === "ton") return "footer-lobby-row--terms";
+  return "footer-lobby-row--private";
 }
 
 function cashierQuote() {
@@ -1763,10 +1795,10 @@ function renderProfile(profileData) {
   const ratingPointsText = `${formatNumber(profile.ratingPoints || 1000)} RP`;
   const cashRankText = MINIMAL_LAUNCH ? "Cash" : cashLevelLabel(profile);
   if (lobbyRank) lobbyRank.textContent = cashRankText;
-  profileBalance.replaceChildren(`${formatUsdtDisplay(profileData.cashBalanceMicros || 0)} · ${formatChips(profileData.balance)} фишек`);
-  profileChips.textContent = formatChips(profileData.balance);
+  profileBalance.replaceChildren(formatUsdtDisplay(profileData.cashBalanceMicros || 0));
+  profileChips.textContent = formatUsdtDisplay(profileData.cashBalanceMicros || 0);
   profileTableStack.textContent = formatUsdtDisplay(profileData.cashTableStackMicros || 0);
-  profileSavedStack.textContent = formatChips(profileData.savedStack);
+  profileSavedStack.textContent = formatChips(profileData.balance);
   lobbyTableStack.textContent = formatChips(profileData.tableStack);
   lobbyActiveTables.textContent = String(profileData.activeTableCount || 0);
   renderHomeWalletSide(profileData);
@@ -1965,8 +1997,8 @@ function renderProfileTournamentStats(profileData = {}) {
       ["ITM", formatNumber(stats.itm)],
       ["Финалки", formatNumber(stats.finalTables)],
       ["Победы", formatNumber(stats.wins)],
-      ["Fee cash", formatUsdtDisplay(stats.cashFeesPaidMicros)],
-      ["Призы cash", formatUsdtDisplay(stats.cashPrizeWonMicros)]
+      ["Fee", formatUsdtDisplay(stats.cashFeesPaidMicros)],
+      ["Призы", formatUsdtDisplay(stats.cashPrizeWonMicros)]
     ];
     items.forEach(([label, value]) => {
       const item = document.createElement("div");

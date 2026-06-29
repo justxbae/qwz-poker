@@ -542,13 +542,13 @@
           <section class="lobby-card profile-dashboard">
             <div class="profile-balance-row">
               <span>Баланс</span>
-              <strong id="profileBalance">0 фишек</strong>
+              <strong id="profileBalance">$0.00</strong>
               <small id="profileStatus">В лобби</small>
             </div>
             <div class="profile-dashboard-stats">
-              <div><span>Доступно</span><strong id="profileChips">0</strong></div>
+              <div><span>Cash</span><strong id="profileChips">$0.00</strong></div>
               <div><span>За столами</span><strong id="profileTableStack">0</strong></div>
-              <div><span>Сохранено</span><strong id="profileSavedStack">0</strong></div>
+              <div><span>Play</span><strong id="profileSavedStack">0</strong></div>
             </div>
             <div class="profile-mode-card profile-mode-card--cash">
               <div>
@@ -591,19 +591,6 @@
             </div>
             <div class="profile-tournament-grid" id="profileTournamentStats"></div>
             <div class="tournament-history-list profile-tournament-history" id="profileTournamentHistory"></div>
-          </section>
-          <section class="lobby-card">
-            <div class="section-title">
-              <div>
-                <p class="eyebrow">Настройки</p>
-                <h2>Игрок</h2>
-              </div>
-              <span>app</span>
-            </div>
-            <div class="settings-list">
-              <button type="button" class="settings-action" data-lobby-tab="cashier">Касса</button>
-              <button type="button" class="settings-action" data-lobby-tab="tables">Мои столы</button>
-            </div>
           </section>
         </section>
 
@@ -935,30 +922,30 @@
             <p>QWZ Poker</p>
             <h2>Меню</h2>
           </header>
-          <div class="lobby-menu-list">
-            <button type="button" data-menu-action="cashier">
-              <span class="menu-icon menu-icon--cashier" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h16v10H4Z"/><path d="M8 7V5h8v2"/><path d="M8 17v2h8v-2"/><path d="M12 10v4M10 12h4"/></svg></span>
-              <span class="menu-copy"><strong>Касса</strong><small>депозит, вывод и способы оплаты</small></span>
-              <span class="menu-meta">$</span>
-              <span class="tg-chevron">›</span>
+          <div class="lobby-menu-list footer-lobby tg-menu-group">
+            <button type="button" class="footer-lobby-row footer-lobby-row--private" data-menu-action="cashier">
+              <span class="footer-lobby-icon" aria-hidden="true"><img src="/assets/mode/monetization.svg" alt="" /></span>
+              <span class="footer-lobby-main">Касса</span>
+              <span class="footer-lobby-value">$</span>
+              <span class="footer-lobby-chevron">›</span>
             </button>
-            <button type="button" data-menu-action="details">
-              <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 5h14v16l-3-2-3 2-3-2-3 2Z"/><path d="M8 9h8M8 13h8"/></svg></span>
-              <span class="menu-copy"><strong>Детализация</strong><small>операции, платежи и баланс</small></span>
-              <span class="menu-meta">live</span>
-              <span class="tg-chevron">›</span>
+            <button type="button" class="footer-lobby-row footer-lobby-row--telegram" data-menu-action="details">
+              <span class="footer-lobby-icon" aria-hidden="true"><img src="/assets/footer/mynotes.svg" alt="" /></span>
+              <span class="footer-lobby-main">Детализация</span>
+              <span class="footer-lobby-value">live</span>
+              <span class="footer-lobby-chevron">›</span>
             </button>
-            <button type="button" data-menu-action="affiliate">
-              <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M2.8 21a5.2 5.2 0 0 1 10.4 0"/><path d="M17 8h4v4"/><path d="m14 15 7-7"/></svg></span>
-              <span class="menu-copy"><strong>Affiliate</strong><small>рефералы, CPA и RevShare</small></span>
-              <span class="menu-meta">CPA</span>
-              <span class="tg-chevron">›</span>
+            <button type="button" class="footer-lobby-row footer-lobby-row--support" data-menu-action="affiliate">
+              <span class="footer-lobby-icon" aria-hidden="true"><img src="/assets/footer/ic_largegroup.svg?v=20260628-1" alt="" /></span>
+              <span class="footer-lobby-main">Affiliate</span>
+              <span class="footer-lobby-value">CPA</span>
+              <span class="footer-lobby-chevron">›</span>
             </button>
-            <button type="button" data-menu-action="support">
-              <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 1 16 0v5a2 2 0 0 1-2 2h-3"/><path d="M9 19h3"/></svg></span>
-              <span class="menu-copy"><strong>Поддержка</strong><small>вопросы по игре и оплате</small></span>
-              <span class="menu-meta">24/7</span>
-              <span class="tg-chevron">›</span>
+            <button type="button" class="footer-lobby-row footer-lobby-row--terms" data-menu-action="support">
+              <span class="footer-lobby-icon" aria-hidden="true"><img src="/assets/footer/Icon-17.svg" alt="" /></span>
+              <span class="footer-lobby-main">Поддержка</span>
+              <span class="footer-lobby-value">24/7</span>
+              <span class="footer-lobby-chevron">›</span>
             </button>
           </div>
         </section>
