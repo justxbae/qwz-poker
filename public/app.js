@@ -147,6 +147,8 @@ const profileStatus = document.querySelector("#profileStatus");
 const profileSessionBadge = document.querySelector("#profileSessionBadge");
 const profileSessionList = document.querySelector("#profileSessionList");
 const profileRefreshButton = document.querySelector("#profileRefreshButton");
+const profileCashStats = document.querySelector("#profileCashStats");
+const profileCashSummary = document.querySelector("#profileCashSummary");
 const profileTournamentStats = document.querySelector("#profileTournamentStats");
 const profileTournamentHistory = document.querySelector("#profileTournamentHistory");
 const profileTournamentSummary = document.querySelector("#profileTournamentSummary");
@@ -817,7 +819,8 @@ function tickDailyPlayClaim() {
 function renderModeBalance() {
   if (!lobbyBalance) return;
   const cashMode = state.gameMode === "cash";
-  lobbyBalance.textContent = cashMode ? formatUsdtDisplay(activeBalance()) : formatChips(activeBalance());
+  if (cashMode) renderUsdIconAmount(lobbyBalance, activeBalance());
+  else lobbyBalance.textContent = formatChips(activeBalance());
   if (!lobbyBalanceCurrency) return;
   if (cashMode) {
     lobbyBalanceCurrency.textContent = "";
@@ -833,7 +836,7 @@ function renderModeContext() {
   const cashMode = state.gameMode === "cash";
   document.body.dataset.gameMode = cashMode ? "cash" : "play";
   if (modeBanner) {
-    if (modeBannerKicker) modeBannerKicker.textContent = cashMode ? "$" : "Рейтинг";
+    if (modeBannerKicker) modeBannerKicker.textContent = cashMode ? "Cash" : "Рейтинг";
     if (modeBannerTitle) {
       if (cashMode) modeBannerTitle.textContent = "Денежная игра";
       else modeBannerTitle.textContent = "Рейтинговый режим";
@@ -1795,9 +1798,9 @@ function renderProfile(profileData) {
   const ratingPointsText = `${formatNumber(profile.ratingPoints || 1000)} RP`;
   const cashRankText = MINIMAL_LAUNCH ? "Cash" : cashLevelLabel(profile);
   if (lobbyRank) lobbyRank.textContent = cashRankText;
-  profileBalance.replaceChildren(formatUsdtDisplay(profileData.cashBalanceMicros || 0));
-  profileChips.textContent = formatUsdtDisplay(profileData.cashBalanceMicros || 0);
-  profileTableStack.textContent = formatUsdtDisplay(profileData.cashTableStackMicros || 0);
+  renderUsdIconAmount(profileBalance, profileData.cashBalanceMicros || 0);
+  renderUsdIconAmount(profileChips, profileData.cashBalanceMicros || 0);
+  renderUsdIconAmount(profileTableStack, profileData.cashTableStackMicros || 0);
   profileSavedStack.textContent = formatChips(profileData.balance);
   lobbyTableStack.textContent = formatChips(profileData.tableStack);
   lobbyActiveTables.textContent = String(profileData.activeTableCount || 0);
@@ -1823,16 +1826,41 @@ function renderProfile(profileData) {
   if (profileRatingSeason) profileRatingSeason.textContent = MINIMAL_LAUNCH ? "—" : (profile.ratingSeasonId || "текущий");
   profileHands.textContent = formatNumber(profileData.handsPlayed || profile.handsPlayed || 0);
   profileTables.textContent = String(profileData.activeTableCount || 0);
-  profileStatus.textContent = profileData.activeTableCount ? "В игре" : "В лобби";
+  if (profileStatus) profileStatus.textContent = "";
   profileSessionBadge.textContent = profileData.activeTableCount
     ? `${profileData.activeTableCount} ${plural(profileData.activeTableCount, "стол", "стола", "столов")}`
-    : "нет";
+    : "";
 
   renderAvatar(profileAvatar, user);
   renderAvatar(lobbyAvatar, user);
 
   renderProfileSessions(profileData.activeTables || []);
+  renderProfileCashStats(profileData);
   renderProfileTournamentStats(profileData);
+}
+
+function renderProfileCashStats(profileData = {}) {
+  const profile = profileData.profile || {};
+  const hands = Number(profile.cashHandsPlayed || profileData.handsPlayed || 0);
+  if (profileCashSummary) profileCashSummary.textContent = `${formatNumber(hands)} ${plural(hands, "рука", "руки", "рук")}`;
+  if (!profileCashStats) return;
+  profileCashStats.replaceChildren();
+  const items = [
+    ["Руки", formatNumber(hands)],
+    ["Столы", formatNumber(profileData.activeTableCount || 0)],
+    ["Рейк", formatUsdtDisplay(profile.cashRakeContributed || 0)],
+    ["Уровень", cashLevelLabel(profile)]
+  ];
+  items.forEach(([label, value]) => {
+    const item = document.createElement("div");
+    item.className = "profile-tournament-stat";
+    const labelNode = document.createElement("span");
+    labelNode.textContent = label;
+    const valueNode = document.createElement("strong");
+    valueNode.textContent = value;
+    item.replaceChildren(labelNode, valueNode);
+    profileCashStats.append(item);
+  });
 }
 
 function renderHomeWalletSide(profileData = {}) {
@@ -1952,7 +1980,7 @@ function renderProfileSessions(activeTables) {
   if (!activeTables.length) {
     const row = document.createElement("div");
     row.className = "settings-row";
-    row.innerHTML = "<span>Активных столов нет</span><strong>Лобби</strong>";
+    row.innerHTML = "<span>Активных столов нет</span><strong></strong>";
     profileSessionList.append(row);
     return;
   }
@@ -6075,7 +6103,31 @@ function formatUsdt(value) {
 
 function formatUsdtDisplay(value) {
   const amount = Number(value || 0);
-  return `${amount < 0 ? "-" : ""}$${formatUsdt(Math.abs(amount))}`;
+  return `${amount < 0 ? "-" : ""}${formatUsdt(Math.abs(amount))} $`;
+}
+
+function usdIconNode(className = "usd-inline-icon") {
+  const icon = document.createElement("span");
+  icon.className = className;
+  icon.setAttribute("aria-hidden", "true");
+  return icon;
+}
+
+function usdAmountNodes(value) {
+  const amount = Number(value || 0);
+  const text = document.createElement("span");
+  text.textContent = `${amount < 0 ? "-" : ""}${formatUsdt(Math.abs(amount))}`;
+  return [text, usdIconNode()];
+}
+
+function renderUsdIconAmount(target, value) {
+  if (!target) return;
+  target.replaceChildren(...usdAmountNodes(value));
+}
+
+function renderUsdIconOnly(target) {
+  if (!target) return;
+  target.replaceChildren(usdIconNode());
 }
 
 function formatUsdtInput(value) {

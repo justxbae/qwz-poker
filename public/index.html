@@ -224,7 +224,7 @@
             <div class="game-mode-switch product-mode-segment" id="gameModeSwitch" aria-label="Режим игры">
               <button type="button" class="active" data-game-mode="cash">
                 <span>Cash</span>
-                <small>$-столы</small>
+                <small>cash-столы</small>
               </button>
               <button type="button" data-game-mode="play">
                 <span>Рейтинг</span>
@@ -390,7 +390,7 @@
           <section class="wallet-card cashier-card">
             <div class="miniapp-title">
               <span>Касса</span>
-              <small id="cashierAssetLabel">$ balance</small>
+              <small id="cashierAssetLabel">Баланс</small>
             </div>
             <div class="wallet-label">Доступно</div>
             <div class="wallet-balance money-value" id="cashierBalance">0</div>
@@ -414,7 +414,7 @@
               </div>
               <span id="cashierDepositNetwork">TON</span>
             </div>
-            <p class="cashier-note" id="cashierNote">Введите сумму в $. Счет в TON фиксирует курс, а после подтверждения сети на баланс поступает $.</p>
+            <p class="cashier-note" id="cashierNote">Введите сумму. Счет в TON фиксирует курс, а после подтверждения сети баланс будет пополнен.</p>
             <h3 class="cashier-amount-title">Выберите сумму пополнения</h3>
             <div class="cashier-calculator">
               <label class="cashier-amount-field">
@@ -449,7 +449,7 @@
               <button type="button" class="cashier-sheet-close" data-cashier-sheet-close aria-label="Закрыть">×</button>
             </div>
             <div class="cashier-withdraw-state">
-              <strong id="cashierWithdrawTitle">Вывод $ пока закрыт</strong>
+              <strong id="cashierWithdrawTitle">Вывод пока закрыт</strong>
               <span id="cashierWithdrawText">Сначала запускаем честную экономику пополнений, открытые столы и историю операций. Методы вывода добавим после отдельной настройки правил и комиссий.</span>
             </div>
           </section>
@@ -533,59 +533,61 @@
           <section class="profile-hero">
             <div class="profile-avatar" id="profileAvatar">P</div>
             <div class="profile-main">
-              <p class="eyebrow">Профиль</p>
               <h2 id="profileName">Игрок</h2>
               <span id="profileUsername">@player</span>
             </div>
             <button type="button" id="profileRefreshButton" class="round-control" aria-label="Обновить профиль" hidden>↻</button>
           </section>
-          <section class="lobby-card profile-dashboard">
+          <section class="profile-dashboard">
             <div class="profile-balance-row">
-              <span>Баланс</span>
-              <strong id="profileBalance">$0.00</strong>
-              <small id="profileStatus">В лобби</small>
+              <h2 class="profile-section-label">Финансы</h2>
+              <strong id="profileBalance">0.00</strong>
             </div>
             <div class="profile-dashboard-stats">
-              <div><span>Cash</span><strong id="profileChips">$0.00</strong></div>
+              <div><span>Доступно</span><strong id="profileChips">0.00</strong></div>
               <div><span>За столами</span><strong id="profileTableStack">0</strong></div>
-              <div><span>Play</span><strong id="profileSavedStack">0</strong></div>
+              <div><span>Рейтинг</span><strong id="profileSavedStack">0</strong></div>
             </div>
-            <div class="profile-mode-card profile-mode-card--cash">
-              <div>
-                <span>Cash</span>
-                <strong id="profileCashTitle">Новичок · Уровень 1</strong>
-              </div>
-              <small id="profileCashXpLabel">0 / 120 XP</small>
-              <div class="profile-progress" aria-label="Прогресс уровня"><span id="profileCashProgress"></span></div>
-              <p><b id="profileCashHands">0</b> рук · <b id="profileHands">0</b> всего</p>
-            </div>
-            <div class="profile-mode-card profile-mode-card--rating">
-              <div>
-                <span>Рейтинг</span>
-                <strong id="profileRatingTitle">Unranked</strong>
-              </div>
-              <small id="profileRatingPoints">0 pts</small>
-              <p><b id="profileRatingHands">0</b> рук · сезон <b id="profileRatingSeason">—</b></p>
-            </div>
+            <button type="button" class="profile-detail-row" id="profileDetailButton">
+              <span class="profile-detail-icon" aria-hidden="true"><img src="/assets/footer/mynotes.svg" alt="" /></span>
+              <span class="profile-detail-main">Детализация</span>
+              <span class="profile-detail-chevron">›</span>
+            </button>
+            <span id="profileCashTitle" hidden></span>
+            <span id="profileCashXpLabel" hidden></span>
+            <span id="profileCashProgress" hidden></span>
+            <span id="profileCashHands" hidden>0</span>
+            <span id="profileHands" hidden>0</span>
+            <span id="profileRatingTitle" hidden></span>
+            <span id="profileRatingPoints" hidden></span>
+            <span id="profileRatingHands" hidden>0</span>
+            <span id="profileRatingSeason" hidden></span>
             <span id="profileTables" hidden>0</span>
           </section>
           <section class="lobby-card">
             <div class="section-title">
               <div>
-                <p class="eyebrow">Текущий стол</p>
                 <h2>Сессия</h2>
               </div>
-              <span id="profileSessionBadge">нет</span>
+              <span id="profileSessionBadge"></span>
             </div>
             <div class="settings-list" id="profileSessionList">
               <div class="settings-row"><span>Активных столов нет</span><strong>Лобби</strong></div>
             </div>
           </section>
+          <section class="lobby-card profile-cash-card">
+            <div class="section-title">
+              <div>
+                <h2>Кеш игры</h2>
+              </div>
+              <span id="profileCashSummary">0 рук</span>
+            </div>
+            <div class="profile-tournament-grid profile-cash-grid" id="profileCashStats"></div>
+          </section>
           <section class="lobby-card profile-tournament-card">
             <div class="section-title">
               <div>
-                <p class="eyebrow">Турниры</p>
-                <h2>Статистика</h2>
+                <h2>Статистика турниров</h2>
               </div>
               <span id="profileTournamentSummary">0 входов</span>
             </div>
