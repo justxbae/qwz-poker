@@ -1255,6 +1255,10 @@ async function handleTelegramBack() {
     return;
   }
   if (state.currentTableId || !currentTable.hidden) {
+    if (state.currentTableId && state.currentTable?.viewer?.isSeated) {
+      await leaveCurrentTable();
+      return;
+    }
     await backToLobbyFromTable();
     return;
   }
