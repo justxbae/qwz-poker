@@ -4240,7 +4240,7 @@ function renderTables() {
     ? `${RATING_FIXED_SMALL_BLIND}/${RATING_FIXED_BIG_BLIND}`
     : formatGameLimit(selectedBlind, Number(currentLimits().find((item) => Number(item.smallBlind) === selectedBlind)?.bigBlind || selectedBlind * 2));
   const homeEmpty = state.gameMode === "play"
-    ? "Рейтинговых столов 100/200 сейчас нет. Скоро добавим 9 max."
+    ? "Рейтинговых столов 100/200 сейчас нет. Скоро добавим новые 6 max."
     : `На выбранных лимитах сейчас нет свободных столов.`;
   renderTableList(homeTableList, availableHomeTables, homeEmpty, { home: true });
   renderTableList(publicTableList, publicTables, `На лимите ${limitText} свободных общих столов пока нет.`);
@@ -5185,9 +5185,15 @@ function renderCurrentTable(table) {
       previousSeatFolded.set(seat.userId, Boolean(seat.folded));
       const nextActiveSeatKey = `${table.handNumber}:${table.activeSeatIndex}:${seat.userId}`;
       const shouldAnimateTurn = index === table.activeSeatIndex && activeSeatKey !== nextActiveSeatKey;
+      // Rotate display positions so the viewer always renders at the bottom
+      // seat (display index 0), like every production poker client.
+      const viewerSeatIndex = table.seats.findIndex((item) => item.userId === state.user?.id);
+      const displayIndex = viewerSeatIndex >= 0
+        ? (index - viewerSeatIndex + table.seats.length) % table.seats.length
+        : index;
       node.className = [
         "seat",
-        `seat-${index}`,
+        `seat-${displayIndex}`,
         `seat-count-${table.seats.length}`,
         index === table.activeSeatIndex ? "active" : "",
         shouldAnimateTurn ? "turn-in" : "",
@@ -6200,7 +6206,7 @@ function renderLimitValue(node, smallBlind, bigBlind, cashMode, { append = false
 function renderHomeOfferMeta(limit, value, kind, cashMode) {
   if (!homeOfferMeta) return;
   if (!cashMode) {
-    homeOfferMeta.textContent = `${RATING_FIXED_SMALL_BLIND}/${RATING_FIXED_BIG_BLIND} · 9 max · daily claim 35 000 фишек`;
+    homeOfferMeta.textContent = `${RATING_FIXED_SMALL_BLIND}/${RATING_FIXED_BIG_BLIND} · 6 max · daily claim 35 000 фишек`;
     return;
   }
   renderLimitValue(homeOfferMeta, limit.smallBlind, limit.bigBlind, true);

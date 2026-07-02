@@ -849,7 +849,7 @@ function finishShowdown(table) {
     }
 
     const winnerNames = orderedWinners.map((winner) => winner.seat.name).join(", ");
-    summaries.push(`${winnerNames} забирает ${pot.label} ${formatTableAmount(table, payoutAmount)} (${handDescription})`);
+    summaries.push(`${winnerNames} забирает ${pot.label} ${formatTableAmount(table, payoutAmount)} (${localizeHandDescription(handDescription)})`);
     historyPots.push({
       label: pot.label,
       amount: payoutAmount,
@@ -1028,6 +1028,30 @@ function uncalledAmountForWinner(table, winner) {
     .filter((seat) => seat !== winner)
     .reduce((max, seat) => Math.max(max, Number(seat.totalBet || 0)), 0);
   return Math.max(0, Number(winner.totalBet || 0) - highestOtherContribution);
+}
+
+const HAND_NAME_RU = {
+  "Royal Flush": "Роял-флеш",
+  "Straight Flush": "Стрит-флеш",
+  "Four of a Kind": "Каре",
+  "Full House": "Фулл-хаус",
+  "Flush": "Флеш",
+  "Straight": "Стрит",
+  "Three of a Kind": "Сет",
+  "Two Pair": "Две пары",
+  "Pair": "Пара",
+  "High Card": "Старшая карта"
+};
+
+// User-facing message only; hand history keeps the raw evaluator text.
+function localizeHandDescription(description) {
+  const text = String(description || "").trim();
+  if (!text) return text;
+  const [base, detail = ""] = text.split(/,\s*/, 2);
+  const localized = HAND_NAME_RU[base.trim()];
+  if (!localized) return text;
+  const detailText = detail.replace(/'s\b/g, "").trim();
+  return detailText ? `${localized} (${detailText})` : localized;
 }
 
 function orderWinnersForOddChips(table, winners) {

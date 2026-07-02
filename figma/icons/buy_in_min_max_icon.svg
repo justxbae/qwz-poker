@@ -1,0 +1,23 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Buy-in MIN MAX icon</title>
+  <desc>Minimal stacked MIN and MAX buy-in indicator icon for poker app UI</desc>
+  <g color="white" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+    <!-- vertical connector -->
+    <path d="M17 19V45" opacity="0.7"/>
+    <path d="M13 21L17 17L21 21"/>
+    <path d="M13 43L17 47L21 43"/>
+
+    <!-- MIN badge -->
+    <rect x="27" y="10" width="28" height="18" rx="7" opacity="0.95"/>
+    <path d="M33 22V16L37 20L41 16V22"/>
+    <path d="M46 16V22"/>
+    <path d="M50 22V16L55 22V16"/>
+
+    <!-- MAX badge -->
+    <rect x="27" y="36" width="28" height="18" rx="7" opacity="0.95"/>
+    <path d="M33 48V42L37 46L41 42V48"/>
+    <path d="M45 48L48 42L51 48"/>
+    <path d="M46.2 46H49.8"/>
+    <path d="M54 42L59 48M59 42L54 48"/>
+  </g>
+</svg>

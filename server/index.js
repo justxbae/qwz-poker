@@ -195,7 +195,9 @@ const TONCENTER_API_BASE = (process.env.TONCENTER_API_BASE || "https://toncenter
 const TONCENTER_API_KEY = process.env.TONCENTER_API_KEY || "";
 const TON_POLLING_INTERVAL_MS = Number(process.env.TON_POLLING_INTERVAL_MS || 60 * 1000);
 const REAL_MONEY_ENABLED = process.env.REAL_MONEY_ENABLED === "true";
-const MINIMAL_LAUNCH = process.env.MINIMAL_LAUNCH === "true";
+// Minimal-launch is the primary skin for the current release window;
+// opt out explicitly with MINIMAL_LAUNCH=false.
+const MINIMAL_LAUNCH = process.env.MINIMAL_LAUNCH !== "false";
 const isProduction = process.env.NODE_ENV === "production";
 const HOST = process.env.HOST || (isProduction ? "0.0.0.0" : "127.0.0.1");
 const startedAt = Date.now();

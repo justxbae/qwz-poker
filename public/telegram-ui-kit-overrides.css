@@ -5680,3 +5680,394 @@ html.minimal-launch body.in-game .bet-spot {
   transform: scale(.82) !important;
   opacity: .86 !important;
 }
+
+/* ============================================================
+   2026-07-02: Weez Poker table — final TonPoker-proportioned pass.
+   One authoritative layer; equal specificity + later cascade wins
+   over every earlier in-game block. Geometry measured from the
+   TonPoker reference at 390x844:
+   - capsule ~66% viewport width, height ~2.0x its width
+   - avatars sit ON the rim, viewer at bottom (app.js rotates seats)
+   - board cards row ~80% of felt width, the main visual element
+   - pot/blinds/table info are secondary, small and muted
+   ============================================================ */
+
+html.minimal-launch body.in-game .board {
+  position: relative !important;
+  width: min(66vw, 268px) !important;
+  height: min(66vh, 545px) !important;
+  margin: 30px auto 0 !important;
+  overflow: visible !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background:
+    radial-gradient(ellipse 70% 46% at 50% 36%, rgba(233, 248, 238, 0.55) 0%, rgba(190, 226, 203, 0.28) 55%, transparent 78%),
+    linear-gradient(180deg, #a9d8bd 0%, #8cc7a6 45%, #74b491 100%) !important;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.5),
+    0 0 22px rgba(170, 225, 195, 0.35),
+    inset 0 0 44px rgba(20, 60, 42, 0.22) !important;
+}
+
+html.minimal-launch body.in-game .board::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 26px 20px !important;
+  border: 1px solid rgba(255, 255, 255, 0.34) !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+}
+
+html.minimal-launch body.in-game .board::after {
+  content: "WEEZ POKER" !important;
+  top: 63% !important;
+  color: rgba(30, 74, 52, 0.16) !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.14em !important;
+  text-shadow: none !important;
+}
+
+/* --- secondary pills: small, muted, no black capsules --- */
+html.minimal-launch body.in-game .blinds,
+html.minimal-launch body.in-game .viewer-hand-badge,
+html.minimal-launch body.in-game .status-line {
+  display: none !important;
+}
+
+html.minimal-launch body.in-game .table-center {
+  position: absolute !important;
+  top: 24.5% !important;
+  left: 50% !important;
+  display: grid !important;
+  justify-items: center !important;
+  gap: 4px !important;
+  transform: translateX(-50%) !important;
+  margin: 0 !important;
+}
+
+html.minimal-launch body.in-game .pot {
+  border-radius: 999px !important;
+  background: rgba(22, 46, 34, 0.4) !important;
+  color: #f2fbf6 !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  padding: 5px 12px !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch body.in-game .pot-chip-stack,
+html.minimal-launch body.in-game .chip-stack,
+html.minimal-launch body.in-game .bet-spot .chip-stack {
+  display: none !important;
+}
+
+html.minimal-launch body.in-game .table-details {
+  position: absolute !important;
+  top: 56.5% !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: max-content !important;
+  max-width: 84% !important;
+  border: 1px solid rgba(255, 255, 255, 0.38) !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.10) !important;
+  color: rgba(24, 60, 42, 0.78) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.01em !important;
+  padding: 5px 12px !important;
+  box-shadow: none !important;
+}
+
+/* --- community cards: the hero element --- */
+html.minimal-launch body.in-game .community {
+  position: absolute !important;
+  top: 31.5% !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  display: flex !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  width: 84% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+html.minimal-launch body.in-game .community .card,
+html.minimal-launch body.in-game .community .board-card-slot {
+  width: calc((100% - 20px) / 5) !important;
+  height: auto !important;
+  aspect-ratio: 0.72 !important;
+  border-radius: 7px !important;
+  margin: 0 !important;
+}
+
+html.minimal-launch body.in-game .community .board-card-slot {
+  border: 0 !important;
+  background: rgba(255, 255, 255, 0.14) !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch body.in-game .community .card {
+  box-shadow: 0 4px 10px rgba(15, 45, 30, 0.28) !important;
+}
+
+/* --- seats: avatars on the rim --- */
+html.minimal-launch body.in-game .seat {
+  position: absolute !important;
+  display: grid !important;
+  justify-items: center !important;
+  width: 108px !important;
+  margin: 0 !important;
+  transform: translate(-50%, -50%) !important;
+  z-index: 6 !important;
+}
+
+html.minimal-launch body.in-game .seat .seat-avatar {
+  width: 58px !important;
+  height: 58px !important;
+  border: 2px solid rgba(255, 255, 255, 0.75) !important;
+  border-radius: 50% !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35) !important;
+}
+
+html.minimal-launch body.in-game .seat-plate {
+  min-width: 96px !important;
+  max-width: 118px !important;
+  margin-top: -8px !important;
+  border-radius: 10px !important;
+  background: rgba(16, 18, 20, 0.92) !important;
+  padding: 5px 10px 6px !important;
+  text-align: center !important;
+}
+
+html.minimal-launch body.in-game .seat-name {
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  max-width: 100% !important;
+}
+
+html.minimal-launch body.in-game .seat-meta {
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+}
+
+html.minimal-launch body.in-game .seat-hand-label {
+  font-size: 10px !important;
+  font-weight: 600 !important;
+}
+
+/* display positions (viewer is always display seat-0 = bottom) */
+html.minimal-launch body.in-game .seat.seat-0 {
+  left: 50% !important;
+  top: 100% !important;
+}
+
+html.minimal-launch body.in-game .seat-count-2.seat-1,
+html.minimal-launch body.in-game .seat-count-4.seat-2,
+html.minimal-launch body.in-game .seat-count-6.seat-3 {
+  left: 50% !important;
+  top: 0% !important;
+}
+
+html.minimal-launch body.in-game .seat-count-3.seat-1,
+html.minimal-launch body.in-game .seat-count-5.seat-1 {
+  left: 0% !important;
+  top: 58% !important;
+}
+
+html.minimal-launch body.in-game .seat-count-3.seat-2,
+html.minimal-launch body.in-game .seat-count-5.seat-4 {
+  left: 100% !important;
+  top: 58% !important;
+}
+
+html.minimal-launch body.in-game .seat-count-4.seat-1,
+html.minimal-launch body.in-game .seat-count-6.seat-1 {
+  left: 0% !important;
+  top: 62% !important;
+}
+
+html.minimal-launch body.in-game .seat-count-4.seat-3,
+html.minimal-launch body.in-game .seat-count-6.seat-5 {
+  left: 100% !important;
+  top: 62% !important;
+}
+
+html.minimal-launch body.in-game .seat-count-5.seat-2,
+html.minimal-launch body.in-game .seat-count-6.seat-2 {
+  left: 0% !important;
+  top: 24% !important;
+}
+
+html.minimal-launch body.in-game .seat-count-5.seat-3,
+html.minimal-launch body.in-game .seat-count-6.seat-4 {
+  left: 100% !important;
+  top: 24% !important;
+}
+
+/* --- bet spots: number-only pill toward table center --- */
+html.minimal-launch body.in-game .bet-spot {
+  position: absolute !important;
+  left: 50% !important;
+  top: auto !important;
+  bottom: calc(100% + 6px) !important;
+  margin: 0 !important;
+  transform: translateX(-50%) !important;
+}
+
+html.minimal-launch body.in-game .seat.seat-0 .bet-spot {
+  bottom: auto !important;
+  top: -34px !important;
+}
+
+html.minimal-launch body.in-game .seat-count-2.seat-1 .bet-spot,
+html.minimal-launch body.in-game .seat-count-4.seat-2 .bet-spot,
+html.minimal-launch body.in-game .seat-count-6.seat-3 .bet-spot {
+  bottom: auto !important;
+  top: calc(100% + 6px) !important;
+}
+
+html.minimal-launch body.in-game .bet-amount {
+  border-radius: 999px !important;
+  background: rgba(20, 24, 22, 0.82) !important;
+  color: #ffd66b !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  padding: 4px 10px !important;
+  margin: 0 !important;
+}
+
+/* --- toolbar: two identical 44px buttons in the corners --- */
+html.minimal-launch body.in-game .game-toolbar .icon-control {
+  width: 44px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  display: grid !important;
+  place-items: center !important;
+  font-size: 19px !important;
+  line-height: 1 !important;
+}
+
+html.minimal-launch body.in-game .sitout-action {
+  width: 44px !important;
+  min-height: 44px !important;
+  font-size: 15px !important;
+}
+
+/* --- viewer hole cards above the bottom plate --- */
+html.minimal-launch body.in-game .seat.seat-0.viewer-seat .seat-cards {
+  position: absolute !important;
+  bottom: calc(100% - 16px) !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: -1 !important;
+}
+
+html.minimal-launch body.in-game .seat.seat-0.viewer-seat .seat-cards .card {
+  width: 46px !important;
+  height: 64px !important;
+  border-radius: 7px !important;
+}
+
+/* --- toolbar cleanup: only menu (left) and info (right) survive --- */
+html.minimal-launch body.in-game .game-toolbar .table-id,
+html.minimal-launch body.in-game .game-toolbar #quickBuyInButton,
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="log"],
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="hands"],
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="stats"],
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="waitlist"] {
+  display: none !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar {
+  display: flex !important;
+  justify-content: space-between !important;
+  padding: 10px 14px 0 !important;
+}
+
+/* --- hero cards peek above the avatar, TonPoker style --- */
+html.minimal-launch body.in-game .seat.seat-0.viewer-seat .seat-cards {
+  bottom: calc(100% - 6px) !important;
+  z-index: -1 !important;
+}
+
+html.minimal-launch body.in-game .seat.seat-0.viewer-seat .seat-cards .card {
+  width: 50px !important;
+  height: 70px !important;
+}
+
+/* hero bet pill sits to the right of the cards, not on them */
+html.minimal-launch body.in-game .seat.seat-0 .bet-spot {
+  left: calc(50% + 66px) !important;
+  top: -48px !important;
+  margin: 0 !important;
+}
+
+/* opponent bet pills hug the plate (kill legacy 34px offset) */
+html.minimal-launch body.in-game .seat-count-2.seat-1 .bet-spot,
+html.minimal-launch body.in-game .seat-count-4.seat-2 .bet-spot,
+html.minimal-launch body.in-game .seat-count-6.seat-3 .bet-spot {
+  margin: 0 !important;
+  top: calc(100% + 2px) !important;
+}
+
+/* --- sit-out quick button: quiet, borderless --- */
+html.minimal-launch body.in-game .sitout-action {
+  border: 0 !important;
+  background: #1c1c1f !important;
+  color: rgba(255, 255, 255, 0.55) !important;
+  box-shadow: none !important;
+}
+
+/* single info glyph: the button text is enough */
+html.minimal-launch body.in-game .game-toolbar .icon-control::before {
+  content: none !important;
+}
+
+/* top-seat bet pill clears the dealer/blind badges under the plate */
+html.minimal-launch body.in-game .seat-count-2.seat-1 .bet-spot,
+html.minimal-launch body.in-game .seat-count-4.seat-2 .bet-spot,
+html.minimal-launch body.in-game .seat-count-6.seat-3 .bet-spot {
+  top: calc(100% + 30px) !important;
+}
+
+/* sit-out quick button: quiet pause glyph instead of the dev box */
+html.minimal-launch body.in-game .sitout-action {
+  font-size: 0 !important;
+}
+
+html.minimal-launch body.in-game .sitout-action::after {
+  content: "II" !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  letter-spacing: 2px !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* Hand result: show the summary pill only at showdown so the player
+   always sees combination + winner + amount (Block 4 requirement). */
+html.minimal-launch body.in-game .game-screen[data-table-status="showdown"] .status-line {
+  display: block !important;
+  position: absolute !important;
+  top: 47% !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: max-content !important;
+  max-width: 88% !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: rgba(16, 18, 20, 0.88) !important;
+  color: #ffe9a8 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-align: center !important;
+  padding: 6px 14px !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3) !important;
+  z-index: 9 !important;
+}
