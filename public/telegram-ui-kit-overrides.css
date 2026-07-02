@@ -5127,3 +5127,301 @@ html.minimal-launch body.in-game .side-menu button:not(.close-button) + button:n
     top: 71% !important;
   }
 }
+
+/* 2026-07-02: strict table composition pass.
+   Rules:
+   - player avatars sit on the table rim, never outside the screen;
+   - community cards get the primary visual space;
+   - table labels stay secondary and low-contrast;
+   - both top controls use one Telegram-native visual system. */
+
+html.minimal-launch body.in-game .game-toolbar {
+  --toolbar-h: 48px;
+  padding: 0 4px !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar #menuButton,
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"] {
+  width: 44px !important;
+  min-width: 44px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  border-radius: 15px !important;
+  background: color-mix(in srgb, var(--tg-surface, #1c1c1f) 82%, #203140 18%) !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 82%, transparent) !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"] {
+  font-size: 0 !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"]::before {
+  content: "i" !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 100% !important;
+  height: 100% !important;
+  font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-size: 24px !important;
+  font-weight: 650 !important;
+  line-height: 1 !important;
+  transform: none !important;
+}
+
+html.minimal-launch body.in-game .board,
+html.minimal-launch body.in-game .game-screen.has-actions .board,
+html.minimal-launch body.in-game .game-screen.has-pre-actions .board,
+html.minimal-launch body.in-game .game-screen.has-bot-actions .board {
+  --board-w: min(calc(100vw - 36px), 364px);
+  --board-h: min(calc(100svh - var(--toolbar-h) - var(--dev-h) - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)), 742px);
+  width: var(--board-w) !important;
+  height: max(620px, var(--board-h)) !important;
+  max-height: calc(100svh - var(--toolbar-h) - 18px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  border-width: 4px !important;
+  border-radius: 43% / 19% !important;
+  background:
+    radial-gradient(ellipse at 50% 32%, rgba(255, 255, 255, 0.11) 0, transparent 26%),
+    radial-gradient(ellipse at center, #1d6a5c 0 26%, #155447 48%, #0d352f 75%, #071d1a 100%) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.065),
+    inset 0 0 0 16px rgba(255, 255, 255, 0.026),
+    inset 0 0 36px rgba(0, 0, 0, 0.44),
+    0 12px 30px rgba(0, 0, 0, 0.28) !important;
+}
+
+html.minimal-launch body.in-game .board::before {
+  inset: 42px 22px !important;
+  border-color: color-mix(in srgb, #d3f3e8 25%, transparent) !important;
+}
+
+html.minimal-launch body.in-game .table-center {
+  top: 33% !important;
+  gap: 7px !important;
+}
+
+html.minimal-launch body.in-game .blinds,
+html.minimal-launch body.in-game .pot,
+html.minimal-launch body.in-game .table-details,
+html.minimal-launch body.in-game .viewer-hand-badge,
+html.minimal-launch body.in-game .seat-action-label,
+html.minimal-launch body.in-game .seat::after,
+html.minimal-launch body.in-game .status-line {
+  background: rgba(8, 18, 16, 0.48) !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 80%, transparent) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+html.minimal-launch body.in-game .blinds {
+  min-height: 22px !important;
+  padding: 3px 8px !important;
+  border-radius: 11px !important;
+  font-size: 12px !important;
+  font-weight: 650 !important;
+}
+
+html.minimal-launch body.in-game .pot-chip-stack {
+  width: 28px !important;
+  height: 20px !important;
+  opacity: .74 !important;
+}
+
+html.minimal-launch body.in-game .pot {
+  min-height: 24px !important;
+  padding: 4px 10px !important;
+  border-radius: 12px !important;
+  font-size: 13px !important;
+  font-weight: 650 !important;
+}
+
+html.minimal-launch body.in-game .community {
+  top: 42.5% !important;
+  width: calc(100% - 30px) !important;
+  max-width: 342px !important;
+  gap: 4px !important;
+}
+
+html.minimal-launch body.in-game .community .board-card-slot {
+  width: calc((100% - 16px) / 5) !important;
+  max-width: 66px !important;
+  min-width: 0 !important;
+  border-radius: 11px !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.minimal-launch body.in-game .community .card {
+  border-radius: 11px !important;
+  padding: 6px 4px !important;
+}
+
+html.minimal-launch body.in-game .community .card-rank {
+  font-size: 17px !important;
+}
+
+html.minimal-launch body.in-game .community .card-suit {
+  font-size: 24px !important;
+}
+
+html.minimal-launch body.in-game .table-details {
+  top: 58.5% !important;
+  width: min(74%, 258px) !important;
+  min-height: 25px !important;
+  padding: 4px 10px !important;
+  border-radius: 13px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  opacity: .82 !important;
+}
+
+html.minimal-launch body.in-game .viewer-hand-badge {
+  top: 73.5% !important;
+  min-height: 24px !important;
+  max-width: 170px !important;
+  padding: 4px 10px !important;
+  border-radius: 12px !important;
+}
+
+html.minimal-launch body.in-game .viewer-hand-badge strong {
+  font-size: 11px !important;
+  font-weight: 650 !important;
+}
+
+html.minimal-launch body.in-game .seat {
+  width: 74px !important;
+}
+
+html.minimal-launch body.in-game .seat-avatar {
+  width: 48px !important;
+  border-width: 2px !important;
+}
+
+html.minimal-launch body.in-game .seat-plate {
+  min-width: 68px !important;
+  max-width: 86px !important;
+  margin-top: -4px !important;
+  padding: 4px 7px 5px !important;
+  border-radius: 12px !important;
+  background: color-mix(in srgb, var(--game-card) 78%, transparent) !important;
+}
+
+html.minimal-launch body.in-game .seat-name {
+  max-width: 72px !important;
+  font-size: 10px !important;
+  font-weight: 650 !important;
+  line-height: 1.05 !important;
+}
+
+html.minimal-launch body.in-game .seat-meta {
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  opacity: .74 !important;
+}
+
+html.minimal-launch body.in-game .seat-action-label {
+  top: -10px !important;
+  max-width: 72px !important;
+  min-height: 18px !important;
+  padding: 3px 6px !important;
+  font-size: 8px !important;
+  color: color-mix(in srgb, #ffe08a 88%, transparent) !important;
+}
+
+html.minimal-launch body.in-game .seat::before {
+  min-height: 18px !important;
+  padding: 3px 6px !important;
+  font-size: 8px !important;
+  opacity: .76 !important;
+}
+
+html.minimal-launch body.in-game .seat::after {
+  top: 69px !important;
+  padding: 3px 6px !important;
+  font-size: 9px !important;
+  opacity: .78 !important;
+}
+
+html.minimal-launch body.in-game .seat-count-1.seat-0,
+html.minimal-launch body.in-game .seat-count-2.seat-0,
+html.minimal-launch body.in-game .seat-count-3.seat-0,
+html.minimal-launch body.in-game .seat-count-4.seat-0,
+html.minimal-launch body.in-game .seat-count-5.seat-0,
+html.minimal-launch body.in-game .seat-count-6.seat-0,
+html.minimal-launch body.in-game .game-screen.has-actions .seat-count-1.seat-0,
+html.minimal-launch body.in-game .game-screen.has-actions .seat-count-2.seat-0,
+html.minimal-launch body.in-game .game-screen.has-actions .seat-count-3.seat-0,
+html.minimal-launch body.in-game .game-screen.has-actions .seat-count-4.seat-0,
+html.minimal-launch body.in-game .game-screen.has-actions .seat-count-5.seat-0,
+html.minimal-launch body.in-game .game-screen.has-actions .seat-count-6.seat-0,
+html.minimal-launch body.in-game .game-screen.has-pre-actions .seat-count-1.seat-0,
+html.minimal-launch body.in-game .game-screen.has-pre-actions .seat-count-2.seat-0,
+html.minimal-launch body.in-game .game-screen.has-pre-actions .seat-count-3.seat-0,
+html.minimal-launch body.in-game .game-screen.has-pre-actions .seat-count-4.seat-0,
+html.minimal-launch body.in-game .game-screen.has-pre-actions .seat-count-5.seat-0,
+html.minimal-launch body.in-game .game-screen.has-pre-actions .seat-count-6.seat-0,
+html.minimal-launch body.in-game .game-screen.has-bot-actions .seat-count-1.seat-0,
+html.minimal-launch body.in-game .game-screen.has-bot-actions .seat-count-2.seat-0,
+html.minimal-launch body.in-game .game-screen.has-bot-actions .seat-count-3.seat-0,
+html.minimal-launch body.in-game .game-screen.has-bot-actions .seat-count-4.seat-0,
+html.minimal-launch body.in-game .game-screen.has-bot-actions .seat-count-5.seat-0,
+html.minimal-launch body.in-game .game-screen.has-bot-actions .seat-count-6.seat-0 {
+  left: 50% !important;
+  top: 91.5% !important;
+}
+
+html.minimal-launch body.in-game .seat-count-2.seat-1,
+html.minimal-launch body.in-game .seat-count-3.seat-2,
+html.minimal-launch body.in-game .seat-count-4.seat-2,
+html.minimal-launch body.in-game .seat-count-5.seat-3,
+html.minimal-launch body.in-game .seat-count-6.seat-3 {
+  left: 50% !important;
+  top: 7.25% !important;
+}
+
+html.minimal-launch body.in-game .seat-count-3.seat-1,
+html.minimal-launch body.in-game .seat-count-4.seat-1,
+html.minimal-launch body.in-game .seat-count-5.seat-1,
+html.minimal-launch body.in-game .seat-count-6.seat-1,
+html.minimal-launch body.in-game .seat-count-6.seat-1,
+html.minimal-launch body.in-game .seat-count-5.seat-1 {
+  left: 8.5% !important;
+  top: 68% !important;
+}
+
+html.minimal-launch body.in-game .seat-count-3.seat-2,
+html.minimal-launch body.in-game .seat-count-4.seat-3,
+html.minimal-launch body.in-game .seat-count-5.seat-4,
+html.minimal-launch body.in-game .seat-count-6.seat-5,
+html.minimal-launch body.in-game .seat-count-6.seat-5,
+html.minimal-launch body.in-game .seat-count-5.seat-4 {
+  left: 91.5% !important;
+  top: 68% !important;
+}
+
+html.minimal-launch body.in-game .seat-count-4.seat-2,
+html.minimal-launch body.in-game .seat-count-5.seat-2,
+html.minimal-launch body.in-game .seat-count-6.seat-2 {
+  left: 8.5% !important;
+  top: 28% !important;
+}
+
+html.minimal-launch body.in-game .seat-count-4.seat-3,
+html.minimal-launch body.in-game .seat-count-5.seat-3,
+html.minimal-launch body.in-game .seat-count-6.seat-4 {
+  left: 91.5% !important;
+  top: 28% !important;
+}
+
+@media (max-height: 760px) {
+  html.minimal-launch body.in-game .community {
+    top: 41% !important;
+  }
+
+  html.minimal-launch body.in-game .table-details {
+    top: 57% !important;
+  }
+
+  html.minimal-launch body.in-game .viewer-hand-badge {
+    top: 72% !important;
+  }
+}
