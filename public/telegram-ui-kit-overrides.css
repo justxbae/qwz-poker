@@ -6928,3 +6928,216 @@ html.minimal-launch body.in-game .drawer-tabs button + button {
 html.minimal-launch body.in-game .drawer-tabs {
   padding: 0 !important;
 }
+
+/* 2026-07-03: hard reset for table popovers; no inherited drawer/footer glitches. */
+html.minimal-launch body.in-game .game-toolbar {
+  position: relative !important;
+  z-index: 120 !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar #menuButton,
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"] {
+  width: 44px !important;
+  min-width: 44px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 15px !important;
+  background: var(--weez-control) !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 86%, transparent) !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar #menuButton.is-open,
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"].is-open {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar #menuButton::before {
+  content: "" !important;
+  width: 27px !important;
+  height: 27px !important;
+  display: block !important;
+  background: currentColor !important;
+  transform: translateY(2px) !important;
+  -webkit-mask: url("/assets/ui/ic_list.svg") center / 27px 27px no-repeat !important;
+  mask: url("/assets/ui/ic_list.svg") center / 27px 27px no-repeat !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"]::before {
+  content: "i" !important;
+  width: auto !important;
+  height: auto !important;
+  display: block !important;
+  background: transparent !important;
+  -webkit-mask: none !important;
+  mask: none !important;
+  font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-size: 24px !important;
+  font-weight: 650 !important;
+  line-height: 1 !important;
+  transform: translateY(-1px) !important;
+}
+
+html.minimal-launch body.in-game .side-menu,
+html.minimal-launch body.in-game .info-drawer {
+  position: fixed !important;
+  top: calc(2px + env(safe-area-inset-top)) !important;
+  bottom: auto !important;
+  width: min(292px, calc(100vw - 40px)) !important;
+  max-height: none !important;
+  padding: 56px 0 0 !important;
+  border: 0 !important;
+  border-radius: 26px !important;
+  background: var(--weez-sheet) !important;
+  color: var(--tg-text, #fff) !important;
+  overflow: hidden !important;
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.34) !important;
+  backdrop-filter: none !important;
+  z-index: 110 !important;
+}
+
+html.minimal-launch body.in-game .side-menu {
+  left: 20px !important;
+  right: auto !important;
+  transform-origin: 22px 22px !important;
+  animation: weez-table-menu-genie-in 180ms cubic-bezier(.16, 1, .3, 1) !important;
+}
+
+html.minimal-launch body.in-game .info-drawer {
+  left: auto !important;
+  right: 20px !important;
+  transform-origin: calc(100% - 22px) 22px !important;
+  animation: weez-table-menu-genie-in 180ms cubic-bezier(.16, 1, .3, 1) !important;
+}
+
+html.minimal-launch body.in-game .side-menu.is-closing,
+html.minimal-launch body.in-game .info-drawer.is-closing {
+  pointer-events: none !important;
+  animation: weez-table-menu-genie-out 160ms cubic-bezier(.7, 0, .84, 0) forwards !important;
+}
+
+html.minimal-launch body.in-game .side-menu .close-button,
+html.minimal-launch body.in-game .info-drawer .close-button {
+  position: absolute !important;
+  top: 8px !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 44px !important;
+  min-width: 44px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 15px !important;
+  background: color-mix(in srgb, var(--weez-sheet) 76%, var(--tg-text, #fff) 11%) !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 88%, transparent) !important;
+  font-size: 0 !important;
+  box-shadow: none !important;
+  z-index: 4 !important;
+}
+
+html.minimal-launch body.in-game .side-menu .close-button {
+  left: 20px !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .close-button {
+  right: 20px !important;
+}
+
+html.minimal-launch body.in-game .side-menu .close-button::before,
+html.minimal-launch body.in-game .info-drawer .close-button::before {
+  content: "" !important;
+  position: static !important;
+  display: block !important;
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 0 !important;
+  background: currentColor !important;
+  transform: none !important;
+  -webkit-mask: url("/assets/ui/cancel.svg") center / 18px 18px no-repeat !important;
+  mask: url("/assets/ui/cancel.svg") center / 18px 18px no-repeat !important;
+}
+
+html.minimal-launch body.in-game .side-menu .close-button::after,
+html.minimal-launch body.in-game .info-drawer .close-button::after {
+  display: none !important;
+}
+
+html.minimal-launch body.in-game .side-menu button:not(.close-button),
+html.minimal-launch body.in-game .drawer-tabs button {
+  position: relative !important;
+  isolation: isolate !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  min-height: 43px !important;
+  height: 43px !important;
+  padding: 0 24px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 91%, transparent) !important;
+  font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-size: 15.5px !important;
+  font-weight: 400 !important;
+  line-height: 20px !important;
+  text-align: left !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+html.minimal-launch body.in-game .side-menu button:not(.close-button)::before,
+html.minimal-launch body.in-game .drawer-tabs button::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: -1 !important;
+  background: rgba(255, 255, 255, .075) !important;
+  opacity: 0 !important;
+  transition: opacity 120ms ease !important;
+}
+
+html.minimal-launch body.in-game .side-menu button:not(.close-button):active::before,
+html.minimal-launch body.in-game .side-menu button:not(.close-button).is-pressing::before,
+html.minimal-launch body.in-game .drawer-tabs button:active::before,
+html.minimal-launch body.in-game .drawer-tabs button.is-pressing::before {
+  opacity: 1 !important;
+}
+
+html.minimal-launch body.in-game .side-menu button:not(.close-button) + button:not(.close-button),
+html.minimal-launch body.in-game .drawer-tabs button + button {
+  background-image: linear-gradient(to right, var(--weez-divider), var(--weez-divider)) !important;
+  background-repeat: no-repeat !important;
+  background-position: 24px 0 !important;
+  background-size: calc(100% - 48px) 1px !important;
+}
+
+html.minimal-launch body.in-game .drawer-tabs {
+  display: block !important;
+  width: 100% !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  overflow: hidden !important;
+}
+
+html.minimal-launch body.in-game .drawer-tabs button.active {
+  background: transparent !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 91%, transparent) !important;
+}
+
+html.minimal-launch body.in-game .drawer-tabs button span {
+  margin: 0 !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .drawer-page {
+  display: none !important;
+}

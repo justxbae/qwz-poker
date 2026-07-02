@@ -5514,6 +5514,8 @@ function closeSitOutPopover() {
 
 function openDrawer(tab = "log") {
   haptic("light");
+  window.clearTimeout(openDrawer.closeTimer);
+  infoDrawer.classList.remove("is-closing");
   infoDrawer.hidden = false;
   document.querySelector(`.game-toolbar [data-panel-tab="${tab}"]`)?.classList.add("is-open");
   closeMenu();
@@ -5527,9 +5529,19 @@ function openDrawer(tab = "log") {
 }
 
 function closeDrawer() {
-  infoDrawer.hidden = true;
-  document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => button.classList.remove("is-open"));
-  updateTelegramBackButton();
+  if (infoDrawer.hidden) {
+    document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => button.classList.remove("is-open"));
+    updateTelegramBackButton();
+    return;
+  }
+  window.clearTimeout(openDrawer.closeTimer);
+  infoDrawer.classList.add("is-closing");
+  openDrawer.closeTimer = window.setTimeout(() => {
+    infoDrawer.hidden = true;
+    infoDrawer.classList.remove("is-closing");
+    document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => button.classList.remove("is-open"));
+    updateTelegramBackButton();
+  }, 170);
 }
 
 function switchDrawerTab(tab) {
