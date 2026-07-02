@@ -7141,3 +7141,132 @@ html.minimal-launch body.in-game .drawer-tabs button span {
 html.minimal-launch body.in-game .info-drawer .drawer-page {
   display: none !important;
 }
+
+/* 2026-07-03: corrected popover model — trigger stays in the same XY and becomes close. */
+html.minimal-launch body.in-game .game-toolbar {
+  z-index: 140 !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar #menuButton,
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"] {
+  position: relative !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  z-index: 145 !important;
+  background: var(--weez-control) !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 86%, transparent) !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar #menuButton.is-open,
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"].is-open {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  background: color-mix(in srgb, var(--weez-sheet) 74%, var(--tg-text, #fff) 12%) !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 90%, transparent) !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar #menuButton.is-open::before,
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"].is-open::before {
+  content: "" !important;
+  display: block !important;
+  width: 18px !important;
+  height: 18px !important;
+  background: currentColor !important;
+  transform: none !important;
+  -webkit-mask: url("/assets/ui/cancel.svg") center / 18px 18px no-repeat !important;
+  mask: url("/assets/ui/cancel.svg") center / 18px 18px no-repeat !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar #menuButton::before {
+  width: 27px !important;
+  height: 27px !important;
+  transform: translateY(2px) !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"]::before {
+  transform: translateY(-1px) !important;
+}
+
+html.minimal-launch body.in-game .side-menu .close-button,
+html.minimal-launch body.in-game .info-drawer .close-button {
+  display: none !important;
+}
+
+html.minimal-launch body.in-game .side-menu,
+html.minimal-launch body.in-game .info-drawer {
+  top: calc(2px + env(safe-area-inset-top)) !important;
+  width: min(292px, calc(100vw - 40px)) !important;
+  padding: 56px 0 0 !important;
+  border-radius: 26px !important;
+  background: var(--weez-sheet) !important;
+  overflow: hidden !important;
+  z-index: 130 !important;
+  animation: weez-popover-open 260ms cubic-bezier(.22, .9, .24, 1) both !important;
+  will-change: opacity, transform !important;
+}
+
+html.minimal-launch body.in-game .side-menu {
+  left: 20px !important;
+  transform-origin: 22px 22px !important;
+}
+
+html.minimal-launch body.in-game .info-drawer {
+  right: 20px !important;
+  left: auto !important;
+  transform-origin: calc(100% - 22px) 22px !important;
+}
+
+html.minimal-launch body.in-game .side-menu.is-closing,
+html.minimal-launch body.in-game .info-drawer.is-closing {
+  animation: weez-popover-close 190ms cubic-bezier(.4, 0, .2, 1) both !important;
+}
+
+@keyframes weez-popover-open {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0) scale(.965);
+  }
+
+  55% {
+    opacity: 1;
+    transform: translate3d(0, 1px, 0) scale(1.006);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes weez-popover-close {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0) scale(.97);
+  }
+}
+
+html.minimal-launch body.in-game .side-menu button:not(.close-button),
+html.minimal-launch body.in-game .drawer-tabs button {
+  min-height: 42px !important;
+  height: 42px !important;
+  padding: 0 24px !important;
+  font-size: 15.5px !important;
+  line-height: 20px !important;
+  font-weight: 400 !important;
+}
+
+html.minimal-launch body.in-game .side-menu button:not(.close-button)::before,
+html.minimal-launch body.in-game .drawer-tabs button::before {
+  background: rgba(255, 255, 255, .055) !important;
+}
+
+html.minimal-launch body.in-game .side-menu button:not(.close-button) + button:not(.close-button),
+html.minimal-launch body.in-game .drawer-tabs button + button {
+  background-position: 24px 0 !important;
+  background-size: calc(100% - 48px) 1px !important;
+}
