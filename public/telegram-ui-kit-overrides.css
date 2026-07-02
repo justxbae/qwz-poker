@@ -6619,3 +6619,76 @@ html.minimal-launch body.in-game .side-menu button:not(.close-button) + button:n
   background-position: 36px 0 !important;
   background-size: calc(100% - 72px) 1px !important;
 }
+
+/* 2026-07-03: side menu is anchored to the top-left button; the button toggles list/cancel in-place. */
+html.minimal-launch body.in-game .game-toolbar #menuButton {
+  position: relative !important;
+  z-index: 82 !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar #menuButton::before {
+  width: 27px !important;
+  height: 27px !important;
+  transform: translateX(.5px) !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar #menuButton.is-open::before {
+  width: 21px !important;
+  height: 21px !important;
+  transform: none !important;
+  -webkit-mask: url("/assets/ui/cancel.svg") center / 21px 21px no-repeat !important;
+  mask: url("/assets/ui/cancel.svg") center / 21px 21px no-repeat !important;
+}
+
+html.minimal-launch body.in-game .side-menu {
+  top: calc(2px + env(safe-area-inset-top)) !important;
+  left: 20px !important;
+  width: min(340px, calc(100vw - 40px)) !important;
+  padding: 58px 0 10px !important;
+  border-radius: 28px !important;
+  transform-origin: 22px 22px !important;
+  animation: weez-table-menu-genie-in 190ms cubic-bezier(.16, 1, .3, 1) !important;
+  clip-path: circle(160% at 22px 22px) !important;
+}
+
+html.minimal-launch body.in-game .side-menu.is-closing {
+  pointer-events: none !important;
+  animation: weez-table-menu-genie-out 170ms cubic-bezier(.7, 0, .84, 0) forwards !important;
+}
+
+@keyframes weez-table-menu-genie-in {
+  from {
+    opacity: .08;
+    transform: scale(.82);
+    clip-path: circle(22px at 22px 22px);
+  }
+
+  62% {
+    opacity: 1;
+    transform: scale(1.012);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+    clip-path: circle(160% at 22px 22px);
+  }
+}
+
+@keyframes weez-table-menu-genie-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+    clip-path: circle(160% at 22px 22px);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(.82);
+    clip-path: circle(22px at 22px 22px);
+  }
+}
+
+html.minimal-launch body.in-game .side-menu .close-button {
+  display: none !important;
+}

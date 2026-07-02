@@ -487,7 +487,13 @@ async function boot() {
   backToLobbyButton.addEventListener("click", () => runAction(backToLobbyFromTable));
   sitButton.addEventListener("click", () => runAction(sitAtTable));
   observerSitButton.addEventListener("click", () => runAction(returnToSeat));
-  menuButton.addEventListener("click", () => openMenu());
+  menuButton.addEventListener("click", () => {
+    if (!sideMenu.hidden) {
+      closeMenu();
+      return;
+    }
+    openMenu();
+  });
   closeMenuButton.addEventListener("click", closeMenu);
   closeDrawerButton.addEventListener("click", closeDrawer);
   document.querySelectorAll("[data-panel-tab]").forEach((button) => {
@@ -5359,7 +5365,11 @@ function openMenu() {
     return;
   }
   haptic("light");
+  window.clearTimeout(openMenu.closeTimer);
+  sideMenu.classList.remove("is-closing");
   sideMenu.hidden = false;
+  menuButton.classList.add("is-open");
+  menuButton.setAttribute("aria-expanded", "true");
   inviteButton.hidden = !state.currentTableId;
   closeSitOutPopover();
   closeDrawer();
@@ -5367,8 +5377,21 @@ function openMenu() {
 }
 
 function closeMenu() {
-  sideMenu.hidden = true;
-  updateTelegramBackButton();
+  if (sideMenu.hidden) {
+    menuButton.classList.remove("is-open");
+    menuButton.setAttribute("aria-expanded", "false");
+    updateTelegramBackButton();
+    return;
+  }
+  window.clearTimeout(openMenu.closeTimer);
+  sideMenu.classList.add("is-closing");
+  openMenu.closeTimer = window.setTimeout(() => {
+    sideMenu.hidden = true;
+    sideMenu.classList.remove("is-closing");
+    menuButton.classList.remove("is-open");
+    menuButton.setAttribute("aria-expanded", "false");
+    updateTelegramBackButton();
+  }, 180);
 }
 
 function openLobbyMenu() {
