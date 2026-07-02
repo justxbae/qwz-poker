@@ -7138,8 +7138,38 @@ html.minimal-launch body.in-game .drawer-tabs button span {
   margin: 0 !important;
 }
 
-html.minimal-launch body.in-game .info-drawer .drawer-page {
+/* Float-panel drawer: size to content instead of the full-height auto/1fr
+   grid, and let the active (non-hidden) page show its rendered rows. */
+html.minimal-launch body.in-game .info-drawer {
+  grid-template-rows: auto auto !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .drawer-page[hidden] {
   display: none !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .drawer-page:not([hidden]) {
+  display: block !important;
+  overflow: visible !important;
+  padding: 6px 6px calc(10px + env(safe-area-inset-bottom)) !important;
+}
+
+/* The toolbar drives which panel opens, so the in-drawer tab row is
+   redundant here — collapse it to just the close control instead of a
+   tall block of blank rows. */
+html.minimal-launch body.in-game .info-drawer .drawer-tabs {
+  grid-template-columns: 1fr auto !important;
+  border-bottom: 0 !important;
+  padding: 0 0 4px !important;
+  background: transparent !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button:not(.close-button) {
+  display: none !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .drawer-tabs .close-button {
+  grid-column: 2 !important;
 }
 
 /* 2026-07-03: corrected popover model — trigger stays in the same XY and becomes close. */
