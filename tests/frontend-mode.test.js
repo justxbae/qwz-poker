@@ -71,7 +71,7 @@ test("frontend wires the daily play claim button to the backend endpoint and cou
 
 test("public tournaments UI treats the main lobby feed as cash-only and uses idempotent admin actions", () => {
   assert.match(appSource, /state\.tournaments = \(data\.tournaments \|\| \[\]\)\.filter\(\(tournament\) => \(tournament\.currency \|\| "USDT"\) === "USDT"\)/);
-  assert.match(appSource, /<span>USDT<\/span>/);
+  assert.match(appSource, /<span>\$<\/span>/);
   assert.doesNotMatch(appSource, /tournament\.balanceBucket === "cash" \? "USDT" : "PLAY"/);
   assert.match(appSource, /requestKey\(`tournament-\$\{endpoint\}-\$\{id\}`\)/);
   assert.match(appSource, /requestKey\(`admin-tournament-action-\$\{tournamentId\}-\$\{action\}`\)/);

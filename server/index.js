@@ -1100,7 +1100,7 @@ async function handleApi(req, res, url) {
         sendJson(res, 409, { error: "Покинуть турнирный стол с возвратом стека нельзя" });
         return;
       }
-      const operationId = req.headers["x-idempotency-key"] || id("table_leave");
+      const operationId = req.headers["x-idempotency-key"] || randomId("table_leave");
       const departingStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
       const result = leaveTable(table, user);
       await persistCompletedHands(table);
@@ -1138,7 +1138,7 @@ async function handleApi(req, res, url) {
         sendJson(res, 409, { error: "Встать из-за турнирного стола нельзя" });
         return;
       }
-      const operationId = req.headers["x-idempotency-key"] || id("table_stand");
+      const operationId = req.headers["x-idempotency-key"] || randomId("table_stand");
       const departingStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
       const result = leaveTable(table, user);
       await persistCompletedHands(table);

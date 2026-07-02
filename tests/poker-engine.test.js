@@ -469,6 +469,44 @@ test("showdown distributes main pot and side pot by contribution eligibility", (
   assert.match(table.message, /Player 2 забирает сайд-пот 1 200/);
 });
 
+test("split pot divides evenly and awards the odd chip left of the button", () => {
+  const table = createTable(owner, { maxPlayers: 3, smallBlind: 25 });
+  joinTable(table, player2);
+  joinTable(table, player3);
+  maybeStartHand(table);
+  startHand(table);
+
+  // Owner is the button, player2 posts SB, player3 posts BB.
+  table.seats[0].cards = ["Kc", "Qc"];
+  table.seats[1].cards = ["Kd", "Qd"];
+  table.seats[2].cards = ["2s", "3s"];
+  table.deck = ["9c", "7d", "4h", "Qh", "Ks"];
+
+  act(table, owner, { action: "call" });
+  act(table, player2, { action: "call" });
+  act(table, player3, { action: "check" });
+  act(table, player2, { action: "check" });
+  act(table, player3, { action: "check" });
+  act(table, owner, { action: "check" });
+  act(table, player2, { action: "check" });
+  act(table, player3, { action: "check" });
+  act(table, owner, { action: "check" });
+  act(table, player2, { action: "check" });
+  act(table, player3, { action: "check" });
+  act(table, owner, { action: "check" });
+
+  assert.equal(table.status, "showdown");
+  // Pot 150, rake floor(150 * 0.05) = 7, net 143 split between two K/Q two-pair hands.
+  assert.equal(table.rakeCollected, 7);
+  // Both winners paid 50; share 71 each, odd chip to the SB (first left of button).
+  assert.equal(table.seats[0].stack, 10_021);
+  assert.equal(table.seats[1].stack, 10_022);
+  assert.equal(table.seats[2].stack, 9_950);
+  const oddChipEvent = (table.events || []).find((event) => event.type === "odd_chip_award");
+  assert.ok(oddChipEvent, "odd_chip_award event is emitted");
+  assert.equal(oddChipEvent.payload.userId, player2.id);
+});
+
 test("showdown records hand history with board, pots, and player results", () => {
   const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
   joinTable(table, player2);

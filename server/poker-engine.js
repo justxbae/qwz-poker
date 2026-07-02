@@ -1041,7 +1041,9 @@ function orderWinnersForOddChips(table, winners) {
 function oddChipDistance(table, seatIndex) {
   if (seatIndex < 0) return Number.MAX_SAFE_INTEGER;
   if (table.dealerIndex < 0 || table.seats.length === 0) return seatIndex;
-  return (seatIndex - table.dealerIndex + table.seats.length) % table.seats.length;
+  // Standard flop-game rule: the odd chip goes to the first seat clockwise
+  // from the button, so the button itself is always last in line.
+  return (seatIndex - table.dealerIndex - 1 + table.seats.length) % table.seats.length;
 }
 
 function isBettingRoundComplete(table) {
