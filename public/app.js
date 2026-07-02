@@ -487,6 +487,16 @@ async function boot() {
   backToLobbyButton.addEventListener("click", () => runAction(backToLobbyFromTable));
   sitButton.addEventListener("click", () => runAction(sitAtTable));
   observerSitButton.addEventListener("click", () => runAction(returnToSeat));
+  sideMenu.addEventListener("pointerdown", onFooterLobbyPress, { passive: true });
+  sideMenu.addEventListener("pointermove", onFooterLobbyPointerMove, { passive: true });
+  sideMenu.addEventListener("pointerup", onFooterLobbyPointerEnd, { passive: true });
+  sideMenu.addEventListener("pointercancel", onFooterLobbyPointerEnd, { passive: true });
+  sideMenu.addEventListener("click", cancelDraggedMenuClick, true);
+  infoDrawer.addEventListener("pointerdown", onFooterLobbyPress, { passive: true });
+  infoDrawer.addEventListener("pointermove", onFooterLobbyPointerMove, { passive: true });
+  infoDrawer.addEventListener("pointerup", onFooterLobbyPointerEnd, { passive: true });
+  infoDrawer.addEventListener("pointercancel", onFooterLobbyPointerEnd, { passive: true });
+  infoDrawer.addEventListener("click", cancelDraggedMenuClick, true);
   menuButton.addEventListener("click", () => {
     if (!sideMenu.hidden) {
       closeMenu();
@@ -497,7 +507,13 @@ async function boot() {
   closeMenuButton.addEventListener("click", closeMenu);
   closeDrawerButton.addEventListener("click", closeDrawer);
   document.querySelectorAll("[data-panel-tab]").forEach((button) => {
-    button.addEventListener("click", () => openDrawer(button.dataset.panelTab));
+    button.addEventListener("click", () => {
+      if (!infoDrawer.hidden && button.classList.contains("is-open")) {
+        closeDrawer();
+        return;
+      }
+      openDrawer(button.dataset.panelTab);
+    });
   });
   document.querySelectorAll("[data-drawer-tab]").forEach((button) => {
     button.addEventListener("click", () => switchDrawerTab(button.dataset.drawerTab));
@@ -722,7 +738,7 @@ function onFooterLobbyAction(event) {
 }
 
 function onFooterLobbyPress(event) {
-  const row = event.target.closest(".footer-lobby-row, .home-table-list .table-item");
+  const row = event.target.closest(".footer-lobby-row, .home-table-list .table-item, .side-menu button:not(.close-button), .drawer-tabs button");
   if (!row) return;
   row._pressStartX = event.clientX;
   row._pressStartY = event.clientY;
@@ -732,7 +748,7 @@ function onFooterLobbyPress(event) {
 }
 
 function onFooterLobbyPointerMove(event) {
-  const row = event.target.closest(".footer-lobby-row.is-pressing, .home-table-list .table-item.is-pressing");
+  const row = event.target.closest(".footer-lobby-row.is-pressing, .home-table-list .table-item.is-pressing, .side-menu button.is-pressing:not(.close-button), .drawer-tabs button.is-pressing");
   if (!row) return;
   const dx = Math.abs(event.clientX - Number(row._pressStartX || event.clientX));
   const dy = Math.abs(event.clientY - Number(row._pressStartY || event.clientY));
@@ -743,20 +759,27 @@ function onFooterLobbyPointerMove(event) {
 }
 
 function onFooterLobbyPointerEnd(event) {
-  const row = event.target.closest(".footer-lobby-row, .home-table-list .table-item");
+  const row = event.target.closest(".footer-lobby-row, .home-table-list .table-item, .side-menu button:not(.close-button), .drawer-tabs button");
   if (!row) return;
   window.clearTimeout(row._pressTimer);
   row._pressTimer = window.setTimeout(() => row.classList.remove("is-pressing"), 120);
 }
 
 function consumeFooterCancelledClick(button) {
-  const row = button.closest(".footer-lobby-row, .home-table-list .table-item");
+  const row = button.closest(".footer-lobby-row, .home-table-list .table-item, .side-menu button:not(.close-button), .drawer-tabs button");
   if (row?.dataset.pressCancelled === "1") {
     row.dataset.pressCancelled = "";
     row.classList.remove("is-pressing");
     return true;
   }
   return false;
+}
+
+function cancelDraggedMenuClick(event) {
+  const button = event.target.closest(".side-menu button:not(.close-button), .drawer-tabs button");
+  if (!button || !consumeFooterCancelledClick(button)) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
 }
 
 function currentLimits() {
@@ -5492,6 +5515,7 @@ function closeSitOutPopover() {
 function openDrawer(tab = "log") {
   haptic("light");
   infoDrawer.hidden = false;
+  document.querySelector(`.game-toolbar [data-panel-tab="${tab}"]`)?.classList.add("is-open");
   closeMenu();
   if (state.currentTable) {
     renderActionLog(state.currentTable.actionLog || []);
@@ -5504,6 +5528,7 @@ function openDrawer(tab = "log") {
 
 function closeDrawer() {
   infoDrawer.hidden = true;
+  document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => button.classList.remove("is-open"));
   updateTelegramBackButton();
 }
 
