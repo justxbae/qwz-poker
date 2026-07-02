@@ -6834,3 +6834,97 @@ html.minimal-launch body.in-game .drawer-tabs button {
 html.minimal-launch body.in-game .drawer-tabs button span {
   margin-left: 9px !important;
 }
+
+/* 2026-07-03: final table menu geometry — exact compact grouped-list behavior. */
+html.minimal-launch body.in-game .side-menu,
+html.minimal-launch body.in-game .info-drawer {
+  width: min(300px, calc(100vw - 40px)) !important;
+  padding: 56px 0 0 !important;
+  border-radius: 26px !important;
+  background: var(--weez-sheet) !important;
+  overflow: hidden !important;
+}
+
+html.minimal-launch body.in-game .side-menu .close-button,
+html.minimal-launch body.in-game .info-drawer .close-button {
+  position: absolute !important;
+  top: 8px !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 44px !important;
+  min-width: 44px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 15px !important;
+  background: color-mix(in srgb, var(--weez-sheet) 76%, var(--tg-text, #fff) 11%) !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 90%, transparent) !important;
+  font-size: 0 !important;
+  box-shadow: none !important;
+  z-index: 2 !important;
+}
+
+html.minimal-launch body.in-game .side-menu .close-button {
+  left: 28px !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .close-button {
+  right: 28px !important;
+}
+
+html.minimal-launch body.in-game .side-menu .close-button::before,
+html.minimal-launch body.in-game .info-drawer .close-button::before {
+  content: "" !important;
+  display: block !important;
+  position: static !important;
+  width: 19px !important;
+  height: 19px !important;
+  border-radius: 0 !important;
+  background: currentColor !important;
+  transform: none !important;
+  -webkit-mask: url("/assets/ui/cancel.svg") center / 19px 19px no-repeat !important;
+  mask: url("/assets/ui/cancel.svg") center / 19px 19px no-repeat !important;
+}
+
+html.minimal-launch body.in-game .side-menu .close-button::after,
+html.minimal-launch body.in-game .info-drawer .close-button::after {
+  display: none !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar #menuButton.is-open {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar #menuButton::before {
+  transform: translateY(2.5px) !important;
+}
+
+html.minimal-launch body.in-game .side-menu button:not(.close-button),
+html.minimal-launch body.in-game .drawer-tabs button {
+  min-height: 44px !important;
+  height: 44px !important;
+  padding: 0 28px !important;
+  font-size: 15.5px !important;
+  line-height: 20px !important;
+  font-weight: 400 !important;
+  background: transparent !important;
+}
+
+html.minimal-launch body.in-game .side-menu button:not(.close-button)::before,
+html.minimal-launch body.in-game .drawer-tabs button::before {
+  inset: 0 !important;
+  background: rgba(255, 255, 255, .08) !important;
+}
+
+html.minimal-launch body.in-game .side-menu button:not(.close-button) + button:not(.close-button),
+html.minimal-launch body.in-game .drawer-tabs button + button {
+  background-position: 28px 0 !important;
+  background-size: calc(100% - 56px) 1px !important;
+}
+
+html.minimal-launch body.in-game .drawer-tabs {
+  padding: 0 !important;
+}
