@@ -4282,3 +4282,233 @@ html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .foote
 html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-chevron {
   display: block !important;
 }
+
+/* ============================================================
+   2026-07-02: In-game table chrome aligned with the lobby skin.
+   Tokens: bg #121212, cards #1c1c1f, controls #2a2a2e, blue
+   #2aabee, red #fa525d, radii 26/24/14, rows 52, buttons 48.
+   The felt itself stays green (game surface); only the chrome
+   (toolbar, pills, plates, action bar, menus, sheets) changes.
+   ============================================================ */
+
+html.minimal-launch body.in-game {
+  background: #121212 !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar .icon-control,
+html.minimal-launch body.in-game .game-toolbar .table-id {
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: #1c1c1f !important;
+  box-shadow: none !important;
+  color: rgba(255, 255, 255, 0.82) !important;
+  font-weight: 500 !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar .icon-control:active {
+  background: #2a2a2e !important;
+  transform: scale(0.97) !important;
+}
+
+html.minimal-launch body.in-game .pot,
+html.minimal-launch body.in-game .blinds,
+html.minimal-launch body.in-game .table-details,
+html.minimal-launch body.in-game .status-line,
+html.minimal-launch body.in-game .viewer-hand-badge,
+html.minimal-launch body.in-game .seat-action-label,
+html.minimal-launch body.in-game .bet-amount {
+  border: 0 !important;
+  background: rgba(18, 18, 18, 0.72) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  font-weight: 500 !important;
+  text-shadow: none !important;
+}
+
+html.minimal-launch body.in-game .pot {
+  font-weight: 600 !important;
+}
+
+html.minimal-launch body.in-game .viewer-hand-badge strong {
+  color: #ffd66b !important;
+  font-weight: 600 !important;
+  text-shadow: none !important;
+}
+
+html.minimal-launch body.in-game .community .card.placeholder,
+html.minimal-launch body.in-game .community .card:empty {
+  border: 0 !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch body.in-game .seat-plate {
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #1c1c1f !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch body.in-game .seat-name {
+  font-weight: 500 !important;
+  text-shadow: none !important;
+}
+
+html.minimal-launch body.in-game .seat-meta {
+  font-weight: 600 !important;
+  text-shadow: none !important;
+}
+
+/* Heads-up top seat: keep the bet chip clear of the plate and badges. */
+html.minimal-launch body.in-game .seat-count-2.seat-1 .bet-spot {
+  margin-top: 34px !important;
+}
+
+html.minimal-launch body.in-game .betting-actions,
+html.minimal-launch body.in-game .pre-actions {
+  border: 0 !important;
+  border-radius: 26px 26px 0 0 !important;
+  background: #1c1c1f !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+html.minimal-launch body.in-game .betting-actions button,
+html.minimal-launch body.in-game .pre-actions button {
+  min-height: 48px !important;
+  border-radius: 24px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+}
+
+html.minimal-launch body.in-game .betting-actions button[data-poker-action="fold"] {
+  background: #fa525d !important;
+  color: #fff !important;
+}
+
+html.minimal-launch body.in-game .betting-actions button[data-poker-action="check"],
+html.minimal-launch body.in-game .betting-actions button[data-poker-action="call"],
+html.minimal-launch body.in-game .pre-actions button {
+  background: #2a2a2e !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+html.minimal-launch body.in-game .betting-actions button[data-poker-action="bet"],
+html.minimal-launch body.in-game .betting-actions button[data-poker-action="raise"],
+html.minimal-launch body.in-game .betting-actions .bet-confirm {
+  background: #2aabee !important;
+  color: #fff !important;
+}
+
+html.minimal-launch body.in-game .quick-bets button {
+  min-height: 34px !important;
+  border: 0 !important;
+  border-radius: 17px !important;
+  background: #2a2a2e !important;
+  color: rgba(255, 255, 255, 0.66) !important;
+  font-weight: 500 !important;
+}
+
+html.minimal-launch body.in-game .side-menu {
+  border: 0 !important;
+  border-radius: 26px !important;
+  background: #1c1c1f !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5) !important;
+  padding: 8px !important;
+}
+
+html.minimal-launch body.in-game .side-menu button {
+  min-height: 52px !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  font-weight: 500 !important;
+  text-align: left !important;
+  padding: 0 16px !important;
+}
+
+html.minimal-launch body.in-game .side-menu button:active {
+  background: #2a2a2e !important;
+}
+
+html.minimal-launch body.in-game .side-menu .close-button {
+  text-align: center !important;
+}
+
+html.minimal-launch body.in-game .info-drawer {
+  border: 0 !important;
+  border-radius: 26px 26px 0 0 !important;
+  background: #1c1c1f !important;
+  box-shadow: 0 -14px 40px rgba(0, 0, 0, 0.5) !important;
+}
+
+html.minimal-launch body.in-game .drawer-tabs button {
+  border: 0 !important;
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.55) !important;
+  font-weight: 500 !important;
+}
+
+html.minimal-launch body.in-game .drawer-tabs button.active {
+  color: #fff !important;
+}
+
+html.minimal-launch .buyin-sheet {
+  border: 0 !important;
+  border-radius: 30px 30px 0 0 !important;
+  background: #1c1c1f !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch .buyin-sheet .buyin-submit {
+  min-height: 48px !important;
+  border-radius: 24px !important;
+  background: #2aabee !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+}
+
+html.minimal-launch body.in-game .blinds {
+  border-radius: 999px !important;
+  padding: 4px 12px !important;
+}
+
+html.minimal-launch body.in-game .board-card-slot {
+  border: 0 !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch body.in-game .sitout-action {
+  background: #2a2a2e !important;
+  border: 0 !important;
+  border-radius: 17px !important;
+  color: rgba(255, 255, 255, 0.66) !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch body.in-game .side-menu button:not(.close-button) {
+  min-height: 52px !important;
+  font-size: 16px !important;
+  background-repeat: no-repeat !important;
+  background-position: 16px 0 !important;
+  background-size: calc(100% - 32px) 1px !important;
+}
+
+html.minimal-launch body.in-game .side-menu button:not(.close-button) + button:not(.close-button) {
+  background-image: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--tg-text, #fff) 22%, transparent),
+    color-mix(in srgb, var(--tg-text, #fff) 22%, transparent)
+  ) !important;
+  border-radius: 0 !important;
+}
