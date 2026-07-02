@@ -14,13 +14,45 @@ export function stateStoreEnabled() {
   return Boolean(redis);
 }
 
-export async function initStateStore() {
+function stateStoreBootTimeoutMs() {
+  const parsed = Number.parseInt(process.env.REDIS_BOOT_TIMEOUT_MS || "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 10_000;
+}
+
+function withTimeout(promise, timeoutMs, message) {
+  let timeout = null;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeout) clearTimeout(timeout);
+  });
+}
+
+async function disconnectRedisClients() {
+  if (subscriber) {
+    subscriber.disconnect();
+    subscriber = null;
+  }
+  if (redis) {
+    redis.disconnect();
+    redis = null;
+  }
+}
+
+export async function initStateStore({ required = false } = {}) {
   const url = process.env.REDIS_URL || "";
-  if (!url) return false;
+  if (!url) {
+    if (required) throw new Error("REDIS_URL is required but is empty");
+    return false;
+  }
+
+  const bootTimeoutMs = stateStoreBootTimeoutMs();
 
   redis = new Redis(url, {
     lazyConnect: true,
     enableReadyCheck: true,
+    connectTimeout: Math.min(bootTimeoutMs, 10_000),
     maxRetriesPerRequest: 2,
     retryStrategy(times) {
       return Math.min(times * 100, 2000);
@@ -30,17 +62,25 @@ export async function initStateStore() {
     lastError = error.message;
     console.error("Redis error:", error.message);
   });
-  await redis.connect();
-  await redis.ping();
-  subscriber = redis.duplicate();
-  await subscriber.connect();
-  await subscriber.psubscribe(`${PREFIX}:table-events:*`);
-  subscriber.on("pmessage", (_pattern, channel, message) => {
-    const tableId = channel.slice(`${PREFIX}:table-events:`.length);
-    for (const listener of tableListeners.get(tableId) || []) listener(message);
-  });
-  lastError = "";
-  return true;
+  try {
+    await withTimeout(redis.connect(), bootTimeoutMs, `Redis connect timed out after ${bootTimeoutMs}ms`);
+    await withTimeout(redis.ping(), bootTimeoutMs, `Redis ping timed out after ${bootTimeoutMs}ms`);
+    subscriber = redis.duplicate();
+    await withTimeout(subscriber.connect(), bootTimeoutMs, `Redis subscriber connect timed out after ${bootTimeoutMs}ms`);
+    await withTimeout(subscriber.psubscribe(`${PREFIX}:table-events:*`), bootTimeoutMs, `Redis subscriber subscribe timed out after ${bootTimeoutMs}ms`);
+    subscriber.on("pmessage", (_pattern, channel, message) => {
+      const tableId = channel.slice(`${PREFIX}:table-events:`.length);
+      for (const listener of tableListeners.get(tableId) || []) listener(message);
+    });
+    lastError = "";
+    return true;
+  } catch (error) {
+    lastError = error.message;
+    await disconnectRedisClients();
+    if (required) throw error;
+    console.warn(`[warn] Redis unavailable, falling back to memory state store: ${error.message}`);
+    return false;
+  }
 }
 
 export async function stateStoreHealth() {

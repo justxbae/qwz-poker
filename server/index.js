@@ -280,7 +280,7 @@ const server = createServer(async (req, res) => {
 await initDatabase();
 await dbUpsertTournamentDefinitions([...tournaments.values()]);
 await hydrateTournamentDefinitions();
-await initStateStore();
+await initStateStore({ required: REAL_MONEY_ENABLED });
 await hydrateActiveTables();
 await hydrateTournamentRegistrations();
 await hydrateRewardTournamentEvents();
