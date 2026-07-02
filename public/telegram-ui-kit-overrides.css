@@ -7300,3 +7300,47 @@ html.minimal-launch body.in-game .drawer-tabs button + button {
   background-position: 24px 0 !important;
   background-size: calc(100% - 48px) 1px !important;
 }
+
+/* ============================================================
+   2026-07-03: toolbar controls use a single centered inline SVG
+   (.control-glyph). ::before is reserved for the open→X state only.
+   Square 44px boxes, glyph centered, Telegram-style press feedback.
+   ============================================================ */
+html.minimal-launch body.in-game .game-toolbar .icon-control {
+  width: 44px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  border-radius: 14px !important;
+  transition: background 140ms ease, transform 120ms ease, filter 140ms ease !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar #menuButton:not(.is-open)::before,
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"]:not(.is-open)::before {
+  content: none !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar .icon-control .control-glyph {
+  display: block !important;
+  width: 24px !important;
+  height: 24px !important;
+  color: inherit !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar #menuButton .control-glyph {
+  width: 26px !important;
+  height: 26px !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar .icon-control.is-open .control-glyph {
+  display: none !important;
+}
+
+/* Press feedback (Telegram): brighten + slight squeeze on hold, restore on release. */
+html.minimal-launch body.in-game .game-toolbar .icon-control:active {
+  background: color-mix(in srgb, var(--weez-control) 66%, #ffffff 18%) !important;
+  color: #ffffff !important;
+  transform: scale(0.93) !important;
+}
