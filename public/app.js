@@ -340,6 +340,26 @@ let potAmountKey = "";
 let previousSeatCardKeys = new Map();
 let previousSeatBets = new Map();
 let previousSeatFolded = new Map();
+// Persistent seat DOM nodes keyed by userId. Reusing nodes (instead of
+// recreating the whole row each update) keeps running animations — the
+// active-seat glow, avatars, in-flight transitions — from restarting on
+// every state tick, which is what made the table feel choppy.
+const seatNodeCache = new Map();
+const SEAT_SKELETON = `
+  <div class="seat-avatar"></div>
+  <div class="seat-cards"></div>
+  <div class="seat-action-label"></div>
+  <div class="bet-spot">
+    <div class="chip-stack" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    <span class="bet-amount"></span>
+  </div>
+  <div class="seat-plate">
+    <div class="seat-name"></div>
+    <div class="seat-timer"><span></span></div>
+    <div class="seat-meta"></div>
+    <div class="seat-hand-label"></div>
+  </div>
+`;
 let activeSeatKey = "";
 let viewerActionHapticKey = "";
 let showdownPayoutKey = "";
@@ -5198,107 +5218,148 @@ function renderCurrentTable(table) {
     highlightCards: boardHighlightCards
   }));
   const shouldPayWinners = maybeAnimatePotToWinners(table, winningSeatIds);
-  seats.replaceChildren(
-    ...table.seats.map((seat, index) => {
-      const node = document.createElement("article");
+  // Switching to a different table starts a fresh seat set — drop the
+  // cached nodes so nothing leaks across tables.
+  if (seatNodeCache.tableId !== table.id) {
+    seatNodeCache.forEach((node) => node.remove());
+    seatNodeCache.clear();
+    seatNodeCache.tableId = table.id;
+  }
+  const viewerSeatIndex = table.seats.findIndex((item) => item.userId === state.user?.id);
+  const orderedNodes = [];
+  const liveUserIds = new Set();
+  table.seats.forEach((seat, index) => {
+    liveUserIds.add(seat.userId);
+    const seatCardKey = `${table.handNumber}:${seat.userId}:${seat.cards.join("|")}`;
+    const previousCardKey = previousSeatCardKeys.get(seat.userId) || "";
+    const shouldAnimateCards = Boolean(seat.cards.length && seatCardKey !== previousCardKey);
+    const seatHand = evaluateVisibleHand([...(seat.cards || []), ...(table.communityCards || [])]);
+    const highlightCards = seat.userId === state.user?.id || winningSeatIds.has(seat.userId)
+      ? seatHand.cards
+      : [];
+    previousSeatCardKeys.set(seat.userId, seatCardKey);
+    const previousBet = previousSeatBets.get(seat.userId) || 0;
+    const shouldAnimateBet = Boolean(seat.bet && seat.bet !== previousBet);
+    previousSeatBets.set(seat.userId, seat.bet || 0);
+    const previousFolded = previousSeatFolded.get(seat.userId) || false;
+    const becameFolded = Boolean(seat.folded && !previousFolded);
+    previousSeatFolded.set(seat.userId, Boolean(seat.folded));
+    const nextActiveSeatKey = `${table.handNumber}:${table.activeSeatIndex}:${seat.userId}`;
+    const shouldAnimateTurn = index === table.activeSeatIndex && activeSeatKey !== nextActiveSeatKey;
+    // Rotate display positions so the viewer always renders at the bottom
+    // seat (display index 0), like every production poker client.
+    const displayIndex = viewerSeatIndex >= 0
+      ? (index - viewerSeatIndex + table.seats.length) % table.seats.length
+      : index;
+
+    // Reuse the existing node for this player; only build the skeleton once.
+    let node = seatNodeCache.get(seat.userId);
+    if (!node) {
+      node = document.createElement("article");
       node.dataset.userId = seat.userId;
-      const seatCardKey = `${table.handNumber}:${seat.userId}:${seat.cards.join("|")}`;
-      const previousCardKey = previousSeatCardKeys.get(seat.userId) || "";
-      const shouldAnimateCards = Boolean(seat.cards.length && seatCardKey !== previousCardKey);
-      const seatHand = evaluateVisibleHand([...(seat.cards || []), ...(table.communityCards || [])]);
-      const highlightCards = seat.userId === state.user?.id || winningSeatIds.has(seat.userId)
-        ? seatHand.cards
-        : [];
-      previousSeatCardKeys.set(seat.userId, seatCardKey);
-      const previousBet = previousSeatBets.get(seat.userId) || 0;
-      const shouldAnimateBet = Boolean(seat.bet && seat.bet !== previousBet);
-      previousSeatBets.set(seat.userId, seat.bet || 0);
-      const previousFolded = previousSeatFolded.get(seat.userId) || false;
-      const becameFolded = Boolean(seat.folded && !previousFolded);
-      previousSeatFolded.set(seat.userId, Boolean(seat.folded));
-      const nextActiveSeatKey = `${table.handNumber}:${table.activeSeatIndex}:${seat.userId}`;
-      const shouldAnimateTurn = index === table.activeSeatIndex && activeSeatKey !== nextActiveSeatKey;
-      // Rotate display positions so the viewer always renders at the bottom
-      // seat (display index 0), like every production poker client.
-      const viewerSeatIndex = table.seats.findIndex((item) => item.userId === state.user?.id);
-      const displayIndex = viewerSeatIndex >= 0
-        ? (index - viewerSeatIndex + table.seats.length) % table.seats.length
-        : index;
-      node.className = [
-        "seat",
-        `seat-${displayIndex}`,
-        `seat-count-${table.seats.length}`,
-        index === table.activeSeatIndex ? "active" : "",
-        shouldAnimateTurn ? "turn-in" : "",
-        seat.sittingOut ? "sitting-out" : "",
-        seat.sitOutNextHand ? "sitout-pending" : "",
-        seat.connected === false ? "disconnected" : "",
-        seat.reconnectDeadline ? "reconnecting" : "",
-        seat.busted ? "busted" : "",
-        seat.folded ? "folded" : "",
-        becameFolded ? "fold-out" : "",
-        seat.userId === state.user?.id ? "viewer-seat" : "",
-        seat.isAllIn ? "all-in" : "",
-        shouldAnimateBet ? "bet-pop" : "",
-        winningSeatIds.has(seat.userId) ? "winner" : "",
-        winningSeatIds.has(seat.userId) && shouldPayWinners ? "winner-paid" : "",
-        seat.userId === state.user?.id && viewerHand.rank >= 1 ? `viewer-made-hand hand-rank-${viewerHand.rank}` : ""
-      ].filter(Boolean).join(" ");
-      node.innerHTML = `
-        <div class="seat-avatar"></div>
-        <div class="seat-cards"></div>
-        <div class="seat-action-label"></div>
-        <div class="bet-spot">
-          <div class="chip-stack" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-          <span class="bet-amount"></span>
-        </div>
-        <div class="seat-plate">
-          <div class="seat-name"></div>
-          <div class="seat-timer"><span></span></div>
-          <div class="seat-meta"></div>
-          <div class="seat-hand-label"></div>
-        </div>
-      `;
-      const badges = [
-        index === table.dealerIndex ? "D" : "",
-        index === table.smallBlindIndex ? "SB" : "",
-        index === table.bigBlindIndex ? "BB" : "",
-        seat.isAllIn ? "All-in" : "",
-        seat.sitOutNextHand ? "Away next" : "",
-        seat.sittingOut ? sittingOutLabel(seat) : "",
-        seat.connected === false ? "Reconnect" : "",
-        seat.busted ? "Busted" : ""
-      ].filter(Boolean);
+      node.innerHTML = SEAT_SKELETON;
+      seatNodeCache.set(seat.userId, node);
+    }
+
+    const nextClassName = [
+      "seat",
+      `seat-${displayIndex}`,
+      `seat-count-${table.seats.length}`,
+      index === table.activeSeatIndex ? "active" : "",
+      shouldAnimateTurn ? "turn-in" : "",
+      seat.sittingOut ? "sitting-out" : "",
+      seat.sitOutNextHand ? "sitout-pending" : "",
+      seat.connected === false ? "disconnected" : "",
+      seat.reconnectDeadline ? "reconnecting" : "",
+      seat.busted ? "busted" : "",
+      seat.folded ? "folded" : "",
+      becameFolded ? "fold-out" : "",
+      seat.userId === state.user?.id ? "viewer-seat" : "",
+      seat.isAllIn ? "all-in" : "",
+      shouldAnimateBet ? "bet-pop" : "",
+      winningSeatIds.has(seat.userId) ? "winner" : "",
+      winningSeatIds.has(seat.userId) && shouldPayWinners ? "winner-paid" : "",
+      seat.userId === state.user?.id && viewerHand.rank >= 1 ? `viewer-made-hand hand-rank-${viewerHand.rank}` : ""
+    ].filter(Boolean).join(" ");
+    // Only touch className when it actually changes, so persistent
+    // animations (active glow) are never restarted by a no-op update.
+    if (node.className !== nextClassName) node.className = nextClassName;
+
+    const badges = [
+      index === table.dealerIndex ? "D" : "",
+      index === table.smallBlindIndex ? "SB" : "",
+      index === table.bigBlindIndex ? "BB" : "",
+      seat.isAllIn ? "All-in" : "",
+      seat.sitOutNextHand ? "Away next" : "",
+      seat.sittingOut ? sittingOutLabel(seat) : "",
+      seat.connected === false ? "Reconnect" : "",
+      seat.busted ? "Busted" : ""
+    ].filter(Boolean);
+
+    // Avatar only re-renders when the player's identity/photo changes,
+    // so it never flashes on routine updates.
+    const avatarKey = `${seat.userId}:${seat.name || ""}:${seat.photoUrl || seat.avatar || ""}`;
+    if (node.dataset.avatarKey !== avatarKey) {
       renderAvatar(node.querySelector(".seat-avatar"), seat);
-      node.querySelector(".seat-name").textContent = seat.name;
-      renderTableValue(node.querySelector(".seat-meta"), table, seat.stack);
-      const actionLabel = lastSeatActionLabel(table, seat);
-      const actionLabelNode = node.querySelector(".seat-action-label");
-      actionLabelNode.textContent = actionLabel;
-      actionLabelNode.hidden = !actionLabel;
-      const handLabel = node.querySelector(".seat-hand-label");
-      if (seat.userId === state.user?.id && viewerHand.label && viewerHand.rank >= 1) {
-        handLabel.textContent = viewerHand.label;
-      } else if (winningSeatIds.has(seat.userId) && seatHand.label) {
-        handLabel.textContent = seatHand.label;
-      } else {
-        handLabel.hidden = true;
-      }
+      node.dataset.avatarKey = avatarKey;
+    }
+
+    const nameNode = node.querySelector(".seat-name");
+    if (nameNode.textContent !== seat.name) nameNode.textContent = seat.name;
+    renderTableValue(node.querySelector(".seat-meta"), table, seat.stack);
+
+    const actionLabel = lastSeatActionLabel(table, seat);
+    const actionLabelNode = node.querySelector(".seat-action-label");
+    actionLabelNode.textContent = actionLabel;
+    actionLabelNode.hidden = !actionLabel;
+
+    const handLabel = node.querySelector(".seat-hand-label");
+    if (seat.userId === state.user?.id && viewerHand.label && viewerHand.rank >= 1) {
+      handLabel.textContent = viewerHand.label;
+      handLabel.hidden = false;
+    } else if (winningSeatIds.has(seat.userId) && seatHand.label) {
+      handLabel.textContent = seatHand.label;
+      handLabel.hidden = false;
+    } else {
+      handLabel.textContent = "";
+      handLabel.hidden = true;
+    }
+
+    // Cards only re-render (and re-deal-animate) when the card set changes.
+    if (node.dataset.cardKey !== seatCardKey || shouldAnimateCards) {
       node.querySelector(".seat-cards").replaceChildren(...renderCards(seat.cards, {
         animate: shouldAnimateCards,
         highlightCards
       }));
-      if (seat.bet) renderTableValue(node.querySelector(".bet-amount"), table, seat.bet);
-      node.dataset.badges = badges.join(" ");
-      node.dataset.bet = seat.bet ? formatTableAmount(table, seat.bet) : "";
-      node.dataset.betSize = chipSize(seat.bet, table.bigBlind);
-      node.dataset.chipTheme = chipTheme(seat.bet, table.bigBlind);
-      if (index === table.activeSeatIndex && table.actionDeadline) {
-        node.style.setProperty("--timer-progress", `${timerProgress(table)}%`);
-      }
-      return node;
-    })
-  );
+      node.dataset.cardKey = seatCardKey;
+    }
+
+    const betAmountNode = node.querySelector(".bet-amount");
+    if (seat.bet) renderTableValue(betAmountNode, table, seat.bet);
+    else betAmountNode.textContent = "";
+    node.dataset.badges = badges.join(" ");
+    node.dataset.bet = seat.bet ? formatTableAmount(table, seat.bet) : "";
+    node.dataset.betSize = chipSize(seat.bet, table.bigBlind);
+    node.dataset.chipTheme = chipTheme(seat.bet, table.bigBlind);
+    if (index === table.activeSeatIndex && table.actionDeadline) {
+      node.style.setProperty("--timer-progress", `${timerProgress(table)}%`);
+    } else {
+      node.style.removeProperty("--timer-progress");
+    }
+    orderedNodes.push(node);
+  });
+
+  // Drop nodes for players who left the table.
+  for (const [userId, node] of seatNodeCache) {
+    if (!liveUserIds.has(userId)) {
+      node.remove();
+      seatNodeCache.delete(userId);
+    }
+  }
+  // Reorder in place: appendChild moves existing nodes without recreating
+  // them, so nothing animates just because the DOM order was touched.
+  orderedNodes.forEach((node) => seats.appendChild(node));
+
   activeSeatKey = table.activeSeatIndex >= 0
     ? `${table.handNumber}:${table.activeSeatIndex}:${table.seats[table.activeSeatIndex]?.userId || ""}`
     : "";
