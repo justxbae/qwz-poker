@@ -6311,6 +6311,22 @@ html.minimal-launch body.in-game .community .card {
   padding: 4px 3px !important;
 }
 
+/* The width rule above also matched the .card nested inside each slot,
+   collapsing it to a fifth of the slot (~8px) so only a tiny white blob
+   showed while the rank/suit overflowed. A dealt card must fill its slot. */
+html.minimal-launch body.in-game .community .board-card-slot .card {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  aspect-ratio: auto !important;
+  border-radius: 8px !important;
+}
+
+html.minimal-launch body.in-game .community .board-card-slot.filled {
+  position: relative !important;
+}
+
 html.minimal-launch body.in-game .community .card-rank {
   font-size: 17px !important;
   line-height: 1 !important;
@@ -7345,4 +7361,67 @@ html.minimal-launch body.in-game .game-toolbar .icon-control:active {
   background: color-mix(in srgb, var(--weez-control) 66%, #ffffff 18%) !important;
   color: #ffffff !important;
   transform: scale(0.93) !important;
+}
+
+/* ============================================================
+   2026-07-03: showdown + card polish pass.
+   ============================================================ */
+
+/* Smooth per-turn timer drain (JS sets the animation once per turn). */
+@keyframes seatTimerDrain {
+  to { width: 0%; }
+}
+
+/* Hand-result banner: a 999px radius on a two-line width:max-content box
+   turned into an ugly dark oval blob. Make it a clean rounded toast. */
+html.minimal-launch body.in-game .game-screen[data-table-status="showdown"] .status-line {
+  top: 43% !important;
+  max-width: 76% !important;
+  border-radius: 16px !important;
+  line-height: 1.28 !important;
+  padding: 9px 15px !important;
+  background: rgba(12, 15, 18, 0.92) !important;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Inner light rim hugs the table edge instead of cutting across the felt
+   near the community cards. */
+html.minimal-launch body.in-game .board::before {
+  inset: 12px 10px !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+/* Bigger, more legible pips on players' hole cards. */
+html.minimal-launch body.in-game .seat-cards .card {
+  width: 30px !important;
+  min-height: 42px !important;
+}
+html.minimal-launch body.in-game .seat.viewer-seat .seat-cards .card {
+  width: 40px !important;
+  min-height: 56px !important;
+}
+html.minimal-launch body.in-game .seat-cards .card-rank {
+  font-size: 12px !important;
+}
+html.minimal-launch body.in-game .seat-cards .card-suit {
+  font-size: 15px !important;
+}
+html.minimal-launch body.in-game .seat.viewer-seat .seat-cards .card-rank {
+  font-size: 15px !important;
+}
+html.minimal-launch body.in-game .seat.viewer-seat .seat-cards .card-suit {
+  font-size: 20px !important;
+}
+
+/* At showdown, an opponent's revealed cards grow IN PLACE and lift over
+   their own avatar (nick/stack plate stays visible) while the winning
+   hand shows. Scaling in place keeps side and edge seats on-screen. */
+html.minimal-launch body.in-game .game-screen[data-table-status="showdown"] .seat:not(.viewer-seat):not(.folded) .seat-cards {
+  z-index: 30 !important;
+  transform: scale(1.4) !important;
+  transform-origin: center bottom !important;
+  transition: transform 220ms ease !important;
+}
+html.minimal-launch body.in-game .game-screen[data-table-status="showdown"] .seat:not(.viewer-seat):not(.folded) .seat-cards .card {
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.5) !important;
 }

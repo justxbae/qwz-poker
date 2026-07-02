@@ -5341,10 +5341,24 @@ function renderCurrentTable(table) {
     node.dataset.bet = seat.bet ? formatTableAmount(table, seat.bet) : "";
     node.dataset.betSize = chipSize(seat.bet, table.bigBlind);
     node.dataset.chipTheme = chipTheme(seat.bet, table.bigBlind);
+    const timerSpan = node.querySelector(".seat-timer span");
     if (index === table.activeSeatIndex && table.actionDeadline) {
+      // Drive the timer as one smooth CSS drain per turn instead of a
+      // per-second width jump: set it once when the turn (deadline)
+      // changes and let it flow linearly to empty.
       node.style.setProperty("--timer-progress", `${timerProgress(table)}%`);
+      const remainingMs = Math.max(0, table.actionDeadline - table.now);
+      const turnKey = `${table.handNumber}:${table.activeSeatIndex}:${table.actionDeadline}`;
+      if (timerSpan && node.dataset.timerKey !== turnKey) {
+        node.dataset.timerKey = turnKey;
+        timerSpan.style.animation = "none";
+        void timerSpan.offsetWidth;
+        timerSpan.style.animation = `seatTimerDrain ${remainingMs}ms linear forwards`;
+      }
     } else {
       node.style.removeProperty("--timer-progress");
+      if (timerSpan) timerSpan.style.animation = "";
+      delete node.dataset.timerKey;
     }
     orderedNodes.push(node);
   });
