@@ -1892,7 +1892,7 @@ function renderHomeWalletSide(profileData = {}) {
   } else {
     const cooldownSeconds = Math.max(0, Number(dailyPlayClaim?.cooldownSeconds || 0));
     const canClaim = Boolean(dailyPlayClaim?.canClaim || cooldownSeconds === 0);
-    const amount = Number(dailyPlayClaim?.amount || 10000);
+    const amount = Number(dailyPlayClaim?.amount || 35000);
     const bonusProgress = canClaim ? 1 : Math.max(0.08, Math.min(1, 1 - (cooldownSeconds / (24 * 60 * 60))));
     if (homeWalletSideLabel) homeWalletSideLabel.textContent = "Бонус дня";
     homeWalletSideValue.textContent = formatNumber(amount);
@@ -3380,7 +3380,7 @@ function renderHomeCta() {
 
   if (balance <= 0) {
     if (!cashMode) {
-      const amount = Number(dailyPlayClaim?.amount || 10000);
+      const amount = Number(dailyPlayClaim?.amount || 35000);
       if (dailyPlayClaim?.canClaim) {
         if (quickPlayTitle) quickPlayTitle.textContent = "Получить фишки";
         else quickPlayButton.textContent = "Получить фишки";
@@ -6582,7 +6582,7 @@ async function claimDailyPlayBonus() {
     }
     renderModeBalance();
     renderHomeCta();
-    showStatus("10 000 игровых фишек начислены");
+    showStatus(`${formatNumber(Number(data.dailyPlayClaim?.amount || 35000))} игровых фишек начислены`);
   } catch (error) {
     if (error.status === 409 && error.data?.dailyPlayClaim) {
       setDailyPlayClaim(error.data.dailyPlayClaim);

@@ -37,7 +37,7 @@ export const CASH_TABLE_LIMITS = [
 export const ECONOMY = {
   play: {
     currency: ASSETS.PLAY,
-    dailyRefillChips: 10_000,
+    dailyRefillChips: 35_000,
     deposit: {
       rubPerStar: 2,
       chipsPerRub: 50,

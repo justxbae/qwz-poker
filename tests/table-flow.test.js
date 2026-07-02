@@ -447,7 +447,7 @@ test("cashier returns deposit settings and records wallet operations", async () 
   }
 });
 
-test("daily play claim credits 10000 play chips once per cooldown without touching cash", async () => {
+test("daily play claim credits 35000 play chips once per cooldown without touching cash", async () => {
   const server = await startServer();
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
@@ -455,22 +455,22 @@ test("daily play claim credits 10000 play chips once per cooldown without touchi
     assert.equal(initialProfile.dailyPlayClaim.canClaim, true);
     assert.equal(initialProfile.dailyPlayClaim.claimedAt, null);
     assert.equal(initialProfile.dailyPlayClaim.cooldownSeconds, 0);
-    assert.equal(initialProfile.dailyPlayClaim.amount, 10_000);
+    assert.equal(initialProfile.dailyPlayClaim.amount, 35_000);
 
     const claimed = await request("/api/play/daily-claim", {
       method: "POST",
       token: auth.token,
       idempotencyKey: "daily-claim-first"
     });
-    assert.equal(claimed.profile.balance, 10_000);
-    assert.equal(claimed.profile.playBalance, 10_000);
+    assert.equal(claimed.profile.balance, 35_000);
+    assert.equal(claimed.profile.playBalance, 35_000);
     assert.equal(claimed.profile.cashBalanceMicros, 0);
     assert.equal(claimed.profile.bonusBalanceMicros, 0);
     assert.equal(claimed.dailyPlayClaim.canClaim, false);
     assert.ok(claimed.dailyPlayClaim.claimedAt);
     assert.ok(claimed.dailyPlayClaim.availableAt);
     assert.ok(claimed.dailyPlayClaim.cooldownSeconds > 86_300);
-    assert.equal(claimed.dailyPlayClaim.amount, 10_000);
+    assert.equal(claimed.dailyPlayClaim.amount, 35_000);
     assert.equal(claimed.progression.dailyPlayClaim.canClaim, false);
 
     const replay = await request("/api/play/daily-claim", {
@@ -478,7 +478,7 @@ test("daily play claim credits 10000 play chips once per cooldown without touchi
       token: auth.token,
       idempotencyKey: "daily-claim-first"
     });
-    assert.equal(replay.profile.balance, 10_000);
+    assert.equal(replay.profile.balance, 35_000);
 
     const cooldown = await requestResponse("/api/play/daily-claim", {
       method: "POST",
@@ -490,11 +490,11 @@ test("daily play claim credits 10000 play chips once per cooldown without touchi
     assert.equal(cooldown.data.dailyPlayClaim.canClaim, false);
 
     const cashier = (await request("/api/cashier", { token: auth.token })).cashier;
-    assert.equal(cashier.playBalance, 10_000);
+    assert.equal(cashier.playBalance, 35_000);
     assert.equal(cashier.cashBalanceMicros, 0);
     assert.equal(cashier.bonusBalanceMicros, 0);
     assert.equal(cashier.playTransactions[0].category, "daily_play_claim");
-    assert.equal(cashier.playTransactions[0].amount, 10_000);
+    assert.equal(cashier.playTransactions[0].amount, 35_000);
 
     const otherAuth = await request("/api/auth", {
       method: "POST",
@@ -505,7 +505,7 @@ test("daily play claim credits 10000 play chips once per cooldown without touchi
       token: otherAuth.token,
       idempotencyKey: "daily-claim-other-user"
     });
-    assert.equal(otherClaim.profile.balance, 10_000);
+    assert.equal(otherClaim.profile.balance, 35_000);
   } finally {
     server.kill();
   }

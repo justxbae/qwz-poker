@@ -118,13 +118,13 @@ export async function getDailyPlayClaim(providerUserId, provider = "telegram") {
 }
 
 export async function claimDailyPlayChips(providerUserId, {
-  amount = 10_000,
+  amount = 35_000,
   cooldownSeconds = 24 * 60 * 60,
   idempotencyKey = ""
 } = {}, provider = "telegram") {
   if (!pool) return null;
   const appUserId = await ensureIdentity(provider, providerUserId);
-  const normalizedAmount = Math.max(1, Math.round(Number(amount) || 10_000));
+  const normalizedAmount = Math.max(1, Math.round(Number(amount) || 35_000));
   const normalizedCooldown = Math.max(1, Math.round(Number(cooldownSeconds) || 24 * 60 * 60));
   const ledgerKey = normalizeIdempotencyKey(idempotencyKey);
   const client = await pool.connect();
