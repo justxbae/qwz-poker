@@ -10139,3 +10139,39 @@ html.minimal-launch body.in-game .info-drawer .drawer-tabs .close-button::before
 html.minimal-launch body.in-game .info-drawer .drawer-tabs .close-button::after {
   transform: translate(-50%, -50%) rotate(-45deg) !important;
 }
+
+/* 2026-07-03: side menu needs its own visible close X (was hidden). */
+html.minimal-launch body.in-game .side-menu .close-button {
+  display: grid !important;
+  place-items: center !important;
+  position: absolute !important;
+  top: 10px !important;
+  right: 10px !important;
+  width: 34px !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: var(--weez-control, rgba(255,255,255,0.06)) !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  z-index: 3 !important;
+}
+html.minimal-launch body.in-game .side-menu .close-button::before,
+html.minimal-launch body.in-game .side-menu .close-button::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 14px !important;
+  height: 2px !important;
+  border-radius: 2px !important;
+  background: rgba(255, 255, 255, 0.8) !important;
+}
+html.minimal-launch body.in-game .side-menu .close-button::before {
+  transform: translate(-50%, -50%) rotate(45deg) !important;
+}
+html.minimal-launch body.in-game .side-menu .close-button::after {
+  transform: translate(-50%, -50%) rotate(-45deg) !important;
+}
