@@ -10175,3 +10175,32 @@ html.minimal-launch body.in-game .side-menu .close-button::before {
 html.minimal-launch body.in-game .side-menu .close-button::after {
   transform: translate(-50%, -50%) rotate(-45deg) !important;
 }
+
+/* 2026-07-04: authoritative visibility lock.
+   Panels are closed by default and only become visible when JS removes [hidden]. */
+html.minimal-launch body.in-game .side-menu[hidden],
+html.minimal-launch body.in-game .info-drawer[hidden] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+html.minimal-launch body.in-game .side-menu:not([hidden]),
+html.minimal-launch body.in-game .info-drawer:not([hidden]) {
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+html.minimal-launch body.in-game .side-menu .close-button,
+html.minimal-launch body.in-game .info-drawer .close-button {
+  display: none !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar #menuButton,
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"] {
+  outline: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}

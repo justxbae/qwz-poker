@@ -5850,15 +5850,10 @@ function streetOverlayFor(table) {
   return null;
 }
 
-function renderActionLog(logItems, handHistory = []) {
-  const historyNodes = handHistory.slice(0, 10).map(renderHandHistoryItem);
-  if (historyNodes.length) {
-    actionLog.replaceChildren(...historyNodes);
-    return;
-  }
+function renderActionLog(logItems) {
   const empty = document.createElement("div");
   empty.className = "drawer-empty";
-  empty.textContent = "История появится после первой завершённой раздачи.";
+  empty.textContent = "История текущей сессии появится после первой завершённой раздачи.";
   actionLog.replaceChildren(empty);
 }
 
