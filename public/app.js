@@ -485,6 +485,14 @@ async function boot() {
       selectLobbyTab(button.dataset.lobbyTab);
     });
   });
+  document.querySelectorAll(".bottom-nav button").forEach((button) => {
+    button.addEventListener("pointerdown", () => {
+      if (button.hidden) return;
+      updateBottomNavIndicator(button.hasAttribute("data-lobby-menu-trigger") ? "__menu" : button.dataset.lobbyTab);
+    });
+    button.addEventListener("pointercancel", () => updateBottomNavIndicator());
+    button.addEventListener("pointerleave", () => updateBottomNavIndicator());
+  });
   lobbyMenuButton?.addEventListener("click", openLobbyMenu);
   lobbyMenuBackdrop?.addEventListener("click", closeLobbyMenu);
   lobbyMenuSheet?.addEventListener("click", onLobbyMenuAction);
@@ -3644,6 +3652,13 @@ function updateBottomNavIndicator(tab = currentLobbyTab) {
   });
   nav.style.setProperty("--nav-count", String(Math.max(1, visibleButtons.length)));
   nav.style.setProperty("--nav-active-index", String(Math.max(0, index)));
+  const target = visibleButtons[Math.max(0, index)];
+  if (target) {
+    const navRect = nav.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    nav.style.setProperty("--nav-active-x", `${Math.max(0, targetRect.left - navRect.left)}px`);
+    nav.style.setProperty("--nav-active-w", `${targetRect.width}px`);
+  }
   nav.classList.toggle("has-active-tab", index >= 0);
 }
 

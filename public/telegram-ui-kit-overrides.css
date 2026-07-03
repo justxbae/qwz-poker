@@ -10343,3 +10343,64 @@ body:not(.in-game) .bottom-nav .nav-label {
   line-height: 1.05 !important;
   font-weight: 520 !important;
 }
+
+/* Same specificity as the older theme-adaptive nav rules above. */
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .bottom-nav {
+  position: fixed !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: calc(20px + env(safe-area-inset-bottom)) !important;
+  width: min(358px, calc(100vw - 44px)) !important;
+  height: 70px !important;
+  min-height: 70px !important;
+  padding: 6px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: rgba(35, 41, 51, 0.58) !important;
+  background-color: rgba(35, 41, 51, 0.58) !important;
+  box-shadow:
+    0 16px 38px rgba(0, 0, 0, 0.38),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 1px 0 rgba(255, 255, 255, 0.10) inset !important;
+  backdrop-filter: blur(24px) saturate(165%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(165%) !important;
+  transform: translateX(-50%) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .bottom-nav::before {
+  top: 5px !important;
+  bottom: 5px !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  width: var(--nav-active-w, calc((100% - 12px) / var(--nav-count))) !important;
+  transform: translateX(var(--nav-active-x, calc(var(--nav-active-index) * 100%))) !important;
+  box-shadow:
+    0 14px 26px rgba(0, 0, 0, 0.24),
+    0 1px 0 rgba(255, 255, 255, 0.13) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.10) inset !important;
+  transition:
+    transform 330ms cubic-bezier(0.2, 0.85, 0.18, 1),
+    width 330ms cubic-bezier(0.2, 0.85, 0.18, 1),
+    background-color 180ms ease,
+    opacity 180ms ease !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .bottom-nav button.active {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  color: #fff !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .bottom-nav button:active {
+  transform: translateY(1px) scale(0.985) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game).is-scrolling .bottom-nav {
+  opacity: 1 !important;
+  transform: translateX(-50%) translateY(-2px) scale(1) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game).scrolling-up .bottom-nav {
+  opacity: 1 !important;
+  transform: translateX(-50%) translateY(0) scale(1) !important;
+}
