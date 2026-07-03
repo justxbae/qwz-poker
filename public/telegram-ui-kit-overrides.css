@@ -7425,3 +7425,40 @@ html.minimal-launch body.in-game .game-screen[data-table-status="showdown"] .sea
 html.minimal-launch body.in-game .game-screen[data-table-status="showdown"] .seat:not(.viewer-seat):not(.folded) .seat-cards .card {
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.5) !important;
 }
+
+/* ============================================================
+   2026-07-03: grouped-list icons for the in-game side menu.
+   Placeholder glyph (menu-placeholder.svg) in a tinted icon box on
+   every row — swap per-row later. ::before = box, ::after = glyph.
+   ============================================================ */
+html.minimal-launch body.in-game .side-menu button:not(.close-button) {
+  position: relative !important;
+  padding-left: 62px !important;
+}
+
+html.minimal-launch body.in-game .side-menu button:not(.close-button)::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 16px !important;
+  top: 50% !important;
+  width: 30px !important;
+  height: 30px !important;
+  transform: translateY(-50%) !important;
+  border-radius: 8px !important;
+  background: color-mix(in srgb, var(--tg-button, #2aabee) 20%, transparent) !important;
+  -webkit-mask: none !important;
+  mask: none !important;
+}
+
+html.minimal-launch body.in-game .side-menu button:not(.close-button)::after {
+  content: "" !important;
+  position: absolute !important;
+  left: 20px !important;
+  top: 50% !important;
+  width: 22px !important;
+  height: 22px !important;
+  transform: translateY(-50%) !important;
+  background: var(--tg-button, #2aabee) !important;
+  -webkit-mask: url("/assets/ui/menu-placeholder.svg") center / 20px 20px no-repeat !important;
+  mask: url("/assets/ui/menu-placeholder.svg") center / 20px 20px no-repeat !important;
+}

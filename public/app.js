@@ -503,6 +503,12 @@ async function boot() {
   });
   buyInButton.addEventListener("click", () => runAction(buyIn));
   inviteButton.addEventListener("click", inviteToTable);
+  document.querySelectorAll("[data-menu-soon]").forEach((button) => {
+    button.addEventListener("click", () => {
+      closeMenu();
+      showStatus("Раздел скоро будет доступен");
+    });
+  });
   quickBuyInButton.addEventListener("click", () => runAction(buyIn));
   backToLobbyButton.addEventListener("click", () => runAction(backToLobbyFromTable));
   sitButton.addEventListener("click", () => runAction(sitAtTable));
@@ -5913,14 +5919,19 @@ function renderTableInfo(table) {
   inviteCard.querySelector("small").textContent = inviteLink;
   inviteCard.querySelector("button").addEventListener("click", inviteToTable);
 
+  const buyInRange = `${formatTableAmount(table, table.minBuyIn || 0)} / ${formatTableAmount(table, table.maxBuyIn || 0)}`;
   const rows = [
     ["Название стола", table.name],
-    ["Тип игры", "Texas Hold'em"],
+    ["Тип игры", "Hold'em"],
     ["Тип банка", "Безлимитный"],
     ["Ставки стола", formatTableLimit(table)],
+    ["Бай-ин", buyInRange],
+    ["Время на ход", "20 сек"],
+    ["Тайм-банк", "15 сек"],
     ["Игроки", `${table.seats.length}/${table.maxPlayers}`],
-    ["Время на ход", "20 c."],
     ["Раздача", `#${table.handNumber || 0}`],
+    ["Rabbit Hunting", "0"],
+    ["Run It Twice", "Скоро"],
     ["Fairness", fairnessProofLabel(table)]
   ];
 
