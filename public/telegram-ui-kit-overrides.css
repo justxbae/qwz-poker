@@ -7328,11 +7328,24 @@ html.minimal-launch body.in-game .game-toolbar .icon-control {
   width: 44px !important;
   height: 44px !important;
   min-height: 44px !important;
-  display: grid !important;
-  place-items: center !important;
   padding: 0 !important;
   border-radius: 14px !important;
   transition: background 140ms ease, transform 120ms ease, filter 140ms ease !important;
+}
+
+/* Only the menu and info controls are shown in-game; the sizing rule
+   above must not re-display the log/hands/stats/waitlist tabs that were
+   hidden earlier (regression from the icon pass). */
+html.minimal-launch body.in-game .game-toolbar #menuButton,
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"] {
+  display: grid !important;
+  place-items: center !important;
+}
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="log"],
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="hands"],
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="stats"],
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="waitlist"] {
+  display: none !important;
 }
 
 html.minimal-launch body.in-game .game-toolbar #menuButton:not(.is-open)::before,
