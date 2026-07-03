@@ -562,6 +562,23 @@ async function handleApi(req, res, url) {
 
   if (req.method === "POST" && url.pathname === "/api/play/daily-claim") {
     await sendIdempotentJson(req, res, user, "play_daily_claim", async (idempotencyKey) => {
+      // Faucet is for low stacks only: once the 24h cooldown has elapsed,
+      // you may claim the daily chips only when your balance is below the
+      // daily amount (<= amount - 1). The cooldown check still runs first.
+      const eligibility = await dailyPlayClaimView(user);
+      if (eligibility.canClaim) {
+        const currentBalance = await getWallet(user.id);
+        const maxEligibleBalance = ECONOMY.play.dailyRefillChips - 1;
+        if (currentBalance > maxEligibleBalance) {
+          return {
+            status: 409,
+            body: {
+              error: `Ежедневный бонус доступен, когда баланс ≤ ${maxEligibleBalance.toLocaleString("ru-RU")} фишек. Сейчас у вас ${currentBalance.toLocaleString("ru-RU")} фишек.`,
+              dailyPlayClaim: eligibility
+            }
+          };
+        }
+      }
       const result = await claimDailyPlayReward(user, idempotencyKey);
       const dailyPlayClaim = await dailyPlayClaimView(user);
       if (!result.claimed) {

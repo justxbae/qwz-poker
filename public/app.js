@@ -85,6 +85,9 @@ const homeScreenInstallButton = document.querySelector("#homeScreenInstallButton
 const homeScreenInstallStatus = document.querySelector("#homeScreenInstallStatus");
 const homeOfferMeta = document.querySelector("#homeOfferMeta");
 const productModeHub = document.querySelector("#productModeHub");
+const dailyPlayClaimCard = document.querySelector("#dailyPlayClaimCard");
+const dailyPlayClaimMeta = document.querySelector("#dailyPlayClaimMeta");
+const dailyPlayClaimButton = document.querySelector("#dailyPlayClaimButton");
 const homeRatingLeague = document.querySelector("#homeRatingLeague");
 const homeRatingPoints = document.querySelector("#homeRatingPoints");
 const homeCashClub = document.querySelector("#homeCashClub");
@@ -322,11 +325,8 @@ const confirmBuyInButton = document.querySelector("#confirmBuyInButton");
 const drawerPages = {
   log: document.querySelector("#drawerLog"),
   info: document.querySelector("#drawerInfo"),
-  hands: document.querySelector("#drawerHands"),
-  stats: document.querySelector("#drawerStats"),
-  waitlist: document.querySelector("#drawerWaitlist")
+  stats: document.querySelector("#drawerStats")
 };
-const pokerHandsGuide = document.querySelector("#pokerHandsGuide");
 const tableItemTemplate = document.querySelector("#tableItemTemplate");
 let actionAmountContext = "";
 let overlayFadeTimer = 0;
@@ -390,7 +390,6 @@ async function boot() {
   setupLobbyOverscroll();
   tg?.expand();
   setupTelegramControls();
-  renderPokerHandsGuide();
 
   await auth();
   await loadConfig();
@@ -447,6 +446,7 @@ async function boot() {
   quickPlayButton.addEventListener("click", () => runAction(quickPlay));
   quickPrivateButton?.addEventListener("click", () => runAction(quickCreatePrivateTable));
   homeWalletSideAction?.addEventListener("click", () => runAction(claimDailyPlayBonus));
+  dailyPlayClaimButton?.addEventListener("click", () => runAction(claimDailyPlayBonus));
   continueGameButton.addEventListener("click", continueGame);
   if (adminNavButton) adminNavButton.hidden = !ADMIN_MODE;
   updateBottomNavIndicator();
@@ -868,6 +868,7 @@ function tickDailyPlayClaim() {
     cooldownSeconds: remainingSeconds
   };
   renderHomeWalletSide(state.homeStats || {});
+  renderDailyPlayClaimCard();
   renderHomeCta();
 }
 
@@ -885,6 +886,7 @@ function renderModeBalance() {
     lobbyBalanceCurrency.removeAttribute("aria-label");
   }
   renderHomeWalletSide(state.homeStats || {});
+  renderDailyPlayClaimCard();
 }
 
 function renderModeContext() {
@@ -903,6 +905,7 @@ function renderModeContext() {
   if (privateGamesTitle) privateGamesTitle.textContent = cashMode ? "Приватные cash-столы" : "Приватные рейтинговые столы";
   if (walletWithdrawButton) walletWithdrawButton.disabled = !cashMode;
   renderHomeWalletSide(state.homeStats || {});
+  renderDailyPlayClaimCard();
 }
 
 function renderLimitOptions() {
@@ -1864,6 +1867,7 @@ function renderProfile(profileData) {
   lobbyTableStack.textContent = formatChips(profileData.tableStack);
   lobbyActiveTables.textContent = String(profileData.activeTableCount || 0);
   renderHomeWalletSide(profileData);
+  renderDailyPlayClaimCard();
   if (homeActivityText) {
     homeActivityText.textContent = profileData.activeTableCount
       ? `${profileData.activeTableCount} ${plural(profileData.activeTableCount, "стол", "стола", "столов")} · ${formatChips(profileData.tableStack)} за столами`
@@ -1926,7 +1930,6 @@ function renderHomeWalletSide(profileData = {}) {
   if (!homeWalletSideValue || !homeWalletSideCurrency || !homeWalletSideHint) return;
   const cashMode = state.gameMode === "cash";
   const profile = profileData.profile || {};
-  const dailyPlayClaim = getDailyPlayClaimState(profileData);
   const progress = Math.max(0, Math.min(1, Number(profile.cashXpProgress || 0)));
 
   homeWalletSideCurrency.hidden = true;
@@ -1949,33 +1952,45 @@ function renderHomeWalletSide(profileData = {}) {
       homeWalletSideAction.disabled = true;
     }
   } else {
-    const cooldownSeconds = Math.max(0, Number(dailyPlayClaim?.cooldownSeconds || 0));
-    const canClaim = Boolean(dailyPlayClaim?.canClaim || cooldownSeconds === 0);
-    const amount = Number(dailyPlayClaim?.amount || 35000);
-    const bonusProgress = canClaim ? 1 : Math.max(0.08, Math.min(1, 1 - (cooldownSeconds / (24 * 60 * 60))));
-    if (homeWalletSideLabel) homeWalletSideLabel.textContent = "Бонус дня";
-    homeWalletSideValue.textContent = formatNumber(amount);
-    homeWalletSideHint.textContent = canClaim ? "доступно сейчас" : formatCooldown(cooldownSeconds);
-    if (homeWalletSideMeter) homeWalletSideMeter.style.width = `${Math.round(bonusProgress * 100)}%`;
+    if (homeWalletSideLabel) homeWalletSideLabel.textContent = "Рейтинг";
+    homeWalletSideValue.textContent = formatNumber(activeBalance());
+    homeWalletSideHint.textContent = "play chips";
+    if (homeWalletSideMeter) homeWalletSideMeter.style.width = "8%";
     if (homeWalletSideAction) {
-      homeWalletSideAction.textContent = "Получить";
-      homeWalletSideAction.disabled = !canClaim || pendingDailyPlayClaim;
+      homeWalletSideAction.textContent = "";
+      homeWalletSideAction.disabled = true;
     }
   }
   if (cashMode && homeWalletSideAction) homeWalletSideAction.title = "Прогресс уровня";
   if (!cashMode && homeWalletSideAction) {
-    homeWalletSideAction.title = !dailyPlayClaim
-      ? "Состояние бонуса загружается"
-      : dailyPlayClaim.canClaim
-      ? "Получить ежедневные игровые фишки"
-      : `Следующая выдача через ${formatCooldown(dailyPlayClaim?.cooldownSeconds || 0)}`;
+    homeWalletSideAction.title = "Ежедневный бонус вынесен отдельным блоком";
   }
   if (!cashMode && homeWalletSideMeter) homeWalletSideMeter.dataset.mode = "bonus";
   if (cashMode && homeWalletSideMeter) homeWalletSideMeter.dataset.mode = "cash";
   if (homeWalletSide) {
     homeWalletSide.dataset.mode = cashMode ? "cash" : "play";
-    homeWalletSide.dataset.state = cashMode ? "club" : "bonus";
+    homeWalletSide.dataset.state = cashMode ? "club" : "rating";
   }
+}
+
+function renderDailyPlayClaimCard() {
+  if (!dailyPlayClaimCard || !dailyPlayClaimButton || !dailyPlayClaimMeta) return;
+  const isRating = state.gameMode === "play";
+  dailyPlayClaimCard.hidden = !isRating;
+  if (!isRating) return;
+
+  const dailyPlayClaim = getDailyPlayClaimState(state.homeStats || {});
+  const cooldownSeconds = Math.max(0, Number(dailyPlayClaim?.cooldownSeconds || 0));
+  const canClaim = Boolean(dailyPlayClaim?.canClaim || cooldownSeconds === 0);
+  const amount = Number(dailyPlayClaim?.amount || 35000);
+
+  dailyPlayClaimMeta.textContent = `${formatNumber(amount)} фишек`;
+  dailyPlayClaimButton.disabled = !canClaim || pendingDailyPlayClaim;
+  dailyPlayClaimButton.textContent = canClaim ? "Получить" : formatCooldown(cooldownSeconds);
+  dailyPlayClaimButton.title = canClaim
+    ? "Получить ежедневные рейтинговые фишки"
+    : `Следующая выдача через ${formatCooldown(cooldownSeconds)}`;
+  dailyPlayClaimCard.dataset.state = canClaim ? "ready" : "cooldown";
 }
 
 function renderProgression(progression) {
@@ -5470,13 +5485,16 @@ function openMenu() {
   }
   haptic("light");
   window.clearTimeout(openMenu.closeTimer);
+  window.clearTimeout(openDrawer.closeTimer);
+  infoDrawer.hidden = true;
+  infoDrawer.classList.remove("is-closing");
+  document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => button.classList.remove("is-open"));
   sideMenu.classList.remove("is-closing");
   sideMenu.hidden = false;
   menuButton.classList.add("is-open");
   menuButton.setAttribute("aria-expanded", "true");
   inviteButton.hidden = !state.currentTableId;
   closeSitOutPopover();
-  closeDrawer();
   updateTelegramBackButton();
 }
 
@@ -5593,13 +5611,17 @@ function closeSitOutPopover() {
   updateTelegramBackButton();
 }
 
-function openDrawer(tab = "log") {
+function openDrawer(tab = "info") {
   haptic("light");
   window.clearTimeout(openDrawer.closeTimer);
+  window.clearTimeout(openMenu.closeTimer);
+  sideMenu.hidden = true;
+  sideMenu.classList.remove("is-closing");
+  menuButton.classList.remove("is-open");
+  menuButton.setAttribute("aria-expanded", "false");
   infoDrawer.classList.remove("is-closing");
   infoDrawer.hidden = false;
   document.querySelector('.game-toolbar [data-panel-tab="info"]')?.classList.add("is-open");
-  closeMenu();
   if (state.currentTable) {
     renderActionLog(state.currentTable.actionLog || [], state.currentTable.handHistory || []);
     renderTableInfo(state.currentTable);
@@ -5634,32 +5656,6 @@ function switchDrawerTab(tab) {
   document.querySelectorAll("[data-drawer-tab]").forEach((button) => {
     button.classList.toggle("active", button.dataset.drawerTab === tab);
   });
-}
-
-function renderPokerHandsGuide() {
-  if (!pokerHandsGuide) return;
-  const hands = [
-    ["Роял-флеш", "A K Q J 10 одной масти", "Самая сильная комбинация."],
-    ["Стрит-флеш", "5 карт подряд одной масти", "Например 9-8-7-6-5 пики."],
-    ["Каре", "4 карты одного ранга", "Например четыре дамы."],
-    ["Фулл-хаус", "Тройка + пара", "Например K-K-K и 7-7."],
-    ["Флеш", "5 карт одной масти", "Порядок карт не важен."],
-    ["Стрит", "5 карт подряд", "Туз может быть A-K-Q-J-10 или A-2-3-4-5."],
-    ["Сет / тройка", "3 карты одного ранга", "Например три девятки."],
-    ["Две пары", "2 пары разных рангов", "Например A-A и 8-8."],
-    ["Пара", "2 карты одного ранга", "Например J-J."],
-    ["Старшая карта", "Когда комбинации нет", "Побеждает самая высокая карта."]
-  ];
-  pokerHandsGuide.replaceChildren(...hands.map(([title, example, text], index) => {
-    const row = document.createElement("div");
-    row.className = "poker-hand-row";
-    row.innerHTML = "<b></b><div><strong></strong><span></span><small></small></div>";
-    row.querySelector("b").textContent = String(index + 1);
-    row.querySelector("strong").textContent = title;
-    row.querySelector("span").textContent = example;
-    row.querySelector("small").textContent = text;
-    return row;
-  }));
 }
 
 function renderViewerHandBadge(hand, table) {
@@ -5856,12 +5852,6 @@ function streetOverlayFor(table) {
 
 function renderActionLog(logItems, handHistory = []) {
   const historyNodes = handHistory.slice(0, 10).map(renderHandHistoryItem);
-  const fallbackNodes = logItems.slice(-6).reverse().map((item) => {
-    const row = document.createElement("div");
-    row.className = "log-item hand-history-fallback";
-    row.textContent = item.text;
-    return row;
-  });
   if (historyNodes.length) {
     actionLog.replaceChildren(...historyNodes);
     return;
@@ -5869,7 +5859,7 @@ function renderActionLog(logItems, handHistory = []) {
   const empty = document.createElement("div");
   empty.className = "drawer-empty";
   empty.textContent = "История появится после первой завершённой раздачи.";
-  actionLog.replaceChildren(empty, ...fallbackNodes);
+  actionLog.replaceChildren(empty);
 }
 
 function renderHandHistoryItem(hand) {
@@ -6704,6 +6694,7 @@ async function claimDailyPlayBonus() {
   if (state.gameMode !== "play" || pendingDailyPlayClaim) return;
   pendingDailyPlayClaim = true;
   renderHomeWalletSide(state.homeStats || {});
+  renderDailyPlayClaimCard();
   try {
     const data = await api("/api/play/daily-claim", {
       method: "POST",
@@ -6729,12 +6720,14 @@ async function claimDailyPlayBonus() {
     if (error.status === 409 && error.data?.dailyPlayClaim) {
       setDailyPlayClaim(error.data.dailyPlayClaim);
       renderHomeWalletSide(state.homeStats || {});
+      renderDailyPlayClaimCard();
       renderHomeCta();
     }
     throw error;
   } finally {
     pendingDailyPlayClaim = false;
     renderHomeWalletSide(state.homeStats || {});
+    renderDailyPlayClaimCard();
   }
 }
 

@@ -7,7 +7,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="/styles.css?v=20260628-2" />
     <link rel="stylesheet" href="/lobby-qa.css?v=20260626-1" />
-    <link rel="stylesheet" href="/telegram-ui-kit-overrides.css?v=20260703-7" />
+    <link rel="stylesheet" href="/telegram-ui-kit-overrides.css?v=20260703-11" />
   </head>
   <body>
     <section class="app-boot" id="appBoot" aria-live="polite" aria-label="Загрузка QWZ Poker">
@@ -31,11 +31,7 @@
           <div class="table-id" id="tableCode">#table</div>
           <button id="quickBuyInButton" class="icon-control" title="Докупить фишки" aria-label="Докупить фишки">+</button>
           <div class="toolbar-spacer"></div>
-          <button class="icon-control" data-panel-tab="log" title="История" aria-label="История">♠</button>
           <button class="icon-control" data-panel-tab="info" title="Инфо" aria-label="Инфо"><svg class="control-glyph" viewBox="0 0 28 28" fill="none" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M15.25 8.75C15.25 9.44036 14.6904 10 14 10C13.3096 10 12.75 9.44036 12.75 8.75C12.75 8.05964 13.3096 7.5 14 7.5C14.6904 7.5 15.25 8.05964 15.25 8.75ZM11.165 12.5C11.165 12.0388 11.5389 11.665 12 11.665H14.25C14.7112 11.665 15.085 12.0388 15.085 12.5V18.665H16.5C16.9612 18.665 17.335 19.0388 17.335 19.5C17.335 19.9612 16.9612 20.335 16.5 20.335H12C11.5389 20.335 11.165 19.9612 11.165 19.5C11.165 19.0388 11.5389 18.665 12 18.665H13.415V13.335H12C11.5389 13.335 11.165 12.9611 11.165 12.5Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M14 3C20.0751 3 25 7.92487 25 14C25 14.1331 24.9939 14.2655 24.9893 14.3975C24.9962 14.4306 25 14.4648 25 14.5C25 14.5459 24.9911 14.5896 24.9795 14.6318C24.652 20.4129 19.863 25 14 25C7.92487 25 3 20.0751 3 14C3 7.92487 7.92487 3 14 3ZM14 4.5C8.75329 4.5 4.5 8.75329 4.5 14C4.5 19.2467 8.75329 23.5 14 23.5C19.2467 23.5 23.5 19.2467 23.5 14C23.5 8.75329 19.2467 4.5 14 4.5Z" fill="currentColor"/></svg></button>
-          <button class="icon-control" data-panel-tab="hands" title="Комбинации" aria-label="Комбинации">★</button>
-          <button class="icon-control" data-panel-tab="stats" title="Статистика" aria-label="Статистика">◔</button>
-          <button class="icon-control" data-panel-tab="waitlist" title="Лист ожидания" aria-label="Лист ожидания">☷</button>
           <button id="sitButton" class="sit-button" hidden>Сесть за стол</button>
         </div>
         <div class="board">
@@ -232,6 +228,15 @@
               </button>
             </div>
             <p class="mode-context-copy" id="modeContextCopy">Cash — деньги, турниры и приватные столы. Рейтинг — отдельный сезон с RP, лигами и лидербордом.</p>
+          </section>
+
+          <section class="daily-play-claim-card" id="dailyPlayClaimCard" hidden>
+            <span class="daily-play-claim-icon" aria-hidden="true"><img src="/assets/footer/mynotes.svg" alt="" /></span>
+            <span class="daily-play-claim-main">
+              <strong>Ежедневный бонус</strong>
+              <small id="dailyPlayClaimMeta">35 000 фишек</small>
+            </span>
+            <button type="button" id="dailyPlayClaimButton">Получить</button>
           </section>
 
           <section class="lobby-card progression-card" id="progressionCard">
@@ -973,10 +978,6 @@
       <button id="standButton">Покинуть стол</button>
       <button id="sitOutButton">Отойти</button>
       <button id="buyInButton">Добавить средства на стол</button>
-      <button type="button" id="replayButton" data-menu-soon>Повтор раздачи</button>
-      <button type="button" id="menuCashierButton" data-menu-soon>Касса</button>
-      <button type="button" id="tableSettingsButton" data-menu-soon>Настройки стола</button>
-      <button type="button" id="menuSettingsButton" data-menu-soon>Настройки</button>
       <button id="inviteButton">Пригласить</button>
       <button id="backToLobbyButton">Назад в лобби</button>
     </aside>
@@ -994,15 +995,8 @@
       <section class="drawer-page" id="drawerInfo" hidden>
         <div class="info-list" id="tableInfo"></div>
       </section>
-      <section class="drawer-page" id="drawerHands" hidden>
-        <div class="poker-hands-guide" id="pokerHandsGuide"></div>
-      </section>
       <section class="drawer-page" id="drawerStats" hidden>
         <div class="stats-table" id="statsTable"></div>
-      </section>
-      <section class="drawer-page empty-state" id="drawerWaitlist" hidden>
-        <div class="empty-icon">✦</div>
-        <p>В листе ожидания нет игроков.</p>
       </section>
     </aside>
 
@@ -1020,6 +1014,6 @@
       </article>
     </template>
 
-    <script src="/app.js?v=20260703-1" type="module"></script>
+    <script src="/app.js?v=20260703-5" type="module"></script>
   </body>
 </html>
