@@ -369,6 +369,8 @@ let queuedPreActionKey = "";
 let pendingBetAction = "";
 let pendingBuyIn = null;
 let pendingDailyPlayClaim = false;
+let bottomNavPointer = null;
+let bottomNavSuppressClick = false;
 const pendingTournamentRequests = new Set();
 const pendingAdminTournamentRequests = new Set();
 const tableEventQueue = [];
@@ -485,14 +487,7 @@ async function boot() {
       selectLobbyTab(button.dataset.lobbyTab);
     });
   });
-  document.querySelectorAll(".bottom-nav button").forEach((button) => {
-    button.addEventListener("pointerdown", () => {
-      if (button.hidden) return;
-      updateBottomNavIndicator(button.hasAttribute("data-lobby-menu-trigger") ? "__menu" : button.dataset.lobbyTab);
-    });
-    button.addEventListener("pointercancel", () => updateBottomNavIndicator());
-    button.addEventListener("pointerleave", () => updateBottomNavIndicator());
-  });
+  wireBottomNavGestures();
   lobbyMenuButton?.addEventListener("click", openLobbyMenu);
   lobbyMenuBackdrop?.addEventListener("click", closeLobbyMenu);
   lobbyMenuSheet?.addEventListener("click", onLobbyMenuAction);
@@ -3640,6 +3635,74 @@ function selectLobbyTab(tab, options = {}) {
   }
   if (tabChanged) refreshScrollReveal();
   updateTelegramBackButton();
+}
+
+function bottomNavKeyForButton(button) {
+  if (!button) return currentLobbyTab;
+  if (button.hasAttribute("data-lobby-menu-trigger")) return "__menu";
+  return button.dataset.lobbyTab || currentLobbyTab;
+}
+
+function bottomNavButtonFromPoint(x, y) {
+  const element = document.elementFromPoint(x, y);
+  const button = element?.closest?.(".bottom-nav button");
+  return button && !button.hidden ? button : null;
+}
+
+function activateBottomNavButton(button) {
+  if (!button || button.hidden) {
+    updateBottomNavIndicator();
+    return;
+  }
+  if (button.hasAttribute("data-lobby-menu-trigger")) {
+    openLobbyMenu();
+    return;
+  }
+  if (button.dataset.lobbyTab === "cashier" && button.dataset.cashierSection) {
+    runAction(() => openCashierSection(button.dataset.cashierSection));
+    return;
+  }
+  selectLobbyTab(button.dataset.lobbyTab);
+}
+
+function wireBottomNavGestures() {
+  const nav = document.querySelector(".bottom-nav");
+  if (!nav) return;
+  nav.addEventListener("click", (event) => {
+    if (!bottomNavSuppressClick) return;
+    event.preventDefault();
+    event.stopPropagation();
+    bottomNavSuppressClick = false;
+  }, true);
+  nav.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    const button = event.target.closest(".bottom-nav button");
+    if (!button || button.hidden) return;
+    bottomNavPointer = { id: event.pointerId, button };
+    bottomNavSuppressClick = true;
+    nav.setPointerCapture?.(event.pointerId);
+    updateBottomNavIndicator(bottomNavKeyForButton(button));
+    event.preventDefault();
+  });
+  nav.addEventListener("pointermove", (event) => {
+    if (!bottomNavPointer || bottomNavPointer.id !== event.pointerId) return;
+    const button = bottomNavButtonFromPoint(event.clientX, event.clientY);
+    if (!button) return;
+    bottomNavPointer.button = button;
+    updateBottomNavIndicator(bottomNavKeyForButton(button));
+  });
+  nav.addEventListener("pointercancel", (event) => {
+    if (!bottomNavPointer || bottomNavPointer.id !== event.pointerId) return;
+    bottomNavPointer = null;
+    updateBottomNavIndicator();
+  });
+  nav.addEventListener("pointerup", (event) => {
+    if (!bottomNavPointer || bottomNavPointer.id !== event.pointerId) return;
+    const button = bottomNavButtonFromPoint(event.clientX, event.clientY) || bottomNavPointer.button;
+    bottomNavPointer = null;
+    activateBottomNavButton(button);
+    event.preventDefault();
+  });
 }
 
 function updateBottomNavIndicator(tab = currentLobbyTab) {
