@@ -5598,10 +5598,10 @@ function openDrawer(tab = "log") {
   window.clearTimeout(openDrawer.closeTimer);
   infoDrawer.classList.remove("is-closing");
   infoDrawer.hidden = false;
-  document.querySelector(`.game-toolbar [data-panel-tab="${tab}"]`)?.classList.add("is-open");
+  document.querySelector('.game-toolbar [data-panel-tab="info"]')?.classList.add("is-open");
   closeMenu();
   if (state.currentTable) {
-    renderActionLog(state.currentTable.actionLog || []);
+    renderActionLog(state.currentTable.actionLog || [], state.currentTable.handHistory || []);
     renderTableInfo(state.currentTable);
     renderStats(state.currentTable);
   }
@@ -5626,6 +5626,7 @@ function closeDrawer() {
 }
 
 function switchDrawerTab(tab) {
+  infoDrawer.dataset.activeTab = tab;
   for (const [key, page] of Object.entries(drawerPages)) {
     page.hidden = key !== tab;
   }
@@ -5854,17 +5855,21 @@ function streetOverlayFor(table) {
 }
 
 function renderActionLog(logItems, handHistory = []) {
-  const historyNodes = handHistory.slice(0, 8).map(renderHandHistoryItem);
-  const logNodes = logItems.slice(-10).reverse().map((item) => {
+  const historyNodes = handHistory.slice(0, 10).map(renderHandHistoryItem);
+  const fallbackNodes = logItems.slice(-6).reverse().map((item) => {
     const row = document.createElement("div");
-    row.className = "log-item";
+    row.className = "log-item hand-history-fallback";
     row.textContent = item.text;
     return row;
   });
-  actionLog.replaceChildren(
-    ...historyNodes,
-    ...logNodes
-  );
+  if (historyNodes.length) {
+    actionLog.replaceChildren(...historyNodes);
+    return;
+  }
+  const empty = document.createElement("div");
+  empty.className = "drawer-empty";
+  empty.textContent = "История появится после первой завершённой раздачи.";
+  actionLog.replaceChildren(empty, ...fallbackNodes);
 }
 
 function renderHandHistoryItem(hand) {
@@ -5905,14 +5910,15 @@ function renderHandHistoryItem(hand) {
 }
 
 function renderTableInfo(table) {
+  const stackBb = table.bigBlind ? Math.round((table.maxBuyIn || table.bigBlind * 100) / table.bigBlind) : 100;
   const buyInRange = `${formatTableAmount(table, table.minBuyIn || 0)} / ${formatTableAmount(table, table.maxBuyIn || 0)}`;
   const rows = [
-    ["Название стола", table.name],
-    ["Тип игры", "Hold'em"],
-    ["Ставки", formatTableLimit(table)],
+    ["Название стола", table.name || `Texas NL ${formatTableLimit(table)}`],
+    ["Тип игры", "Texas Hold'em"],
+    ["Стек", `${stackBb} BB`],
     ["Бай-ин", buyInRange],
-    ["Время на ход", "20 сек"],
-    ["Тайм-банк", "15 сек"]
+    ["Turn time", "20 сек"],
+    ["Time bank", "15 сек"]
   ];
 
   tableInfo.replaceChildren(
@@ -5928,18 +5934,19 @@ function renderTableInfo(table) {
 }
 
 function renderStats(table) {
+  const seats = (table.seats || []).filter((seat) => seat?.userId);
   statsTable.replaceChildren(
     headerRow(["Ник", "Бай-ин", "Результат"]),
-    ...table.seats.map((seat) => {
-      const initialStack = Number(seat.handStartStack ?? seat.stack + seat.totalBet);
-      const profit = seat.stack - initialStack;
+    ...seats.map((seat) => {
+      const buyIn = Number(seat.buyIn ?? seat.initialStack ?? seat.handStartStack ?? seat.stack + seat.totalBet);
+      const result = Number(seat.stack || 0) + Number(seat.totalBet || 0) - buyIn;
       const row = document.createElement("div");
       row.className = "stats-row";
       row.innerHTML = `<span></span><span></span><strong></strong>`;
       row.children[0].textContent = seat.name;
-      row.children[1].textContent = formatTableAmount(table, initialStack);
-      row.children[2].textContent = `${profit >= 0 ? "+" : ""}${formatTableAmount(table, profit)}`;
-      row.children[2].className = profit >= 0 ? "positive" : "negative";
+      row.children[1].textContent = formatTableAmount(table, buyIn);
+      row.children[2].textContent = `${result >= 0 ? "+" : ""}${formatTableAmount(table, result)}`;
+      row.children[2].className = result >= 0 ? "positive" : "negative";
       return row;
     })
   );
