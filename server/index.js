@@ -169,7 +169,7 @@ loadEnv(path.join(rootDir, ".env"));
 const PORT = Number(process.env.PORT || 3000);
 const BOT_TOKEN = process.env.BOT_TOKEN || "";
 const BOT_USERNAME = normalizeBotUsername(process.env.BOT_USERNAME || "qwzpokerbot");
-const APP_NAME = process.env.APP_NAME || "QWZ Poker";
+const APP_NAME = process.env.APP_NAME || "Weez Poker";
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || "";
 const ADMIN_USER_IDS = parseIdList(process.env.ADMIN_USER_IDS || ADMIN_CHAT_ID);
 const ADMIN_OWNER_IDS = parseIdList(process.env.ADMIN_OWNER_IDS || process.env.ADMIN_USER_IDS || ADMIN_CHAT_ID);
@@ -744,7 +744,7 @@ async function handleApi(req, res, url) {
       const invoiceLink = await createTelegramStarsInvoiceLink({
         botToken: BOT_TOKEN,
         baseUrl: TELEGRAM_API_BASE,
-        title: "QWZ Poker deposit",
+        title: "Weez Poker deposit",
         description: `Пополнение ${formatUsdtMicros(quote.cashUsdtMicros)} USDT`,
         payload,
         stars: quote.stars
@@ -828,7 +828,7 @@ async function handleApi(req, res, url) {
         const invoiceLink = await createTelegramStarsInvoiceLink({
           botToken: BOT_TOKEN,
           baseUrl: TELEGRAM_API_BASE,
-          title: "QWZ Poker deposit",
+          title: "Weez Poker deposit",
           description: `Пополнение ${formatUsdtMicros(quote.cashUsdtMicros)} USDT`,
           payload,
           stars: quote.stars
@@ -852,7 +852,7 @@ async function handleApi(req, res, url) {
         const result = await createCryptoBotInvoice({
           apiKey: CRYPTOBOT_API_KEY,
           baseUrl: CRYPTOBOT_API_BASE,
-          title: "QWZ Poker deposit",
+          title: "Weez Poker deposit",
           description: `Пополнение ${formatUsdtMicros(quote.cashUsdtMicros)} USDT`,
           payload,
           usdtAmount: quote.usdtAmount,
@@ -887,7 +887,7 @@ async function handleApi(req, res, url) {
         const result = await createXRocketInvoice({
           apiKey: XROCKET_PAY_API_KEY,
           baseUrl: XROCKET_PAY_API_BASE,
-          title: "QWZ Poker deposit",
+          title: "Weez Poker deposit",
           description: `Пополнение ${formatUsdtMicros(quote.cashUsdtMicros)} USDT`,
           payload,
           usdtAmount: quote.usdtAmount,
@@ -3028,7 +3028,7 @@ function seedPublicTables() {
   for (const limit of PLAY_TABLE_LIMITS) {
     for (let index = 1; index <= limit.count; index += 1) {
       const table = createTable(null, {
-        name: `QWZ NL ${limit.smallBlind}/${limit.smallBlind * 2} #${index}`,
+        name: `Weez NL ${limit.smallBlind}/${limit.smallBlind * 2} #${index}`,
         maxPlayers: 6,
         smallBlind: limit.smallBlind,
         bigBlind: limit.bigBlind,
@@ -3044,7 +3044,7 @@ function seedPublicTables() {
   for (const limit of CASH_TABLE_LIMITS) {
     for (let index = 1; index <= limit.count; index += 1) {
       const table = createTable(null, {
-        name: `QWZ NL $${formatUsdtMicros(limit.smallBlind)}/$${formatUsdtMicros(limit.bigBlind)} #${index}`,
+        name: `Weez NL $${formatUsdtMicros(limit.smallBlind)}/$${formatUsdtMicros(limit.bigBlind)} #${index}`,
         maxPlayers: 6,
         smallBlind: limit.smallBlind,
         bigBlind: limit.bigBlind,
@@ -3092,8 +3092,8 @@ async function reconcileSystemPublicTables() {
       const cashMode = limit.gameMode === "cash";
       const table = createTable(null, {
         name: cashMode
-          ? `QWZ NL $${formatUsdtMicros(limit.smallBlind)}/$${formatUsdtMicros(limit.bigBlind)} #${index}`
-          : `QWZ NL ${limit.smallBlind}/${limit.bigBlind} #${index}`,
+          ? `Weez NL $${formatUsdtMicros(limit.smallBlind)}/$${formatUsdtMicros(limit.bigBlind)} #${index}`
+          : `Weez NL ${limit.smallBlind}/${limit.bigBlind} #${index}`,
         maxPlayers: 6,
         smallBlind: limit.smallBlind,
         bigBlind: limit.bigBlind,
@@ -4478,7 +4478,7 @@ async function getTransactions(user) {
         category: "starting_balance",
         title: "Стартовый баланс",
         amount: DEFAULT_WALLET,
-        meta: "QWZ chips",
+        meta: "Weez chips",
         createdAt: new Date().toISOString()
       }
     ] : []);
@@ -5740,7 +5740,7 @@ function notifyAdmin(type, title, { user, lines = [] } = {}) {
   if (!ADMIN_CHAT_ID || !BOT_TOKEN || BOT_TOKEN.includes("replace_with") || BOT_TOKEN === "test-token") return;
 
   const text = [
-    `QWZ Poker · ${title}`,
+    `Weez Poker · ${title}`,
     `Событие: ${type}`,
     user ? `Игрок: ${formatUser(user)}` : "",
     ...lines,

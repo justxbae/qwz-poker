@@ -10443,3 +10443,41 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .bottom-nav .bottom-nav-
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .bottom-nav button:active {
   transform: none !important;
 }
+
+/* Brand/money polish: compact cash balances, dollar mark before value. */
+html.minimal-launch body:not(.in-game) .home-balance #lobbyBalance,
+html.minimal-launch body:not(.in-game) .home-balance #lobbyBalance > span {
+  font-size: 34px !important;
+  line-height: 0.96 !important;
+  letter-spacing: -0.055em !important;
+  white-space: nowrap !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance strong {
+  gap: 0.035em !important;
+  align-items: baseline !important;
+  white-space: nowrap !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance .usd-inline-icon {
+  width: 0.82em !important;
+  height: 0.82em !important;
+  transform: translateY(0.04em) !important;
+}
+
+html.minimal-launch body:not(.in-game) .profile-dashboard-stats strong,
+html.minimal-launch body:not(.in-game) .profile-finance-card strong,
+html.minimal-launch body:not(.in-game) .profile-balance-row strong {
+  font-size: 19px !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.035em !important;
+  white-space: nowrap !important;
+}
+
+html.minimal-launch body:not(.in-game) .profile-dashboard-stats strong .usd-inline-icon,
+html.minimal-launch body:not(.in-game) .profile-finance-card strong .usd-inline-icon,
+html.minimal-launch body:not(.in-game) .profile-balance-row strong .usd-inline-icon {
+  width: 0.82em !important;
+  height: 0.82em !important;
+  transform: translateY(0.04em) !important;
+}

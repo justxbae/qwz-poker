@@ -3546,7 +3546,7 @@ async function quickCreatePrivateTable() {
     mode: "create",
     table: { ...limit, gameMode: state.gameMode, currency: state.gameMode === "cash" ? "USDT" : "PLAY_CHIPS" },
     body: {
-      name: `QWZ private ${formatGameLimit(smallBlind, Number(limit?.bigBlind || smallBlind * 2))}`,
+      name: `Weez private ${formatGameLimit(smallBlind, Number(limit?.bigBlind || smallBlind * 2))}`,
       maxPlayers: "6",
       smallBlind: String(smallBlind),
       minBuyIn: String(limit?.minBuyIn || ""),
@@ -3613,7 +3613,7 @@ function selectLobbyTab(tab, options = {}) {
   const tabChanged = currentLobbyTab !== tab;
   currentLobbyTab = tab;
   updateBottomNavIndicator(tab);
-  haptic("light");
+  if (!options.silentHaptic) haptic("light");
   document.querySelectorAll("[data-lobby-tab]").forEach((button) => {
     button.classList.toggle("active", button.dataset.lobbyTab === tab);
     if (tabChanged && button.dataset.lobbyTab === tab) {
@@ -3655,14 +3655,14 @@ function activateBottomNavButton(button) {
     return;
   }
   if (button.hasAttribute("data-lobby-menu-trigger")) {
-    openLobbyMenu();
+    openLobbyMenu({ silentHaptic: true });
     return;
   }
   if (button.dataset.lobbyTab === "cashier" && button.dataset.cashierSection) {
     runAction(() => openCashierSection(button.dataset.cashierSection));
     return;
   }
-  selectLobbyTab(button.dataset.lobbyTab);
+  selectLobbyTab(button.dataset.lobbyTab, { silentHaptic: true });
 }
 
 function wireBottomNavGestures() {
@@ -5287,7 +5287,7 @@ function showStatus(message) {
   if (tg?.showPopup) {
     try {
       tg.showPopup({
-        title: "QWZ Poker",
+        title: "Weez Poker",
         message,
         buttons: [{ type: "ok" }]
       });
@@ -5635,9 +5635,9 @@ function closeMenu() {
   }, 180);
 }
 
-function openLobbyMenu() {
+function openLobbyMenu(options = {}) {
   if (!lobbyMenuSheet || !lobbyMenuBackdrop) return;
-  haptic("light");
+  if (!options.silentHaptic) haptic("light");
   closeCashierSheet({ silent: true });
   lobbyMenuButton?.classList.add("active", "nav-pressed");
   window.setTimeout(() => lobbyMenuButton?.classList.remove("nav-pressed"), 360);
@@ -5697,7 +5697,7 @@ async function inviteToTable() {
   const table = state.currentTable;
   const blindText = table ? formatTableLimit(table) : "";
   const inviteLink = tableInviteLink(state.currentTableId);
-  const shareText = `QWZ Poker: стол ${blindText}`;
+  const shareText = `Weez Poker: стол ${blindText}`;
   const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`;
 
   haptic("light");
@@ -6351,7 +6351,7 @@ function formatUsdt(value) {
 
 function formatUsdtDisplay(value) {
   const amount = Number(value || 0);
-  return `${amount < 0 ? "-" : ""}${formatUsdt(Math.abs(amount))} $`;
+  return `${amount < 0 ? "-" : ""}$${formatUsdt(Math.abs(amount))}`;
 }
 
 function usdIconNode(className = "usd-inline-icon") {
@@ -6364,8 +6364,8 @@ function usdIconNode(className = "usd-inline-icon") {
 function usdAmountNodes(value) {
   const amount = Number(value || 0);
   const text = document.createElement("span");
-  text.textContent = `${amount < 0 ? "-" : ""}${formatUsdt(Math.abs(amount))}`;
-  return [text, usdIconNode()];
+  text.textContent = formatUsdt(Math.abs(amount));
+  return amount < 0 ? [document.createTextNode("-"), usdIconNode(), text] : [usdIconNode(), text];
 }
 
 function renderUsdIconAmount(target, value) {
