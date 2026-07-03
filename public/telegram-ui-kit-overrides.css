@@ -6022,15 +6022,19 @@ html.minimal-launch body:not(.in-game) .daily-play-claim-icon {
 }
 
 html.minimal-launch body:not(.in-game) .daily-play-claim-icon img {
-  width: 28px !important;
-  height: 28px !important;
+  width: 36px !important;
+  height: 36px !important;
   filter: brightness(0) invert(1) !important;
 }
 
 html.minimal-launch body:not(.in-game) .daily-play-claim-main {
   min-width: 0 !important;
   display: grid !important;
-  gap: 3px !important;
+  place-items: center !important;
+  gap: 0 !important;
+  text-align: center !important;
+  transform: translateY(0) !important;
+  transition: transform 220ms cubic-bezier(.22, .9, .24, 1) !important;
 }
 
 html.minimal-launch body:not(.in-game) .daily-play-claim-main strong {
@@ -6042,10 +6046,36 @@ html.minimal-launch body:not(.in-game) .daily-play-claim-main strong {
 }
 
 html.minimal-launch body:not(.in-game) .daily-play-claim-main small {
+  display: block !important;
   color: var(--tg-hint, rgba(255,255,255,.55)) !important;
   font-size: 14px !important;
-  font-weight: 400 !important;
+  font-weight: 500 !important;
   line-height: 18px !important;
+  max-height: 0 !important;
+  opacity: 0 !important;
+  transform: translateY(10px) !important;
+  overflow: hidden !important;
+  transition: max-height 220ms cubic-bezier(.22, .9, .24, 1), opacity 180ms ease, transform 220ms cubic-bezier(.22, .9, .24, 1) !important;
+}
+
+html.minimal-launch body:not(.in-game) .daily-play-claim-card.claim-success .daily-play-claim-main {
+  transform: translateY(-7px) !important;
+}
+
+html.minimal-launch body:not(.in-game) .daily-play-claim-card.claim-success .daily-play-claim-main small {
+  max-height: 18px !important;
+  opacity: 1 !important;
+  transform: translateY(2px) !important;
+}
+
+html.minimal-launch body:not(.in-game) .daily-play-claim-card.claim-success-out .daily-play-claim-main {
+  transform: translateY(0) !important;
+}
+
+html.minimal-launch body:not(.in-game) .daily-play-claim-card.claim-success-out .daily-play-claim-main small {
+  max-height: 0 !important;
+  opacity: 0 !important;
+  transform: translateY(-8px) !important;
 }
 
 html.minimal-launch body:not(.in-game) #dailyPlayClaimButton {
@@ -10203,4 +10233,113 @@ html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"] {
   outline: 0 !important;
   border: 0 !important;
   box-shadow: none !important;
+}
+
+/* 2026-07-04: final bottom nav. This override file loads after styles.css. */
+html.minimal-launch body:not(.in-game) .bottom-nav,
+body:not(.in-game) .bottom-nav {
+  --nav-count: 4;
+  --nav-active-index: 0;
+  position: fixed !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: calc(20px + env(safe-area-inset-bottom)) !important;
+  width: min(358px, calc(100vw - 44px)) !important;
+  height: 70px !important;
+  min-height: 70px !important;
+  padding: 6px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: rgba(35, 41, 51, 0.58) !important;
+  box-shadow:
+    0 16px 38px rgba(0, 0, 0, 0.38),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 1px 0 rgba(255, 255, 255, 0.10) inset !important;
+  backdrop-filter: blur(24px) saturate(165%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(165%) !important;
+  transform: translateX(-50%) !important;
+  overflow: hidden !important;
+}
+
+html.minimal-launch body:not(.in-game) .bottom-nav::before,
+body:not(.in-game) .bottom-nav::before {
+  content: "" !important;
+  position: absolute !important;
+  top: 6px !important;
+  bottom: 6px !important;
+  left: 6px !important;
+  width: calc((100% - 12px) / var(--nav-count)) !important;
+  border-radius: 999px !important;
+  background: rgba(120, 124, 132, 0.32) !important;
+  box-shadow:
+    0 12px 26px rgba(0, 0, 0, 0.22),
+    0 1px 0 rgba(255, 255, 255, 0.08) inset !important;
+  transform: translateX(calc(var(--nav-active-index) * 100%)) !important;
+  transition:
+    transform 290ms cubic-bezier(0.18, 0.9, 0.22, 1),
+    background-color 180ms ease,
+    opacity 180ms ease !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+}
+
+html.minimal-launch body:not(.in-game) .bottom-nav button,
+body:not(.in-game) .bottom-nav button {
+  position: relative !important;
+  z-index: 1 !important;
+  min-height: 58px !important;
+  height: 58px !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: rgba(235, 235, 245, 0.64) !important;
+  transition:
+    color 180ms ease,
+    transform 180ms ease !important;
+}
+
+html.minimal-launch body:not(.in-game) .bottom-nav button.active,
+body:not(.in-game) .bottom-nav button.active {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #fff !important;
+}
+
+html.minimal-launch body:not(.in-game) .bottom-nav .nav-icon,
+body:not(.in-game) .bottom-nav .nav-icon {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  min-height: 28px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch body:not(.in-game) .bottom-nav .nav-icon img,
+body:not(.in-game) .bottom-nav .nav-icon img {
+  width: 25px !important;
+  height: 25px !important;
+  display: block !important;
+  object-fit: contain !important;
+  filter: brightness(0) invert(68%) opacity(0.78) !important;
+}
+
+html.minimal-launch body:not(.in-game) .bottom-nav button.active .nav-icon img,
+body:not(.in-game) .bottom-nav button.active .nav-icon img {
+  filter: brightness(0) invert(100%) opacity(1) !important;
+}
+
+html.minimal-launch body:not(.in-game) .bottom-nav .tournament-nav-button .nav-icon img,
+body:not(.in-game) .bottom-nav .tournament-nav-button .nav-icon img {
+  width: 31px !important;
+  height: 31px !important;
+}
+
+html.minimal-launch body:not(.in-game) .bottom-nav .nav-label,
+body:not(.in-game) .bottom-nav .nav-label {
+  margin: 0 !important;
+  color: currentColor !important;
+  font-size: 12px !important;
+  line-height: 1.05 !important;
+  font-weight: 520 !important;
 }

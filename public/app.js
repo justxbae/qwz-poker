@@ -833,7 +833,7 @@ function activeBalance() {
 }
 
 function getDailyPlayClaimState(profileData = null) {
-  return profileData?.dailyPlayClaim || state.progression?.dailyPlayClaim || state.dailyPlayClaim || null;
+  return state.dailyPlayClaim || profileData?.dailyPlayClaim || state.progression?.dailyPlayClaim || null;
 }
 
 function formatCooldown(seconds) {
@@ -1984,13 +1984,54 @@ function renderDailyPlayClaimCard() {
   const canClaim = Boolean(dailyPlayClaim?.canClaim || cooldownSeconds === 0);
   const amount = Number(dailyPlayClaim?.amount || 35000);
 
-  dailyPlayClaimMeta.textContent = `${formatNumber(amount)} фишек`;
+  if (!dailyPlayClaimCard.classList.contains("claim-success")) dailyPlayClaimMeta.textContent = "";
   dailyPlayClaimButton.disabled = !canClaim || pendingDailyPlayClaim;
   dailyPlayClaimButton.textContent = canClaim ? "Получить" : formatCooldown(cooldownSeconds);
   dailyPlayClaimButton.title = canClaim
     ? "Получить ежедневные рейтинговые фишки"
     : `Следующая выдача через ${formatCooldown(cooldownSeconds)}`;
   dailyPlayClaimCard.dataset.state = canClaim ? "ready" : "cooldown";
+}
+
+function showDailyClaimSuccess(amount) {
+  if (!dailyPlayClaimCard || !dailyPlayClaimMeta) return;
+  window.clearTimeout(showDailyClaimSuccess.timer);
+  dailyPlayClaimMeta.textContent = `Получено ${formatNumber(amount)}`;
+  dailyPlayClaimCard.classList.remove("claim-success", "claim-success-out");
+  void dailyPlayClaimCard.offsetWidth;
+  dailyPlayClaimCard.classList.add("claim-success");
+  showDailyClaimSuccess.timer = window.setTimeout(() => {
+    dailyPlayClaimCard.classList.add("claim-success-out");
+    showDailyClaimSuccess.timer = window.setTimeout(() => {
+      dailyPlayClaimCard.classList.remove("claim-success", "claim-success-out");
+      dailyPlayClaimMeta.textContent = "";
+    }, 260);
+  }, 1150);
+}
+
+function animatePlayBalance(fromValue, toValue) {
+  const from = Math.max(0, Number(fromValue) || 0);
+  const to = Math.max(0, Number(toValue) || 0);
+  if (state.gameMode !== "play" || from === to) {
+    renderModeBalance();
+    renderHomeWalletSide(state.homeStats || {});
+    return;
+  }
+  const startedAt = performance.now();
+  const duration = 720;
+  const easeOut = (value) => 1 - Math.pow(1 - value, 3);
+  const paint = (now) => {
+    const progress = Math.min(1, (now - startedAt) / duration);
+    const value = Math.round(from + (to - from) * easeOut(progress));
+    if (lobbyBalance) lobbyBalance.textContent = formatChips(value);
+    if (homeWalletSideValue) homeWalletSideValue.textContent = formatNumber(value);
+    if (progress < 1) window.requestAnimationFrame(paint);
+    else {
+      renderModeBalance();
+      renderHomeWalletSide(state.homeStats || {});
+    }
+  };
+  window.requestAnimationFrame(paint);
 }
 
 function renderProgression(progression) {
@@ -5523,13 +5564,15 @@ function openLobbyMenu() {
   lobbyMenuButton?.classList.add("active", "nav-pressed");
   window.setTimeout(() => lobbyMenuButton?.classList.remove("nav-pressed"), 360);
   updateBottomNavIndicator("__menu");
-  lobbyMenuBackdrop.hidden = false;
-  lobbyMenuSheet.hidden = false;
-  lobbyMenuSheet.classList.add("sheet-open");
-  lobbyMenuSheet.style.setProperty("--sheet-drag-y", "0px");
-  document.body.classList.add("lobby-menu-open");
-  window.requestAnimationFrame(() => lobbyMenuSheet.classList.add("sheet-visible"));
-  updateTelegramBackButton();
+  window.setTimeout(() => {
+    lobbyMenuBackdrop.hidden = false;
+    lobbyMenuSheet.hidden = false;
+    lobbyMenuSheet.classList.add("sheet-open");
+    lobbyMenuSheet.style.setProperty("--sheet-drag-y", "0px");
+    document.body.classList.add("lobby-menu-open");
+    window.requestAnimationFrame(() => lobbyMenuSheet.classList.add("sheet-visible"));
+    updateTelegramBackButton();
+  }, 120);
 }
 
 function closeLobbyMenu(options = {}) {
@@ -6688,6 +6731,7 @@ async function api(path, options = {}) {
 async function claimDailyPlayBonus() {
   if (state.gameMode !== "play" || pendingDailyPlayClaim) return;
   pendingDailyPlayClaim = true;
+  const previousBalance = Number(state.user?.balance || 0);
   renderHomeWalletSide(state.homeStats || {});
   renderDailyPlayClaimCard();
   try {
@@ -6708,9 +6752,11 @@ async function claimDailyPlayBonus() {
       state.progression = data.progression;
       renderProgression(data.progression);
     }
-    renderModeBalance();
     renderHomeCta();
-    showStatus(`${formatNumber(Number(data.dailyPlayClaim?.amount || 35000))} игровых фишек начислены`);
+    const amount = Number(data.dailyPlayClaim?.amount || 35000);
+    haptic("success");
+    showDailyClaimSuccess(amount);
+    animatePlayBalance(previousBalance, Number(state.user?.balance || previousBalance + amount));
   } catch (error) {
     if (error.status === 409 && error.data?.dailyPlayClaim) {
       setDailyPlayClaim(error.data.dailyPlayClaim);
