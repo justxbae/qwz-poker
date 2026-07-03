@@ -5870,73 +5870,52 @@ function renderActionLog(logItems, handHistory = []) {
 function renderHandHistoryItem(hand) {
   const row = document.createElement("article");
   row.className = "hand-history-item";
-  const mainPot = hand.pots?.[0];
-  row.innerHTML = `
-    <div class="hand-history-head">
-      <strong></strong>
-      <span></span>
-    </div>
-    <div class="hand-history-board"></div>
-    <div class="hand-history-pots"></div>
-    <div class="hand-history-players"></div>
-  `;
-  row.querySelector("strong").textContent = `Раздача #${hand.handNumber}`;
   const cashMode = state.currentTable?.gameMode === "cash";
-  row.querySelector("span").textContent = mainPot
-    ? `${mainPot.winners.join(", ")} +${cashMode ? formatUsdtDisplay(mainPot.amount) : formatChips(mainPot.amount)}`
-    : "Без банка";
-  row.querySelector(".hand-history-board").replaceChildren(...renderCards(hand.board || []));
-  row.querySelector(".hand-history-pots").replaceChildren(...(hand.pots || []).map((potItem) => {
-    const item = document.createElement("div");
-    item.textContent = `${potItem.label}: ${cashMode ? formatUsdtDisplay(potItem.amount) : formatChips(potItem.amount)} · ${potItem.winners.join(", ")}`;
-    return item;
-  }));
-  row.querySelector(".hand-history-players").replaceChildren(...(hand.seats || []).map((seat) => {
-    const item = document.createElement("div");
-    item.className = "hand-history-player";
-    item.innerHTML = "<span></span><div></div><strong></strong>";
-    item.querySelector("span").textContent = seat.name;
-    item.querySelector("div").replaceChildren(...renderCards(seat.cards || []));
-    item.querySelector("strong").textContent = `${seat.profit >= 0 ? "+" : ""}${cashMode ? formatUsdtDisplay(seat.profit) : formatChips(seat.profit)}`;
-    item.querySelector("strong").className = seat.profit >= 0 ? "positive" : "negative";
-    return item;
-  }));
+  const mainPot = hand.pots?.[0];
+  const winnerName = mainPot?.winners?.[0] || "";
+  const winnerSeat = (hand.seats || []).find((seat) => seat.name === winnerName);
+  const winnerCards = (winnerSeat?.cards || []).filter((card) => card && card !== "hidden");
+  const board = hand.board || [];
+  const evaluated = evaluateVisibleHand([...winnerCards, ...board]);
+  const best = evaluated.rank >= 1 ? evaluated.cards : [];
+  const combo = evaluated.rank >= 1 ? evaluated.label : (mainPot?.handDescription || "");
+  const amount = mainPot ? (cashMode ? formatUsdtDisplay(mainPot.amount) : formatChips(mainPot.amount)) : "";
+
+  row.innerHTML = `
+    <div class="hh-top">
+      <span class="hh-date"></span>
+      <strong class="hh-amount"></strong>
+    </div>
+    <div class="hh-cards">
+      <div class="hh-hole"></div>
+      <div class="hh-board"></div>
+    </div>
+    <div class="hh-foot">
+      <span class="hh-winner"></span>
+      <span class="hh-combo"></span>
+    </div>
+  `;
+  row.querySelector(".hh-date").textContent = formatDateTime(hand.at) || `Раздача #${hand.handNumber}`;
+  row.querySelector(".hh-amount").textContent = amount ? `+${amount}` : "";
+  row.querySelector(".hh-hole").replaceChildren(...renderCards(winnerCards.length ? winnerCards : ["hidden", "hidden"], { highlightCards: best }));
+  row.querySelector(".hh-board").replaceChildren(...renderCards(board, { highlightCards: best }));
+  row.querySelector(".hh-winner").textContent = winnerName || "—";
+  row.querySelector(".hh-combo").textContent = combo;
   return row;
 }
 
 function renderTableInfo(table) {
-  const inviteLink = tableInviteLink(table.id);
-  const inviteCard = document.createElement("div");
-  inviteCard.className = "table-invite-card";
-  inviteCard.innerHTML = `
-    <div>
-      <span>Приглашение</span>
-      <strong>Отправить ссылку друзьям</strong>
-      <small></small>
-    </div>
-    <button type="button">Поделиться</button>
-  `;
-  inviteCard.querySelector("small").textContent = inviteLink;
-  inviteCard.querySelector("button").addEventListener("click", inviteToTable);
-
   const buyInRange = `${formatTableAmount(table, table.minBuyIn || 0)} / ${formatTableAmount(table, table.maxBuyIn || 0)}`;
   const rows = [
     ["Название стола", table.name],
     ["Тип игры", "Hold'em"],
-    ["Тип банка", "Безлимитный"],
-    ["Ставки стола", formatTableLimit(table)],
+    ["Ставки", formatTableLimit(table)],
     ["Бай-ин", buyInRange],
     ["Время на ход", "20 сек"],
-    ["Тайм-банк", "15 сек"],
-    ["Игроки", `${table.seats.length}/${table.maxPlayers}`],
-    ["Раздача", `#${table.handNumber || 0}`],
-    ["Rabbit Hunting", "0"],
-    ["Run It Twice", "Скоро"],
-    ["Fairness", fairnessProofLabel(table)]
+    ["Тайм-банк", "15 сек"]
   ];
 
   tableInfo.replaceChildren(
-    inviteCard,
     ...rows.map(([label, value]) => {
       const row = document.createElement("div");
       row.className = "info-row";
@@ -5950,7 +5929,7 @@ function renderTableInfo(table) {
 
 function renderStats(table) {
   statsTable.replaceChildren(
-    headerRow(["Игроки", "Бай-ин", "Выигрыш"]),
+    headerRow(["Ник", "Бай-ин", "Результат"]),
     ...table.seats.map((seat) => {
       const initialStack = Number(seat.handStartStack ?? seat.stack + seat.totalBet);
       const profit = seat.stack - initialStack;

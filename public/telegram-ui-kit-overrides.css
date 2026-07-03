@@ -7556,3 +7556,232 @@ html.minimal-launch body.in-game .community .card-rank {
 html.minimal-launch body.in-game .community .card-suit {
   font-size: 24px !important;
 }
+
+/* ============================================================
+   2026-07-03: right panel rebuilt to the Telegram-native code —
+   icon tab rail (History / Info / Stats) where the active tab
+   expands to reveal its label, plus a compact reference-style
+   hand-history block.
+   ============================================================ */
+
+/* --- Icon tab rail (overrides the earlier collapse) -------------- */
+html.minimal-launch body.in-game .info-drawer .drawer-tabs {
+  display: flex !important;
+  align-items: center !important;
+  grid-template-columns: none !important;
+  gap: 6px !important;
+  padding: 2px 2px 10px !important;
+  border-bottom: 0 !important;
+  background: transparent !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button:not(.close-button) {
+  display: inline-flex !important;
+  align-items: center !important;
+  width: 40px !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: var(--weez-control) !important;
+  color: var(--tg-hint, #8b98a5) !important;
+  overflow: hidden !important;
+  transition: width 220ms cubic-bezier(.22, .9, .24, 1), background 160ms ease, color 160ms ease !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button:not(.close-button) .dt-icon {
+  flex: 0 0 40px !important;
+  width: 40px !important;
+  height: 40px !important;
+  background: currentColor !important;
+  -webkit-mask: url("/assets/ui/menu-placeholder.svg") center / 20px 20px no-repeat !important;
+  mask: url("/assets/ui/menu-placeholder.svg") center / 20px 20px no-repeat !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button:not(.close-button) .dt-label {
+  max-width: 0 !important;
+  opacity: 0 !important;
+  white-space: nowrap !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  transition: max-width 220ms cubic-bezier(.22, .9, .24, 1), opacity 150ms ease, padding 220ms ease !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button.active {
+  width: auto !important;
+  background: var(--tg-button, #2aabee) !important;
+  color: #fff !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button.active .dt-label {
+  max-width: 160px !important;
+  opacity: 1 !important;
+  padding-right: 14px !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button:active {
+  transform: scale(0.96) !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .drawer-tabs .close-button {
+  margin-left: auto !important;
+}
+
+/* --- Reference-style hand-history block --------------------------- */
+html.minimal-launch body.in-game .hand-history-item {
+  display: block !important;
+  padding: 12px !important;
+  margin-bottom: 8px !important;
+  border-radius: 14px !important;
+  background: var(--weez-control) !important;
+}
+
+html.minimal-launch body.in-game .hand-history-item .hh-top {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+html.minimal-launch body.in-game .hand-history-item .hh-date {
+  font-size: 12px !important;
+  color: var(--tg-hint, #8b98a5) !important;
+}
+
+html.minimal-launch body.in-game .hand-history-item .hh-amount {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: #f7bc45 !important;
+}
+
+html.minimal-launch body.in-game .hand-history-item .hh-cards {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin: 9px 0 8px !important;
+}
+
+html.minimal-launch body.in-game .hand-history-item .hh-hole,
+html.minimal-launch body.in-game .hand-history-item .hh-board {
+  display: flex !important;
+  gap: 3px !important;
+}
+
+html.minimal-launch body.in-game .hand-history-item .hh-hole {
+  padding-right: 10px !important;
+  border-right: 1px solid var(--weez-divider, rgba(255,255,255,0.08)) !important;
+}
+
+html.minimal-launch body.in-game .hand-history-item .card {
+  width: 26px !important;
+  min-height: 36px !important;
+  aspect-ratio: 0.72 !important;
+  border-radius: 5px !important;
+  box-shadow: none !important;
+  opacity: 0.55 !important;
+}
+
+html.minimal-launch body.in-game .hand-history-item .card.best-card {
+  opacity: 1 !important;
+  box-shadow: 0 0 0 1.5px #f7bc45 !important;
+}
+
+html.minimal-launch body.in-game .hand-history-item .card-rank {
+  font-size: 11px !important;
+}
+html.minimal-launch body.in-game .hand-history-item .card-suit {
+  font-size: 13px !important;
+}
+
+html.minimal-launch body.in-game .hand-history-item .hh-foot {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+html.minimal-launch body.in-game .hand-history-item .hh-winner {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--tg-text, #fff) !important;
+}
+
+html.minimal-launch body.in-game .hand-history-item .hh-combo {
+  font-size: 12px !important;
+  color: var(--tg-hint, #8b98a5) !important;
+}
+
+/* tab buttons size to their own content (fixed 40 inactive, content when
+   active) — prevents the active tab collapsing to 0 as a flex item. */
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button:not(.close-button) {
+  flex: none !important;
+}
+
+/* Fixed active-tab width (auto collapses to 0 as a flex item here);
+   150px fits История / Информация / Статистика. */
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button.active {
+  width: 150px !important;
+}
+
+/* ------------------------------------------------------------------
+   Robust segmented tab bar (text). Replaces the finicky icon-expand
+   rail: three even tabs, active filled with the accent. Icons can be
+   layered back on later via .dt-icon once finalized.
+   ------------------------------------------------------------------ */
+html.minimal-launch body.in-game .info-drawer .drawer-tabs {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr 1fr auto !important;
+  align-items: center !important;
+  gap: 5px !important;
+  padding: 3px !important;
+  margin-bottom: 8px !important;
+  border-radius: 14px !important;
+  background: rgba(0, 0, 0, 0.24) !important;
+}
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button:not(.close-button) {
+  flex: none !important;
+  width: auto !important;
+  min-height: 38px !important;
+  padding: 0 6px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  border-radius: 11px !important;
+  background: transparent !important;
+  color: var(--tg-hint, #8b98a5) !important;
+  overflow: visible !important;
+}
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button.active {
+  width: auto !important;
+  background: var(--tg-button, #2aabee) !important;
+  color: #fff !important;
+}
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button:not(.close-button) .dt-icon {
+  flex: 0 0 16px !important;
+  width: 16px !important;
+  height: 16px !important;
+  background: currentColor !important;
+  -webkit-mask: url("/assets/ui/menu-placeholder.svg") center / 15px 15px no-repeat !important;
+  mask: url("/assets/ui/menu-placeholder.svg") center / 15px 15px no-repeat !important;
+}
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button:not(.close-button) .dt-label {
+  max-width: none !important;
+  opacity: 1 !important;
+  padding: 0 !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+}
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button:active {
+  transform: scale(0.97) !important;
+}
+html.minimal-launch body.in-game .info-drawer .drawer-tabs .close-button {
+  margin-left: 2px !important;
+}
+
+/* Base .drawer-tabs span { display:none } (legacy icon-only tabs) also
+   hid our icon+label spans — restore them. */
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button .dt-icon {
+  display: inline-block !important;
+}
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button .dt-label {
+  display: inline-block !important;
+}
