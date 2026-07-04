@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 
 let PORT = 3901;
 let BASE_URL = `http://127.0.0.1:${PORT}`;
+const realMoneyIntegrationEnabled = Boolean(process.env.TEST_DATABASE_URL && process.env.TEST_REDIS_URL);
 
 test("table auto-starts, accepts custom raise, and pays the pot at showdown", async () => {
   const server = await startServer({ ADMIN_USER_IDS: "dev-user" });
@@ -595,10 +596,12 @@ test("idempotency key rejects a different request body", async () => {
   }
 });
 
-test("crypto deposit order can be created but does not credit chips before confirmation", async () => {
+test("crypto deposit order can be created but does not credit chips before confirmation", { skip: !realMoneyIntegrationEnabled }, async () => {
   const server = await startServer({
     ADMIN_USER_IDS: "dev-user",
     REAL_MONEY_ENABLED: "true",
+    DATABASE_URL: process.env.TEST_DATABASE_URL,
+    REDIS_URL: process.env.TEST_REDIS_URL,
     TON_PAYMENTS_ENABLED: "true",
     TON_RECEIVER_ADDRESS: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
     TON_USDT_RATE: "250"
@@ -647,7 +650,7 @@ test("crypto deposit order can be created but does not credit chips before confi
   }
 });
 
-test("Stars, Crypto Bot, and xRocket deposit rails create invoices and credit cash on confirmation", async () => {
+test("Stars, Crypto Bot, and xRocket deposit rails create invoices and credit cash on confirmation", { skip: !realMoneyIntegrationEnabled }, async () => {
   const telegramApi = await startMockApiServer(async (req) => {
     if (req.method === "POST" && req.url.startsWith("/bottest-token/getWebhookInfo")) {
       return {
@@ -710,6 +713,8 @@ test("Stars, Crypto Bot, and xRocket deposit rails create invoices and credit ca
   const server = await startServer({
     ADMIN_USER_IDS: "dev-user",
     REAL_MONEY_ENABLED: "true",
+    DATABASE_URL: process.env.TEST_DATABASE_URL,
+    REDIS_URL: process.env.TEST_REDIS_URL,
     APP_PUBLIC_URL: "https://qwz.test",
     TELEGRAM_API_BASE: telegramApi.url,
     CRYPTOBOT_API_KEY: "crypto-test-key",
@@ -984,7 +989,7 @@ test("Stars, Crypto Bot, and xRocket deposit rails create invoices and credit ca
   }
 });
 
-test("Stars invoice is blocked when Telegram webhook cannot return payment confirmation", async () => {
+test("Stars invoice is blocked when Telegram webhook cannot return payment confirmation", { skip: !realMoneyIntegrationEnabled }, async () => {
   let invoiceRequests = 0;
   const telegramApi = await startMockApiServer(async (req) => {
     if (req.method === "POST" && req.url.startsWith("/bottest-token/getWebhookInfo")) {
@@ -1002,6 +1007,8 @@ test("Stars invoice is blocked when Telegram webhook cannot return payment confi
 
   const server = await startServer({
     REAL_MONEY_ENABLED: "true",
+    DATABASE_URL: process.env.TEST_DATABASE_URL,
+    REDIS_URL: process.env.TEST_REDIS_URL,
     APP_PUBLIC_URL: "https://qwz.test",
     TELEGRAM_API_BASE: telegramApi.url
   });
@@ -1022,10 +1029,12 @@ test("Stars invoice is blocked when Telegram webhook cannot return payment confi
   }
 });
 
-test("admin can manually approve and reject crypto payment orders", async () => {
+test("admin can manually approve and reject crypto payment orders", { skip: !realMoneyIntegrationEnabled }, async () => {
   const server = await startServer({
     ADMIN_USER_IDS: "dev-user",
     REAL_MONEY_ENABLED: "true",
+    DATABASE_URL: process.env.TEST_DATABASE_URL,
+    REDIS_URL: process.env.TEST_REDIS_URL,
     TON_PAYMENTS_ENABLED: "true",
     TON_RECEIVER_ADDRESS: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
     TON_USDT_RATE: "250"
@@ -1082,9 +1091,11 @@ test("admin can manually approve and reject crypto payment orders", async () => 
   }
 });
 
-test("withdrawals stay disabled until the payout rail is connected", async () => {
+test("withdrawals stay disabled until the payout rail is connected", { skip: !realMoneyIntegrationEnabled }, async () => {
   const server = await startServer({
-    REAL_MONEY_ENABLED: "true"
+    REAL_MONEY_ENABLED: "true",
+    DATABASE_URL: process.env.TEST_DATABASE_URL,
+    REDIS_URL: process.env.TEST_REDIS_URL
   });
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
@@ -1105,10 +1116,12 @@ test("withdrawals stay disabled until the payout rail is connected", async () =>
   }
 });
 
-test("cash withdrawal hold, reject refund, and approve fee accounting stay balanced", async () => {
+test("cash withdrawal hold, reject refund, and approve fee accounting stay balanced", { skip: !realMoneyIntegrationEnabled }, async () => {
   const server = await startServer({
     ADMIN_USER_IDS: "dev-user",
     REAL_MONEY_ENABLED: "true",
+    DATABASE_URL: process.env.TEST_DATABASE_URL,
+    REDIS_URL: process.env.TEST_REDIS_URL,
     WITHDRAWALS_ENABLED: "true",
     TON_PAYMENTS_ENABLED: "true",
     TON_RECEIVER_ADDRESS: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",

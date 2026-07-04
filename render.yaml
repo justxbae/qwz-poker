@@ -10,7 +10,11 @@ services:
       - key: NODE_ENV
         value: production
       - key: APP_NAME
-        value: QWZ Poker
+        value: Weez Poker
+      - key: WITHDRAWALS_ENABLED
+        value: "true"
+      - key: ADMIN_TELEGRAM_EVENT_TYPES
+        value: open,stars_order,crypto_order,stars_paid,crypto_paid,crypto_manual_review,payment_approved,payment_rejected,withdrawal_request,withdrawal_approved,withdrawal_rejected
       - key: BOT_USERNAME
         value: qwzpokerbot
       - key: BOT_TOKEN

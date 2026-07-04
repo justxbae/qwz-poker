@@ -52,7 +52,9 @@ let lastPresenceHeartbeatAt = 0;
 let lastTournamentRefreshAt = 0;
 const cashierState = {
   deposit: null,
+  withdrawals: null,
   selectedMethod: "stars",
+  selectedWithdrawalMethod: "ton",
   demoTopup: false,
   disabled: false,
   sheet: ""
@@ -114,6 +116,12 @@ const cashierNote = document.querySelector("#cashierNote");
 const cashierAmountAsset = document.querySelector("#cashierAmountAsset");
 const cashierWithdrawTitle = document.querySelector("#cashierWithdrawTitle");
 const cashierWithdrawText = document.querySelector("#cashierWithdrawText");
+const cashierWithdrawForm = document.querySelector("#cashierWithdrawForm");
+const cashierWithdrawAmount = document.querySelector("#cashierWithdrawAmount");
+const cashierWithdrawDestination = document.querySelector("#cashierWithdrawDestination");
+const cashierWithdrawMethods = document.querySelector("#cashierWithdrawMethods");
+const cashierWithdrawSubmit = document.querySelector("#cashierWithdrawSubmit");
+const cashierWithdrawStatus = document.querySelector("#cashierWithdrawStatus");
 const cashierPrimaryButton = document.querySelector("#cashierPrimaryButton");
 const cashierSheetBackdrop = document.querySelector("#cashierSheetBackdrop");
 const cashierSheetCloseButtons = document.querySelectorAll("[data-cashier-sheet-close]");
@@ -429,6 +437,12 @@ async function boot() {
   cashierPresets?.addEventListener("click", onCashierPresetClick);
   cashierMethods?.addEventListener("click", onCashierMethodClick);
   cashierPayButton?.addEventListener("click", () => runAction(payCashierAmount));
+  cashierWithdrawMethods?.addEventListener("click", onCashierWithdrawMethodClick);
+  cashierWithdrawAmount?.addEventListener("blur", normalizeWithdrawAmountInput);
+  cashierWithdrawForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    runAction(submitWithdrawalRequest);
+  });
   tournamentList?.addEventListener("click", onTournamentAction);
   tournamentDetailBackdrop?.addEventListener("click", closeTournamentDetails);
   tournamentDetailClose?.addEventListener("click", closeTournamentDetails);
@@ -1387,21 +1401,17 @@ function renderCashier(cashier) {
       ? "Введите сумму в $, выберите способ оплаты и откройте счет. Баланс пополнится после подтверждения платежа."
       : "Игровые фишки используются только в игровом режиме и не выводятся. Тестовое начисление доступно только в режиме разработчика.";
   }
-  if (cashierWithdrawTitle) cashierWithdrawTitle.textContent = cashMode ? "Вывод $ пока закрыт" : "У игровых фишек нет вывода";
-  if (cashierWithdrawText) {
-    cashierWithdrawText.textContent = cashMode
-      ? "Сначала запускаем честную экономику пополнений, открытые столы и историю операций. Методы вывода добавим после отдельной настройки правил и комиссий."
-      : "Игровые фишки используются только в игровых столах и не обмениваются на денежный баланс.";
-  }
   renderMoneyValue(cashierBalance, cashMode ? cashier.cashBalanceMicros : cashier.playBalance, cashMode);
   renderMoneyValue(cashierTableStack, cashMode ? (cashier.cashTableStackMicros || 0) : (cashier.tableStack || 0), cashMode);
   renderMoneyValue(cashierTotalBankroll, cashMode
     ? (cashier.cashTotalBankrollMicros || cashier.cashBalanceMicros || 0)
     : (cashier.totalBankroll || cashier.balance || 0), cashMode);
   cashierState.deposit = cashier.deposit || null;
+  cashierState.withdrawals = cashier.withdrawals || null;
   cashierState.demoTopup = DEV_MODE && !cashier.realMoneyEnabled;
   cashierState.disabled = !cashMode && !cashierState.demoTopup;
   renderCashierControls(cashierState.demoTopup ? (state.config?.play?.deposit || {}) : (cashier.deposit || {}));
+  renderWithdrawalControls(cashier, cashMode);
   renderCashierHistory(cashierState.demoTopup ? (cashier.playTransactions || []) : (cashier.transactions || []), cashMode);
 }
 
@@ -1469,6 +1479,53 @@ function renderCashierControls(deposit) {
   syncCashierQuote();
 }
 
+function renderWithdrawalControls(cashier, cashMode) {
+  const withdrawals = cashier?.withdrawals || {};
+  const enabled = Boolean(cashMode && withdrawals.enabled);
+  if (cashierWithdrawTitle) cashierWithdrawTitle.textContent = enabled ? "Ручная заявка на вывод" : (cashMode ? "Вывод $ пока закрыт" : "У игровых фишек нет вывода");
+  if (cashierWithdrawText) {
+    cashierWithdrawText.textContent = enabled
+      ? "Средства будут заморожены до ручной проверки администратором. После выплаты заявка отмечается в админке."
+      : cashMode
+        ? "Вывод включается только после настройки WITHDRAWALS_ENABLED=true и проверки реквизитов выплат."
+        : "Игровые фишки используются только в рейтинговых столах и не обмениваются на денежный баланс.";
+  }
+  if (!cashierWithdrawForm || !cashierWithdrawAmount || !cashierWithdrawMethods || !cashierWithdrawSubmit) return;
+  cashierWithdrawForm.hidden = !enabled;
+  if (!enabled) {
+    if (cashierWithdrawStatus) cashierWithdrawStatus.textContent = "";
+    cashierWithdrawMethods.replaceChildren();
+    return;
+  }
+
+  const minUsdt = Number(withdrawals.minimumUsdtMicros || 10_000_000) / 1_000_000;
+  const maxUsdt = Number(withdrawals.maximumUsdtMicros || 5_000_000_000) / 1_000_000;
+  cashierWithdrawAmount.min = String(minUsdt);
+  cashierWithdrawAmount.max = String(maxUsdt);
+  cashierWithdrawAmount.step = "0.01";
+  if (!Number(cashierWithdrawAmount.value)) cashierWithdrawAmount.value = minUsdt.toFixed(2);
+
+  const methods = withdrawals.methods || [];
+  if (methods.length && !methods.some((method) => method.id === cashierState.selectedWithdrawalMethod && method.enabled)) {
+    cashierState.selectedWithdrawalMethod = methods.find((method) => method.enabled)?.id || methods[0].id || "ton";
+  }
+  cashierWithdrawMethods.replaceChildren(...methods.map((method) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.withdrawMethod = method.id;
+    button.disabled = !method.enabled;
+    button.className = `footer-lobby-row ${cashierMethodRowClass(method.id)}${method.id === cashierState.selectedWithdrawalMethod ? " active" : ""}`;
+    button.innerHTML = `
+      <span class="footer-lobby-icon" aria-hidden="true"><img src="${cashierMethodIcon(method.id)}" alt="" /></span>
+      <span class="footer-lobby-main">${escapeHtml(paymentMethodTitleShort(method.id))}</span>
+      <span class="footer-lobby-value">${escapeHtml(withdrawalMethodMeta(method))}</span>
+      <span class="footer-lobby-chevron">›</span>
+    `;
+    return button;
+  }));
+  cashierWithdrawSubmit.disabled = !methods.some((method) => method.enabled);
+}
+
 function onCashierPresetClick(event) {
   const button = event.target.closest("[data-rub-amount]");
   if (!button || !cashierRubAmount) return;
@@ -1486,11 +1543,28 @@ function onCashierMethodClick(event) {
   syncCashierQuote();
 }
 
+function onCashierWithdrawMethodClick(event) {
+  const button = event.target.closest("[data-withdraw-method]");
+  if (!button || button.disabled) return;
+  cashierState.selectedWithdrawalMethod = button.dataset.withdrawMethod;
+  cashierWithdrawMethods.querySelectorAll("button").forEach((item) => {
+    item.classList.toggle("active", item.dataset.withdrawMethod === cashierState.selectedWithdrawalMethod);
+  });
+}
+
 function normalizeCashierAmountInput() {
   if (!cashierRubAmount || cashierState.demoTopup) return;
   const quote = cashierQuote();
   cashierRubAmount.value = Number(quote.usdtAmount || 0).toFixed(2);
   syncCashierQuote();
+}
+
+function normalizeWithdrawAmountInput() {
+  if (!cashierWithdrawAmount) return;
+  const withdrawals = cashierState.withdrawals || {};
+  const minUsdt = Number(withdrawals.minimumUsdtMicros || 10_000_000) / 1_000_000;
+  const maxUsdt = Number(withdrawals.maximumUsdtMicros || 5_000_000_000) / 1_000_000;
+  cashierWithdrawAmount.value = clampAmount(Number(cashierWithdrawAmount.value || minUsdt), minUsdt, maxUsdt).toFixed(2);
 }
 
 function syncCashierQuote() {
@@ -1560,6 +1634,13 @@ function cashierMethodMeta(method) {
   if (method.id === "xrocket") return "USDT";
   if (method.id === "ton") return "TON";
   return method.speed || "";
+}
+
+function withdrawalMethodMeta(method) {
+  if (!method?.enabled) return "закрыто";
+  if (method.id === "ton") return "TON";
+  if (method.id === "usdt") return "USDT";
+  return "ручная проверка";
 }
 
 function cashierMethodIcon(method) {
@@ -1749,6 +1830,42 @@ async function payCashierAmount() {
     cashierStatus.textContent = `${method === "cryptobot" ? "Crypto Bot" : "xRocket"} счёт открыт.`;
   } finally {
     if (cashierPayButton) cashierPayButton.disabled = false;
+  }
+}
+
+async function submitWithdrawalRequest() {
+  if (!cashierWithdrawSubmit || !cashierWithdrawAmount || !cashierWithdrawDestination) return;
+  normalizeWithdrawAmountInput();
+  const method = cashierState.selectedWithdrawalMethod || "ton";
+  const destination = String(cashierWithdrawDestination.value || "").trim();
+  if (destination.length < 4) {
+    if (cashierWithdrawStatus) cashierWithdrawStatus.textContent = "Укажите реквизиты/адрес для вывода.";
+    haptic("error");
+    return;
+  }
+  cashierWithdrawSubmit.disabled = true;
+  if (cashierWithdrawStatus) cashierWithdrawStatus.textContent = "Создаём заявку...";
+  try {
+    const data = await api("/api/cashier/withdraw", {
+      method: "POST",
+      idempotencyKey: requestKey(`withdrawal-${method}`),
+      body: {
+        method,
+        usdtAmount: Number(cashierWithdrawAmount.value || 0),
+        destination
+      }
+    });
+    if (data.cashier) renderCashier(data.cashier);
+    await auth();
+    await loadProfile();
+    cashierWithdrawDestination.value = "";
+    if (cashierWithdrawStatus) cashierWithdrawStatus.textContent = "Заявка создана. Средства заморожены до проверки.";
+    haptic("success");
+  } catch (error) {
+    if (cashierWithdrawStatus) cashierWithdrawStatus.textContent = error.message || "Не удалось создать заявку.";
+    haptic("error");
+  } finally {
+    cashierWithdrawSubmit.disabled = false;
   }
 }
 

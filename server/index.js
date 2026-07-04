@@ -176,6 +176,7 @@ const ADMIN_OWNER_IDS = parseIdList(process.env.ADMIN_OWNER_IDS || process.env.A
 const ADMIN_FINANCE_IDS = parseIdList(process.env.ADMIN_FINANCE_IDS || "");
 const ADMIN_SUPPORT_IDS = parseIdList(process.env.ADMIN_SUPPORT_IDS || "");
 const ADMIN_RISK_IDS = parseIdList(process.env.ADMIN_RISK_IDS || "");
+const ADMIN_TELEGRAM_EVENT_TYPES = parseAdminTelegramEventTypes(process.env.ADMIN_TELEGRAM_EVENT_TYPES || "");
 const ADMIN_WEB_SECRET = process.env.ADMIN_WEB_SECRET || "";
 const ADMIN_WEB_USER_ID = "web-admin";
 const ADMIN_GRANT_MAX_CHIPS = Number(process.env.ADMIN_GRANT_MAX_CHIPS || 500000);
@@ -5168,13 +5169,15 @@ function withdrawalSettings() {
 
 function notifyWithdrawalCreated(user, order, balance) {
   const cashMode = Number(order.grossUsdtMicros || 0) > 0;
-  notifyAdmin("withdrawal_request", "Создана заявка на вывод", {
+  notifyAdmin("withdrawal_request", "Новая заявка на вывод", {
     user,
     lines: [
+      "Требуется ручная обработка",
       `Order: ${order.id}`,
       `Метод: ${order.method}`,
-      cashMode ? `Hold: ${formatUsdtMicros(order.grossUsdtMicros)} USDT` : `Hold: ${formatNumber(order.chips)} chips`,
-      cashMode ? `Скрытая комиссия: ${formatUsdtMicros(order.feeUsdtMicros)} USDT` : `Комиссия: ${formatNumber(order.feeChips)} chips`,
+      `Реквизиты: ${order.destination || "не указаны"}`,
+      cashMode ? `Заморожено: ${formatUsdtMicros(order.grossUsdtMicros)} USDT` : `Заморожено: ${formatNumber(order.chips)} chips`,
+      cashMode ? `Комиссия: ${formatUsdtMicros(order.feeUsdtMicros)} USDT` : `Комиссия: ${formatNumber(order.feeChips)} chips`,
       cashMode ? `К выплате: ${formatUsdtMicros(order.payoutUsdtMicros)} USDT` : `К выплате: ${formatNumber(order.payoutChips)} chips`,
       cashMode ? `Баланс: ${formatUsdtMicros(balance)} USDT` : `Баланс: ${formatNumber(balance)} chips`
     ]
@@ -5737,6 +5740,7 @@ function notifyAdmin(type, title, { user, lines = [] } = {}) {
     console.error("Admin event persistence failed:", error.message);
   });
 
+  if (!ADMIN_TELEGRAM_EVENT_TYPES.has(type)) return;
   if (!ADMIN_CHAT_ID || !BOT_TOKEN || BOT_TOKEN.includes("replace_with") || BOT_TOKEN === "test-token") return;
 
   const text = [
@@ -5754,6 +5758,25 @@ function notifyAdmin(type, title, { user, lines = [] } = {}) {
   }).catch((error) => {
     console.error("Admin log failed:", error.message);
   });
+}
+
+function parseAdminTelegramEventTypes(value) {
+  const defaults = [
+    "open",
+    "stars_order",
+    "crypto_order",
+    "stars_paid",
+    "crypto_paid",
+    "crypto_manual_review",
+    "payment_approved",
+    "payment_rejected",
+    "withdrawal_request",
+    "withdrawal_approved",
+    "withdrawal_rejected"
+  ];
+  const raw = String(value || "").trim();
+  if (!raw) return new Set(defaults);
+  return new Set(raw.split(",").map((item) => item.trim()).filter(Boolean));
 }
 
 async function recordDeviceSessionForRequest(req, user, body = {}) {
