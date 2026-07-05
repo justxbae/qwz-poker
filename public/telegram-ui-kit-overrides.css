@@ -10779,3 +10779,323 @@ html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-stat
   bottom: calc(var(--keyboard-height, 0px) + 84px + env(safe-area-inset-bottom)) !important;
   z-index: 9 !important;
 }
+
+/* Weez final money + withdrawal pass, 2026-07-05. */
+html.minimal-launch body:not(.in-game) .home-balance #lobbyBalance,
+html.minimal-launch body:not(.in-game) .home-balance #lobbyBalance > span,
+html.minimal-launch body:not(.in-game) .profile-dashboard-stats strong,
+html.minimal-launch body:not(.in-game) .profile-dashboard-stats strong > span,
+html.minimal-launch body:not(.in-game) .profile-balance-row strong,
+html.minimal-launch body:not(.in-game) .profile-balance-row strong > span {
+  font-family: "SF Pro Rounded", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-variant-numeric: tabular-nums !important;
+  letter-spacing: -0.055em !important;
+  color: #fff !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance strong,
+html.minimal-launch body:not(.in-game) .home-balance #lobbyBalance,
+html.minimal-launch body:not(.in-game) .profile-dashboard-stats strong,
+html.minimal-launch body:not(.in-game) .profile-balance-row strong {
+  display: inline-flex !important;
+  align-items: baseline !important;
+  gap: 0 !important;
+  white-space: nowrap !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  transform: none !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance #lobbyBalance {
+  font-size: clamp(25px, calc(34px * var(--money-scale, 1)), 34px) !important;
+  line-height: 0.92 !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-balance #lobbyBalance {
+  font-size: clamp(23px, calc(29px * var(--money-scale, 1)), 29px) !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance > span {
+  color: rgba(235, 235, 245, 0.58) !important;
+  font-weight: 650 !important;
+}
+
+html.minimal-launch body:not(.in-game) .usd-mark {
+  display: inline-block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: currentColor !important;
+  font: inherit !important;
+  font-size: 0.88em !important;
+  line-height: 1 !important;
+  letter-spacing: -0.08em !important;
+  transform: translateY(0.015em) !important;
+}
+
+html.minimal-launch body:not(.in-game) .usd-int {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+html.minimal-launch body:not(.in-game) .usd-frac {
+  font-size: 0.7em !important;
+  line-height: 1 !important;
+  margin-left: 0.01em !important;
+  letter-spacing: -0.045em !important;
+}
+
+html.minimal-launch body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+html.minimal-launch body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats div {
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+html.minimal-launch body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats strong {
+  font-size: clamp(16px, calc(23px * var(--money-scale, 1)), 23px) !important;
+  line-height: 1 !important;
+  transform: none !important;
+}
+
+html.minimal-launch body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats span {
+  color: rgba(235, 235, 245, 0.58) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-topup-card,
+html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-withdraw-card {
+  --weez-sheet-bg: var(--tg-bg-color, #17212b);
+  --weez-card-bg: color-mix(in srgb, var(--tg-section-bg-color, #1e2b38) 88%, white 7%);
+  --weez-field-bg: color-mix(in srgb, var(--tg-section-bg-color, #1e2b38) 72%, white 16%);
+  background: var(--weez-sheet-bg) !important;
+  background-color: var(--weez-sheet-bg) !important;
+  padding: 28px 14px calc(18px + env(safe-area-inset-bottom)) !important;
+  gap: 13px !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-withdraw-form {
+  display: grid !important;
+  gap: 13px !important;
+  width: 100% !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-withdraw-form[hidden] {
+  display: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-amount-title,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .withdraw-section-heading {
+  width: min(100%, 342px) !important;
+  margin: 0 auto !important;
+  padding: 0 2px !important;
+  color: #fff !important;
+  font-weight: 760 !important;
+  letter-spacing: -0.045em !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-amount-title {
+  margin-top: 28px !important;
+  font-size: 24px !important;
+  line-height: 1.08 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .withdraw-section-heading {
+  font-size: 17px !important;
+  line-height: 1.12 !important;
+  margin-top: 8px !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .withdraw-balance-card,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-calculator,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby.tg-menu-group,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .withdraw-warning {
+  width: min(100%, 342px) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: var(--weez-card-bg) !important;
+  background-color: var(--weez-card-bg) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .withdraw-balance-card {
+  border-radius: 17px !important;
+  overflow: hidden !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .withdraw-balance-row {
+  display: grid !important;
+  grid-template-columns: 44px minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  column-gap: 10px !important;
+  min-height: 58px !important;
+  padding: 8px 14px !important;
+  position: relative !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .withdraw-balance-row + .withdraw-balance-row::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 68px !important;
+  right: 0 !important;
+  top: 0 !important;
+  height: 1px !important;
+  background: rgba(255,255,255,.13) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .withdraw-balance-icon {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: 760 !important;
+  background: rgba(64, 210, 116, .16) !important;
+  color: #40d274 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .withdraw-balance-icon.lock {
+  background: rgba(255,255,255,.08) !important;
+  color: rgba(235,235,245,.52) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .withdraw-balance-copy {
+  display: grid !important;
+  min-width: 0 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .withdraw-balance-copy strong {
+  color: #fff !important;
+  font-size: 16px !important;
+  line-height: 1.1 !important;
+  font-weight: 560 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .withdraw-balance-copy small {
+  color: rgba(235,235,245,.58) !important;
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .withdraw-balance-row b {
+  color: #fff !important;
+  font-size: 18px !important;
+  font-weight: 680 !important;
+  letter-spacing: -0.04em !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-calculator {
+  border-radius: 22px !important;
+  padding: 12px !important;
+  display: grid !important;
+  gap: 9px !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .withdraw-address-card {
+  margin-top: 0 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-amount-field {
+  height: 50px !important;
+  min-height: 50px !important;
+  border-radius: 14px !important;
+  background: var(--weez-field-bg) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-amount-field input {
+  height: 100% !important;
+  padding: 0 15px !important;
+  color: #fff !important;
+  font-size: 22px !important;
+  line-height: 1 !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.035em !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-amount-field input::placeholder {
+  color: rgba(235,235,245,.48) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .withdraw-warning {
+  border-radius: 16px !important;
+  padding: 11px 13px !important;
+  color: rgba(255,255,255,.86) !important;
+  font-size: 13px !important;
+  line-height: 1.28 !important;
+  background: rgba(204, 48, 61, .20) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby.tg-menu-group {
+  border-radius: 22px !important;
+  min-height: 0 !important;
+  padding: 6px 14px !important;
+  display: grid !important;
+  grid-template-rows: repeat(2, 52px) !important;
+  overflow: hidden !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row {
+  height: 52px !important;
+  min-height: 52px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row.active {
+  background: transparent !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row::before,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row.active::before {
+  display: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row + .footer-lobby-row::after {
+  content: "" !important;
+  position: absolute !important;
+  left: 62px !important;
+  right: 8px !important;
+  top: 0 !important;
+  height: 1px !important;
+  background: rgba(255,255,255,.16) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-main {
+  color: #fff !important;
+  font-size: 17px !important;
+  font-weight: 500 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-value,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-chevron {
+  color: rgba(235,235,245,.46) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-pay-button {
+  width: min(100%, 342px) !important;
+  margin: 6px auto 0 !important;
+  min-height: 58px !important;
+  border-radius: 18px !important;
+  background: var(--tg-button-color, #2aabee) !important;
+  color: var(--tg-button-text-color, #fff) !important;
+}
+
+html.minimal-launch body.keyboard-open.cashier-sheet-open .cashier-withdraw-card .cashier-pay-button {
+  position: sticky !important;
+  bottom: calc(var(--keyboard-height, 0px) + 10px + env(safe-area-inset-bottom)) !important;
+  z-index: 20 !important;
+}
+
+html.minimal-launch body.keyboard-open.cashier-sheet-open .cashier-withdraw-card .cashier-status.error,
+html.minimal-launch body.keyboard-open.cashier-sheet-open .cashier-withdraw-card .cashier-status.manual-visible {
+  position: sticky !important;
+  bottom: calc(var(--keyboard-height, 0px) + 78px + env(safe-area-inset-bottom)) !important;
+  z-index: 21 !important;
+}

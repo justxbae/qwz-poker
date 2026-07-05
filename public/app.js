@@ -122,6 +122,8 @@ const cashierWithdrawDestination = document.querySelector("#cashierWithdrawDesti
 const cashierWithdrawMethods = document.querySelector("#cashierWithdrawMethods");
 const cashierWithdrawSubmit = document.querySelector("#cashierWithdrawSubmit");
 const cashierWithdrawStatus = document.querySelector("#cashierWithdrawStatus");
+const cashierWithdrawAvailable = document.querySelector("#cashierWithdrawAvailable");
+const cashierWithdrawBonus = document.querySelector("#cashierWithdrawBonus");
 const cashierPrimaryButton = document.querySelector("#cashierPrimaryButton");
 const cashierSheetBackdrop = document.querySelector("#cashierSheetBackdrop");
 const cashierSheetCloseButtons = document.querySelectorAll("[data-cashier-sheet-close]");
@@ -1515,6 +1517,8 @@ function renderWithdrawalControls(cashier, cashMode) {
 
   const minUsdt = Number(withdrawals.minimumUsdtMicros || 10_000_000) / 1_000_000;
   const maxUsdt = Number(withdrawals.maximumUsdtMicros || 5_000_000_000) / 1_000_000;
+  if (cashierWithdrawAvailable) cashierWithdrawAvailable.textContent = `$${formatUsdt(cashier.cashBalanceMicros || 0)}`;
+  if (cashierWithdrawBonus) cashierWithdrawBonus.textContent = `$${formatUsdt(cashier.bonusBalanceMicros || 0)}`;
   cashierWithdrawAmount.min = String(minUsdt);
   cashierWithdrawAmount.max = String(maxUsdt);
   cashierWithdrawAmount.step = "0.01";
@@ -6651,13 +6655,16 @@ function usdAmountNodes(value) {
   const amount = Number(value || 0);
   const formatted = formatUsdt(Math.abs(amount));
   const [integerPart, fractionalPart = "00"] = formatted.split(".");
+  const mark = document.createElement("span");
+  mark.className = "usd-mark";
+  mark.textContent = "$";
   const text = document.createElement("span");
   text.className = "usd-int";
   text.textContent = integerPart;
   const cents = document.createElement("span");
   cents.className = "usd-frac";
   cents.textContent = `.${fractionalPart}`;
-  return amount < 0 ? [document.createTextNode("-"), usdIconNode(), text, cents] : [usdIconNode(), text, cents];
+  return amount < 0 ? [document.createTextNode("-"), mark, text, cents] : [mark, text, cents];
 }
 
 function renderUsdIconAmount(target, value) {
@@ -6673,8 +6680,8 @@ function applyMoneyScale(target, value, { play = false } = {}) {
     : formatUsdt(Math.abs(Number(value || 0))).split(".")[0];
   const digits = normalized.replace(/\D/g, "").length;
   const scale = play
-    ? Math.max(0.78, Math.min(1, 1 - Math.max(0, digits - 5) * 0.035))
-    : Math.max(0.66, Math.min(1, 1 - Math.max(0, digits - 4) * 0.06));
+    ? Math.max(0.78, Math.min(1, 1 - Math.max(0, digits - 4) * 0.04))
+    : Math.max(0.68, Math.min(1, 1 - Math.max(0, digits - 3) * 0.075));
   target.style.setProperty("--money-scale", String(scale));
   target.dataset.moneyDigits = String(digits);
 }

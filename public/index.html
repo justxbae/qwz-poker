@@ -453,15 +453,32 @@
               <span id="cashierWithdrawText">Сначала запускаем честную экономику пополнений, открытые столы и историю операций. Методы вывода добавим после отдельной настройки правил и комиссий.</span>
             </div>
             <form class="cashier-withdraw-form" id="cashierWithdrawForm" hidden>
-              <h3 class="cashier-amount-title">Выберите сумму вывода</h3>
+              <h3 class="cashier-amount-title">Вывести на USDT TON</h3>
+              <div class="withdraw-balance-card">
+                <div class="withdraw-balance-row">
+                  <span class="withdraw-balance-icon ok" aria-hidden="true">✓</span>
+                  <span class="withdraw-balance-copy"><strong>Основной баланс</strong><small>Доступно к выводу</small></span>
+                  <b id="cashierWithdrawAvailable">$0.00</b>
+                </div>
+                <div class="withdraw-balance-row muted">
+                  <span class="withdraw-balance-icon lock" aria-hidden="true">⌔</span>
+                  <span class="withdraw-balance-copy"><strong>Баланс бонусов</strong><small>Ограничено</small></span>
+                  <b id="cashierWithdrawBonus">$0.00</b>
+                </div>
+              </div>
+              <h4 class="withdraw-section-heading">Выберите сумму для вывода</h4>
               <div class="cashier-calculator">
                 <label class="cashier-amount-field">
                   <span>Сумма вывода</span>
                   <input id="cashierWithdrawAmount" type="number" min="10" max="5000" step="0.01" value="10.00" inputmode="decimal" />
                 </label>
+              </div>
+              <h4 class="withdraw-section-heading">Выберите кошелек для получения</h4>
+              <div class="withdraw-warning">Мемо/комментарии не поддерживаются. Проверьте адрес перед созданием заявки.</div>
+              <div class="cashier-calculator withdraw-address-card">
                 <label class="cashier-amount-field">
                   <span>Реквизиты</span>
-                  <input id="cashierWithdrawDestination" type="text" maxlength="240" autocomplete="off" placeholder="TON / USDT адрес или реквизиты" />
+                  <input id="cashierWithdrawDestination" type="text" maxlength="240" autocomplete="off" placeholder="Введите адрес" />
                 </label>
               </div>
               <div class="cashier-methods footer-lobby tg-menu-group" id="cashierWithdrawMethods"></div>
