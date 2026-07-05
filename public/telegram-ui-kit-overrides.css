@@ -10650,3 +10650,132 @@ html.minimal-launch body:not(.in-game) .cashier-transaction-side button {
   font: inherit !important;
   font-size: 13px !important;
 }
+
+/* Final money + cashier sheet polish. */
+html.minimal-launch body:not(.in-game) .home-balance #lobbyBalance,
+html.minimal-launch body:not(.in-game) .home-balance #lobbyBalance > span,
+html.minimal-launch body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats strong,
+html.minimal-launch body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats strong > span {
+  font-family: "SF Pro Rounded", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", sans-serif !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance #lobbyBalance {
+  display: inline-flex !important;
+  align-items: baseline !important;
+  gap: 0 !important;
+  transform: scale(var(--money-scale, 1)) !important;
+  transform-origin: right center !important;
+  font-size: 30px !important;
+  line-height: 0.92 !important;
+  letter-spacing: -0.055em !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-balance #lobbyBalance {
+  font-size: 25.5px !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance strong {
+  gap: 0 !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance .usd-inline-icon,
+html.minimal-launch body:not(.in-game) .profile-dashboard-stats .usd-inline-icon,
+html.minimal-launch body:not(.in-game) .profile-finance-card .usd-inline-icon,
+html.minimal-launch body:not(.in-game) .profile-balance-row .usd-inline-icon {
+  width: 0.74em !important;
+  height: 0.74em !important;
+  margin: 0 -0.015em 0 0 !important;
+  transform: translateY(0.055em) !important;
+  flex: 0 0 auto !important;
+}
+
+html.minimal-launch body:not(.in-game) .usd-frac {
+  font-size: 0.7em !important;
+  letter-spacing: -0.04em !important;
+}
+
+html.minimal-launch body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats strong {
+  display: inline-flex !important;
+  align-items: baseline !important;
+  gap: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  transform: scale(var(--money-scale, 1)) !important;
+  transform-origin: left center !important;
+  font-size: 22px !important;
+  line-height: 1 !important;
+  color: #fff !important;
+  letter-spacing: -0.045em !important;
+}
+
+html.minimal-launch body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats div {
+  overflow: hidden !important;
+}
+
+html.minimal-launch body:not(.in-game) [data-lobby-view="profile"].active .profile-dashboard-stats span {
+  color: rgba(235, 235, 245, 0.64) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-topup-card,
+html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-withdraw-card {
+  --weez-sheet-bg: var(--tg-bg-color, #17212b);
+  --weez-card-bg: color-mix(in srgb, var(--tg-section-bg-color, #1f2d3a) 88%, white 7%);
+  --weez-field-bg: color-mix(in srgb, var(--tg-section-bg-color, #1f2d3a) 76%, white 15%);
+  background: var(--weez-sheet-bg) !important;
+  background-color: var(--weez-sheet-bg) !important;
+  gap: 14px !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  padding-bottom: calc(18px + env(safe-area-inset-bottom)) !important;
+}
+
+html.minimal-launch body.keyboard-open.cashier-sheet-open [data-cashier-sheet].sheet-open {
+  max-height: calc(100dvh - var(--keyboard-height, 0px) - 10px) !important;
+  padding-bottom: calc(92px + env(safe-area-inset-bottom)) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-calculator,
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods.footer-lobby.tg-menu-group,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-calculator,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby.tg-menu-group {
+  background: var(--weez-card-bg) !important;
+  background-color: var(--weez-card-bg) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-amount-field,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-amount-field {
+  height: 52px !important;
+  min-height: 52px !important;
+  border-radius: 16px !important;
+  background: var(--weez-field-bg) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-amount-field input,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-amount-field input {
+  font-size: 23px !important;
+  line-height: 1 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-calculator {
+  margin-bottom: 10px !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby.tg-menu-group {
+  margin-top: 10px !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-pay-button,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-pay-button {
+  position: sticky !important;
+  bottom: calc(var(--keyboard-height, 0px) + 12px + env(safe-area-inset-bottom)) !important;
+  z-index: 8 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-status,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-status {
+  position: sticky !important;
+  bottom: calc(var(--keyboard-height, 0px) + 84px + env(safe-area-inset-bottom)) !important;
+  z-index: 9 !important;
+}

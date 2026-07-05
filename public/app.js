@@ -446,6 +446,7 @@ async function boot() {
     event.preventDefault();
     runAction(submitWithdrawalRequest);
   });
+  setupKeyboardAwareSheets();
   tournamentList?.addEventListener("click", onTournamentAction);
   tournamentDetailBackdrop?.addEventListener("click", closeTournamentDetails);
   tournamentDetailClose?.addEventListener("click", closeTournamentDetails);
@@ -662,9 +663,8 @@ async function auth() {
   renderAvatar(profileAvatar, data.user);
   profileName.textContent = data.user.name;
   profileUsername.textContent = data.user.username ? `@${data.user.username}` : `id ${data.user.id}`;
-  profileBalance.textContent = state.gameMode === "cash"
-    ? formatUsdtDisplay(data.user.cashBalanceMicros || 0)
-    : `${data.user.balance.toLocaleString("ru-RU")} фишек`;
+  if (state.gameMode === "cash") renderUsdIconAmount(profileBalance, data.user.cashBalanceMicros || 0);
+  else profileBalance.textContent = `${data.user.balance.toLocaleString("ru-RU")} фишек`;
   profileChips.textContent = data.user.balance.toLocaleString("ru-RU");
   renderHomeCta();
 }
@@ -896,7 +896,10 @@ function renderModeBalance() {
   if (!lobbyBalance) return;
   const cashMode = state.gameMode === "cash";
   if (cashMode) renderUsdIconAmount(lobbyBalance, activeBalance());
-  else lobbyBalance.textContent = formatChips(activeBalance());
+  else {
+    lobbyBalance.textContent = formatChips(activeBalance());
+    applyMoneyScale(lobbyBalance, activeBalance(), { play: true });
+  }
   if (!lobbyBalanceCurrency) return;
   if (cashMode) {
     lobbyBalanceCurrency.textContent = "";
@@ -4502,6 +4505,29 @@ function closeTournamentDetails() {
   updateTelegramBackButton();
 }
 
+function setupKeyboardAwareSheets() {
+  const viewport = window.visualViewport;
+  const update = () => {
+    const keyboardHeight = viewport
+      ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+      : 0;
+    document.documentElement.style.setProperty("--keyboard-height", `${Math.round(keyboardHeight)}px`);
+    document.body.classList.toggle("keyboard-open", keyboardHeight > 80);
+  };
+  viewport?.addEventListener("resize", update);
+  viewport?.addEventListener("scroll", update);
+  window.addEventListener("resize", update);
+  document.querySelectorAll("[data-cashier-sheet]").forEach((sheet) => {
+    sheet.addEventListener("pointerdown", (event) => {
+      const interactive = event.target.closest("input, textarea, select, button, a");
+      if (!interactive && document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    });
+  });
+  update();
+}
+
 function onTournamentDetailTabSelect(event) {
   const button = event.target.closest("[data-tournament-detail-tab]");
   if (!button) return;
@@ -6623,14 +6649,34 @@ function usdIconNode(className = "usd-inline-icon") {
 
 function usdAmountNodes(value) {
   const amount = Number(value || 0);
+  const formatted = formatUsdt(Math.abs(amount));
+  const [integerPart, fractionalPart = "00"] = formatted.split(".");
   const text = document.createElement("span");
-  text.textContent = formatUsdt(Math.abs(amount));
-  return amount < 0 ? [document.createTextNode("-"), usdIconNode(), text] : [usdIconNode(), text];
+  text.className = "usd-int";
+  text.textContent = integerPart;
+  const cents = document.createElement("span");
+  cents.className = "usd-frac";
+  cents.textContent = `.${fractionalPart}`;
+  return amount < 0 ? [document.createTextNode("-"), usdIconNode(), text, cents] : [usdIconNode(), text, cents];
 }
 
 function renderUsdIconAmount(target, value) {
   if (!target) return;
   target.replaceChildren(...usdAmountNodes(value));
+  applyMoneyScale(target, value);
+}
+
+function applyMoneyScale(target, value, { play = false } = {}) {
+  if (!target) return;
+  const normalized = play
+    ? String(Math.round(Math.abs(Number(value || 0))))
+    : formatUsdt(Math.abs(Number(value || 0))).split(".")[0];
+  const digits = normalized.replace(/\D/g, "").length;
+  const scale = play
+    ? Math.max(0.78, Math.min(1, 1 - Math.max(0, digits - 5) * 0.035))
+    : Math.max(0.66, Math.min(1, 1 - Math.max(0, digits - 4) * 0.06));
+  target.style.setProperty("--money-scale", String(scale));
+  target.dataset.moneyDigits = String(digits);
 }
 
 function renderUsdIconOnly(target) {
