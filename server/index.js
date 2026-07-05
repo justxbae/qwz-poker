@@ -80,6 +80,7 @@ import {
   listAdminAuditLogs as dbListAdminAuditLogs,
   listRiskFlags as dbListRiskFlags,
   listRewardTournamentEvents as dbListRewardTournamentEvents,
+  listUserWithdrawalOrders as dbListUserWithdrawalOrders,
   listWithdrawalOrders as dbListWithdrawalOrders,
   markPaymentOrderPaid as dbMarkPaymentOrderPaid,
   recordAnalyticsEvent as dbRecordAnalyticsEvent,
@@ -965,6 +966,16 @@ async function handleApi(req, res, url) {
           feeUsdtMicros: result.order?.feeUsdtMicros || 0
         }
       });
+      return { withdrawal: result.order, cashier: await cashierView(user) };
+    });
+    return;
+  }
+
+  const withdrawCancelMatch = url.pathname.match(/^\/api\/cashier\/withdrawals\/([^/]+)\/cancel$/);
+  if (req.method === "POST" && withdrawCancelMatch) {
+    const withdrawalId = decodeURIComponent(withdrawCancelMatch[1]);
+    await sendIdempotentJson(req, res, user, `cashier_withdraw_cancel:${withdrawalId}`, async () => {
+      const result = await cancelWithdrawalRequest(user, withdrawalId);
       return { withdrawal: result.order, cashier: await cashierView(user) };
     });
     return;
@@ -2991,11 +3002,21 @@ async function cashierView(user) {
     currency: cashMode ? ASSETS.CASH : ASSETS.PLAY,
     mode: cashMode ? "cash" : "play",
     realMoneyEnabled: REAL_MONEY_ENABLED,
-    deposit: cashMode ? depositSettings({ realMoneyEnabled: REAL_MONEY_ENABLED }) : ECONOMY.play.deposit,
-    withdrawals: withdrawalSettings(),
-    transactions: cashMode ? await getCashTransactions(user) : await getTransactions(user),
-    playTransactions: await getTransactions(user)
-  };
+	    deposit: cashMode ? depositSettings({ realMoneyEnabled: REAL_MONEY_ENABLED }) : ECONOMY.play.deposit,
+	    withdrawals: withdrawalSettings(),
+	    withdrawalOrders: cashMode ? await getUserWithdrawalOrders(user) : [],
+	    transactions: cashMode ? await getCashTransactions(user) : await getTransactions(user),
+	    playTransactions: await getTransactions(user)
+	  };
+	}
+
+async function getUserWithdrawalOrders(user, limit = 20) {
+  const dbOrders = await dbListUserWithdrawalOrders(user.id, "telegram", limit);
+  if (dbOrders) return dbOrders;
+  return [...withdrawalOrders.values()]
+    .filter((order) => String(order.userId) === String(user.id))
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+    .slice(0, limit);
 }
 
 async function refreshUserWallets(user) {
@@ -5094,6 +5115,31 @@ async function handleAdminWithdrawalAction({ admin, withdrawalId, action, reason
     }
   });
   return { order: reviewed, balance };
+}
+
+async function cancelWithdrawalRequest(user, withdrawalId) {
+  const order = await withdrawalOrderFromId(withdrawalId);
+  if (!order) {
+    const error = new Error("Заявка на вывод не найдена");
+    error.status = 404;
+    throw error;
+  }
+  if (String(order.userId) !== String(user.id)) {
+    const error = new Error("Заявка принадлежит другому пользователю");
+    error.status = 403;
+    throw error;
+  }
+  if (!["pending", "manual_review"].includes(order.status)) {
+    const error = new Error(`Заявку в статусе ${order.status} нельзя отменить`);
+    error.status = 409;
+    throw error;
+  }
+  return handleAdminWithdrawalAction({
+    admin: { id: user.id, name: user.name || "Player", username: user.username || "" },
+    withdrawalId,
+    action: "reject",
+    reason: "user_cancel"
+  });
 }
 
 async function withdrawalOrderFromId(orderId) {

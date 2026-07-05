@@ -2249,6 +2249,20 @@ export async function listWithdrawalOrders(limit = 30) {
   return result.rows.map(withdrawalRow);
 }
 
+export async function listUserWithdrawalOrders(providerUserId, provider = "telegram", limit = 20) {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const result = await query(`
+    select wo.*, au.display_name as "userName", au.username
+    from withdrawal_orders wo
+    left join app_users au on au.id = wo.app_user_id
+    where wo.app_user_id = $1
+    order by wo.created_at desc
+    limit $2
+  `, [appUserId, limit]);
+  return result.rows.map(withdrawalRow);
+}
+
 export async function listPendingCryptoPaymentOrders(limit = 50) {
   if (!pool) return null;
   const result = await query(`

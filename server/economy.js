@@ -307,17 +307,7 @@ export function quoteWithdrawal({ usdtAmount = 0, amount = 0, method = "ton", de
   const hiddenSpreadUsdtMicros = Math.ceil(grossUsdtMicros * hiddenSpreadPercent);
   const feeUsdtMicros = Math.min(grossUsdtMicros, percentFeeUsdtMicros + networkFeeUsdtMicros + hiddenSpreadUsdtMicros);
   const payoutUsdtMicros = Math.max(0, grossUsdtMicros - feeUsdtMicros);
-  const destinationValue = String(destination || "").trim();
-  if (destinationValue.length < 4) {
-    const error = new Error("Укажите реквизиты/адрес для вывода");
-    error.status = 400;
-    throw error;
-  }
-  if (destinationValue.length > 240) {
-    const error = new Error("Реквизиты вывода слишком длинные");
-    error.status = 400;
-    throw error;
-  }
+  const destinationValue = validateWithdrawalDestination(methodId, destination);
 
   return {
     method: methodId,
@@ -334,6 +324,44 @@ export function quoteWithdrawal({ usdtAmount = 0, amount = 0, method = "ton", de
     hiddenSpreadPercent,
     destination: destinationValue
   };
+}
+
+export function validateWithdrawalDestination(method = "ton", destination = "") {
+  const methodId = String(method || "ton").toLowerCase();
+  const destinationValue = String(destination || "").trim();
+  const compact = destinationValue.replace(/\s+/g, "");
+  if (destinationValue.length < 12) {
+    const error = new Error("Укажите полный адрес кошелька");
+    error.status = 400;
+    throw error;
+  }
+  if (destinationValue.length > 240) {
+    const error = new Error("Реквизиты вывода слишком длинные");
+    error.status = 400;
+    throw error;
+  }
+  if (methodId === "ton") {
+    const userFriendlyTon = /^(?:EQ|UQ)[A-Za-z0-9_-]{46}$/.test(compact);
+    const rawTon = /^-?\d+:[a-fA-F0-9]{64}$/.test(compact);
+    if (!userFriendlyTon && !rawTon) {
+      const error = new Error("Укажите корректный TON-адрес");
+      error.status = 400;
+      throw error;
+    }
+  } else if (methodId === "usdt") {
+    const trc20 = /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(compact);
+    const evm = /^0x[a-fA-F0-9]{40}$/.test(compact);
+    if (!trc20 && !evm) {
+      const error = new Error("Укажите корректный USDT-адрес");
+      error.status = 400;
+      throw error;
+    }
+  } else if (/^[a-zA-Z]+$/.test(compact) && compact.length < 24) {
+    const error = new Error("Укажите полный адрес кошелька");
+    error.status = 400;
+    throw error;
+  }
+  return destinationValue;
 }
 
 export function toUsdtMicros(value) {

@@ -22,30 +22,35 @@ test("cash uses USDT micros directly and Stars quote 100 per USDT", () => {
 });
 
 test("cash withdrawal quote validates method, amount and destination in USDT micros", () => {
+  const validTonAddress = `UQ${"A".repeat(46)}`;
   const quote = quoteWithdrawal({
     usdtAmount: 25,
     method: "ton",
-    destination: "EQC-valid-ton-address"
+    destination: validTonAddress
   });
   assert.equal(quote.method, "ton");
   assert.equal(quote.grossUsdtMicros, toUsdtMicros(25));
   assert.equal(quote.balanceBucket, "cash_usdt");
   assert.equal(quote.asset, "USDT");
-  assert.equal(quote.destination, "EQC-valid-ton-address");
+  assert.equal(quote.destination, validTonAddress);
   assert.ok(quote.payoutUsdtMicros > 0);
   assert.ok(quote.payoutUsdtMicros <= quote.grossUsdtMicros);
 
   assert.throws(
-    () => quoteWithdrawal({ usdtAmount: 1, method: "ton", destination: "EQC-valid-ton-address" }),
+    () => quoteWithdrawal({ usdtAmount: 1, method: "ton", destination: validTonAddress }),
     /Минимальный вывод/
   );
   assert.throws(
-    () => quoteWithdrawal({ usdtAmount: 25, method: "bad", destination: "EQC-valid-ton-address" }),
+    () => quoteWithdrawal({ usdtAmount: 25, method: "bad", destination: validTonAddress }),
     /Метод вывода/
   );
   assert.throws(
     () => quoteWithdrawal({ usdtAmount: 25, method: "ton", destination: "" }),
-    /реквизиты/
+    /адрес/
+  );
+  assert.throws(
+    () => quoteWithdrawal({ usdtAmount: 25, method: "ton", destination: "Usjdbbdick" }),
+    /адрес/
   );
 });
 

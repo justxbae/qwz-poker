@@ -10481,3 +10481,172 @@ html.minimal-launch body:not(.in-game) .profile-balance-row strong .usd-inline-i
   height: 0.82em !important;
   transform: translateY(0.04em) !important;
 }
+
+/* Withdrawal: casino-style strict form, no explanatory wall of text. */
+html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-withdraw-card {
+  background: var(--tg-bg-color, #191317) !important;
+  background-color: var(--tg-bg-color, #191317) !important;
+  padding: 28px 14px calc(18px + env(safe-area-inset-bottom)) !important;
+  gap: 16px !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .section-title {
+  position: absolute !important;
+  top: 14px !important;
+  right: 14px !important;
+  display: block !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-sheet-close {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 999px !important;
+  background: color-mix(in srgb, var(--tg-section-bg-color, #261b20) 80%, white 8%) !important;
+  color: rgba(255, 255, 255, 0.72) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-amount-title {
+  max-width: 330px !important;
+  margin: 30px auto 8px !important;
+  padding: 0 2px !important;
+  color: #fff !important;
+  font-size: 30px !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.045em !important;
+  font-weight: 760 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-calculator,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby.tg-menu-group {
+  width: min(100%, 342px) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  border-radius: 28px !important;
+  background: color-mix(in srgb, var(--tg-section-bg-color, #261b20) 84%, white 8%) !important;
+  background-color: color-mix(in srgb, var(--tg-section-bg-color, #261b20) 84%, white 8%) !important;
+  box-shadow: none !important;
+  border: 0 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-calculator {
+  display: grid !important;
+  gap: 10px !important;
+  padding: 14px !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-amount-field {
+  height: 58px !important;
+  border-radius: 18px !important;
+  background: color-mix(in srgb, var(--tg-section-bg-color, #261b20) 74%, white 12%) !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-amount-field > span,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-amount-field small {
+  display: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-amount-field input {
+  height: 100% !important;
+  padding: 0 18px !important;
+  color: #fff !important;
+  font-size: 25px !important;
+  line-height: 1 !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.035em !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby.tg-menu-group {
+  min-height: 0 !important;
+  padding: 8px 14px !important;
+  display: grid !important;
+  grid-template-rows: repeat(2, 58px) !important;
+  overflow: hidden !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row {
+  height: 58px !important;
+  min-height: 58px !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row::before,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row.active::before {
+  display: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row + .footer-lobby-row::after {
+  content: "" !important;
+  position: absolute !important;
+  left: 62px !important;
+  right: 10px !important;
+  top: 0 !important;
+  height: 1px !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-status {
+  width: min(100%, 342px) !important;
+  min-height: 0 !important;
+  margin: -4px auto 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+  background: transparent !important;
+  color: rgba(235, 235, 245, 0.72) !important;
+  opacity: 0 !important;
+  transform: translateY(-6px) !important;
+  transition: opacity 180ms ease, transform 180ms ease, padding 180ms ease, background-color 180ms ease !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-status.manual-visible,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-status.error {
+  padding: 12px 14px !important;
+  background: color-mix(in srgb, var(--tg-section-bg-color, #261b20) 84%, white 8%) !important;
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-status.error {
+  color: #ff8f8f !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-pay-button {
+  width: min(100%, 342px) !important;
+  margin: 8px auto 0 !important;
+  border-radius: 24px !important;
+}
+
+html.minimal-launch body:not(.in-game) .cashier-transaction.withdrawal {
+  min-height: 58px !important;
+}
+
+html.minimal-launch body:not(.in-game) .cashier-transaction.withdrawal strong {
+  font-size: 17px !important;
+  font-weight: 560 !important;
+}
+
+html.minimal-launch body:not(.in-game) .cashier-transaction-side {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+}
+
+html.minimal-launch body:not(.in-game) .cashier-transaction-side button {
+  appearance: none !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  padding: 8px 12px !important;
+  background: rgba(255, 255, 255, 0.10) !important;
+  color: rgba(255, 255, 255, 0.86) !important;
+  font: inherit !important;
+  font-size: 13px !important;
+}

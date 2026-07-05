@@ -438,7 +438,10 @@ async function boot() {
   cashierMethods?.addEventListener("click", onCashierMethodClick);
   cashierPayButton?.addEventListener("click", () => runAction(payCashierAmount));
   cashierWithdrawMethods?.addEventListener("click", onCashierWithdrawMethodClick);
+  cashierWithdrawAmount?.addEventListener("input", updateWithdrawalManualNotice);
   cashierWithdrawAmount?.addEventListener("blur", normalizeWithdrawAmountInput);
+  cashierWithdrawDestination?.addEventListener("input", updateWithdrawalManualNotice);
+  cashierHistory?.addEventListener("click", onCashierHistoryClick);
   cashierWithdrawForm?.addEventListener("submit", (event) => {
     event.preventDefault();
     runAction(submitWithdrawalRequest);
@@ -1412,7 +1415,11 @@ function renderCashier(cashier) {
   cashierState.disabled = !cashMode && !cashierState.demoTopup;
   renderCashierControls(cashierState.demoTopup ? (state.config?.play?.deposit || {}) : (cashier.deposit || {}));
   renderWithdrawalControls(cashier, cashMode);
-  renderCashierHistory(cashierState.demoTopup ? (cashier.playTransactions || []) : (cashier.transactions || []), cashMode);
+  renderCashierHistory(
+    cashierState.demoTopup ? (cashier.playTransactions || []) : (cashier.transactions || []),
+    cashMode,
+    cashier.withdrawalOrders || []
+  );
 }
 
 function renderCashierControls(deposit) {
@@ -1482,10 +1489,12 @@ function renderCashierControls(deposit) {
 function renderWithdrawalControls(cashier, cashMode) {
   const withdrawals = cashier?.withdrawals || {};
   const enabled = Boolean(cashMode && withdrawals.enabled);
-  if (cashierWithdrawTitle) cashierWithdrawTitle.textContent = enabled ? "Ручная заявка на вывод" : (cashMode ? "Вывод $ пока закрыт" : "У игровых фишек нет вывода");
+  const stateBlock = cashierWithdrawTitle?.closest(".cashier-withdraw-state");
+  if (stateBlock) stateBlock.hidden = enabled;
+  if (cashierWithdrawTitle) cashierWithdrawTitle.textContent = enabled ? "" : (cashMode ? "Вывод пока закрыт" : "У игровых фишек нет вывода");
   if (cashierWithdrawText) {
     cashierWithdrawText.textContent = enabled
-      ? "Средства будут заморожены до ручной проверки администратором. После выплаты заявка отмечается в админке."
+      ? ""
       : cashMode
         ? "Вывод включается только после настройки WITHDRAWALS_ENABLED=true и проверки реквизитов выплат."
         : "Игровые фишки используются только в рейтинговых столах и не обмениваются на денежный баланс.";
@@ -1493,7 +1502,10 @@ function renderWithdrawalControls(cashier, cashMode) {
   if (!cashierWithdrawForm || !cashierWithdrawAmount || !cashierWithdrawMethods || !cashierWithdrawSubmit) return;
   cashierWithdrawForm.hidden = !enabled;
   if (!enabled) {
-    if (cashierWithdrawStatus) cashierWithdrawStatus.textContent = "";
+    if (cashierWithdrawStatus) {
+      cashierWithdrawStatus.textContent = "";
+      cashierWithdrawStatus.classList.remove("manual-visible", "error");
+    }
     cashierWithdrawMethods.replaceChildren();
     return;
   }
@@ -1505,7 +1517,7 @@ function renderWithdrawalControls(cashier, cashMode) {
   cashierWithdrawAmount.step = "0.01";
   if (!Number(cashierWithdrawAmount.value)) cashierWithdrawAmount.value = minUsdt.toFixed(2);
 
-  const methods = withdrawals.methods || [];
+  const methods = (withdrawals.methods || []).filter((method) => method.enabled);
   if (methods.length && !methods.some((method) => method.id === cashierState.selectedWithdrawalMethod && method.enabled)) {
     cashierState.selectedWithdrawalMethod = methods.find((method) => method.enabled)?.id || methods[0].id || "ton";
   }
@@ -1521,9 +1533,11 @@ function renderWithdrawalControls(cashier, cashMode) {
       <span class="footer-lobby-value">${escapeHtml(withdrawalMethodMeta(method))}</span>
       <span class="footer-lobby-chevron">›</span>
     `;
-    return button;
-  }));
+	    return button;
+	  }));
   cashierWithdrawSubmit.disabled = !methods.some((method) => method.enabled);
+  if (cashierWithdrawDestination) cashierWithdrawDestination.placeholder = withdrawalPlaceholder(cashierState.selectedWithdrawalMethod);
+  updateWithdrawalManualNotice();
 }
 
 function onCashierPresetClick(event) {
@@ -1550,6 +1564,8 @@ function onCashierWithdrawMethodClick(event) {
   cashierWithdrawMethods.querySelectorAll("button").forEach((item) => {
     item.classList.toggle("active", item.dataset.withdrawMethod === cashierState.selectedWithdrawalMethod);
   });
+  if (cashierWithdrawDestination) cashierWithdrawDestination.placeholder = withdrawalPlaceholder(cashierState.selectedWithdrawalMethod);
+  updateWithdrawalManualNotice();
 }
 
 function normalizeCashierAmountInput() {
@@ -1565,6 +1581,48 @@ function normalizeWithdrawAmountInput() {
   const minUsdt = Number(withdrawals.minimumUsdtMicros || 10_000_000) / 1_000_000;
   const maxUsdt = Number(withdrawals.maximumUsdtMicros || 5_000_000_000) / 1_000_000;
   cashierWithdrawAmount.value = clampAmount(Number(cashierWithdrawAmount.value || minUsdt), minUsdt, maxUsdt).toFixed(2);
+  updateWithdrawalManualNotice();
+}
+
+function withdrawalPlaceholder(method = "ton") {
+  return method === "usdt" ? "USDT адрес" : "TON адрес";
+}
+
+function validateWithdrawalDestinationInput(method = "ton", value = "") {
+  const destination = String(value || "").trim();
+  const compact = destination.replace(/\s+/g, "");
+  if (destination.length < 12) return "Укажите полный адрес кошелька.";
+  if (destination.length > 240) return "Адрес слишком длинный.";
+  if (method === "ton") {
+    const userFriendlyTon = /^(?:EQ|UQ)[A-Za-z0-9_-]{46}$/.test(compact);
+    const rawTon = /^-?\d+:[a-fA-F0-9]{64}$/.test(compact);
+    return userFriendlyTon || rawTon ? "" : "Укажите корректный TON-адрес.";
+  }
+  if (method === "usdt") {
+    const trc20 = /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(compact);
+    const evm = /^0x[a-fA-F0-9]{40}$/.test(compact);
+    return trc20 || evm ? "" : "Укажите корректный USDT-адрес.";
+  }
+  return "";
+}
+
+function withdrawalInputsReady() {
+  if (!cashierWithdrawAmount || !cashierWithdrawDestination) return false;
+  const amount = Number(cashierWithdrawAmount.value || 0);
+  const method = cashierState.selectedWithdrawalMethod || "ton";
+  return amount > 0 && !validateWithdrawalDestinationInput(method, cashierWithdrawDestination.value);
+}
+
+function updateWithdrawalManualNotice() {
+  if (!cashierWithdrawStatus || !cashierWithdrawForm || cashierWithdrawForm.hidden) return;
+  cashierWithdrawStatus.classList.remove("error");
+  if (withdrawalInputsReady()) {
+    cashierWithdrawStatus.textContent = "Заявки пока обрабатываются вручную.";
+    cashierWithdrawStatus.classList.add("manual-visible");
+  } else {
+    cashierWithdrawStatus.textContent = "";
+    cashierWithdrawStatus.classList.remove("manual-visible");
+  }
 }
 
 function syncCashierQuote() {
@@ -1719,14 +1777,39 @@ function isTelegramUrl(url) {
   }
 }
 
-function renderCashierHistory(transactions, cashMode = false) {
+function renderCashierHistory(transactions, cashMode = false, withdrawals = []) {
   cashierHistory.replaceChildren();
-  if (!transactions.length) {
+  if (!transactions.length && !withdrawals.length) {
     const empty = document.createElement("div");
     empty.className = "cashier-empty";
     empty.textContent = "Операций пока нет";
     cashierHistory.append(empty);
     return;
+  }
+
+  for (const withdrawal of withdrawals) {
+    const row = document.createElement("div");
+    row.className = `cashier-transaction withdrawal ${["pending", "manual_review"].includes(withdrawal.status) ? "pending" : withdrawal.status}`;
+
+    const main = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = `Вывод ${formatUsdtDisplay(withdrawal.grossUsdtMicros || withdrawal.chips || 0)}`;
+    const meta = document.createElement("span");
+    meta.textContent = `${withdrawalStatusTitle(withdrawal.status)} · ${formatCompactTime(withdrawal.createdAt)}`;
+    main.append(title, meta);
+
+    const side = document.createElement("div");
+    side.className = "cashier-transaction-side";
+    if (["pending", "manual_review"].includes(withdrawal.status)) {
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.dataset.withdrawCancel = withdrawal.id;
+      cancel.textContent = "Отменить";
+      side.append(cancel);
+    }
+
+    row.append(main, side);
+    cashierHistory.append(row);
   }
 
   for (const transaction of transactions) {
@@ -1745,6 +1828,50 @@ function renderCashierHistory(transactions, cashMode = false) {
 
     row.append(main, amount);
     cashierHistory.append(row);
+  }
+}
+
+function withdrawalStatusTitle(status = "") {
+  if (status === "approved") return "Выплачено";
+  if (status === "rejected") return "Отменено";
+  if (status === "failed") return "Ошибка";
+  return "В обработке";
+}
+
+function formatCompactTime(value) {
+  if (!value) return "";
+  return new Date(value).toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function onCashierHistoryClick(event) {
+  const button = event.target.closest("[data-withdraw-cancel]");
+  if (!button) return;
+  runAction(() => cancelWithdrawalRequest(button.dataset.withdrawCancel, button));
+}
+
+async function cancelWithdrawalRequest(orderId, button) {
+  if (!orderId) return;
+  if (button) button.disabled = true;
+  try {
+    const data = await api(`/api/cashier/withdrawals/${encodeURIComponent(orderId)}/cancel`, {
+      method: "POST",
+      idempotencyKey: requestKey(`withdrawal-cancel-${orderId}`),
+      body: {}
+    });
+    if (data.cashier) renderCashier(data.cashier);
+    await auth();
+    await loadProfile();
+    haptic("success");
+  } catch (error) {
+    if (cashierStatus) cashierStatus.textContent = error.message || "Не удалось отменить заявку.";
+    haptic("error");
+  } finally {
+    if (button) button.disabled = false;
   }
 }
 
@@ -1838,13 +1965,21 @@ async function submitWithdrawalRequest() {
   normalizeWithdrawAmountInput();
   const method = cashierState.selectedWithdrawalMethod || "ton";
   const destination = String(cashierWithdrawDestination.value || "").trim();
-  if (destination.length < 4) {
-    if (cashierWithdrawStatus) cashierWithdrawStatus.textContent = "Укажите реквизиты/адрес для вывода.";
+  const destinationError = validateWithdrawalDestinationInput(method, destination);
+  if (destinationError) {
+    if (cashierWithdrawStatus) {
+      cashierWithdrawStatus.textContent = destinationError;
+      cashierWithdrawStatus.classList.add("error");
+      cashierWithdrawStatus.classList.remove("manual-visible");
+    }
     haptic("error");
     return;
   }
   cashierWithdrawSubmit.disabled = true;
-  if (cashierWithdrawStatus) cashierWithdrawStatus.textContent = "Создаём заявку...";
+  if (cashierWithdrawStatus) {
+    cashierWithdrawStatus.textContent = "Создаём заявку...";
+    cashierWithdrawStatus.classList.remove("error", "manual-visible");
+  }
   try {
     const data = await api("/api/cashier/withdraw", {
       method: "POST",
@@ -1859,10 +1994,18 @@ async function submitWithdrawalRequest() {
     await auth();
     await loadProfile();
     cashierWithdrawDestination.value = "";
-    if (cashierWithdrawStatus) cashierWithdrawStatus.textContent = "Заявка создана. Средства заморожены до проверки.";
+    if (cashierWithdrawStatus) {
+      cashierWithdrawStatus.textContent = "Заявка создана.";
+      cashierWithdrawStatus.classList.add("manual-visible");
+      cashierWithdrawStatus.classList.remove("error");
+    }
     haptic("success");
   } catch (error) {
-    if (cashierWithdrawStatus) cashierWithdrawStatus.textContent = error.message || "Не удалось создать заявку.";
+    if (cashierWithdrawStatus) {
+      cashierWithdrawStatus.textContent = error.message || "Не удалось создать заявку.";
+      cashierWithdrawStatus.classList.add("error");
+      cashierWithdrawStatus.classList.remove("manual-visible");
+    }
     haptic("error");
   } finally {
     cashierWithdrawSubmit.disabled = false;
