@@ -1688,7 +1688,7 @@ function paymentMethodTitleShort(method) {
   if (method === "stars") return "Stars";
   if (method === "cryptobot") return "Crypto bot";
   if (method === "xrocket") return "xRocket";
-  if (method === "ton") return "TON";
+  if (method === "ton") return "Gram";
   return "$";
 }
 
@@ -1697,22 +1697,22 @@ function cashierMethodMeta(method) {
   if (method.id === "stars") return "Telegram";
   if (method.id === "cryptobot") return "USDT";
   if (method.id === "xrocket") return "USDT";
-  if (method.id === "ton") return "TON";
+  if (method.id === "ton") return "Gram";
   return method.speed || "";
 }
 
 function withdrawalMethodMeta(method) {
   if (!method?.enabled) return "закрыто";
-  if (method.id === "ton") return "TON";
+  if (method.id === "ton") return "Gram";
   if (method.id === "usdt") return "USDT";
   return "ручная проверка";
 }
 
 function cashierMethodIcon(method) {
-  if (method === "stars") return "/assets/footer/Icon-17.svg";
-  if (method === "cryptobot") return "/assets/footer/telegram.svg";
-  if (method === "xrocket") return "/assets/footer/ic_largegroup.svg?v=20260628-1";
-  if (method === "ton") return "/assets/footer/mynotes.svg";
+  if (method === "stars") return "/assets/footer/premiumbadge.svg";
+  if (method === "cryptobot") return "/assets/footer/cryptobot.png";
+  if (method === "xrocket") return "/assets/footer/xrocket.png";
+  if (method === "ton") return "/assets/footer/gram-circular-badge.png";
   return "/assets/mode/monetization.svg";
 }
 

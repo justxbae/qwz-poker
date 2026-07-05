@@ -11099,3 +11099,133 @@ html.minimal-launch body.keyboard-open.cashier-sheet-open .cashier-withdraw-card
   bottom: calc(var(--keyboard-height, 0px) + 78px + env(safe-area-inset-bottom)) !important;
   z-index: 21 !important;
 }
+
+/* Weez cashier/lobby polish, 2026-07-05 follow-up. */
+html.minimal-launch body:not(.in-game) .home-account .home-identity,
+html.minimal-launch body:not(.in-game) .home-account .home-profile-link {
+  display: none !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-account {
+  width: auto !important;
+  min-width: 0 !important;
+}
+
+html.minimal-launch body:not(.in-game) .lobby-avatar {
+  width: 62px !important;
+  height: 62px !important;
+  min-width: 62px !important;
+  font-size: 28px !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-balance #lobbyBalance {
+  font-size: clamp(26px, calc(33px * var(--money-scale, 1)), 33px) !important;
+  line-height: .92 !important;
+}
+
+html.minimal-launch body:not(.in-game) .home-balance #lobbyBalance {
+  font-size: clamp(24px, calc(32px * var(--money-scale, 1)), 32px) !important;
+}
+
+html.minimal-launch body:not(.in-game) .usd-mark {
+  margin-right: -0.045em !important;
+  font-size: .86em !important;
+  transform: translateY(.01em) !important;
+}
+
+html.minimal-launch body:not(.in-game) .usd-frac {
+  font-size: .7em !important;
+  margin-left: 0 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-topup-card,
+html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-withdraw-card {
+  --weez-sheet-bg: var(--tg-bg-color, #17212b);
+  --weez-card-bg: #2C3844;
+  --weez-field-bg: #3F4857;
+  background: var(--weez-sheet-bg) !important;
+  background-color: var(--weez-sheet-bg) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-calculator,
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .withdraw-balance-card,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-calculator,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby.tg-menu-group {
+  background: #2C3844 !important;
+  background-color: #2C3844 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-amount-field,
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-presets,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-amount-field {
+  background: #3F4857 !important;
+  background-color: #3F4857 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-calculator {
+  gap: 10px !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-amount-field {
+  margin-bottom: 0 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card #cashierAmountAsset,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-amount-field small {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 100% !important;
+  top: 0 !important;
+  transform: none !important;
+  color: rgba(255,255,255,.72) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods button,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row {
+  transition: background-color 160ms ease, color 160ms ease !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods button.active,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row.active {
+  background: #256CA9 !important;
+  background-color: #256CA9 !important;
+  border-radius: 18px !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods button.active span,
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods button.active strong,
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods button.active .footer-lobby-main,
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods button.active .footer-lobby-value,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row.active .footer-lobby-main,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row.active .footer-lobby-value {
+  color: #fff !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods button.active .footer-lobby-chevron,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row.active .footer-lobby-chevron {
+  color: rgba(255,255,255,.52) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods .footer-lobby-icon img[src*="premiumbadge"] {
+  filter: brightness(0) invert(1) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods .footer-lobby-icon img[src*="cryptobot"],
+html.minimal-launch body.cashier-sheet-open .cashier-methods .footer-lobby-icon img[src*="xrocket"],
+html.minimal-launch body.cashier-sheet-open .cashier-methods .footer-lobby-icon img[src*="gram-circular-badge"] {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  filter: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods.footer-lobby .footer-lobby-row::before,
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods.footer-lobby .footer-lobby-row.active::before {
+  display: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods.footer-lobby .footer-lobby-row + .footer-lobby-row::after {
+  background: rgba(255,255,255,.16) !important;
+}
