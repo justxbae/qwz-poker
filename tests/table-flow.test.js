@@ -350,6 +350,37 @@ test("standing keeps the table open as observer and allows sitting again", async
   }
 });
 
+test("sitting out releases a cash table seat after the reconnect window", async () => {
+  const server = await startServer({ TABLE_SIT_OUT_TIMEOUT_MS: "300" });
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await topUp(auth.token, 2);
+    const table = (await request("/api/tables", {
+      method: "POST",
+      token: auth.token,
+      body: { name: "Auto release", maxPlayers: 2, smallBlind: 25, buyInAmount: 10000 }
+    })).table;
+
+    const sittingOut = await request(`/api/tables/${table.id}/sit-out`, {
+      method: "POST",
+      token: auth.token
+    });
+    assert.equal(sittingOut.table.viewer.isSeated, true);
+    assert.equal(sittingOut.table.seats[0].sittingOut, true);
+
+    await sleep(1300);
+
+    const profile = (await request("/api/profile", { token: auth.token })).profile;
+    assert.equal(profile.balance, 10000);
+    assert.equal(profile.tableStack, 0);
+
+    const tableResponse = await requestResponse(`/api/tables/${table.id}`, { token: auth.token });
+    assert.equal(tableResponse.status, 404);
+  } finally {
+    server.kill();
+  }
+});
+
 test("initial buy-in chooses table stack and spends wallet balance", async () => {
   const server = await startServer({ ADMIN_USER_IDS: "dev-user" });
   try {
@@ -1792,6 +1823,10 @@ async function startServerAndWaitForExit(extraEnv = {}) {
       resolve({ code, stdout, stderr });
     });
   });
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function topUp(token, count = 1) {

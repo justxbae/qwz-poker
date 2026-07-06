@@ -7,10 +7,15 @@ export const NEXT_HAND_DELAY_MS = 5000;
 export const START_INTRO_MS = 3500;
 export const RUNOUT_CARD_DELAY_MS = 900;
 export const REBUY_TIMEOUT_MS = 3 * 60 * 1000;
-export const SIT_OUT_TIMEOUT_MS = 5 * 60 * 1000;
+export const SIT_OUT_TIMEOUT_MS = envMs("TABLE_SIT_OUT_TIMEOUT_MS", 5 * 60 * 1000);
 export const RECONNECT_WINDOW_MS = 30 * 1000;
 const PRESENCE_STALE_MS = 10 * 1000;
 const TABLE_EVENT_LIMIT = 160;
+
+function envMs(name, fallback) {
+  const value = Number.parseInt(process.env[name] || "", 10);
+  return Number.isFinite(value) && value >= 100 ? value : fallback;
+}
 
 export function createTable(owner, body = {}, options = {}) {
   const maxPlayers = clamp(Number(body.maxPlayers || 6), 2, 6);
