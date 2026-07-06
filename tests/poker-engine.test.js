@@ -295,6 +295,30 @@ test("expired turn auto-folds when facing a bet", () => {
   assert.match(table.message, /Player 2 забирает банк/);
 });
 
+test("disconnected cash player auto-sits out after timeout and stops receiving blinds", () => {
+  const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
+  joinTable(table, player2);
+  maybeStartHand(table);
+  startHand(table);
+
+  const ownerSeat = table.seats.find((seat) => seat.userId === owner.id);
+  ownerSeat.presenceTracked = true;
+  ownerSeat.connected = false;
+  ownerSeat.lastSeenAt = Date.now() - 60_000;
+  table.actionDeadline = Date.now() - 1;
+  tickTables(new Map([[table.id, table]]));
+
+  assert.equal(table.status, "showdown");
+  assert.equal(ownerSeat.sittingOut, true);
+  assert.equal(ownerSeat.sittingOutReason, "away");
+  assert.ok(ownerSeat.sittingOutUntil > Date.now() + 250_000);
+
+  startHand(table);
+  assert.equal(table.status, "waiting");
+  assert.equal(ownerSeat.cards.length, 0);
+  assert.equal(ownerSeat.bet, 0);
+});
+
 test("new hand assigns separate blinds even if a player folded last hand", () => {
   const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
   joinTable(table, player2);

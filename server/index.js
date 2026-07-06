@@ -325,7 +325,10 @@ async function tickActiveTables() {
         const beforeEventSequence = Number(table.eventSequence || 0);
         const beforeStatus = table.status;
         tickTables(new Map([[tableId, table]]));
-        if (beforeEventSequence !== Number(table.eventSequence || 0) || beforeStatus !== table.status) {
+        const autoSettled = await settleExpiredTableSessions(table);
+        if (autoSettled && table.seats.length === 0) {
+          await deleteActiveTableSnapshot(table.id);
+        } else if (autoSettled || beforeEventSequence !== Number(table.eventSequence || 0) || beforeStatus !== table.status) {
           await persistActiveTableSnapshot(table);
         } else {
           table.stateRevision = beforeRevision;
@@ -335,6 +338,44 @@ async function tickActiveTables() {
       if (error.status !== 409) throw error;
     }
   }
+}
+
+async function settleExpiredTableSessions(table, now = Date.now()) {
+  if (!table || table.tournamentId) return false;
+  let changed = false;
+  const expiredSeats = table.seats
+    .filter((seat) => seat.sittingOut && seat.sittingOutUntil && now >= Number(seat.sittingOutUntil || 0))
+    .map((seat) => ({ ...seat }));
+
+  for (const seat of expiredSeats) {
+    if (!table.seats.some((candidate) => candidate.userId === seat.userId)) continue;
+    const user = tableSessionUserFromSeat(seat);
+    const result = leaveTable(table, user);
+    await persistCompletedHands(table);
+    const deleteSnapshot = result.tableEmpty;
+    await settleLeftTableStack(user, table, seat.stack || result.stack, {
+      returnToWallet: true,
+      deleteSnapshot,
+      idempotencyKey: `auto-stand:${table.id}:${seat.userId}:${seat.sittingOutUntil}`
+    });
+    if (deleteSnapshot && table.isPrivate) tables.delete(table.id);
+    changed = true;
+  }
+
+  return changed;
+}
+
+function tableSessionUserFromSeat(seat) {
+  const existing = userProfiles.get(String(seat.userId || ""));
+  return {
+    ...(existing || {}),
+    id: String(seat.userId || ""),
+    name: seat.name || existing?.name || "Игрок",
+    username: seat.username || existing?.username || "",
+    photoUrl: seat.photoUrl || existing?.photoUrl || "",
+    balance: existing?.balance || 0,
+    cashBalanceMicros: existing?.cashBalanceMicros || 0
+  };
 }
 
 setInterval(async () => {

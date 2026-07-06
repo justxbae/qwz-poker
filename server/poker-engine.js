@@ -1108,6 +1108,11 @@ function moveChipsToPot(table, seat, amount) {
 function autoTimeoutAction(table) {
   const seat = table.seats[table.activeSeatIndex];
   const toCall = Math.max(0, table.currentBet - seat.bet);
+  const shouldSitOutAfterTimeout = shouldAutoSitOutOnTimeout(seat);
+  if (shouldSitOutAfterTimeout) {
+    seat.sitOutNextHand = true;
+    seat.sittingOutReason = "away";
+  }
 
   if (toCall > 0) {
     seat.folded = true;
@@ -1127,6 +1132,12 @@ function autoTimeoutAction(table) {
   }
 
   advanceAfterAction(table);
+}
+
+function shouldAutoSitOutOnTimeout(seat, now = Date.now()) {
+  if (!seat?.presenceTracked) return false;
+  if (seat.connected === false) return true;
+  return Boolean(seat.lastSeenAt && now - seat.lastSeenAt > PRESENCE_STALE_MS);
 }
 
 function activeSeats(table) {
