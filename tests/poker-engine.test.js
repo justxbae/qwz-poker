@@ -558,9 +558,43 @@ test("showdown records hand history with board, pots, and player results", () =>
   assert.equal(table.handHistory[0].pots[0].rake, 5);
   assert.deepEqual(table.handHistory[0].pots[0].winners, ["Owner"]);
   assert.equal(table.handHistory[0].seats.find((seat) => seat.name === "Owner").profit, 45);
+  assert.ok(table.handHistory[0].tableSessionId);
 
   const view = publicTable(table, owner.id);
   assert.equal(view.handHistory.length, 1);
+});
+
+test("public hand history only exposes the active table session", () => {
+  const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
+  table.handHistory.push({
+    id: "old_hand",
+    tableSessionId: "old_session",
+    handNumber: 99,
+    at: Date.now() - 1000,
+    board: ["As", "Ks", "Qs", "Js", "Ts"],
+    fairnessProof: null,
+    pots: [],
+    seats: []
+  });
+  joinTable(table, player2);
+  startHand(table);
+  table.seats[0].cards = ["As", "Ah"];
+  table.seats[1].cards = ["Ks", "Kh"];
+  table.deck = ["2c", "7d", "9h", "Jc", "4s"];
+
+  act(table, owner, { action: "call" });
+  act(table, player2, { action: "check" });
+  act(table, player2, { action: "check" });
+  act(table, owner, { action: "check" });
+  act(table, player2, { action: "check" });
+  act(table, owner, { action: "check" });
+  act(table, player2, { action: "check" });
+  act(table, owner, { action: "check" });
+
+  const view = publicTable(table, owner.id);
+  assert.equal(view.handHistory.length, 1);
+  assert.notEqual(view.handHistory[0].id, "old_hand");
+  assert.equal(view.handHistory[0].handNumber, table.handNumber);
 });
 
 test("owner can manually choose fold or call for active test players", () => {

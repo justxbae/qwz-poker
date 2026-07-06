@@ -56,6 +56,8 @@ export function createTable(owner, body = {}, options = {}) {
     actionLog: [],
     eventSequence: 0,
     events: [],
+    tableSessionId: "",
+    tableSessionStartedAt: 0,
     handHistory: [],
     departedContributions: [],
     fairnessProof: null,
@@ -268,12 +270,12 @@ export function sitIn(table, user) {
 export function touchTablePresence(table, user) {
   const seat = table.seats.find((candidate) => candidate.userId === user.id);
   if (!seat) return null;
-  const wasDisconnected = seat.presenceTracked && seat.connected === false;
+  const hadVisibleReconnect = seat.presenceTracked && seat.connected === false && Number(seat.reconnectDeadline || 0) > 0;
   seat.presenceTracked = true;
   seat.connected = true;
   seat.lastSeenAt = Date.now();
   seat.reconnectDeadline = 0;
-  if (wasDisconnected) emitTableEvent(table, "seat_return", { userId: seat.userId, reconnect: true });
+  if (hadVisibleReconnect) emitTableEvent(table, "seat_return", { userId: seat.userId, reconnect: true });
   return seat;
 }
 
@@ -324,6 +326,12 @@ export function startHand(table, user) {
       seat.sitOutNextHand = false;
     }
     return;
+  }
+
+  if (!table.tableSessionId) {
+    table.tableSessionId = randomId("session");
+    table.tableSessionStartedAt = Date.now();
+    table.handHistory = [];
   }
 
   if (table.status !== "starting") {
@@ -509,7 +517,9 @@ export function publicTable(table, viewerId = "") {
     now: Date.now(),
     message: table.message,
     actionLog: table.actionLog,
-    handHistory: publicHandHistory(table.handHistory),
+    tableSessionId: table.tableSessionId || "",
+    tableSessionStartedAt: table.tableSessionStartedAt || 0,
+    handHistory: publicHandHistory(table),
     fairness: publicCurrentFairness(table),
     events: publicTableEvents(table),
     viewer: {
@@ -559,21 +569,25 @@ export function publicTable(table, viewerId = "") {
   };
 }
 
-function publicHandHistory(history) {
-  return history.map((hand) => ({
-    id: hand.id,
-    handNumber: hand.handNumber,
-    at: hand.at,
-    board: hand.board,
-    fairnessProof: hand.fairnessProof ? publicFairnessProof(hand.fairnessProof) : null,
-    pots: hand.pots.map((pot) => ({
-      label: pot.label,
-      amount: pot.amount,
-      winners: pot.winners,
-      handDescription: pot.handDescription
-    })),
-    seats: hand.seats
-  }));
+function publicHandHistory(table) {
+  const sessionId = String(table?.tableSessionId || "");
+  if (!sessionId) return [];
+  return (table.handHistory || [])
+    .filter((hand) => hand.tableSessionId === sessionId)
+    .map((hand) => ({
+      id: hand.id,
+      handNumber: hand.handNumber,
+      at: hand.at,
+      board: hand.board,
+      fairnessProof: hand.fairnessProof ? publicFairnessProof(hand.fairnessProof) : null,
+      pots: hand.pots.map((pot) => ({
+        label: pot.label,
+        amount: pot.amount,
+        winners: pot.winners,
+        handDescription: pot.handDescription
+      })),
+      seats: hand.seats
+    }));
 }
 
 function canControlTestPlayers(table, user) {
@@ -899,6 +913,7 @@ function recordHandHistory(table, { pots, rake = 0 }) {
   const revealed = new Set(table.showdownRevealUserIds || []);
   const record = {
     id: randomId("hand"),
+    tableSessionId: table.tableSessionId || "",
     handNumber: table.handNumber,
     at: Date.now(),
     board: [...table.communityCards],
@@ -1278,9 +1293,9 @@ function updateTablePresence(table, now = Date.now()) {
     if (!seat.presenceTracked || seat.connected === false || !seat.lastSeenAt) continue;
     if (now - seat.lastSeenAt <= PRESENCE_STALE_MS) continue;
     seat.connected = false;
-    seat.reconnectDeadline = now + RECONNECT_WINDOW_MS;
-    emitTableEvent(table, "seat_disconnected", { userId: seat.userId, reconnectDeadline: seat.reconnectDeadline });
-    if (table.activeSeatIndex >= 0 && table.seats[table.activeSeatIndex]?.userId === seat.userId) {
+    if (table.tournamentId && table.activeSeatIndex >= 0 && table.seats[table.activeSeatIndex]?.userId === seat.userId) {
+      seat.reconnectDeadline = now + RECONNECT_WINDOW_MS;
+      emitTableEvent(table, "seat_disconnected", { userId: seat.userId, reconnectDeadline: seat.reconnectDeadline });
       table.actionDeadline = Math.max(Number(table.actionDeadline || 0), seat.reconnectDeadline);
       emitTableEvent(table, "action_prompt", {
         userId: seat.userId,

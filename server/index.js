@@ -352,6 +352,7 @@ async function settleExpiredTableSessions(table, now = Date.now()) {
     const user = tableSessionUserFromSeat(seat);
     const result = leaveTable(table, user);
     await persistCompletedHands(table);
+    clearTableSessionIfEmpty(table);
     const deleteSnapshot = result.tableEmpty;
     await settleLeftTableStack(user, table, seat.stack || result.stack, {
       returnToWallet: true,
@@ -376,6 +377,17 @@ function tableSessionUserFromSeat(seat) {
     balance: existing?.balance || 0,
     cashBalanceMicros: existing?.cashBalanceMicros || 0
   };
+}
+
+function clearTableSessionIfEmpty(table) {
+  if (!table || table.tournamentId || table.seats.length > 0) return false;
+  table.tableSessionId = "";
+  table.tableSessionStartedAt = 0;
+  table.handHistory = [];
+  table.actionLog = [];
+  table.events = [];
+  table.eventSequence = 0;
+  return true;
 }
 
 setInterval(async () => {
@@ -1176,6 +1188,7 @@ async function handleApi(req, res, url) {
       const departingStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
       const result = leaveTable(table, user);
       await persistCompletedHands(table);
+      clearTableSessionIfEmpty(table);
       const deleteSnapshot = result.tableEmpty && table.isPrivate;
       await settleLeftTableStack(user, table, departingStack || result.stack, {
         returnToWallet: true,
@@ -1214,6 +1227,7 @@ async function handleApi(req, res, url) {
       const departingStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
       const result = leaveTable(table, user);
       await persistCompletedHands(table);
+      clearTableSessionIfEmpty(table);
       const deleteSnapshot = result.tableEmpty && table.isPrivate;
       await settleLeftTableStack(user, table, departingStack || result.stack, { deleteSnapshot, idempotencyKey: operationId });
       if (deleteSnapshot) {
@@ -2179,6 +2193,7 @@ async function persistCompletedHands(table) {
       tableId: table.id,
       tableName: table.name,
       handNumber: hand.handNumber,
+      tableSessionId: hand.tableSessionId || table.tableSessionId || "",
       smallBlind: table.smallBlind,
       bigBlind: table.bigBlind,
       board: hand.board || [],
@@ -2284,6 +2299,11 @@ function normalizeHydratedTable(table, now = Date.now()) {
   table.communityCards = Array.isArray(table.communityCards) ? table.communityCards : [];
   table.actionLog = Array.isArray(table.actionLog) ? table.actionLog : [];
   table.handHistory = Array.isArray(table.handHistory) ? table.handHistory : [];
+  table.tableSessionId = typeof table.tableSessionId === "string" ? table.tableSessionId : "";
+  table.tableSessionStartedAt = Number(table.tableSessionStartedAt || 0);
+  table.handHistory = table.tableSessionId
+    ? table.handHistory.filter((hand) => hand?.tableSessionId === table.tableSessionId)
+    : [];
   table.departedContributions = Array.isArray(table.departedContributions) ? table.departedContributions : [];
   table.runoutQueue = Array.isArray(table.runoutQueue) ? table.runoutQueue : [];
   table.deck = Array.isArray(table.deck) ? table.deck : [];

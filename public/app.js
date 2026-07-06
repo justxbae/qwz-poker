@@ -608,6 +608,7 @@ async function boot() {
       if (error.message === "Unauthorized" || error.message === "Table not found") {
         state.currentTableId = "";
         state.currentTable = null;
+        hideTablePanels({ updateBack: false });
         currentTable.hidden = true;
         lobby.hidden = false;
         await auth();
@@ -5192,10 +5193,10 @@ async function leaveCurrentTable() {
   resetTableEventCursor(tableId);
   stopTableEventStream();
   state.currentTable = null;
+  hideTablePanels({ updateBack: false });
   currentTable.hidden = true;
   lobby.hidden = false;
   document.body.classList.remove("in-game");
-  closeDrawer();
   selectLobbyTab("home");
   await auth();
   await loadCashier();
@@ -5268,11 +5269,10 @@ async function goToLobby() {
   state.currentTableId = "";
   stopTableEventStream();
   state.currentTable = null;
+  hideTablePanels({ updateBack: false });
   currentTable.hidden = true;
   lobby.hidden = false;
   document.body.classList.remove("in-game");
-  closeMenu();
-  closeDrawer();
   selectLobbyTab("home");
   await auth();
   await loadCashier();
@@ -5923,6 +5923,19 @@ function closeMenu() {
     menuButton.setAttribute("aria-expanded", "false");
     updateTelegramBackButton();
   }, 180);
+}
+
+function hideTablePanels({ updateBack = true } = {}) {
+  window.clearTimeout(openMenu.closeTimer);
+  window.clearTimeout(openDrawer.closeTimer);
+  sideMenu.hidden = true;
+  sideMenu.classList.remove("is-closing");
+  infoDrawer.hidden = true;
+  infoDrawer.classList.remove("is-closing");
+  menuButton.classList.remove("is-open");
+  menuButton.setAttribute("aria-expanded", "false");
+  document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => button.classList.remove("is-open"));
+  if (updateBack) updateTelegramBackButton();
 }
 
 function openLobbyMenu(options = {}) {
@@ -6980,6 +6993,8 @@ function clampAmount(amount, min, max) {
 }
 
 function enterGameMode() {
+  const entering = !document.body.classList.contains("in-game");
+  if (entering) hideTablePanels({ updateBack: false });
   lobby.hidden = true;
   document.body.classList.add("in-game");
   updateTelegramBackButton();
