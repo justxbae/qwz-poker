@@ -5922,7 +5922,11 @@ function parseAdminTelegramEventTypes(value) {
     "payment_rejected",
     "withdrawal_request",
     "withdrawal_approved",
-    "withdrawal_rejected"
+    "withdrawal_rejected",
+    // Incident/ops alerts (TZ E4: reconciliation drift, payment/server incidents).
+    "reconciliation_alert",
+    "crypto_webhook_error",
+    "telegram_webhook_unhealthy"
   ];
   const raw = String(value || "").trim();
   if (!raw) return new Set(defaults);
