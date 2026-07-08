@@ -532,6 +532,10 @@ async function boot() {
       showStatus("Раздел скоро будет доступен");
     });
   });
+  document.querySelectorAll("[data-doc]").forEach((button) => {
+    button.addEventListener("click", () => openDocSheet(button.dataset.doc));
+  });
+  document.querySelector("#docSheetClose")?.addEventListener("click", closeDocSheet);
   quickBuyInButton.addEventListener("click", () => runAction(buyIn));
   backToLobbyButton.addEventListener("click", () => runAction(backToLobbyFromTable));
   sitButton.addEventListener("click", () => runAction(sitAtTable));
@@ -5988,6 +5992,79 @@ function hideTablePanels({ updateBack = true } = {}) {
   menuButton.setAttribute("aria-expanded", "false");
   document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => button.classList.remove("is-open"));
   if (updateBack) updateTelegramBackButton();
+}
+
+const DOC_SHEET_CONTENT = {
+  terms: {
+    title: "Пользовательское соглашение",
+    sections: [
+      ["Возраст", "Сервис доступен только пользователям старше 18 лет."],
+      ["Балансы", "Игровые фишки — не деньги, не выводятся и не обмениваются. Денежный баланс ($) пополняется и выводится только через кассу."],
+      ["Честная игра", "Мульти-аккаунты, сговор, дампинг фишек и использование багов запрещены и ведут к ограничению аккаунта."],
+      ["Решения", "Спорные ситуации разбираются по истории раздач. Решения администрации логируются."],
+      ["Гарантии", "Покер — игра с элементом случайности. Сервис не обещает заработок."]
+    ]
+  },
+  rules: {
+    title: "Правила игры",
+    sections: [
+      ["Формат", "Texas Hold'em No-Limit. Cash-столы — на $, рейтинговые — на игровые фишки, турниры — на турнирные фишки."],
+      ["Ход", "20 секунд на решение + тайм-банк 15 секунд. Если время вышло: чек, если возможен, иначе фолд, затем sit-out."],
+      ["Sit-out", "После 300 секунд в sit-out место освобождается, стек возвращается на баланс. В турнирах место сохраняется, блайнды списываются."],
+      ["Стол", "Докупка — только между раздачами и не выше максимального бай-ина."],
+      ["Честность", "Колода формируется по схеме commit-reveal; проверка доступна после раздачи."]
+    ]
+  },
+  payments: {
+    title: "Платежи и вывод",
+    sections: [
+      ["Пополнение", "Stars, Crypto Bot, xRocket, TON. Баланс зачисляется после подтверждения оплаты провайдером."],
+      ["Вывод", "Минимум $10. Комиссия 2% + сетевой сбор — расходы на услуги платёжных агрегаторов; итоговая сумма видна до создания заявки."],
+      ["Порог", "Вывод открывается, когда сыгранный рейк достигает 25% от суммы депозитов. Прогресс виден в кассе."],
+      ["Обработка", "На старте все заявки проходят ручную проверку — обычно до 24 часов. Заявку можно отменить до обработки."],
+      ["Бонусы", "Бонусный баланс не выводится до выполнения условий отыгрыша."]
+    ]
+  },
+  responsible: {
+    title: "Ответственная игра 18+",
+    sections: [
+      ["18+", "Игра доступна только совершеннолетним."],
+      ["Контроль", "Играйте на суммы, потерю которых можете себе позволить. Не пытайтесь «отыграться»."],
+      ["Пауза", "Если игра перестала быть развлечением — сделайте перерыв или напишите в поддержку для ограничения доступа."],
+      ["Безопасность", "Подозрительная активность может приостановить выплаты до проверки."]
+    ]
+  }
+};
+
+function openDocSheet(docId) {
+  const doc = DOC_SHEET_CONTENT[docId];
+  const sheet = document.querySelector("#docSheet");
+  if (!doc || !sheet) return;
+  const title = document.querySelector("#docSheetTitle");
+  if (title) title.textContent = doc.title;
+  const body = document.querySelector("#docSheetBody");
+  if (body) {
+    body.replaceChildren(...doc.sections.map(([head, text]) => {
+      const row = document.createElement("div");
+      row.className = "doc-sheet-row";
+      row.innerHTML = "<strong></strong><span></span>";
+      row.querySelector("strong").textContent = head;
+      row.querySelector("span").textContent = text;
+      return row;
+    }));
+  }
+  sheet.hidden = false;
+  window.requestAnimationFrame(() => sheet.classList.add("sheet-visible"));
+  haptic("light");
+}
+
+function closeDocSheet() {
+  const sheet = document.querySelector("#docSheet");
+  if (!sheet) return;
+  sheet.classList.remove("sheet-visible");
+  window.setTimeout(() => {
+    sheet.hidden = true;
+  }, 180);
 }
 
 function openLobbyMenu(options = {}) {

@@ -993,6 +993,28 @@
             </button>
           </div>
           <div class="lobby-menu-list lobby-menu-list--secondary footer-lobby tg-menu-group">
+            <button type="button" class="footer-lobby-row footer-lobby-row--terms" data-doc="terms">
+              <span class="footer-lobby-icon" aria-hidden="true"><img src="/assets/footer/mynotes.svg" alt="" /></span>
+              <span class="footer-lobby-main">Пользовательское соглашение</span>
+              <span class="footer-lobby-chevron">›</span>
+            </button>
+            <button type="button" class="footer-lobby-row footer-lobby-row--terms" data-doc="rules">
+              <span class="footer-lobby-icon" aria-hidden="true"><img src="/assets/footer/mynotes.svg" alt="" /></span>
+              <span class="footer-lobby-main">Правила игры</span>
+              <span class="footer-lobby-chevron">›</span>
+            </button>
+            <button type="button" class="footer-lobby-row footer-lobby-row--terms" data-doc="payments">
+              <span class="footer-lobby-icon" aria-hidden="true"><img src="/assets/mode/monetization.svg" alt="" /></span>
+              <span class="footer-lobby-main">Платежи и вывод</span>
+              <span class="footer-lobby-chevron">›</span>
+            </button>
+            <button type="button" class="footer-lobby-row footer-lobby-row--terms" data-doc="responsible">
+              <span class="footer-lobby-icon" aria-hidden="true"><img src="/assets/footer/Icon-17.svg" alt="" /></span>
+              <span class="footer-lobby-main">Ответственная игра 18+</span>
+              <span class="footer-lobby-chevron">›</span>
+            </button>
+          </div>
+          <div class="lobby-menu-list lobby-menu-list--secondary footer-lobby tg-menu-group">
             <button type="button" class="footer-lobby-row footer-lobby-row--telegram" data-menu-action="settings" disabled>
               <span class="footer-lobby-icon" aria-hidden="true"><img src="/assets/nav/ic_bot2.svg" alt="" /></span>
               <span class="footer-lobby-main">Настройки</span>
@@ -1009,6 +1031,16 @@
         </section>
       </section>
     </main>
+
+    <section class="lobby-menu-sheet doc-sheet" id="docSheet" hidden aria-modal="true" aria-label="Документ">
+      <div class="cashier-sheet-grabber" aria-hidden="true"></div>
+      <header class="lobby-menu-head">
+        <p>Weez Poker</p>
+        <h2 id="docSheetTitle">Документ</h2>
+      </header>
+      <div class="doc-sheet-body" id="docSheetBody"></div>
+      <button type="button" class="cashier-pay-button" id="docSheetClose">Понятно</button>
+    </section>
 
     <aside class="side-menu" id="sideMenu" hidden>
       <button class="close-button" id="closeMenuButton" aria-label="Закрыть меню">×</button>

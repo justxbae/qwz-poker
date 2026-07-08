@@ -11392,3 +11392,37 @@ html.minimal-launch .withdraw-rake-bar span {
   width: 0%;
   transition: width 240ms ease !important;
 }
+
+/* 2026-07-08: reusable legal/FAQ doc sheet (TZ Block I). */
+html.minimal-launch .doc-sheet {
+  z-index: 210 !important;
+  max-height: calc(100svh - 40px) !important;
+  overflow: auto !important;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+}
+html.minimal-launch .doc-sheet-body {
+  display: grid !important;
+  gap: 10px !important;
+  padding: 4px 16px 14px !important;
+}
+html.minimal-launch .doc-sheet-row {
+  display: grid !important;
+  gap: 3px !important;
+  padding: 11px 13px !important;
+  border-radius: 14px !important;
+  background: var(--weez-control, rgba(255,255,255,0.05)) !important;
+}
+html.minimal-launch .doc-sheet-row strong {
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  color: var(--tg-text, #fff) !important;
+}
+html.minimal-launch .doc-sheet-row span {
+  font-size: 13px !important;
+  line-height: 1.35 !important;
+  color: var(--tg-hint, #8b98a5) !important;
+}
+html.minimal-launch .doc-sheet .cashier-pay-button {
+  margin: 4px 16px 0 !important;
+  width: calc(100% - 32px) !important;
+}
