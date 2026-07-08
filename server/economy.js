@@ -65,20 +65,29 @@ export const ECONOMY = {
     enabled: false,
     minimumUsdtMicros: toUsdtMicros(10),
     maximumUsdtMicros: toUsdtMicros(5000),
+    // Launch policy (product decision 2026-07-08): one flat, fully visible
+    // 2% service fee framed as payment-aggregator costs. No hidden spread —
+    // the quote the user sees is exactly what is deducted.
+    feeLabel: "Расходы на услуги платёжных агрегаторов",
+    // Anti "deposit → instant withdrawal" guard: total contributed rake must
+    // reach 25% of total deposits before a withdrawal can be created. Shown
+    // to the player as a progress bar in the cashier. Env-overridable for
+    // tests/ops (WITHDRAWAL_RAKE_THRESHOLD_PERCENT).
+    rakeThresholdPercent: process.env.WITHDRAWAL_RAKE_THRESHOLD_PERCENT !== undefined
+      ? Math.max(0, Number(process.env.WITHDRAWAL_RAKE_THRESHOLD_PERCENT) || 0)
+      : 0.25,
     methods: [
       {
         id: "ton",
         title: "TON",
-        feePercent: 0.025,
-        networkFeeUsdtMicros: toUsdtMicros(0.15),
-        hiddenSpreadPercent: 0.01
+        feePercent: 0.02,
+        networkFeeUsdtMicros: toUsdtMicros(0.15)
       },
       {
         id: "usdt",
         title: "USDT TRC20",
-        feePercent: 0.035,
-        networkFeeUsdtMicros: toUsdtMicros(1),
-        hiddenSpreadPercent: 0.015
+        feePercent: 0.02,
+        networkFeeUsdtMicros: toUsdtMicros(1)
       }
     ]
   },
@@ -300,12 +309,12 @@ export function quoteWithdrawal({ usdtAmount = 0, amount = 0, method = "ton", de
     throw error;
   }
 
+  // No hidden spread: the visible service fee + network fee is the whole
+  // deduction (TZ D4 "No hidden fees").
   const feePercent = Number(methodSettings.feePercent || 0);
-  const hiddenSpreadPercent = Number(methodSettings.hiddenSpreadPercent || 0);
   const networkFeeUsdtMicros = Math.max(0, Math.round(Number(methodSettings.networkFeeUsdtMicros || 0)));
   const percentFeeUsdtMicros = Math.ceil(grossUsdtMicros * feePercent);
-  const hiddenSpreadUsdtMicros = Math.ceil(grossUsdtMicros * hiddenSpreadPercent);
-  const feeUsdtMicros = Math.min(grossUsdtMicros, percentFeeUsdtMicros + networkFeeUsdtMicros + hiddenSpreadUsdtMicros);
+  const feeUsdtMicros = Math.min(grossUsdtMicros, percentFeeUsdtMicros + networkFeeUsdtMicros);
   const payoutUsdtMicros = Math.max(0, grossUsdtMicros - feeUsdtMicros);
   const destinationValue = validateWithdrawalDestination(methodId, destination);
 
@@ -319,9 +328,8 @@ export function quoteWithdrawal({ usdtAmount = 0, amount = 0, method = "ton", de
     payoutUsdtMicros,
     percentFeeUsdtMicros,
     networkFeeUsdtMicros,
-    hiddenSpreadUsdtMicros,
     feePercent,
-    hiddenSpreadPercent,
+    feeLabel: settings.feeLabel,
     destination: destinationValue
   };
 }

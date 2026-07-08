@@ -54,6 +54,21 @@ test("cash withdrawal quote validates method, amount and destination in USDT mic
   );
 });
 
+test("withdrawal fee is a flat visible 2% + network fee with no hidden spread", () => {
+  const validTonAddress = `UQ${"A".repeat(46)}`;
+  const quote = quoteWithdrawal({ usdtAmount: 100, method: "ton", destination: validTonAddress });
+  // 2% of $100 = $2.00 service fee, + $0.15 TON network fee.
+  assert.equal(quote.feePercent, 0.02);
+  assert.equal(quote.percentFeeUsdtMicros, toUsdtMicros(2));
+  assert.equal(quote.networkFeeUsdtMicros, toUsdtMicros(0.15));
+  assert.equal(quote.feeUsdtMicros, toUsdtMicros(2.15));
+  assert.equal(quote.payoutUsdtMicros, toUsdtMicros(97.85));
+  assert.equal(typeof quote.feeLabel, "string");
+  assert.ok(quote.feeLabel.length > 0);
+  assert.equal(quote.hiddenSpreadUsdtMicros, undefined);
+  assert.equal(quote.hiddenSpreadPercent, undefined);
+});
+
 test("welcome bonus is 25% capped at $50 with 6x rake wagering", () => {
   assert.deepEqual(quoteWelcomeBonus(toUsdtMicros(20)), {
     bonusAmountMicros: toUsdtMicros(5),

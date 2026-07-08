@@ -1154,11 +1154,14 @@ test("cash withdrawal hold, reject refund, and approve fee accounting stay balan
     DATABASE_URL: process.env.TEST_DATABASE_URL,
     REDIS_URL: process.env.TEST_REDIS_URL,
     WITHDRAWALS_ENABLED: "true",
+    WITHDRAWAL_RAKE_THRESHOLD_PERCENT: "0",
     TON_PAYMENTS_ENABLED: "true",
     TON_RECEIVER_ADDRESS: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
     TON_USDT_RATE: "250",
     RISK_LARGE_WITHDRAWAL_USDT: "10"
   });
+  const testTonAddress1 = `UQ${"B".repeat(46)}`;
+  const testTonAddress2 = `UQ${"C".repeat(46)}`;
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
     const depositOrder = (await request("/api/cashier/crypto-order", {
@@ -1183,13 +1186,13 @@ test("cash withdrawal hold, reject refund, and approve fee accounting stay balan
       method: "POST",
       token: auth.token,
       idempotencyKey: "withdrawal-lifecycle-reject",
-      body: { currency: "USDT", method: "ton", usdtAmount: 20, destination: "UQB-test-wallet-1" }
+      body: { currency: "USDT", method: "ton", usdtAmount: 20, destination: testTonAddress1 }
     })).withdrawal;
 
     assert.equal(rejectedWithdrawal.status, "pending");
     assert.equal(rejectedWithdrawal.chips, 0);
     assert.equal(rejectedWithdrawal.grossUsdtMicros, 20_000_000);
-    assert.equal(rejectedWithdrawal.feeUsdtMicros, 850_000);
+    assert.equal(rejectedWithdrawal.feeUsdtMicros, 550_000);
 
     cashier = (await request("/api/cashier", { token: auth.token })).cashier;
     assert.equal(cashier.balance, 30_000_000);
@@ -1208,7 +1211,7 @@ test("cash withdrawal hold, reject refund, and approve fee accounting stay balan
       method: "POST",
       token: auth.token,
       idempotencyKey: "withdrawal-lifecycle-approve",
-      body: { currency: "USDT", method: "ton", usdtAmount: 20, destination: "UQB-test-wallet-2" }
+      body: { currency: "USDT", method: "ton", usdtAmount: 20, destination: testTonAddress2 }
     })).withdrawal;
 
     await request(`/api/admin/withdrawals/${approvedWithdrawal.id}/approve`, {
@@ -1223,8 +1226,8 @@ test("cash withdrawal hold, reject refund, and approve fee accounting stay balan
 
     const dashboard = (await request("/api/admin", { token: auth.token })).admin;
     assert.equal(dashboard.stats.pendingWithdrawals, 0);
-    assert.equal(dashboard.stats.approvedWithdrawalFeeUsdtTotal, 850_000);
-    assert.equal(dashboard.stats.platformLedgerNetTotal, 850_000);
+    assert.equal(dashboard.stats.approvedWithdrawalFeeUsdtTotal, 550_000);
+    assert.equal(dashboard.stats.platformLedgerNetTotal, 550_000);
     assert.equal(dashboard.audit.reconciliation.cashWalletLedgerDrift, 0);
     assert.ok(dashboard.recentRiskFlags.some((flag) => flag.type === "large_withdrawal"));
     assert.ok(dashboard.recentAdminAudit.some((entry) => entry.action === "withdrawal_approve"));
@@ -1239,6 +1242,56 @@ test("cash withdrawal hold, reject refund, and approve fee accounting stay balan
       }),
       /Заявка уже в статусе approved/
     );
+  } finally {
+    server.kill();
+  }
+});
+
+test("withdrawal rake threshold blocks deposit-then-withdraw until 25% rake is paid", { skip: !realMoneyIntegrationEnabled }, async () => {
+  const server = await startServer({
+    ADMIN_USER_IDS: "dev-user",
+    REAL_MONEY_ENABLED: "true",
+    DATABASE_URL: process.env.TEST_DATABASE_URL,
+    REDIS_URL: process.env.TEST_REDIS_URL,
+    WITHDRAWALS_ENABLED: "true",
+    TON_PAYMENTS_ENABLED: "true",
+    TON_RECEIVER_ADDRESS: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+    TON_USDT_RATE: "250"
+  });
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    const depositOrder = (await request("/api/cashier/crypto-order", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "rake-threshold-deposit",
+      body: { method: "ton", usdtAmount: 40 }
+    })).order;
+    await request(`/api/admin/payments/${depositOrder.id}/approve`, {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "rake-threshold-deposit-approve",
+      body: { reason: "test_deposit" }
+    });
+
+    // Cashier exposes the visible progress: $40 deposited -> $10 rake required.
+    const cashier = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(cashier.withdrawals.rakeThresholdPercent, 0.25);
+    assert.equal(cashier.withdrawalRakeProgress.requiredMicros, 10_000_000);
+    assert.equal(cashier.withdrawalRakeProgress.met, false);
+
+    const blocked = await requestResponse("/api/cashier/withdraw", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "rake-threshold-blocked",
+      body: { currency: "USDT", method: "ton", usdtAmount: 20, destination: `UQ${"D".repeat(46)}` }
+    });
+    assert.equal(blocked.status, 409);
+    assert.match(blocked.data.error, /рейка/);
+    assert.equal(blocked.data.withdrawalRakeProgress.met, false);
+
+    // Balance untouched: no hold was created for the blocked request.
+    const after = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(after.balance, 40_000_000);
   } finally {
     server.kill();
   }

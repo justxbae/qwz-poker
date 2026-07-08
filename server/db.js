@@ -1993,6 +1993,19 @@ async function insertBonusTransferLedger(client, {
   ]);
 }
 
+export async function getCashDepositTotal(providerUserId, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const result = await query(`
+    select coalesce(sum(cash_usdt_micros), 0)::bigint as total
+    from payment_orders
+    where app_user_id = $1
+      and status = 'paid'
+      and credited_asset = 'USDT'
+  `, [appUserId]);
+  return Number(result.rows[0]?.total || 0);
+}
+
 export async function listPaymentOrders(limit = 10) {
   if (!pool) return null;
   const result = await query(`

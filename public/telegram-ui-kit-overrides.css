@@ -11340,3 +11340,14 @@ html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods
   background: #256CA9 !important;
   background-color: #256CA9 !important;
 }
+
+/* 2026-07-08: product decision — the $ sign sits to the LEFT of the
+   deposit amount, input text shifts right of it. */
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card #cashierAmountAsset {
+  right: auto !important;
+  left: 18px !important;
+}
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-amount-field input {
+  padding-right: 18px !important;
+  padding-left: 46px !important;
+}

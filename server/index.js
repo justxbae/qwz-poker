@@ -56,6 +56,7 @@ import {
   getDailyPlayClaim as dbGetDailyPlayClaim,
   getBonusSummary as dbGetBonusSummary,
   getPaymentOrder as dbGetPaymentOrder,
+  getCashDepositTotal as dbGetCashDepositTotal,
   getPlayerProfile as dbGetPlayerProfile,
   getIdempotencyResult as dbGetIdempotencyResult,
   getSavedStack as dbGetSavedStack,
@@ -277,7 +278,11 @@ const server = createServer(async (req, res) => {
     await serveStatic(req, res, url);
   } catch (error) {
     reportError(error, { url: req.url, method: req.method });
-    sendJson(res, error.status || 500, { error: error.status ? error.message : "Internal server error" });
+    sendJson(res, error.status || 500, {
+      error: error.status ? error.message : "Internal server error",
+      // Structured context for client UX (e.g. withdrawal rake progress).
+      ...(error.status && error.data && typeof error.data === "object" ? error.data : {})
+    });
   }
 });
 
@@ -3065,6 +3070,7 @@ async function cashierView(user) {
     realMoneyEnabled: REAL_MONEY_ENABLED,
 	    deposit: cashMode ? depositSettings({ realMoneyEnabled: REAL_MONEY_ENABLED }) : ECONOMY.play.deposit,
 	    withdrawals: withdrawalSettings(),
+	    withdrawalRakeProgress: cashMode ? await withdrawalRakeProgress(user) : null,
 	    withdrawalOrders: cashMode ? await getUserWithdrawalOrders(user) : [],
 	    transactions: cashMode ? await getCashTransactions(user) : await getTransactions(user),
 	    playTransactions: await getTransactions(user)
@@ -4983,6 +4989,38 @@ async function adjustWalletManually({ admin, targetId, type, amount, balanceBuck
   return result;
 }
 
+async function withdrawalRakeProgress(user) {
+  const percent = Number(ECONOMY.withdrawals.rakeThresholdPercent || 0);
+  const memoryDeposits = [...cryptoOrders.values()]
+    .filter((order) => order.userId === user.id && order.status === "paid" && Number(order.cashUsdtMicros || 0) > 0)
+    .reduce((sum, order) => sum + Number(order.cashUsdtMicros || 0), 0);
+  const depositTotalMicros = (await dbGetCashDepositTotal(user.id)) ?? memoryDeposits;
+  const profile = await getProfileForUser(user);
+  const rakePaidMicros = Number(profile.cashRakeContributed || 0);
+  const requiredMicros = Math.ceil(depositTotalMicros * percent);
+  return {
+    percent,
+    depositTotalMicros,
+    rakePaidMicros,
+    requiredMicros,
+    remainingMicros: Math.max(0, requiredMicros - rakePaidMicros),
+    met: rakePaidMicros >= requiredMicros
+  };
+}
+
+async function assertWithdrawalRakeThreshold(user) {
+  const progress = await withdrawalRakeProgress(user);
+  if (progress.met) return;
+  const error = new Error(
+    `Для вывода нужно сыграть ещё ${formatUsdtMicros(progress.remainingMicros)} USDT рейка `
+    + `(${formatUsdtMicros(progress.rakePaidMicros)} из ${formatUsdtMicros(progress.requiredMicros)}). `
+    + "Порог: 25% от суммы депозитов."
+  );
+  error.status = 409;
+  error.data = { withdrawalRakeProgress: progress };
+  throw error;
+}
+
 async function createWithdrawalRequest(user, body = {}, idempotencyKey = "") {
   requireRealMoneyEnabled();
   if (process.env.WITHDRAWALS_ENABLED !== "true") {
@@ -4991,6 +5029,9 @@ async function createWithdrawalRequest(user, body = {}, idempotencyKey = "") {
     throw error;
   }
   const quote = quoteWithdrawal(body);
+  if (Number(quote.grossUsdtMicros || 0) > 0) {
+    await assertWithdrawalRakeThreshold(user);
+  }
   const order = {
     id: randomId("wd"),
     userId: user.id,
@@ -5260,16 +5301,18 @@ function normalizeWithdrawalMethod(method) {
 }
 
 function withdrawalSettings() {
+  const enabled = REAL_MONEY_ENABLED && process.env.WITHDRAWALS_ENABLED === "true";
   return {
-    enabled: REAL_MONEY_ENABLED && process.env.WITHDRAWALS_ENABLED === "true",
+    enabled,
     minimumUsdtMicros: ECONOMY.withdrawals.minimumUsdtMicros,
     maximumUsdtMicros: ECONOMY.withdrawals.maximumUsdtMicros,
+    // TZ D4 "no hidden fees": the service fee, its label, and the network
+    // fee are part of the public contract shown before creating an order.
+    feeLabel: ECONOMY.withdrawals.feeLabel,
+    rakeThresholdPercent: ECONOMY.withdrawals.rakeThresholdPercent,
     methods: ECONOMY.withdrawals.methods.map((method) => ({
       ...method,
-      feePercent: undefined,
-      hiddenSpreadPercent: undefined,
-      networkFeeUsdtMicros: undefined,
-      enabled: REAL_MONEY_ENABLED && process.env.WITHDRAWALS_ENABLED === "true"
+      enabled
     }))
   };
 }
