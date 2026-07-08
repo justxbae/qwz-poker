@@ -440,8 +440,10 @@
               </div>
             </div>
             <div class="cashier-methods" id="cashierMethods"></div>
-            <button type="button" class="cashier-pay-button" id="cashierPayButton">Пополнить</button>
-            <div class="cashier-status" id="cashierStatus" role="status"></div>
+            <div class="cashier-sticky-footer">
+              <div class="cashier-status" id="cashierStatus" role="status"></div>
+              <button type="button" class="cashier-pay-button" id="cashierPayButton">Пополнить</button>
+            </div>
           </section>
           <section class="lobby-card cashier-withdraw-card" data-cashier-sheet="withdraw" aria-modal="true">
             <div class="cashier-sheet-grabber" aria-hidden="true"></div>
@@ -471,6 +473,7 @@
                 <label class="cashier-amount-field">
                   <span>Сумма вывода</span>
                   <input id="cashierWithdrawAmount" type="number" min="10" max="5000" step="0.01" value="10.00" inputmode="decimal" />
+                  <small>$</small>
                 </label>
               </div>
               <h4 class="withdraw-section-heading">Выберите кошелек для получения</h4>
@@ -490,8 +493,10 @@
                 <div class="withdraw-fee-row"><span>Рейк для вывода</span><b id="cashierWithdrawRakeText">$0 из $0</b></div>
                 <div class="withdraw-rake-bar"><span id="cashierWithdrawRakeFill"></span></div>
               </div>
-              <button type="submit" class="cashier-pay-button" id="cashierWithdrawSubmit">Создать заявку</button>
-              <div class="cashier-status" id="cashierWithdrawStatus" role="status"></div>
+              <div class="cashier-sticky-footer">
+                <div class="cashier-status" id="cashierWithdrawStatus" role="status"></div>
+                <button type="submit" class="cashier-pay-button" id="cashierWithdrawSubmit">Создать заявку</button>
+              </div>
             </form>
           </section>
           <section class="lobby-card cashier-history-card">

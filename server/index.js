@@ -5085,10 +5085,11 @@ async function withdrawalRakeProgress(user) {
 async function assertWithdrawalRakeThreshold(user) {
   const progress = await withdrawalRakeProgress(user);
   if (progress.met) return;
+  const percentText = `${Math.round(Number(progress.percent || 0) * 100)}%`;
   const error = new Error(
     `Для вывода нужно сыграть ещё ${formatUsdtMicros(progress.remainingMicros)} USDT рейка `
     + `(${formatUsdtMicros(progress.rakePaidMicros)} из ${formatUsdtMicros(progress.requiredMicros)}). `
-    + "Порог: 25% от суммы депозитов."
+    + `Порог: ${percentText} от суммы депозитов.`
   );
   error.status = 409;
   error.data = { withdrawalRakeProgress: progress };

@@ -69,13 +69,13 @@ export const ECONOMY = {
     // 2% service fee framed as payment-aggregator costs. No hidden spread —
     // the quote the user sees is exactly what is deducted.
     feeLabel: "Расходы на услуги платёжных агрегаторов",
-    // Anti "deposit → instant withdrawal" guard: total contributed rake must
-    // reach 25% of total deposits before a withdrawal can be created. Shown
-    // to the player as a progress bar in the cashier. Env-overridable for
-    // tests/ops (WITHDRAWAL_RAKE_THRESHOLD_PERCENT).
+    // Anti "deposit → instant withdrawal" guard. Competitor-like launch policy:
+    // withdrawals are manual-reviewed by default, not hard-blocked by a scary
+    // playthrough meter. Ops can still enable a strict contributed-rake gate via
+    // WITHDRAWAL_RAKE_THRESHOLD_PERCENT for abuse waves/tests.
     rakeThresholdPercent: process.env.WITHDRAWAL_RAKE_THRESHOLD_PERCENT !== undefined
       ? Math.max(0, Number(process.env.WITHDRAWAL_RAKE_THRESHOLD_PERCENT) || 0)
-      : 0.25,
+      : 0,
     methods: [
       {
         id: "ton",

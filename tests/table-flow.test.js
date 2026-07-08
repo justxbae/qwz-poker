@@ -1256,7 +1256,8 @@ test("withdrawal rake threshold blocks deposit-then-withdraw until 25% rake is p
     WITHDRAWALS_ENABLED: "true",
     TON_PAYMENTS_ENABLED: "true",
     TON_RECEIVER_ADDRESS: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
-    TON_USDT_RATE: "250"
+    TON_USDT_RATE: "250",
+    WITHDRAWAL_RAKE_THRESHOLD_PERCENT: "0.25"
   });
   try {
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });

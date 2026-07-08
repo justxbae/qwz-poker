@@ -11440,3 +11440,289 @@ html.minimal-launch .doc-sheet .cashier-pay-button {
   background: rgba(0, 0, 0, 0.28); font-size: 12px; line-height: 1.45;
   white-space: pre-wrap; word-break: break-word;
 }
+
+/* 2026-07-09: cashier keyboard/footer and softer withdrawal launch policy UI. */
+html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-topup-card,
+html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-withdraw-card {
+  --weez-sheet-bg: var(--tg-bg-color, #17212b);
+  --weez-card-bg: #2C3844;
+  --weez-field-bg: #3F4857;
+  background: var(--weez-sheet-bg) !important;
+  background-color: var(--weez-sheet-bg) !important;
+  padding: 28px 14px 0 !important;
+  gap: 14px !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+}
+
+html.minimal-launch body.keyboard-open.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-topup-card,
+html.minimal-launch body.keyboard-open.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-withdraw-card {
+  bottom: var(--keyboard-height, 0px) !important;
+  max-height: calc(100dvh - var(--keyboard-height, 0px) - 8px) !important;
+  padding-bottom: 0 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-sheet-grabber {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 30 !important;
+  flex: 0 0 auto !important;
+  background: linear-gradient(to bottom, var(--weez-sheet-bg) 0%, var(--weez-sheet-bg) 58%, rgba(0,0,0,0) 100%) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-calculator,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-calculator,
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods.footer-lobby.tg-menu-group,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby.tg-menu-group {
+  width: min(100%, 342px) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  background: var(--weez-card-bg) !important;
+  background-color: var(--weez-card-bg) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-calculator,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-calculator {
+  display: grid !important;
+  gap: 10px !important;
+  padding: 14px !important;
+  border-radius: 24px !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-amount-field,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-amount-field {
+  position: relative !important;
+  height: 58px !important;
+  min-height: 58px !important;
+  border-radius: 17px !important;
+  background: var(--weez-field-bg) !important;
+  background-color: var(--weez-field-bg) !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-amount-field > span,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-amount-field > span {
+  display: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open #cashierRubAmount,
+html.minimal-launch body.cashier-sheet-open #cashierWithdrawAmount {
+  height: 100% !important;
+  padding: 0 18px 0 58px !important;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  color: #fff !important;
+  font-family: "SF Pro Rounded", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-size: 28px !important;
+  line-height: 1 !important;
+  font-weight: 520 !important;
+  letter-spacing: -0.045em !important;
+}
+
+html.minimal-launch body.cashier-sheet-open #cashierAmountAsset,
+html.minimal-launch body.cashier-sheet-open #cashierWithdrawAmount + small {
+  position: absolute !important;
+  left: 24px !important;
+  right: auto !important;
+  top: 50% !important;
+  bottom: auto !important;
+  width: 18px !important;
+  height: 18px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transform: translateY(-50%) !important;
+  color: rgba(255,255,255,.72) !important;
+  font-size: 24px !important;
+  line-height: 1 !important;
+  font-weight: 500 !important;
+  pointer-events: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-presets {
+  height: 40px !important;
+  min-height: 40px !important;
+  margin: 0 !important;
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 0 !important;
+  overflow: hidden !important;
+  border-radius: 999px !important;
+  background: var(--weez-field-bg) !important;
+  background-color: var(--weez-field-bg) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-presets button {
+  min-width: 0 !important;
+  min-height: 40px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #fff !important;
+  font-size: 15px !important;
+  font-weight: 500 !important;
+  position: relative !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-presets button + button::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 8px !important;
+  bottom: 8px !important;
+  width: 1px !important;
+  background: rgba(255,255,255,.36) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods.footer-lobby.tg-menu-group,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby.tg-menu-group {
+  display: grid !important;
+  grid-template-rows: none !important;
+  gap: 0 !important;
+  min-height: 0 !important;
+  padding: 8px 10px !important;
+  border-radius: 24px !important;
+  overflow: hidden !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods.footer-lobby .footer-lobby-row,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row {
+  position: relative !important;
+  display: grid !important;
+  grid-template-columns: 42px minmax(0, 1fr) auto 16px !important;
+  align-items: center !important;
+  column-gap: 10px !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  padding: 0 8px !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: transparent !important;
+  color: #fff !important;
+  opacity: 1 !important;
+  transition: background-color 150ms ease, color 150ms ease !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods.footer-lobby .footer-lobby-row::before,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row::before {
+  display: none !important;
+  content: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods.footer-lobby .footer-lobby-row + .footer-lobby-row::after,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row + .footer-lobby-row::after {
+  content: "" !important;
+  position: absolute !important;
+  left: 60px !important;
+  right: 20px !important;
+  top: 0 !important;
+  height: 1px !important;
+  background: rgba(255,255,255,.16) !important;
+  opacity: 1 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods.footer-lobby .footer-lobby-row.active + .footer-lobby-row::after,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row.active + .footer-lobby-row::after,
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods.footer-lobby .footer-lobby-row:has(+ .footer-lobby-row.active)::after,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row:has(+ .footer-lobby-row.active)::after {
+  opacity: 0 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods.footer-lobby .footer-lobby-row.active,
+html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby .footer-lobby-row.active {
+  background: #256CA9 !important;
+  background-color: #256CA9 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-icon {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 10px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background-color 150ms ease !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row.active .footer-lobby-icon {
+  background: #256CA9 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-icon img {
+  width: 25px !important;
+  height: 25px !important;
+  object-fit: contain !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-main {
+  color: #fff !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+  font-weight: 500 !important;
+  min-width: 0 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-value {
+  color: rgba(235,235,245,.44) !important;
+  font-size: 17px !important;
+  line-height: 1 !important;
+  font-weight: 500 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row.active .footer-lobby-value,
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-row.active .footer-lobby-main {
+  color: #fff !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-methods.footer-lobby .footer-lobby-chevron {
+  color: rgba(235,235,245,.38) !important;
+  font-size: 28px !important;
+  line-height: 1 !important;
+  justify-self: end !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-sticky-footer {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 40 !important;
+  display: grid !important;
+  gap: 8px !important;
+  width: calc(100% + 28px) !important;
+  margin: 4px -14px 0 !important;
+  padding: 12px 14px calc(14px + env(safe-area-inset-bottom)) !important;
+  background: linear-gradient(to top, var(--weez-sheet-bg) 0%, var(--weez-sheet-bg) 78%, rgba(23,33,43,0) 100%) !important;
+  backdrop-filter: blur(18px) saturate(130%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(130%) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-sticky-footer .cashier-pay-button {
+  position: static !important;
+  inset: auto !important;
+  width: min(100%, 342px) !important;
+  margin: 0 auto !important;
+  min-height: 58px !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+  background: var(--tg-button-color, #2aabee) !important;
+  color: var(--tg-button-text-color, #fff) !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  opacity: 1 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-sticky-footer .cashier-pay-button:disabled {
+  opacity: .56 !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-sticky-footer .cashier-status {
+  position: static !important;
+  width: min(100%, 342px) !important;
+  margin: 0 auto !important;
+  min-height: 0 !important;
+  z-index: auto !important;
+}
