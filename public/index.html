@@ -482,6 +482,14 @@
                 </label>
               </div>
               <div class="cashier-methods footer-lobby tg-menu-group" id="cashierWithdrawMethods"></div>
+              <div class="withdraw-fee-preview" id="cashierWithdrawFeePreview" hidden>
+                <div class="withdraw-fee-row"><span id="cashierWithdrawFeeLabel">Комиссия</span><b id="cashierWithdrawFeeValue">$0.00</b></div>
+                <div class="withdraw-fee-row total"><span>Вы получите</span><b id="cashierWithdrawReceive">$0.00</b></div>
+              </div>
+              <div class="withdraw-rake-progress" id="cashierWithdrawRake" hidden>
+                <div class="withdraw-fee-row"><span>Рейк для вывода</span><b id="cashierWithdrawRakeText">$0 из $0</b></div>
+                <div class="withdraw-rake-bar"><span id="cashierWithdrawRakeFill"></span></div>
+              </div>
               <button type="submit" class="cashier-pay-button" id="cashierWithdrawSubmit">Создать заявку</button>
               <div class="cashier-status" id="cashierWithdrawStatus" role="status"></div>
             </form>

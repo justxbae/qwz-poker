@@ -1417,6 +1417,7 @@ function renderCashier(cashier) {
     : (cashier.totalBankroll || cashier.balance || 0), cashMode);
   cashierState.deposit = cashier.deposit || null;
   cashierState.withdrawals = cashier.withdrawals || null;
+  cashierState.withdrawalRakeProgress = cashier.withdrawalRakeProgress || null;
   cashierState.demoTopup = DEV_MODE && !cashier.realMoneyEnabled;
   cashierState.disabled = !cashMode && !cashierState.demoTopup;
   renderCashierControls(cashierState.demoTopup ? (state.config?.play?.deposit || {}) : (cashier.deposit || {}));
@@ -1624,6 +1625,8 @@ function withdrawalInputsReady() {
 function updateWithdrawalManualNotice() {
   if (!cashierWithdrawStatus || !cashierWithdrawForm || cashierWithdrawForm.hidden) return;
   cashierWithdrawStatus.classList.remove("error");
+  renderWithdrawalFeePreview();
+  renderWithdrawalRakeProgress();
   if (withdrawalInputsReady()) {
     cashierWithdrawStatus.textContent = "Заявки пока обрабатываются вручную.";
     cashierWithdrawStatus.classList.add("manual-visible");
@@ -1631,6 +1634,55 @@ function updateWithdrawalManualNotice() {
     cashierWithdrawStatus.textContent = "";
     cashierWithdrawStatus.classList.remove("manual-visible");
   }
+}
+
+function renderWithdrawalFeePreview() {
+  const preview = document.querySelector("#cashierWithdrawFeePreview");
+  if (!preview) return;
+  const withdrawals = cashierState.withdrawals || {};
+  const method = (withdrawals.methods || []).find((item) => item.id === cashierState.selectedWithdrawalMethod);
+  const grossMicros = Math.round(Number(cashierWithdrawAmount?.value || 0) * 1_000_000);
+  if (!method || grossMicros <= 0) {
+    preview.hidden = true;
+    return;
+  }
+  // Mirror of the server quote: visible 2% service fee + network fee.
+  const percentFee = Math.ceil(grossMicros * Number(method.feePercent || 0));
+  const networkFee = Math.max(0, Math.round(Number(method.networkFeeUsdtMicros || 0)));
+  const fee = Math.min(grossMicros, percentFee + networkFee);
+  const label = document.querySelector("#cashierWithdrawFeeLabel");
+  if (label) {
+    const percentText = `${(Number(method.feePercent || 0) * 100).toFixed(0)}%`;
+    label.textContent = `Комиссия ${percentText} + сеть`;
+    label.title = withdrawals.feeLabel || "";
+  }
+  const feeValue = document.querySelector("#cashierWithdrawFeeValue");
+  if (feeValue) feeValue.textContent = `$${formatUsdt(fee)}`;
+  const receive = document.querySelector("#cashierWithdrawReceive");
+  if (receive) receive.textContent = `$${formatUsdt(Math.max(0, grossMicros - fee))}`;
+  preview.hidden = false;
+}
+
+function renderWithdrawalRakeProgress() {
+  const block = document.querySelector("#cashierWithdrawRake");
+  if (!block) return;
+  const progress = cashierState.withdrawalRakeProgress;
+  if (!progress || progress.met || !Number(progress.requiredMicros || 0)) {
+    block.hidden = true;
+    if (cashierWithdrawSubmit && progress && progress.met === false && !Number(progress.requiredMicros || 0)) {
+      cashierWithdrawSubmit.disabled = false;
+    }
+    return;
+  }
+  block.hidden = false;
+  const text = document.querySelector("#cashierWithdrawRakeText");
+  if (text) text.textContent = `$${formatUsdt(progress.rakePaidMicros || 0)} из $${formatUsdt(progress.requiredMicros)}`;
+  const fill = document.querySelector("#cashierWithdrawRakeFill");
+  if (fill) {
+    const ratio = Math.max(0, Math.min(1, Number(progress.rakePaidMicros || 0) / Number(progress.requiredMicros)));
+    fill.style.width = `${Math.round(ratio * 100)}%`;
+  }
+  if (cashierWithdrawSubmit) cashierWithdrawSubmit.disabled = true;
 }
 
 function syncCashierQuote() {

@@ -11351,3 +11351,44 @@ html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-amount-
   padding-right: 18px !important;
   padding-left: 46px !important;
 }
+
+/* 2026-07-08: withdrawal fee preview + rake-threshold progress. */
+html.minimal-launch .withdraw-fee-preview,
+html.minimal-launch .withdraw-rake-progress {
+  display: grid !important;
+  gap: 8px !important;
+  padding: 12px 14px !important;
+  border-radius: 15px !important;
+  background: #2C3844 !important;
+}
+html.minimal-launch .withdraw-fee-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  font-size: 13.5px !important;
+  color: var(--tg-hint, #8b98a5) !important;
+}
+html.minimal-launch .withdraw-fee-row b {
+  color: var(--tg-text, #fff) !important;
+  font-weight: 600 !important;
+}
+html.minimal-launch .withdraw-fee-row.total span {
+  color: var(--tg-text, #fff) !important;
+}
+html.minimal-launch .withdraw-fee-row.total b {
+  color: #35d07f !important;
+}
+html.minimal-launch .withdraw-rake-bar {
+  height: 6px !important;
+  border-radius: 999px !important;
+  background: rgba(0, 0, 0, 0.3) !important;
+  overflow: hidden !important;
+}
+html.minimal-launch .withdraw-rake-bar span {
+  display: block !important;
+  height: 100% !important;
+  border-radius: 999px !important;
+  background: var(--tg-button, #2aabee) !important;
+  width: 0%;
+  transition: width 240ms ease !important;
+}
