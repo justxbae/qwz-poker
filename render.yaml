@@ -14,7 +14,7 @@ services:
       - key: WITHDRAWALS_ENABLED
         value: "true"
       - key: ADMIN_TELEGRAM_EVENT_TYPES
-        value: open,stars_order,crypto_order,stars_paid,crypto_paid,crypto_manual_review,payment_approved,payment_rejected,withdrawal_request,withdrawal_approved,withdrawal_rejected
+        value: open,stars_order,crypto_order,stars_paid,crypto_paid,crypto_manual_review,payment_approved,payment_rejected,withdrawal_request,withdrawal_approved,withdrawal_rejected,reconciliation_alert,crypto_webhook_error,telegram_webhook_unhealthy
       - key: BOT_USERNAME
         value: qwzpokerbot
       - key: BOT_TOKEN
