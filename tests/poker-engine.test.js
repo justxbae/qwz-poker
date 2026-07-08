@@ -319,6 +319,32 @@ test("disconnected cash player auto-sits out after timeout and stops receiving b
   assert.equal(ownerSeat.bet, 0);
 });
 
+test("disconnected tournament player keeps the seat and blinds out instead of sitting out", () => {
+  const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
+  table.tournamentId = "mtt-test";
+  joinTable(table, player2);
+  maybeStartHand(table);
+  startHand(table);
+
+  const ownerSeat = table.seats.find((seat) => seat.userId === owner.id);
+  ownerSeat.presenceTracked = true;
+  ownerSeat.connected = false;
+  ownerSeat.lastSeenAt = Date.now() - 60_000;
+  table.actionDeadline = Date.now() - 1;
+  tickTables(new Map([[table.id, table]]));
+
+  // Timed out, but not sat out: the tournament seat stays live.
+  assert.equal(ownerSeat.sittingOut, false);
+  assert.equal(ownerSeat.sitOutNextHand, false);
+
+  startHand(table);
+  assert.equal(ownerSeat.cards.length, 2);
+  assert.ok(table.seats.some((seat) => seat.userId === owner.id));
+  // Still posting blinds: some chips are committed by the seat.
+  const committed = table.seats.reduce((sum, seat) => sum + seat.bet, 0);
+  assert.ok(committed >= table.smallBlind + table.bigBlind);
+});
+
 test("new hand assigns separate blinds even if a player folded last hand", () => {
   const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
   joinTable(table, player2);

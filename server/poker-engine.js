@@ -1128,7 +1128,9 @@ function moveChipsToPot(table, seat, amount) {
 function autoTimeoutAction(table) {
   const seat = table.seats[table.activeSeatIndex];
   const toCall = Math.max(0, table.currentBet - seat.bet);
-  const shouldSitOutAfterTimeout = shouldAutoSitOutOnTimeout(seat);
+  // Tournament policy (TZ A2): a disconnected player keeps the seat and
+  // blinds/antes out — never auto-sit-out on tournament tables.
+  const shouldSitOutAfterTimeout = !table.tournamentId && shouldAutoSitOutOnTimeout(seat);
   if (shouldSitOutAfterTimeout) {
     seat.sitOutNextHand = true;
     seat.sittingOutReason = "away";
