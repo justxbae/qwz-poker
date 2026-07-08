@@ -2914,6 +2914,52 @@ async function loadAdminDashboard() {
   if (adminOperationalStatus) adminOperationalStatus.textContent = "Обновляем данные...";
   const data = await api(`/api/admin?days=${encodeURIComponent(adminAnalyticsDays)}`);
   renderAdminDashboard(data.admin);
+  loadAdminLiveTables().catch(() => {});
+}
+
+async function loadAdminLiveTables() {
+  const container = document.querySelector("#adminLiveTables");
+  if (!container) return;
+  const data = await api("/api/admin/tables");
+  container.replaceChildren(...(data.tables || []).map((table) => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "cashier-row admin-live-table-row";
+    row.innerHTML = "<span></span><b></b>";
+    row.querySelector("span").textContent = `${table.name} · ${table.players}/${table.maxPlayers} · #${table.handNumber}`;
+    row.querySelector("b").textContent = table.status;
+    row.addEventListener("click", () => loadAdminTableSession(table.id));
+    return row;
+  }));
+  if (!data.tables?.length) {
+    const empty = document.createElement("div");
+    empty.className = "cashier-empty";
+    empty.textContent = "Активных столов нет";
+    container.append(empty);
+  }
+}
+
+async function loadAdminTableSession(tableId) {
+  const target = document.querySelector("#adminLiveSession");
+  if (!target) return;
+  const { session } = await api(`/api/admin/tables/${tableId}/session`);
+  const hand = session.currentHand || {};
+  const lines = [
+    `Статус: ${hand.status} · Раздача #${hand.handNumber} · Банк ${hand.pot}`,
+    `Борд: ${(hand.board || []).join(" ") || "—"}`,
+    ...session.seats.map((seat) => {
+      const flags = [
+        seat.folded ? "fold" : "",
+        seat.sittingOut ? `sit-out(${seat.sittingOutReason || ""})` : "",
+        seat.connected === false ? "offline" : ""
+      ].filter(Boolean).join(" ");
+      return `${seat.name}: стек ${seat.stack}, ставка ${seat.bet}${flags ? ` · ${flags}` : ""}`;
+    }),
+    "",
+    ...session.events.slice(-12).map((event) => `${event.sequence ?? ""} ${event.type}`)
+  ];
+  target.textContent = lines.join("\n");
+  target.hidden = false;
 }
 
 function selectAdminPanel(panel) {

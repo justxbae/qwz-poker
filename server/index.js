@@ -1443,6 +1443,80 @@ async function handleAdminApi(req, res, url, adminUser) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/admin/tables") {
+    requireAdminRole(adminUser.id, "support");
+    sendJson(res, 200, {
+      tables: [...tables.values()].map((table) => ({
+        id: table.id,
+        name: table.name,
+        gameMode: table.gameMode || "play",
+        tournamentId: table.tournamentId || null,
+        isPrivate: Boolean(table.isPrivate),
+        status: table.status,
+        handNumber: table.handNumber || 0,
+        players: table.seats.length,
+        maxPlayers: table.maxPlayers,
+        pot: table.pot || 0,
+        smallBlind: table.smallBlind,
+        bigBlind: table.bigBlind
+      }))
+    });
+    return;
+  }
+
+  const adminTableSessionMatch = url.pathname.match(/^\/api\/admin\/tables\/([^/]+)\/session$/);
+  if (req.method === "GET" && adminTableSessionMatch) {
+    requireAdminRole(adminUser.id, "support");
+    const table = tables.get(adminTableSessionMatch[1]);
+    if (!table) {
+      sendJson(res, 404, { error: "Стол не найден" });
+      return;
+    }
+    // Read-only live view (TZ E1). Hole cards stay hidden during the active
+    // hand: publicTable with an empty viewer id only reveals showdown hands.
+    const view = publicTable(table, "");
+    await recordAdminAudit({
+      req,
+      admin: adminUser,
+      action: "table_session_view",
+      targetType: "table",
+      targetId: table.id,
+      result: "ok",
+      meta: { handNumber: table.handNumber || 0 }
+    });
+    sendJson(res, 200, {
+      session: {
+        table: view,
+        seats: view.seats.map((seat) => ({
+          userId: seat.userId,
+          name: seat.name,
+          username: seat.username,
+          stack: seat.stack,
+          bet: seat.bet,
+          folded: seat.folded,
+          sittingOut: seat.sittingOut,
+          sittingOutReason: seat.sittingOutReason,
+          connected: seat.connected,
+          reconnectDeadline: seat.reconnectDeadline
+        })),
+        currentHand: {
+          handNumber: view.handNumber,
+          status: view.status,
+          board: view.communityCards,
+          pot: view.pot,
+          dealerIndex: view.dealerIndex,
+          smallBlindIndex: view.smallBlindIndex,
+          bigBlindIndex: view.bigBlindIndex,
+          activeSeatIndex: view.activeSeatIndex,
+          actionDeadline: view.actionDeadline
+        },
+        events: (table.events || []).slice(-80),
+        handHistory: view.handHistory || []
+      }
+    });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/admin/tournaments") {
     requireAdminRole(adminUser.id, "support");
     await sendIdempotentJson(req, res, adminUser, "admin_tournament_create", async () => {

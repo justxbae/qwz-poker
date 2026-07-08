@@ -1362,6 +1362,19 @@ test("admin api exposes dashboard and manual wallet adjustments", async () => {
     assert.equal(dashboard.stats.players, 1);
     assert.equal(dashboard.stats.walletTotal, 0);
 
+    // Read-only live table/session view (TZ E1).
+    const adminTables = (await request("/api/admin/tables", { token: auth.token })).tables;
+    assert.ok(Array.isArray(adminTables) && adminTables.length > 0);
+    const session = (await request(`/api/admin/tables/${adminTables[0].id}/session`, { token: auth.token })).session;
+    assert.equal(session.table.id, adminTables[0].id);
+    assert.ok(Array.isArray(session.seats));
+    assert.ok(Array.isArray(session.events));
+    assert.equal(typeof session.currentHand.handNumber, "number");
+    // No hole cards leak through the admin view during an active hand.
+    for (const seat of session.table.seats || []) {
+      for (const card of seat.cards || []) assert.equal(card, "hidden");
+    }
+
     let data = await request("/api/admin/wallet-adjust", {
       method: "POST",
       token: auth.token,

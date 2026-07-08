@@ -11426,3 +11426,17 @@ html.minimal-launch .doc-sheet .cashier-pay-button {
   margin: 4px 16px 0 !important;
   width: calc(100% - 32px) !important;
 }
+
+/* 2026-07-08: admin live table/session view (read-only). */
+.admin-live-tables { display: grid; gap: 6px; margin-bottom: 10px; }
+.admin-live-table-row {
+  display: flex; align-items: center; justify-content: space-between;
+  min-height: 42px; padding: 0 12px; border: 0; border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05); color: inherit; text-align: left;
+}
+.admin-live-table-row b { font-weight: 600; opacity: 0.8; }
+.admin-live-session {
+  margin: 0 0 12px; padding: 12px; border-radius: 12px;
+  background: rgba(0, 0, 0, 0.28); font-size: 12px; line-height: 1.45;
+  white-space: pre-wrap; word-break: break-word;
+}
