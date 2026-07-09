@@ -33,8 +33,8 @@ const state = {
   adminTournaments: [],
   adminRewardTournaments: [],
   selectedAdminTournamentId: "",
-  gameMode: "cash",
-  selectedSmallBlind: 25,
+  gameMode: "play",
+  selectedSmallBlind: 100,
   homeSelectedSmallBlinds: [25],
   tables: [],
   tournaments: []
@@ -698,8 +698,7 @@ async function loadConfig() {
       ? ""
       : "$-игра доступна только если сервер запущен с REAL_MONEY_ENABLED=true";
   }
-  if (state.config.realMoneyEnabled) {
-    state.gameMode = "cash";
+  if (state.gameMode === "cash") {
     const limits = currentLimits();
     state.selectedSmallBlind = Number(limits[0]?.smallBlind || 25);
     state.homeSelectedSmallBlinds = normalizeHomeSelectedBlinds([state.selectedSmallBlind]);
@@ -754,9 +753,7 @@ function onGameFormatSelect(event) {
   const action = actionButton.dataset.modeAction;
   haptic("selection");
   if (action === "private") {
-    selectLobbyTab("tables");
-    document.querySelector("#createTableForm")?.scrollIntoView({ behavior: "smooth", block: "center" });
-    showStatus("Приватный стол создаётся в форме ниже: выберите лимит и количество игроков.");
+    selectLobbyTab("private");
     return;
   }
   if (action === "sitgo") {
@@ -778,11 +775,11 @@ function onFooterLobbyAction(event) {
   const action = button.dataset.footerAction;
   haptic("selection");
   if (action === "telegram") {
-    openPaymentUrl("https://t.me/qwzpoker");
+    openPaymentUrl("https://t.me/weezpoker");
     return;
   }
   if (action === "support") {
-    showStatus("Поддержку подключим отдельной ссылкой.");
+    openPaymentUrl("https://t.me/weezSup");
     return;
   }
   if (action === "terms") {
@@ -932,7 +929,7 @@ function renderModeContext() {
   }
   if (homeGamesTitle) homeGamesTitle.textContent = "Техасский холдем";
   if (publicGamesTitle) publicGamesTitle.textContent = cashMode ? "Cash-столы" : "Рейтинговые столы";
-  if (privateGamesTitle) privateGamesTitle.textContent = cashMode ? "Приватные cash-столы" : "Приватные рейтинговые столы";
+  if (privateGamesTitle) privateGamesTitle.textContent = "Мои приватные столы";
   if (walletWithdrawButton) walletWithdrawButton.disabled = !cashMode;
   renderHomeWalletSide(state.homeStats || {});
   renderDailyPlayClaimCard();
@@ -1172,7 +1169,7 @@ function setupLobbyOverscroll() {
       reset();
       return;
     }
-    overscroll = Math.max(-26, Math.min(26, pull * 0.18));
+    overscroll = Math.max(-44, Math.min(44, pull * 0.24));
     document.body.classList.add("scroll-bounce-active");
     document.body.classList.remove("scroll-bounce-release");
     lobby.style.setProperty("--scroll-bounce-y", `${overscroll.toFixed(1)}px`);
@@ -3811,12 +3808,13 @@ async function onCreateTable(event) {
   event.preventDefault();
   const form = new FormData(createTableForm);
   const body = Object.fromEntries(form.entries());
-  body.gameMode = state.gameMode;
+  body.gameMode = "cash";
+  body.visibility = "private";
   openBuyInOverlay({
     mode: "create",
     body,
     smallBlind: Number(body.smallBlind || state.selectedSmallBlind),
-    gameMode: state.gameMode
+    gameMode: "cash"
   });
 }
 
@@ -3910,18 +3908,21 @@ function renderHomeCta() {
 }
 
 async function quickCreatePrivateTable() {
-  const smallBlind = Number(state.selectedSmallBlind || 25);
-  const limit = currentLimits().find((item) => Number(item.smallBlind) === smallBlind);
+  const cashLimits = state.config?.cash?.limits?.length ? state.config.cash.limits : [{ smallBlind: 25, bigBlind: 50 }];
+  const smallBlind = state.gameMode === "cash"
+    ? Number(state.selectedSmallBlind || cashLimits[0]?.smallBlind || 25)
+    : Number(cashLimits[0]?.smallBlind || 25);
+  const limit = cashLimits.find((item) => Number(item.smallBlind) === smallBlind) || cashLimits[0];
   openBuyInOverlay({
     mode: "create",
-    table: { ...limit, gameMode: state.gameMode, currency: state.gameMode === "cash" ? "USDT" : "PLAY_CHIPS" },
+    table: { ...limit, gameMode: "cash", currency: "USDT" },
     body: {
       name: `Weez private ${formatGameLimit(smallBlind, Number(limit?.bigBlind || smallBlind * 2))}`,
       maxPlayers: "6",
       smallBlind: String(smallBlind),
       minBuyIn: String(limit?.minBuyIn || ""),
       maxBuyIn: String(limit?.maxBuyIn || ""),
-      gameMode: state.gameMode,
+      gameMode: "cash",
       visibility: "private"
     }
   });
@@ -3934,15 +3935,8 @@ function onLimitSelect(event) {
   haptic("selection");
   const blind = Number(button.dataset.smallBlind);
   if (button.closest("#limitPills") && state.gameMode === "cash") {
-    const selected = normalizeHomeSelectedBlinds(state.homeSelectedSmallBlinds);
-    if (selected.includes(blind)) {
-      state.homeSelectedSmallBlinds = selected.length > 1 ? selected.filter((item) => item !== blind) : selected;
-    } else {
-      state.homeSelectedSmallBlinds = normalizeHomeSelectedBlinds([...selected, blind]);
-    }
-    state.selectedSmallBlind = state.homeSelectedSmallBlinds.includes(blind)
-      ? blind
-      : Number(state.homeSelectedSmallBlinds.at(-1) || blind);
+    state.homeSelectedSmallBlinds = normalizeHomeSelectedBlinds([blind]);
+    state.selectedSmallBlind = blind;
   } else {
     state.selectedSmallBlind = blind;
   }
@@ -4812,25 +4806,33 @@ function renderTables() {
     ? normalizeHomeSelectedBlinds(state.homeSelectedSmallBlinds)
     : [RATING_FIXED_SMALL_BLIND];
   const publicTables = state.tables.filter((table) => !table.isPrivate && (table.gameMode || "play") === state.gameMode && Number(table.smallBlind) === tableBlind);
-  const privateTables = state.tables.filter((table) => table.isPrivate && (table.gameMode || "play") === state.gameMode && Number(table.smallBlind) === tableBlind);
+  const privateBlind = state.gameMode === "cash"
+    ? tableBlind
+    : Number(state.config?.cash?.limits?.[0]?.smallBlind || 25);
+  const privateTables = state.tables.filter((table) => table.isPrivate && (table.gameMode || "play") === "cash" && Number(table.smallBlind) === privateBlind);
   const homePublicTables = state.tables.filter((table) => !table.isPrivate && (table.gameMode || "play") === state.gameMode && homeBlinds.includes(Number(table.smallBlind)));
   const availablePublicTables = publicTables.filter((table) => table.seats.length < table.maxPlayers);
   const availableHomeTables = homePublicTables.filter((table) => table.seats.length < table.maxPlayers);
-  onlineStatus.textContent = state.gameMode === "play"
-    ? `${availableHomeTables.length} ${plural(availableHomeTables.length, "стол", "стола", "столов")} · 100/200`
-    : `${availableHomeTables.length} ${plural(availableHomeTables.length, "стол", "стола", "столов")}`;
+  if (state.gameMode === "play") {
+    onlineStatus.replaceChildren("Блайнды", document.createElement("br"), "100/200");
+  } else {
+    onlineStatus.textContent = `${availableHomeTables.length} ${plural(availableHomeTables.length, "стол", "стола", "столов")}`;
+  }
   publicTablesStatus.textContent = `${publicTables.length} ${plural(publicTables.length, "стол", "стола", "столов")}`;
   privateTablesStatus.textContent = `${privateTables.length} ${plural(privateTables.length, "стол", "стола", "столов")}`;
   renderContinueCard();
   const limitText = state.gameMode === "play"
     ? `${RATING_FIXED_SMALL_BLIND}/${RATING_FIXED_BIG_BLIND}`
     : formatGameLimit(selectedBlind, Number(currentLimits().find((item) => Number(item.smallBlind) === selectedBlind)?.bigBlind || selectedBlind * 2));
+  const cashLimits = state.config?.cash?.limits?.length ? state.config.cash.limits : [{ smallBlind: 25, bigBlind: 50 }];
+  const privateLimit = cashLimits.find((item) => Number(item.smallBlind) === privateBlind) || cashLimits[0];
+  const privateLimitText = formatGameLimit(privateBlind, Number(privateLimit?.bigBlind || privateBlind * 2), true);
   const homeEmpty = state.gameMode === "play"
-    ? "Рейтинговых столов 100/200 сейчас нет. Скоро добавим новые 6 max."
-    : `На выбранных лимитах сейчас нет свободных столов.`;
+    ? "Столов 100/200 сейчас нет."
+    : `На выбранном лимите сейчас нет свободных столов.`;
   renderTableList(homeTableList, availableHomeTables, homeEmpty, { home: true });
   renderTableList(publicTableList, publicTables, `На лимите ${limitText} свободных общих столов пока нет.`);
-  renderTableList(privateTableList, privateTables, `Приватных столов ${limitText} пока нет. Создай игру для друзей.`);
+  renderTableList(privateTableList, privateTables, `Приватных cash-столов ${privateLimitText} пока нет.`);
 }
 
 function renderTableList(container, tables, emptyText, options = {}) {
@@ -6161,7 +6163,7 @@ function onLobbyMenuAction(event) {
   } else if (action === "details") {
     runAction(() => openCashierSection("history"));
   } else if (action === "support") {
-    showStatus("Поддержку подключим отдельным разделом");
+    openPaymentUrl("https://t.me/weezSup");
     updateTelegramBackButton();
   } else if (action === "affiliate") {
     selectLobbyTab("affiliate");

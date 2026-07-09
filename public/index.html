@@ -218,13 +218,13 @@
               <span>Texas Hold'em</span>
             </div>
             <div class="game-mode-switch product-mode-segment" id="gameModeSwitch" aria-label="Режим игры">
-              <button type="button" class="active" data-game-mode="cash">
-                <span>Cash</span>
-                <small>cash-столы</small>
-              </button>
-              <button type="button" data-game-mode="play">
+              <button type="button" class="active" data-game-mode="play">
                 <span>Рейтинг</span>
                 <small>RP-сезон</small>
+              </button>
+              <button type="button" data-game-mode="cash">
+                <span>Cash</span>
+                <small>cash-столы</small>
               </button>
             </div>
             <p class="mode-context-copy" id="modeContextCopy">Cash — деньги, турниры и приватные столы. Рейтинг — отдельный сезон с RP, лигами и лидербордом.</p>
@@ -309,7 +309,7 @@
             <button type="button" class="footer-lobby-row footer-lobby-row--telegram" data-footer-action="telegram">
               <span class="footer-lobby-icon" aria-hidden="true"><img src="/assets/footer/telegram.svg" alt="" /></span>
               <span class="footer-lobby-main">Weez Poker</span>
-              <span class="footer-lobby-value">t.me/qwzpoker</span>
+              <span class="footer-lobby-value">t.me/weezpoker</span>
               <span class="footer-lobby-chevron">›</span>
             </button>
             <button type="button" class="footer-lobby-row footer-lobby-row--support" data-footer-action="support">
@@ -352,11 +352,23 @@
           </div>
           <div class="table-list" id="publicTableList"></div>
         </section>
+        </section>
+
+        <section class="lobby-view private-cash-page" data-lobby-view="private">
+        <section class="lobby-card private-cash-intro">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Private cash</p>
+              <h2>Приватный стол</h2>
+            </div>
+            <span>$ only</span>
+          </div>
+        </section>
         <section class="lobby-card">
           <div class="section-title">
             <div>
-              <p class="eyebrow">Приватные столы</p>
-              <h2 id="privateGamesTitle">Приватные столы</h2>
+              <p class="eyebrow">Cash-only</p>
+              <h2 id="privateGamesTitle">Мои приватные столы</h2>
             </div>
             <span id="privateTablesStatus">private</span>
           </div>

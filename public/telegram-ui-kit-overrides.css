@@ -11726,3 +11726,75 @@ html.minimal-launch body.cashier-sheet-open .cashier-sticky-footer .cashier-stat
   min-height: 0 !important;
   z-index: auto !important;
 }
+
+/* 2026-07-09: lobby/rating/private polish. Keep bottom nav stable and cashier CTA non-sticky. */
+html.minimal-launch:not(.admin-mode) body:not(.in-game).is-scrolling .bottom-nav,
+html.minimal-launch:not(.admin-mode) body:not(.in-game).scrolling-up .bottom-nav,
+html.minimal-launch:not(.admin-mode) body:not(.in-game).scrolling-down .bottom-nav {
+  opacity: 1 !important;
+  transform: translateX(-50%) translateY(0) scale(1) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .bottom-nav:not(.has-active-tab) .bottom-nav-pill {
+  opacity: 0 !important;
+}
+
+html.minimal-launch body.keyboard-open.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-topup-card,
+html.minimal-launch body.keyboard-open.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-withdraw-card {
+  bottom: 0 !important;
+  max-height: calc(100dvh - 8px) !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-sheet-grabber {
+  position: static !important;
+  top: auto !important;
+  z-index: auto !important;
+  background: transparent !important;
+}
+
+html.minimal-launch body.cashier-sheet-open .cashier-sticky-footer {
+  position: static !important;
+  bottom: auto !important;
+  width: min(100%, 342px) !important;
+  margin: 6px auto 0 !important;
+  padding: 0 0 calc(12px + env(safe-area-inset-bottom)) !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.minimal-launch body:not(.in-game) #onlineStatus {
+  text-align: right !important;
+  line-height: 1.08 !important;
+}
+
+html.minimal-launch body:not(.in-game) .private-cash-page.active {
+  display: grid !important;
+  gap: 14px !important;
+}
+
+html.minimal-launch body:not(.in-game) .private-cash-page .private-cash-intro,
+html.minimal-launch body:not(.in-game) .private-cash-page .lobby-card,
+html.minimal-launch body:not(.in-game) .private-cash-page .create-card {
+  background: var(--weez-card-bg, #1c1c1f) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch body:not(.in-game) .private-cash-page .section-title span {
+  color: rgba(235, 235, 245, 0.48) !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+}
+
+html.minimal-launch body:not(.in-game) .private-cash-page .create-card label {
+  color: rgba(235, 235, 245, 0.56) !important;
+}
+
+html.minimal-launch body:not(.in-game) .private-cash-page .create-card input,
+html.minimal-launch body:not(.in-game) .private-cash-page .create-card select {
+  background: var(--weez-row-bg, rgba(255, 255, 255, 0.08)) !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+  color: #fff !important;
+}
