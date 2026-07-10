@@ -2881,7 +2881,8 @@ function updateMemoryProfileProgress(userIds, gameMode, hand = null, table = nul
         profit: Number(seatResult.profit || 0),
         bigBlind: Number(table?.bigBlind || 0),
         isPrivate: Boolean(table?.isPrivate),
-        activePlayers
+        activePlayers,
+        potSize: (hand?.pots || []).reduce((sum, pot) => sum + Number(pot.grossAmount ?? pot.amount ?? 0), 0)
       });
       profile.ratingPoints = nextRatingPoints(profile.ratingPoints, delta);
       profile.ratingPeakPoints = Math.max(Number(profile.ratingPeakPoints || 0), profile.ratingPoints);

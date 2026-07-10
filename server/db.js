@@ -648,7 +648,8 @@ export async function recordProfileHandProgress({
       profit: Number(seatResult.profit || 0),
       bigBlind: Number(table?.bigBlind || 0),
       isPrivate: Boolean(table?.isPrivate),
-      activePlayers
+      activePlayers,
+      potSize: (hand?.pots || []).reduce((sum, pot) => sum + Number(pot.grossAmount ?? pot.amount ?? 0), 0)
     }) : 0;
     const clubPointsDelta = cashMode ? cashClubPointsFromRake(rakeShare) : 0;
     const currentResult = await query(`

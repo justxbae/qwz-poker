@@ -382,12 +382,15 @@
             </div>
             <span>Texas NL</span>
           </div>
-          <input type="hidden" name="smallBlind" value="25" />
           <label>
             Название
             <input name="name" maxlength="40" value="Weez private table" />
           </label>
           <div class="create-grid">
+            <label>
+              Лимит
+              <select name="smallBlind" id="privateLimitSelect"></select>
+            </label>
             <label>
               Игроков
               <select name="maxPlayers">

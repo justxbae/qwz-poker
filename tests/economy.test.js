@@ -87,11 +87,16 @@ test("welcome bonus is 25% capped at $50 with 6x rake wagering", () => {
 });
 
 test("rating uses BB result caps and ignores private or inactive hands", () => {
-  assert.equal(ratingDeltaForHand({ profit: 500, bigBlind: 50, activePlayers: 2 }), 10);
+  // Heads-up runs at 0.5 weight (anti chip-passing), 3-way+ at full weight.
+  assert.equal(ratingDeltaForHand({ profit: 500, bigBlind: 50, activePlayers: 2 }), 5);
+  assert.equal(ratingDeltaForHand({ profit: 500, bigBlind: 50, activePlayers: 3 }), 10);
   assert.equal(ratingDeltaForHand({ profit: 10000, bigBlind: 50, activePlayers: 2 }), RATING.maxHandDelta);
   assert.equal(ratingDeltaForHand({ profit: -10000, bigBlind: 50, activePlayers: 2 }), -RATING.maxHandDelta);
   assert.equal(ratingDeltaForHand({ profit: 500, bigBlind: 50, activePlayers: 1 }), 0);
   assert.equal(ratingDeltaForHand({ profit: 500, bigBlind: 50, activePlayers: 2, isPrivate: true }), 0);
+  // Micro-pot gate: pot below 2 BB never rates (fold-farm cycles).
+  assert.equal(ratingDeltaForHand({ profit: 25, bigBlind: 50, activePlayers: 3, potSize: 75 }), 0);
+  assert.equal(ratingDeltaForHand({ profit: 500, bigBlind: 50, activePlayers: 3, potSize: 100 }), 10);
   assert.equal(nextRatingPoints(1000, -25), 975);
   assert.equal(nextRatingPoints(10, -25), 0);
   assert.equal(ratingLeague(1600).title, "Gold");

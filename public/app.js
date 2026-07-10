@@ -691,6 +691,7 @@ async function loadConfig() {
   MINIMAL_LAUNCH = Boolean(state.config?.minimalLaunch || MINIMAL_LAUNCH);
   document.documentElement.classList.toggle("minimal-launch", MINIMAL_LAUNCH);
   applyMinimalLaunchMode();
+  populatePrivateLimitSelect();
   const cashButton = gameModeSwitch?.querySelector('[data-game-mode="cash"]');
   if (cashButton) {
     cashButton.disabled = false;
@@ -3804,15 +3805,37 @@ function renderAdminRows(container, rows, emptyText) {
   }
 }
 
+function populatePrivateLimitSelect() {
+  const select = document.querySelector("#privateLimitSelect");
+  const limits = state.config?.cash?.limits || [];
+  if (!select || !limits.length) return;
+  select.replaceChildren(...limits.map((limit, index) => {
+    const option = document.createElement("option");
+    option.value = String(limit.smallBlind);
+    option.textContent = formatGameLimit(limit.smallBlind, limit.bigBlind, true);
+    if (index === 0) option.selected = true;
+    return option;
+  }));
+}
+
 async function onCreateTable(event) {
   event.preventDefault();
   const form = new FormData(createTableForm);
   const body = Object.fromEntries(form.entries());
+  // Private tables are strictly cash-only and use the cash stake ladder.
+  const cashLimits = state.config?.cash?.limits || [];
+  const limit = cashLimits.find((item) => Number(item.smallBlind) === Number(body.smallBlind)) || cashLimits[0];
+  if (limit) {
+    body.smallBlind = String(limit.smallBlind);
+    body.minBuyIn = String(limit.minBuyIn || "");
+    body.maxBuyIn = String(limit.maxBuyIn || "");
+  }
   body.gameMode = "cash";
   body.visibility = "private";
   openBuyInOverlay({
     mode: "create",
     body,
+    table: limit ? { ...limit, gameMode: "cash", currency: "USDT" } : undefined,
     smallBlind: Number(body.smallBlind || state.selectedSmallBlind),
     gameMode: "cash"
   });

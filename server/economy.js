@@ -408,12 +408,25 @@ export function ratingLeague(points) {
   return [...RATING.leagues].reverse().find((league) => value >= league.min) || RATING.leagues[0];
 }
 
-export function ratingDeltaForHand({ profit = 0, bigBlind = 1, isPrivate = false, activePlayers = 0 } = {}) {
+// Anti-abuse policy (docs/RATING_INTEGRITY.md): private tables never rate,
+// short-handed farming is dampened, and blind-steal micro-hands don't count.
+export const RATING_INTEGRITY = {
+  minPotBigBlinds: 2,
+  headsUpMultiplier: 0.5
+};
+
+export function ratingDeltaForHand({ profit = 0, bigBlind = 1, isPrivate = false, activePlayers = 0, potSize = null } = {}) {
   if (isPrivate || Number(activePlayers || 0) < 2) return 0;
   const blind = Math.max(1, Math.round(Number(bigBlind || 1)));
+  // Micro-pot gate: a hand where the pot never reached 2 BB (instant blind
+  // folds, fold-farm cycles) earns/loses no rating.
+  if (potSize !== null && Number(potSize) < blind * RATING_INTEGRITY.minPotBigBlinds) return 0;
   const resultBb = Number(profit || 0) / blind;
   if (!Number.isFinite(resultBb) || resultBb === 0) return 0;
-  const raw = resultBb * RATING.tableMultiplier;
+  // Heads-up runs at half weight: two accounts passing chips back and forth
+  // build RP twice as slowly, and the loser side bleeds symmetrically.
+  const headsUp = Number(activePlayers) === 2 ? RATING_INTEGRITY.headsUpMultiplier : 1;
+  const raw = resultBb * RATING.tableMultiplier * headsUp;
   return Math.max(-RATING.maxHandDelta, Math.min(RATING.maxHandDelta, Math.round(raw)));
 }
 
