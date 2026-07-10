@@ -8,11 +8,13 @@ const cssSource = await readFile(new URL("../public/styles.css", import.meta.url
 const renderConfig = await readFile(new URL("../render.yaml", import.meta.url), "utf8");
 const dbSource = await readFile(new URL("../server/db.js", import.meta.url), "utf8");
 
-test("lobby starts in Cash mode without changing tabs when mode changes", () => {
-  assert.match(appSource, /gameMode:\s*"cash"/);
+test("lobby starts in Rating mode with the Рейтинг | Cash switch order", () => {
+  assert.match(appSource, /gameMode:\s*"play"/);
   assert.doesNotMatch(appSource, /selectLobbyTab\(state\.gameMode === "play"/);
-  assert.match(htmlSource, /class="active" data-game-mode="cash"/);
-  assert.doesNotMatch(htmlSource, /class="active" data-game-mode="play"/);
+  assert.match(htmlSource, /class="active" data-game-mode="play"/);
+  assert.doesNotMatch(htmlSource, /class="active" data-game-mode="cash"/);
+  // Рейтинг comes first in the segmented switch.
+  assert.ok(htmlSource.indexOf('data-game-mode="play"') < htmlSource.indexOf('data-game-mode="cash"'));
 });
 
 test("rating mode hides cash-only game formats", () => {

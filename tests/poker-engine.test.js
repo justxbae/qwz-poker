@@ -784,3 +784,22 @@ test("two-phase fairness validates player reveal after server commit", () => {
   assert.equal(playerProof.source, "player-commit-reveal");
   assert.equal(playerProof.seedHash, seedHash);
 });
+
+test("own folded cards are visible only to their owner in hand history", () => {
+  const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
+  joinTable(table, player2);
+  maybeStartHand(table);
+  startHand(table);
+  const ownerCards = [...table.seats[0].cards];
+  act(table, owner, { action: "fold" });
+
+  const ownView = publicTable(table, owner.id).handHistory[0];
+  const ownSeat = ownView.seats.find((seat) => seat.userId === owner.id);
+  assert.deepEqual(ownSeat.cards, ownerCards);
+  assert.equal(ownSeat.privateCards, undefined);
+
+  const otherView = publicTable(table, player2.id).handHistory[0];
+  const foldedSeat = otherView.seats.find((seat) => seat.userId === owner.id);
+  assert.deepEqual(foldedSeat.cards, ["hidden", "hidden"]);
+  assert.equal(foldedSeat.privateCards, undefined);
+});

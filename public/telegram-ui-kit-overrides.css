@@ -11798,3 +11798,11 @@ html.minimal-launch body:not(.in-game) .private-cash-page .create-card select {
   border-radius: 18px !important;
   color: #fff !important;
 }
+
+/* 2026-07-10: personal hand history — green win / red loss result. */
+html.minimal-launch body.in-game .hand-history-item .hh-amount {
+  color: #35d07f !important;
+}
+html.minimal-launch body.in-game .hand-history-item .hh-amount.negative {
+  color: #ff5566 !important;
+}

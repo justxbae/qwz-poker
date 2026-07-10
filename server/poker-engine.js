@@ -524,7 +524,7 @@ export function publicTable(table, viewerId = "") {
     actionLog: table.actionLog,
     tableSessionId: table.tableSessionId || "",
     tableSessionStartedAt: table.tableSessionStartedAt || 0,
-    handHistory: publicHandHistory(table),
+    handHistory: publicHandHistory(table, viewerId),
     fairness: publicCurrentFairness(table),
     events: publicTableEvents(table),
     viewer: {
@@ -574,7 +574,7 @@ export function publicTable(table, viewerId = "") {
   };
 }
 
-function publicHandHistory(table) {
+function publicHandHistory(table, viewerId = "") {
   const sessionId = String(table?.tableSessionId || "");
   if (!sessionId) return [];
   return (table.handHistory || [])
@@ -591,7 +591,16 @@ function publicHandHistory(table) {
         winners: pot.winners,
         handDescription: pot.handDescription
       })),
-      seats: hand.seats
+      // Each viewer sees their OWN hole cards even when folded/mucked;
+      // other players' hidden cards stay hidden. privateCards never leaves
+      // the server for anyone but the owner.
+      seats: hand.seats.map((seat) => {
+        const { privateCards, ...publicSeat } = seat;
+        if (viewerId && seat.userId === viewerId && Array.isArray(privateCards) && privateCards.length) {
+          return { ...publicSeat, cards: [...privateCards] };
+        }
+        return publicSeat;
+      })
     }));
 }
 
@@ -931,6 +940,10 @@ function recordHandHistory(table, { pots, rake = 0 }) {
         userId: seat.userId || "",
         name: seat.name,
         cards: seat.folded || (!table.allInRunout && !revealed.has(seat.userId)) ? ["hidden", "hidden"] : [...seat.cards],
+        // Own-history feature: the raw hole cards are kept server-side and
+        // exposed by publicHandHistory ONLY to the seat owner, so a player
+        // can always review what they folded/lost with.
+        privateCards: [...seat.cards],
         folded: seat.folded,
         totalBet: seat.totalBet,
         rakeContributed: rakeByUserId.get(String(seat.userId || "")) || 0,

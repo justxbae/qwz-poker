@@ -6462,15 +6462,21 @@ function renderHandHistoryItem(hand) {
   const row = document.createElement("article");
   row.className = "hand-history-item";
   const cashMode = state.currentTable?.gameMode === "cash";
+  const board = hand.board || [];
+  // Personal history: the viewer's own hand and own result. Falls back to
+  // the pot winner when the viewer did not play the hand (observer).
+  const mySeat = (hand.seats || []).find((seat) => String(seat.userId) === String(state.user?.id));
   const mainPot = hand.pots?.[0];
   const winnerName = mainPot?.winners?.[0] || "";
-  const winnerSeat = (hand.seats || []).find((seat) => seat.name === winnerName);
-  const winnerCards = (winnerSeat?.cards || []).filter((card) => card && card !== "hidden");
-  const board = hand.board || [];
-  const evaluated = evaluateVisibleHand([...winnerCards, ...board]);
+  const focusSeat = mySeat || (hand.seats || []).find((seat) => seat.name === winnerName);
+  const focusCards = (focusSeat?.cards || []).filter((card) => card && card !== "hidden");
+  const evaluated = evaluateVisibleHand([...focusCards, ...board]);
   const best = evaluated.rank >= 1 ? evaluated.cards : [];
-  const combo = evaluated.rank >= 1 ? evaluated.label : (mainPot?.handDescription || "");
-  const amount = mainPot ? (cashMode ? formatUsdtDisplay(mainPot.amount) : formatChips(mainPot.amount)) : "";
+  const combo = focusCards.length && evaluated.rank >= 0
+    ? evaluated.label
+    : (mainPot?.handDescription || "");
+  const profit = Number(focusSeat?.profit || 0);
+  const signedAmount = `${profit >= 0 ? "+" : "−"}${cashMode ? formatUsdtDisplay(Math.abs(profit)) : formatChips(Math.abs(profit))}`;
 
   row.innerHTML = `
     <div class="hh-top">
@@ -6486,12 +6492,16 @@ function renderHandHistoryItem(hand) {
       <span class="hh-combo"></span>
     </div>
   `;
-  row.querySelector(".hh-date").textContent = formatDateTime(hand.at) || `Раздача #${hand.handNumber}`;
-  row.querySelector(".hh-amount").textContent = amount ? `+${amount}` : "";
-  row.querySelector(".hh-hole").replaceChildren(...renderCards(winnerCards.length ? winnerCards : ["hidden", "hidden"], { highlightCards: best }));
+  // No date per product decision: combination + #hand on the left,
+  // signed personal result on the right.
+  row.querySelector(".hh-date").textContent = combo ? `${combo} · #${hand.handNumber}` : `#${hand.handNumber}`;
+  const amountNode = row.querySelector(".hh-amount");
+  amountNode.textContent = focusSeat ? signedAmount : "";
+  amountNode.classList.toggle("negative", profit < 0);
+  row.querySelector(".hh-hole").replaceChildren(...renderCards(focusCards.length ? focusCards : ["hidden", "hidden"], { highlightCards: best }));
   row.querySelector(".hh-board").replaceChildren(...renderCards(board, { highlightCards: best }));
-  row.querySelector(".hh-winner").textContent = winnerName || "—";
-  row.querySelector(".hh-combo").textContent = combo;
+  row.querySelector(".hh-winner").textContent = mySeat ? "" : (winnerName ? `Победил: ${winnerName}` : "");
+  row.querySelector(".hh-combo").textContent = "";
   return row;
 }
 
