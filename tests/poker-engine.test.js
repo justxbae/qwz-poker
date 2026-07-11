@@ -5,6 +5,7 @@ import {
   act,
   addBuyIn,
   commitPlayerFairnessSeed,
+  chooseShowMuck,
   createTable,
   createProvablyFairDeck,
   joinTable,
@@ -589,6 +590,69 @@ test("showdown records hand history with board, pots, and player results", () =>
   const view = publicTable(table, owner.id);
   assert.equal(view.handHistory.length, 1);
 });
+
+test("losing showdown hand can explicitly show before the server deadline", () => {
+  const table = completedHeadsUpShowdown();
+  const loserView = publicTable(table, player2.id);
+  assert.equal(loserView.showMuck.canDecide, true);
+  assert.deepEqual(loserView.seats.find((seat) => seat.userId === player2.id).cards, ["Ks", "Kh"]);
+  assert.deepEqual(publicTable(table, owner.id).seats.find((seat) => seat.userId === player2.id).cards, ["hidden", "hidden"]);
+  assert.equal(table.handHistory[0].persistenceReady, false);
+
+  chooseShowMuck(table, player2, "show");
+
+  assert.deepEqual(publicTable(table, owner.id).seats.find((seat) => seat.userId === player2.id).cards, ["Ks", "Kh"]);
+  assert.equal(table.showMuckWindow.status, "closed");
+  assert.equal(table.showMuckWindow.choices[player2.id], "show");
+  assert.equal(table.handHistory[0].persistenceReady, true);
+  assert.deepEqual(table.handHistory[0].seats.find((seat) => seat.userId === player2.id).cards, ["Ks", "Kh"]);
+  assert.ok(table.events.some((event) => event.type === "show_muck_selected" && event.payload.choice === "show"));
+});
+
+test("show/muck timeout auto-mucks and all-in runout never opens the choice", () => {
+  const table = completedHeadsUpShowdown();
+  table.showMuckWindow.deadline = Date.now() - 1;
+  tickTables(new Map([[table.id, table]]));
+
+  assert.equal(table.showMuckWindow.status, "closed");
+  assert.equal(table.showMuckWindow.choices[player2.id], "auto-muck");
+  assert.equal(table.handHistory[0].persistenceReady, true);
+  assert.deepEqual(publicTable(table, owner.id).seats.find((seat) => seat.userId === player2.id).cards, ["hidden", "hidden"]);
+  assert.deepEqual(publicTable(table, owner.id).handHistory[0].seats.find((seat) => seat.userId === player2.id).cards, ["Ks", "Kh"]);
+
+  const allIn = createTable({ ...owner, stack: 50 }, { maxPlayers: 2, smallBlind: 25 });
+  joinTable(allIn, { ...player2, stack: 50 });
+  startHand(allIn);
+  allIn.seats[0].cards = ["2c", "3d"];
+  allIn.seats[1].cards = ["As", "Ah"];
+  allIn.deck = ["4c", "5d", "9h", "Ts", "Jc"];
+  act(allIn, owner, { action: "call" });
+  while (allIn.status === "runout") {
+    allIn.runoutNextAt = Date.now() - 1;
+    tickTables(new Map([[allIn.id, allIn]]));
+  }
+  assert.equal(allIn.showMuckWindow, null);
+  assert.equal(publicTable(allIn, owner.id).showMuck.canDecide, false);
+});
+
+function completedHeadsUpShowdown() {
+  const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
+  joinTable(table, player2);
+  startHand(table);
+  table.seats[0].cards = ["As", "Ah"];
+  table.seats[1].cards = ["Ks", "Kh"];
+  table.deck = ["2c", "7d", "9h", "Jc", "4s"];
+  act(table, owner, { action: "call" });
+  act(table, player2, { action: "check" });
+  act(table, player2, { action: "check" });
+  act(table, owner, { action: "check" });
+  act(table, player2, { action: "check" });
+  act(table, owner, { action: "check" });
+  act(table, player2, { action: "check" });
+  act(table, owner, { action: "check" });
+  assert.equal(table.status, "showdown");
+  return table;
+}
 
 test("public hand history only exposes the active table session", () => {
   const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });

@@ -18,7 +18,7 @@ Persisted in PostgreSQL:
 - `wallets.bonus_usdt_micros` - bonus USDT bucket, separated from withdrawable money.
 - `wallets.locked_usdt_micros` - held funds for withdrawals, disputes, or manual review.
 - `wallets.withdrawable_usdt_micros` - future withdrawable accounting bucket.
-- `player_profiles` - cash level/status, XP, rating points, and profile counters.
+- `player_profiles` - cash level/status, XP, rating points, profile counters, and the selected earned status id.
 - `ledger_entries` - immutable wallet movement history.
 - `platform_ledger_entries` - immutable project-side ledger for rake, future tournament fees, withdrawals, bonuses, reversals, and manual review adjustments.
 - `saved_stacks` - saved stack after leaving a table.
@@ -34,13 +34,14 @@ Persisted in PostgreSQL:
 - `tournament_tables` - current virtual table composition and blind state.
 - `tournament_results` - immutable finishing place and prize result per player.
 - `tournament_payouts` - idempotent payout records tied to wallet ledger credits.
-- `hand_histories` - completed hand summaries, board, pots, seats, rake, and fairness proof.
+- `hand_histories` - completed hand summaries, board, pots, seats, rake, fairness proof, and the final show/muck decision state.
 - `hand_actions` - normalized per-hand action history for replay, analytics, and anti-fraud.
 - `hand_results` - normalized winners, combinations, win amounts, and rake per player.
 - `rating_seasons` - seasons for the Rating mode.
 - `rating_entries` - immutable rating point movements by season and source.
 - `achievement_definitions` - achievement catalogue.
 - `user_achievements` - player achievement progress and claim status.
+- `user_attributions` - immutable first-touch and mutable last non-direct Telegram acquisition attribution (`source`, `campaign`, `creative`, `placement`, raw start param, and timestamps).
 - `battle_pass_seasons` - future seasonal Battle Pass configuration.
 - `battle_pass_progress` - player XP/reward progress for Battle Pass seasons.
 - `bonus_grants` - bonuses, wagering requirements, expiration, and status.
@@ -142,10 +143,12 @@ Tracked server-side events include:
 - `tournament_register`
 - `tournament_cancel`
 - `tournament_payout`
+- `show_muck_selected`
+- `daily_claim_success`
 
 Tournament registration, refund, and payout respect the tournament `balance_bucket`. Cash uses integer USDT micros and `ledger_entries.balance_bucket='cash'`; play uses integer PLAY_CHIPS and `balance_bucket='play'`. The buy-in liability and platform fee are tracked separately. Settlement locks the tournament row, writes all results/payouts, credits wallets, updates profile stats, marks registrations finished, and closes tournament tables in one transaction.
 
-The admin dashboard aggregates a 7-day funnel: opened app -> opened cashier -> created deposit order -> paid deposit -> joined table, plus hands, actions, deposit amount, and table activity. If traffic grows, `analytics_events` can be streamed into ClickHouse/BigQuery/Amplitude without changing the product event names.
+The admin dashboard aggregates a 7-day funnel: opened app -> opened cashier -> created deposit order -> paid deposit -> joined table, plus hands, actions, deposit amount, and table activity. Acquisition is reported by first-touch `source/campaign/creative/placement`; a later direct open does not erase the last non-direct touch. If traffic grows, `analytics_events` can be streamed into ClickHouse/BigQuery/Amplitude without changing the product event names.
 
 ## Sessions
 

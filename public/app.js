@@ -278,6 +278,7 @@ const actionAmount = document.querySelector("#actionAmount");
 const amountLabel = document.querySelector("#amountLabel");
 const betSlider = document.querySelector("#betSlider");
 const confirmBetButton = document.querySelector("#confirmBetButton");
+const showMuckActions = document.querySelector("#showMuckActions");
 const startOverlay = document.querySelector("#startOverlay");
 const startTitle = document.querySelector("#startTitle");
 const startSubtitle = document.querySelector("#startSubtitle");
@@ -416,7 +417,7 @@ async function boot() {
   }
 
   const startParam = tg?.initDataUnsafe?.start_param;
-  if (startParam) await joinTable(startParam);
+  if (/^tbl_[A-Za-z0-9_-]+$/.test(String(startParam || ""))) await joinTable(startParam);
 
   createTableForm.addEventListener("submit", onCreateTable);
   refreshButton?.addEventListener("click", loadTables);
@@ -574,6 +575,7 @@ async function boot() {
   bettingActions.addEventListener("click", onPokerAction);
   bettingActions.addEventListener("click", onBetPreset);
   confirmBetButton.addEventListener("click", onConfirmBet);
+  showMuckActions?.addEventListener("click", onShowMuckChoice);
   preActions.addEventListener("click", onPreAction);
   currentTable.addEventListener("click", onTableBackdropClick);
   actionAmount.addEventListener("input", syncSliderFromAmount);
@@ -643,10 +645,15 @@ function showBootError(error) {
 }
 
 async function auth() {
+  const startParam = tg?.initDataUnsafe?.start_param
+    || params.get("startapp")
+    || params.get("startParam")
+    || "";
   const body = {
     initData: tg?.initData || "",
     platform: tg?.platform || "",
-    colorScheme: tg?.colorScheme || ""
+    colorScheme: tg?.colorScheme || "",
+    startParam
   };
   if (ADMIN_MODE) {
     body.adminSecret = adminWebSecret();
@@ -2278,8 +2285,8 @@ function renderHomeWalletSide(profileData = {}) {
     }
   } else {
     const ratingPoints = Number(state.user?.ratingPoints || state.progression?.rating?.startingRp || 1000);
-    if (homeWalletSideLabel) homeWalletSideLabel.textContent = "Рейтинг";
-    homeWalletSideValue.textContent = formatNumber(ratingPoints);
+    if (homeWalletSideLabel) homeWalletSideLabel.textContent = "";
+    homeWalletSideValue.textContent = `${formatNumber(ratingPoints)} RP`;
     homeWalletSideHint.textContent = state.user?.ratingLeague || state.user?.ratingTier || "Bronze";
     if (homeWalletSideMeter) homeWalletSideMeter.style.width = "8%";
     if (homeWalletSideAction) {
@@ -3121,6 +3128,7 @@ function renderAdminOverview({ admin, stats, analytics, conversion, diagnostics,
   reportGrid.dataset.reportSection = "acquisition";
   reportGrid.append(adminDailyChartCard(analytics));
   reportGrid.append(adminFunnelCard(analytics, conversion));
+  reportGrid.append(adminAttributionCard(analytics));
 
   const financeRows = [
     ["Cash USDT wallet", `${formatUsdt(stats.cashWalletTotal || 0)} USDT`, "Деньги пользователей в cash-режиме"],
@@ -3270,6 +3278,46 @@ function adminFunnelCard(analytics, conversion) {
       </div>
       <div class="admin-funnel-track"><i style="width:${width}%"></i></div>
       <small>${index === 0 ? "точка входа" : `конверсия ${formatPercent(rate)}`}</small>
+    `;
+    list.append(row);
+  });
+  return card;
+}
+
+function adminAttributionCard(analytics) {
+  const card = document.createElement("section");
+  card.className = "admin-dashboard-card admin-funnel-card";
+  card.innerHTML = `
+    <div class="admin-section-header">
+      <div>
+        <p class="eyebrow">Attribution</p>
+        <h3>Источники трафика</h3>
+      </div>
+      <span>first-touch</span>
+    </div>
+    <div class="admin-funnel"></div>
+  `;
+  const list = card.querySelector(".admin-funnel");
+  const rows = analytics.attribution || [];
+  if (!rows.length) {
+    const empty = document.createElement("div");
+    empty.className = "cashier-empty";
+    empty.textContent = "Запуски без start_param пока считаются direct";
+    list.append(empty);
+    return card;
+  }
+  const maxUsers = Math.max(1, ...rows.map((row) => Number(row.users || 0)));
+  rows.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "admin-funnel-step";
+    const width = Math.max(6, Math.round(Number(item.users || 0) / maxUsers * 100));
+    const playerRate = ratioValue(item.tablePlayers || 0, item.users || 0);
+    const campaign = [item.source || "direct", item.campaign, item.creative].filter(Boolean).join(" / ");
+    const placement = item.placement ? ` · ${escapeHtml(item.placement)}` : "";
+    row.innerHTML = `
+      <div class="admin-funnel-row"><span>${escapeHtml(campaign)}</span><strong>${formatNumber(item.users || 0)}</strong></div>
+      <div class="admin-funnel-track"><i style="width:${width}%"></i></div>
+      <small>${formatNumber(item.newUsers || 0)} новых · ${formatNumber(item.tablePlayers || 0)} игроков · ${formatNumber(item.payers || 0)} FTD · CR ${formatPercent(playerRate)}${placement}</small>
     `;
     list.append(row);
   });
@@ -5276,6 +5324,22 @@ async function submitPokerAction(action) {
   });
 }
 
+async function onShowMuckChoice(event) {
+  const button = event.target.closest("button[data-show-muck]");
+  if (!button || !state.currentTableId || button.disabled) return;
+  const choice = button.dataset.showMuck;
+  showMuckActions.querySelectorAll("button").forEach((item) => {
+    item.disabled = true;
+  });
+  await runAction(async () => {
+    const data = await api(`/api/tables/${state.currentTableId}/show-muck`, {
+      method: "POST",
+      body: { choice }
+    });
+    renderCurrentTable(data.table);
+  });
+}
+
 async function addTestPlayer() {
   if (!state.currentTableId) return;
   const data = await api(`/api/tables/${state.currentTableId}/add-test-player`, { method: "POST" });
@@ -5775,6 +5839,7 @@ function renderCurrentTable(table) {
   renderViewerHandBadge(viewerHand, table);
   maybeHapticForViewerTurn(table);
   renderBettingActions(table);
+  renderShowMuckActions(table);
   renderPreActions(table);
   renderStartOverlay(table);
   renderActionToast(table);
@@ -5953,6 +6018,17 @@ function renderCurrentTable(table) {
     : "";
 }
 
+function renderShowMuckActions(table) {
+  if (!showMuckActions) return;
+  const showMuck = table.showMuck || {};
+  const visible = Boolean(showMuck.canDecide && Number(showMuck.deadline || 0) > Number(table.now || Date.now()));
+  showMuckActions.hidden = !visible;
+  currentTable.classList.toggle("has-show-muck", visible);
+  showMuckActions.querySelectorAll("button").forEach((button) => {
+    button.disabled = !visible;
+  });
+}
+
 function renderSeatControls(table) {
   const isSeated = Boolean(table.viewer?.isSeated);
   const isSittingOut = Boolean(table.viewer?.sittingOut);
@@ -6114,7 +6190,7 @@ const DOC_SHEET_CONTENT = {
     sections: [
       ["Пополнение", "Stars, Crypto Bot, xRocket, TON. Баланс зачисляется после подтверждения оплаты провайдером."],
       ["Вывод", "Минимум $10. Комиссия 2% + сетевой сбор — расходы на услуги платёжных агрегаторов; итоговая сумма видна до создания заявки."],
-      ["Порог", "Вывод открывается, когда сыгранный рейк достигает 25% от суммы депозитов. Прогресс виден в кассе."],
+      ["Проверка", "На старте заявки обрабатываются вручную. При подозрительной активности проверка может занять больше времени."],
       ["Обработка", "На старте все заявки проходят ручную проверку — обычно до 24 часов. Заявку можно отменить до обработки."],
       ["Бонусы", "Бонусный баланс не выводится до выполнения условий отыгрыша."]
     ]

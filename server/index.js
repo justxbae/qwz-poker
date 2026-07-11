@@ -39,6 +39,8 @@ import {
   verifyCryptoBotWebhookSignature,
   verifyXRocketWebhookSignature
 } from "./payments.js";
+import { mergeAttributionTouch, parseTrafficAttribution } from "./attribution.js";
+import { ACHIEVEMENT_CATALOG, achievementDefinition, publicAchievementDefinition } from "./achievements.js";
 import {
   addCashWalletEntry as dbAddCashWalletEntry,
   addWalletEntry as dbAddWalletEntry,
@@ -57,7 +59,9 @@ import {
   getBonusSummary as dbGetBonusSummary,
   getPaymentOrder as dbGetPaymentOrder,
   getCashDepositTotal as dbGetCashDepositTotal,
+  grantUserAchievement as dbGrantUserAchievement,
   getPlayerProfile as dbGetPlayerProfile,
+  listUserAchievements as dbListUserAchievements,
   getIdempotencyResult as dbGetIdempotencyResult,
   getSavedStack as dbGetSavedStack,
   getWithdrawalOrder as dbGetWithdrawalOrder,
@@ -85,6 +89,7 @@ import {
   listWithdrawalOrders as dbListWithdrawalOrders,
   markPaymentOrderPaid as dbMarkPaymentOrderPaid,
   recordAnalyticsEvent as dbRecordAnalyticsEvent,
+  recordUserAttribution as dbRecordUserAttribution,
   recordAdminAuditLog as dbRecordAdminAuditLog,
   recordAdminEvent as dbRecordAdminEvent,
   recordDeviceSession as dbRecordDeviceSession,
@@ -106,8 +111,10 @@ import {
   setSavedStack as dbSetSavedStack,
   setCashWallet as dbSetCashWallet,
   setWallet as dbSetWallet,
+  selectUserStatus as dbSelectUserStatus,
   updatePaymentOrderStatus as dbUpdatePaymentOrderStatus,
   upsertActiveTableSnapshot as dbUpsertActiveTableSnapshot,
+  upsertAchievementDefinitions as dbUpsertAchievementDefinitions,
   upsertTelegramUser
 } from "./db.js";
 import {
@@ -128,6 +135,7 @@ import {
   ACTION_TIMEOUT_MS,
   NEXT_HAND_DELAY_MS,
   RUNOUT_CARD_DELAY_MS,
+  SHOW_MUCK_TIMEOUT_MS,
   START_INTRO_MS,
   act,
   addBuyIn,
@@ -140,6 +148,7 @@ import {
   leaveTable,
   maybeStartHand,
   publicTable,
+  chooseShowMuck,
   revealPlayerFairnessSeed,
   setPlayerFairnessSeed,
   sitIn,
@@ -230,9 +239,13 @@ const cryptoOrders = new Map();
 const withdrawalOrders = new Map();
 const adminEvents = [];
 const analyticsEvents = [];
+const userAttributions = new Map();
+const memoryUserAchievements = new Map();
+const memorySelectedStatuses = new Map();
 const platformLedgerEntries = [];
 const rewardTournamentEvents = new Map();
 const loggedAppOpens = new Set();
+const processedHandOutcomeIds = new Set();
 const persistedHandIds = new Set();
 const recentHandHistories = [];
 const idempotencyResults = new Map();
@@ -287,6 +300,7 @@ const server = createServer(async (req, res) => {
 });
 
 await initDatabase();
+await dbUpsertAchievementDefinitions(ACHIEVEMENT_CATALOG);
 await dbUpsertTournamentDefinitions([...tournaments.values()]);
 await hydrateTournamentDefinitions();
 await initStateStore({ required: REAL_MONEY_ENABLED });
@@ -573,6 +587,7 @@ async function handleApi(req, res, url) {
 
     const token = randomId("session");
     const user = await normalizeUser(auth.user);
+    const attribution = await recordTrafficAttribution(user, body.startParam);
     sessions.set(token, user);
     sessionExpirations.set(token, Date.now() + SESSION_TTL_MS);
     await stateSetSession(token, user);
@@ -580,9 +595,11 @@ async function handleApi(req, res, url) {
     await trackAnalytics("app_open", {
       user,
       category: "acquisition",
+      source: attribution.last.source,
       meta: {
         cashBalanceMicros: user.cashBalanceMicros || 0,
-        playBalance: user.balance || 0
+        playBalance: user.balance || 0,
+        attribution
       }
     });
     if (!loggedAppOpens.has(user.id)) {
@@ -615,6 +632,16 @@ async function handleApi(req, res, url) {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/profile/status") {
+    const body = await readJson(req);
+    const selectedStatus = await selectAchievementStatus(user, body.code);
+    sendJson(res, 200, {
+      selectedStatus,
+      profile: await profileView(user)
+    });
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/progression") {
     sendJson(res, 200, { progression: await progressionView(user) });
     return;
@@ -622,23 +649,6 @@ async function handleApi(req, res, url) {
 
   if (req.method === "POST" && url.pathname === "/api/play/daily-claim") {
     await sendIdempotentJson(req, res, user, "play_daily_claim", async (idempotencyKey) => {
-      // Faucet is for low stacks only: once the 24h cooldown has elapsed,
-      // you may claim the daily chips only when your balance is below the
-      // daily amount (<= amount - 1). The cooldown check still runs first.
-      const eligibility = await dailyPlayClaimView(user);
-      if (eligibility.canClaim) {
-        const currentBalance = await getWallet(user.id);
-        const maxEligibleBalance = ECONOMY.play.dailyRefillChips - 1;
-        if (currentBalance > maxEligibleBalance) {
-          return {
-            status: 409,
-            body: {
-              error: `Ежедневный бонус доступен, когда баланс ≤ ${maxEligibleBalance.toLocaleString("ru-RU")} фишек. Сейчас у вас ${currentBalance.toLocaleString("ru-RU")} фишек.`,
-              dailyPlayClaim: eligibility
-            }
-          };
-        }
-      }
       const result = await claimDailyPlayReward(user, idempotencyKey);
       const dailyPlayClaim = await dailyPlayClaimView(user);
       if (!result.claimed) {
@@ -650,6 +660,13 @@ async function handleApi(req, res, url) {
           }
         };
       }
+      await trackAnalytics("daily_claim_success", {
+        user,
+        category: "retention",
+        amount: ECONOMY.play.dailyRefillChips,
+        asset: "PLAY_CHIPS",
+        meta: { cooldownSeconds: DAILY_PLAY_CLAIM_COOLDOWN_SECONDS }
+      });
       return {
         dailyPlayClaim,
         profile: await profileView(user),
@@ -1389,6 +1406,25 @@ async function handleApi(req, res, url) {
       return;
     }
 
+    if (req.method === "POST" && action === "show-muck") {
+      const body = await readJson(req);
+      const showMuck = chooseShowMuck(table, user, body.choice);
+      await persistCompletedHands(table);
+      await persistActiveTableSnapshot(table);
+      await trackAnalytics("show_muck_selected", {
+        user,
+        category: "gameplay",
+        contextId: table.id,
+        meta: {
+          choice: String(body.choice || ""),
+          handNumber: table.handNumber,
+          gameMode: table.gameMode
+        }
+      });
+      sendJson(res, 200, { showMuck, table: tableView(table, user) });
+      return;
+    }
+
     if (req.method === "POST" && action === "add-test-player") {
       if (table.gameMode === "cash" || table.tournamentId) {
         const error = new Error("Тестовые игроки недоступны за денежным столом");
@@ -1898,6 +1934,20 @@ async function trackAnalytics(eventName, options = {}) {
   }
 }
 
+async function recordTrafficAttribution(user, startParam = "") {
+  const touch = parseTrafficAttribution(startParam);
+  try {
+    const stored = await dbRecordUserAttribution(user.id, touch);
+    if (stored) return stored;
+  } catch (error) {
+    reportError(error, { kind: "traffic_attribution", userId: user.id });
+  }
+  const current = userAttributions.get(String(user.id)) || null;
+  const merged = mergeAttributionTouch(current, touch);
+  userAttributions.set(String(user.id), merged);
+  return merged;
+}
+
 async function recordPlatformLedger(entry = {}) {
   const amount = Math.max(0, Math.round(Number(entry.amount || 0)));
   if (amount <= 0) return null;
@@ -1968,6 +2018,29 @@ async function analyticsDashboard(days = 7) {
     if (!current || at < current) firstPaidByUser.set(event.userId, at);
   }
   const firstDepositUsers = [...firstPaidByUser.values()].filter((at) => at >= cutoff).length;
+  const attributedSources = new Map();
+  for (const [userId, attribution] of userAttributions) {
+    const source = attribution.first?.source || "direct";
+    const campaign = attribution.first?.campaign || "";
+    const creative = attribution.first?.creative || "";
+    const placement = attribution.first?.placement || "";
+    const attributionKey = [source, campaign, creative, placement].join("\u001f");
+    const row = attributedSources.get(attributionKey) || {
+      source,
+      campaign,
+      creative,
+      placement,
+      users: 0,
+      newUsers: 0,
+      tablePlayers: 0,
+      payers: 0
+    };
+    row.users += 1;
+    if (new Date(attribution.first?.seenAt || 0).getTime() >= cutoff) row.newUsers += 1;
+    if (events.some((event) => event.userId === userId && event.name === "table_join")) row.tablePlayers += 1;
+    if (events.some((event) => event.userId === userId && event.name === "deposit_paid")) row.payers += 1;
+    attributedSources.set(attributionKey, row);
+  }
   return {
     days: Number(days || 7),
     totalEvents: events.length,
@@ -2009,7 +2082,8 @@ async function analyticsDashboard(days = 7) {
     events: [...byName.values()].map((event) => ({
       ...event,
       users: userCount(event.name)
-    })).sort((a, b) => b.count - a.count).slice(0, 30)
+    })).sort((a, b) => b.count - a.count).slice(0, 30),
+    attribution: [...attributedSources.values()].sort((left, right) => right.users - left.users || left.source.localeCompare(right.source))
   };
 }
 
@@ -2248,6 +2322,7 @@ async function healthSnapshot({ publicView = false } = {}) {
     };
     health.audit = {
       cachedHandHistories: recentHandHistories.length,
+      processedHandOutcomes: processedHandOutcomeIds.size,
       persistedHandKeys: persistedHandIds.size,
       fundMovementUsers: fundMovements.size
     };
@@ -2265,7 +2340,80 @@ async function persistAllCompletedHands() {
 async function persistCompletedHands(table) {
   for (const hand of table.handHistory || []) {
     const key = `${table.id}:${hand.id}`;
-    if (persistedHandIds.has(key)) continue;
+    if (!processedHandOutcomeIds.has(key)) {
+      try {
+        const progressUserIds = Array.isArray(hand.seats)
+          ? hand.seats.map((seat) => seat.userId).filter(Boolean)
+          : [];
+        if (progressUserIds.length) {
+          updateMemoryProfileProgress(progressUserIds, table.gameMode, hand, table);
+          await dbRecordProfileHandProgress({
+            providerUserIds: progressUserIds,
+            gameMode: table.gameMode,
+            handId: hand.id,
+            hand,
+            table
+          });
+          if (table.gameMode === "cash") {
+            for (const seat of hand.seats || []) {
+              if (!seat.userId || Number(seat.profit || 0) <= 0) continue;
+              await grantAchievement(seat.userId, "first_cash_win", {
+                sourceId: hand.id,
+                meta: { tableId: table.id, handNumber: hand.handNumber }
+              });
+            }
+          }
+          if (table.gameMode === "cash" && Number(hand.rake || 0) > 0) {
+            for (const seat of hand.seats || []) {
+              const contributed = Math.max(0, Number(seat.rakeContributed || 0));
+              if (!seat.userId || contributed <= 0) continue;
+              const dbUnlocks = await dbApplyBonusWagering({
+                providerUserIds: [seat.userId],
+                rakeAmountMicros: contributed,
+                handId: hand.id
+              });
+              const unlocks = dbUnlocks ?? applyMemoryBonusWagering([seat.userId], contributed, hand.id);
+              for (const unlock of unlocks) notifyBonusUnlocked(unlock);
+            }
+          }
+        }
+        await trackAnalytics("hand_completed", {
+          category: "gameplay",
+          amount: Number(hand.rake || 0),
+          asset: table.gameMode === "cash" ? "USDT" : "PLAY_CHIPS",
+          contextId: hand.id,
+          meta: {
+            tableId: table.id,
+            tableName: table.name,
+            gameMode: table.gameMode,
+            handNumber: hand.handNumber,
+            smallBlind: table.smallBlind,
+            bigBlind: table.bigBlind,
+            players: Array.isArray(hand.seats) ? hand.seats.length : 0,
+            potTotal: Array.isArray(hand.pots) ? hand.pots.reduce((sum, pot) => sum + Number(pot.amount || 0), 0) : 0
+          }
+        });
+        if (Number(hand.rake || 0) > 0) {
+          await recordPlatformLedger({
+            type: "credit",
+            category: "rake_cash",
+            title: "Cash game rake",
+            amount: hand.rake,
+            contextId: hand.id,
+            meta: `${table.name} · ${table.smallBlind}/${table.bigBlind} · hand #${hand.handNumber}`,
+            idempotencyKey: `rake:${hand.id}`,
+            asset: table.gameMode === "cash" ? "USDT" : "PLAY_CHIPS",
+            balanceBucket: table.gameMode === "cash" ? "cash" : "play"
+          });
+        }
+        processedHandOutcomeIds.add(key);
+      } catch (error) {
+        console.error("Hand outcome persist failed:", error.message);
+        continue;
+      }
+    }
+
+    if (hand.persistenceReady === false || persistedHandIds.has(key)) continue;
 
     const record = {
       id: hand.id,
@@ -2282,66 +2430,10 @@ async function persistCompletedHands(table) {
       at: hand.at || Date.now(),
       finishedAt: new Date(hand.at || Date.now()).toISOString()
     };
-    recentHandHistories.unshift(record);
-    recentHandHistories.splice(50);
-
     try {
       await dbRecordHandHistory(table, hand);
-      const progressUserIds = Array.isArray(hand.seats)
-        ? hand.seats.map((seat) => seat.userId).filter(Boolean)
-        : [];
-      if (progressUserIds.length) {
-        updateMemoryProfileProgress(progressUserIds, table.gameMode, hand, table);
-        await dbRecordProfileHandProgress({
-          providerUserIds: progressUserIds,
-          gameMode: table.gameMode,
-          handId: hand.id,
-          hand,
-          table
-        });
-        if (table.gameMode === "cash" && Number(hand.rake || 0) > 0) {
-          for (const seat of hand.seats || []) {
-            const contributed = Math.max(0, Number(seat.rakeContributed || 0));
-            if (!seat.userId || contributed <= 0) continue;
-            const dbUnlocks = await dbApplyBonusWagering({
-              providerUserIds: [seat.userId],
-              rakeAmountMicros: contributed,
-              handId: hand.id
-            });
-            const unlocks = dbUnlocks ?? applyMemoryBonusWagering([seat.userId], contributed, hand.id);
-            for (const unlock of unlocks) notifyBonusUnlocked(unlock);
-          }
-        }
-      }
-      await trackAnalytics("hand_completed", {
-        category: "gameplay",
-        amount: Number(hand.rake || 0),
-        asset: table.gameMode === "cash" ? "USDT" : "PLAY_CHIPS",
-        contextId: hand.id,
-        meta: {
-          tableId: table.id,
-          tableName: table.name,
-          gameMode: table.gameMode,
-          handNumber: hand.handNumber,
-          smallBlind: table.smallBlind,
-          bigBlind: table.bigBlind,
-          players: Array.isArray(hand.seats) ? hand.seats.length : 0,
-          potTotal: Array.isArray(hand.pots) ? hand.pots.reduce((sum, pot) => sum + Number(pot.amount || 0), 0) : 0
-        }
-      });
-      if (Number(hand.rake || 0) > 0) {
-        await recordPlatformLedger({
-          type: "credit",
-          category: "rake_cash",
-          title: "Cash game rake",
-          amount: hand.rake,
-          contextId: hand.id,
-          meta: `${table.name} · ${table.smallBlind}/${table.bigBlind} · hand #${hand.handNumber}`,
-          idempotencyKey: `rake:${hand.id}`,
-          asset: table.gameMode === "cash" ? "USDT" : "PLAY_CHIPS",
-          balanceBucket: table.gameMode === "cash" ? "cash" : "play"
-        });
-      }
+      recentHandHistories.unshift(record);
+      recentHandHistories.splice(50);
       persistedHandIds.add(key);
     } catch (error) {
       console.error("Hand history persist failed:", error.message);
@@ -2385,6 +2477,9 @@ function normalizeHydratedTable(table, now = Date.now()) {
     : [];
   table.departedContributions = Array.isArray(table.departedContributions) ? table.departedContributions : [];
   table.runoutQueue = Array.isArray(table.runoutQueue) ? table.runoutQueue : [];
+  table.showMuckWindow = table.showMuckWindow && typeof table.showMuckWindow === "object"
+    ? table.showMuckWindow
+    : null;
   table.deck = Array.isArray(table.deck) ? table.deck : [];
   table.status = table.status || "waiting";
   table.gameMode = table.gameMode === "cash" ? "cash" : table.gameMode === "tournament" || table.tournamentId ? "tournament" : "play";
@@ -2400,7 +2495,15 @@ function normalizeHydratedTable(table, now = Date.now()) {
   if (table.status === "starting") {
     table.startIntroUntil = now + START_INTRO_MS;
   } else if (table.status === "showdown") {
-    table.handFinishedAt = now - NEXT_HAND_DELAY_MS;
+    if (table.showMuckWindow?.status === "open") {
+      table.showMuckWindow.deadline = Math.min(
+        now + SHOW_MUCK_TIMEOUT_MS,
+        Math.max(now + 250, Number(table.showMuckWindow.deadline || now + SHOW_MUCK_TIMEOUT_MS))
+      );
+      table.handFinishedAt = now;
+    } else {
+      table.handFinishedAt = now - NEXT_HAND_DELAY_MS;
+    }
   } else if (table.status === "runout") {
     table.runoutNextAt = now + RUNOUT_CARD_DELAY_MS;
   } else if (table.activeSeatIndex >= 0) {
@@ -2627,6 +2730,7 @@ async function profileView(user) {
     activeTableCount: activeTables.length,
     handsPlayed: profile.handsPlayed || 0,
     tournamentHistory,
+    achievements: await achievementStateView(user),
     profile
   };
 }
@@ -2639,6 +2743,89 @@ async function getProfileForUser(user) {
   }
   user.profile = user.profile || defaultPlayerProfile();
   return user.profile;
+}
+
+async function achievementStateView(user) {
+  const dbItems = await dbListUserAchievements(user.id);
+  const items = dbItems || memoryAchievementItems(user.id);
+  const selectedStatus = items.find((item) => item.selected) || null;
+  return {
+    version: 1,
+    selectedStatus: selectedStatus ? publicAchievementItem(selectedStatus) : null,
+    earned: items.filter((item) => item.earned).map(publicAchievementItem),
+    catalog: items.map(publicAchievementItem)
+  };
+}
+
+async function grantAchievement(userId, code, options = {}) {
+  const definition = achievementDefinition(code);
+  if (!definition) return null;
+  const dbResult = await dbGrantUserAchievement(userId, code, options);
+  if (dbResult) return dbResult;
+  const userKey = String(userId || "");
+  if (!memoryUserAchievements.has(userKey)) memoryUserAchievements.set(userKey, new Map());
+  const awards = memoryUserAchievements.get(userKey);
+  if (!awards.has(code)) {
+    awards.set(code, {
+      completedAt: new Date().toISOString(),
+      meta: { ...(options.meta || {}), sourceId: String(options.sourceId || "") }
+    });
+  }
+  return { code, ...awards.get(code) };
+}
+
+async function selectAchievementStatus(user, code) {
+  const definition = achievementDefinition(code);
+  if (!definition?.rules?.isStatus) {
+    const error = new Error("Этот статус нельзя выбрать");
+    error.status = 400;
+    throw error;
+  }
+  const dbResult = await dbSelectUserStatus(user.id, code);
+  if (dbResult) return publicAchievementDefinition(definition);
+  const awards = memoryUserAchievements.get(String(user.id));
+  if (!awards?.has(code)) {
+    const error = new Error("Сначала получите этот статус");
+    error.status = 409;
+    throw error;
+  }
+  memorySelectedStatuses.set(String(user.id), code);
+  return publicAchievementDefinition(definition);
+}
+
+function memoryAchievementItems(userId) {
+  const userKey = String(userId || "");
+  const awards = memoryUserAchievements.get(userKey) || new Map();
+  const selectedCode = memorySelectedStatuses.get(userKey) || "";
+  return ACHIEVEMENT_CATALOG.map((definition) => {
+    const award = awards.get(definition.code);
+    return {
+      ...publicAchievementDefinition(definition),
+      earned: Boolean(award),
+      progress: award ? 1 : 0,
+      status: award ? "completed" : "locked",
+      completedAt: award?.completedAt || null,
+      claimedAt: null,
+      selected: selectedCode === definition.code,
+      meta: award?.meta || {}
+    };
+  });
+}
+
+function publicAchievementItem(item) {
+  return {
+    id: item.id,
+    code: item.code,
+    title: item.title,
+    description: item.description || "",
+    category: item.category || "general",
+    rarity: item.rarity || "common",
+    isStatus: Boolean(item.isStatus),
+    earned: Boolean(item.earned),
+    status: item.status || (item.earned ? "completed" : "locked"),
+    completedAt: item.completedAt || null,
+    selected: Boolean(item.selected)
+  };
 }
 
 async function progressionView(user) {

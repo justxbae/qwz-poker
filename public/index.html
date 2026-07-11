@@ -7,7 +7,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="/styles.css?v=20260628-2" />
     <link rel="stylesheet" href="/lobby-qa.css?v=20260626-1" />
-    <link rel="stylesheet" href="/telegram-ui-kit-overrides.css?v=20260711-4" />
+    <link rel="stylesheet" href="/telegram-ui-kit-overrides.css?v=20260711-6" />
   </head>
   <body>
     <section class="app-boot" id="appBoot" aria-live="polite" aria-label="Загрузка Weez Poker">
@@ -90,6 +90,11 @@
           <button type="button" class="bet-confirm" id="confirmBetButton">Подтвердить<br /><span>50</span></button>
           <button data-poker-action="bet">Bet</button>
           <button data-poker-action="raise">Raise</button>
+        </div>
+        <div class="show-muck-actions" id="showMuckActions" hidden aria-live="polite">
+          <span>Показать карты?</span>
+          <button type="button" class="secondary" data-show-muck="muck">Скрыть</button>
+          <button type="button" data-show-muck="show">Показать</button>
         </div>
         <div class="sitout-popover" id="sitOutPopover" hidden>
           <button type="button" id="confirmSitOutButton">Отошёл</button>
@@ -1107,6 +1112,6 @@
       </article>
     </template>
 
-    <script src="/app.js?v=20260711-4" type="module"></script>
+    <script src="/app.js?v=20260711-6" type="module"></script>
   </body>
 </html>

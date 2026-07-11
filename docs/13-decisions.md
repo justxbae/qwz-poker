@@ -1,5 +1,89 @@
 # Weez Poker Decisions
 
+## 2026-07-11: Show/muck — короткое server-driven окно и отдельная история
+
+**Зона:** gameplay / frontend / audit
+
+**Решение:** После обычного showdown проигравшая не сброшенная рука получает окно `show/muck` на `3 000 ms`. Победители показываются автоматически; при all-in runout показываются все активные руки и окно не создаётся; отсутствие ответа означает `auto-muck`. Следующая раздача не начинается до закрытия окна. Визуально muck остаётся скрытым, но участник завершённой раздачи может проверить в session hand history не сброшенные showdown-руки; folded-facing-bet карты другим игрокам не раскрываются.
+
+**Почему:** Это отделяет краткий table UX от проверяемой истории и соответствует официальным правилам PokerStars для auto-muck, all-in reveal и «paid to see» в hand history.
+
+**Влияет на:** `server/poker-engine.js`, `/api/tables/:id/show-muck`, table snapshots/SSE, `hand_histories`, frontend post-hand actions.
+
+**Что обновлено:** Добавлены state/deadline, `show_muck_window_open`, `show_muck_selected`, `show_muck_window_closed`, API, UI и unit-тесты explicit show/timeout/all-in.
+
+**Открытые вопросы:** Глобальная настройка «всегда скрывать проигравшую руку» и выбор показа одной hole card не входят в beta.
+
+## 2026-07-11: Acquisition attribution — first touch и last non-direct touch
+
+**Зона:** analytics / growth / backend / admin
+
+**Решение:** Telegram `start_param` для маркетинга имеет формат `source--campaign--creative--placement`. `tbl_*` и `ref_*` остаются служебными форматами. First touch неизменяем; last touch обновляется новым недиректным касанием, а обычный direct reopen не стирает прошлую campaign. Admin отчёт группирует source/campaign/creative/placement и показывает users, new users, table players и payers.
+
+**Почему:** Без устойчивой атрибуции нельзя считать activation, FTD, CAC и сравнивать каналы; подмена campaign token на table id раньше ломала бы открытие приложения.
+
+**Влияет на:** `/api/auth`, `user_attributions`, `analytics_events`, admin analytics, Telegram deep links.
+
+**Что обновлено:** Добавлены parser, memory/PG persistence, first/last merge, dashboard и regression-тесты.
+
+**Открытые вопросы:** Стоимость кампаний и cohort retention будут добавлены после появления реальных расходов и зрелых D1/D7 cohorts.
+
+## 2026-07-11: Статусы и достижения не дают игрового преимущества
+
+**Зона:** profile / retention / architecture
+
+**Решение:** Status/achievement layer является server-defined metadata без денежной награды и gameplay advantage. Выбрать можно только заработанный item с `isStatus=true`; выдача идемпотентна. Beta catalog: `beta_tester`, `founding_player`, `first_cash_win`, `freeroll_winner`, `season_1_final_table`, `season_1_champion`.
+
+**Почему:** Сначала нужен стабильный контракт выдачи, аудита и отображения, а не декоративные badges с неутверждённой экономикой.
+
+**Влияет на:** `achievement_definitions`, `user_achievements`, `player_profiles.selected_status_id`, `/api/profile`, `/api/profile/status`.
+
+**Что обновлено:** Добавлены каталог, persistence/memory paths, profile API, guard выбора и автоматическая первая cash-победа.
+
+**Открытые вопросы:** Admin grant UI, сезонная автоматизация и визуальное размещение статуса проходят отдельный pass.
+
+## 2026-07-11: Withdrawal beta policy is transparent manual review, not mandatory playthrough
+
+**Зона:** product / economy / payments / frontend
+
+**Решение:** Для первого контролируемого beta-запуска вывод использует полностью видимую комиссию `2% + network fee` и ручную проверку каждой заявки. Глобальный обязательный порог «сыграть рейк 25% от всех депозитов» по умолчанию отключён (`WITHDRAWAL_RAKE_THRESHOLD_PERCENT=0`); подозрительный deposit→withdraw flow переводится в manual review/risk, а не блокирует всех добросовестных пользователей. Автоматическая выплата не требуется для закрытой beta, но ручная выплата обязана фиксировать внешний transaction id/hash, статус `paid`, actor, timestamp и audit trail.
+
+**Почему:** Старый 25% playthrough выглядит как скрытое ограничение доступа к собственным средствам и не соответствует уже реализованной launch-политике сервера. Риск транзитных депозитов безопаснее закрывать ручной проверкой, source-of-funds/risk flags и прозрачной комиссией.
+
+**Влияет на:** `server/economy.js`, withdrawal settings/API, cashier UI, пользовательские документы, `docs/ECONOMICS.md`, admin withdrawal queue.
+
+**Что обновлено:** Канон и пользовательский текст синхронизированы с существующим default `rakeThresholdPercent=0`; 25% остаётся только как аварийный env-override для конкретной abuse-wave/test среды, а не публичное условие.
+
+**Открытые вопросы:** До автоматизации выплат утвердить публичный SLA ручной обработки, лимиты enhanced review/KYC и список обязательных подтверждений выплаты по каждому методу.
+
+## 2026-07-11: Rabbit Hunt deferred beyond the first public launch
+
+**Зона:** product / gameplay / economy / development
+
+**Решение:** Rabbit Hunt полностью исключён из beta++ и первого публичного real-money запуска. В текущей итерации не создавать offer window, API, ledger category, table events, admin controls или frontend CTA для этой функции. Рабочая гипотеза `cash-only / 1 BB` не считается утверждённой экономикой и будет рассмотрена в отдельном ТЗ после стабильного запуска базовой игры.
+
+**Почему:** Rabbit Hunt не является обязательным правилом Hold'em. Poker TDA запрещает его в турнирах, а крупные онлайн-румы внедряют его как отдельную настраиваемую продуктовую функцию и отдельно дорабатывают окно активации. Для Weez он добавляет новый денежный flow, post-hand state, SSE/reconnect semantics и задержку следующей руки, но не улучшает надёжность базовой игры перед первым набором пользователей.
+
+**Влияет на:** `MASTER_SPEC.md`, `docs/GPT56_SOL_BETA_PLUS_PLUS_BACKEND_TZ.md`, `docs/TECH_ROADMAP.md`, poker event contract, ledger scope и launch checklist.
+
+**Что обновлено:** Rabbit Hunt перенесён в отдельный future product discovery; из обязательных beta++ событий, тестов, админки и reconciliation он удалён. Заодно канонический daily claim синхронизирован с реализованными `35 000 PLAY_CHIPS / 24h` независимо от остатка play-баланса.
+
+**Открытые вопросы:** Перед будущей реализацией отдельно утвердить eligibility, кто и сколько раз может купить reveal, цену/получателя fee, длительность окна, влияние на next-hand cadence, поведение при нескольких запросах, reconnect/replay, fairness proof и доступность на private cash tables. До этого видео конкурента не требуется.
+
+## 2026-07-11: Beta++ backend TZ for gameplay, finance, admin and rating hardening
+
+**Зона:** product / architecture / economy / development
+
+**Решение:** Для первого real-money beta launch вводится отдельное backend ТЗ `docs/GPT56_SOL_BETA_PLUS_PLUS_BACKEND_TZ.md`, которое дополняет `docs/CLAUDE_NEXT_PHASE_TZ.md` и фокусируется не на общем next-phase pass, а на launch hardening: hand/table timings, show/muck window, cash/rating/tournament separation, rating anti-abuse, statuses/achievements, admin operations, finance lifecycle, измеримый launch contract и event contract для анимаций. Rabbit Hunt этой итерацией не реализуется.
+
+**Почему:** Старое ТЗ уже покрывало широкий product-grade pass, но для beta launch нужен отдельный документ с минимальным дублированием и с упором на операционную полноту, спорные post-hand flow и real-money readiness.
+
+**Влияет на:** `MASTER_SPEC.md`, `docs/TECH_ROADMAP.md`, backend gameplay audit, admin API, finance operations, rating season flow, event model.
+
+**Что обновлено:** Добавлен `docs/GPT56_SOL_BETA_PLUS_PLUS_BACKEND_TZ.md`, синхронизированы `MASTER_SPEC.md` и roadmap по show/muck, launch gates, аналитике и границам optional-функций.
+
+**Открытые вопросы:** `Run It Twice`, `All-in Cash Out`, seat-me/waiting-list и social/chat слой остаются вне beta++ default scope до отдельного решения.
+
 ## 2026-06-28: Cash UI uses dollar display instead of Tether mark
 
 **Зона:** product / frontend
@@ -46,7 +130,7 @@
 
 **Решение:** Базовая игровая механика QWZ утверждена как единый NL Hold'em core с режимными надстройками. `cash` и `rating` используют одну логику улиц, all-in, side pots, showdown, sit-out и reconnect, но разные buckets и разные продуктовые ограничения. Во всех режимах действует strict table-stakes rule: mid-hand нельзя докладывать деньги/фишки из wallet, top-up и rebuy выполняются только между руками. `cash` остаётся основным “полным” режимом: USDT-only, normal table buy-in flow, table selection/listing как сейчас, top-up между руками, optional auto top-up до целевого стека, строгий rake/no-flop-no-drop, hand history и provably-fair audit. `rating` остаётся облегчённым competitive mode: только PLAY_CHIPS, никакой конвертации в cash, никакого обычного tournament buy-in, без insurance/cash-out и без отдельных спонтанных play tournaments; сезон и leaderboard живут поверх cash-like table flow.
 
-По темпу игры: базовый action clock для cash/rating сохраняется быстрым, а quality-pass должен довести его до server-configurable model с optional time bank, auto-check если check legal и auto-fold иначе. Tournament mode получает отдельную disconnected/tournament timing policy и blind-clock events. Для showdown/muck остаётся действующая логика: обычный проигравший hand может быть скрыт, но all-in runout раскрывает карты всем участникам. Rabbit hunt, Run It Twice и All-in Cash Out не входят в default gameplay: Rabbit Hunt запрещён в cash и турнирах; Run It Twice и All-in Cash Out рассматриваются только как optional cash-only features после отдельного решения и только без дополнительного rake distortion.
+По темпу игры: базовый action clock для cash/rating сохраняется быстрым, а quality-pass должен довести его до server-configurable model с optional time bank, auto-check если check legal и auto-fold иначе. Tournament mode получает отдельную disconnected/tournament timing policy и blind-clock events. Для showdown/muck остаётся действующая логика: обычный проигравший hand может быть скрыт, но all-in runout раскрывает карты всем участникам; при этом после руки должно существовать отдельное server-driven окно на show/muck decision. Rabbit Hunt, Run It Twice и All-in Cash Out не входят в beta++ launch; каждый из этих cash-only кандидатов требует отдельного продуктового и экономического решения.
 
 Disconnect/sit-out policy для cash/rating утверждён отдельно от турниров. Если игрок потерял соединение, пока не его ход, стол не показывает отдельный reconnect-state и раздача продолжается. Когда ход доходит до отсутствующего игрока, обычный action timer приводит к auto-check, если check legal, иначе auto-fold. После timeout игрок уходит в sit-out на 300 секунд; в cash/rating sit-out игрок не получает новые карты и ему не ставятся новые blinds. Если он не вернулся за 300 секунд, сервер автоматически освобождает место и возвращает стек в соответствующий wallet через idempotent ledger/table mutation. В турнирах disconnect не освобождает место: игрок продолжает blind/ante out до возврата или bust.
 
@@ -58,7 +142,7 @@ Disconnect/sit-out policy для cash/rating утверждён отдельно
 
 **Что обновлено:** Зафиксирован утверждённый gameplay ruleset для quality pass и границы optional market-facing features.
 
-**Открытые вопросы:** Анти hit-and-run penalty, seat-me / active waiting list, paid time-bank cards, public rabbit-hunt on play/private tables и table chat/emoji остаются отдельными продуктами и не входят в базовый rollout.
+**Открытые вопросы:** Анти hit-and-run penalty, seat-me / active waiting list, paid time-bank cards, Rabbit Hunt и table chat/emoji остаются отдельными продуктами и не входят в базовый rollout.
 
 ## 2026-06-21: Gameplay quality bar for cash, rating, tournaments and animation hooks
 
@@ -120,7 +204,7 @@ Disconnect/sit-out policy для cash/rating утверждён отдельно
 
 **Зона:** product / architecture / development
 
-**Решение:** В рейтинговом режиме правая верхняя карточка лобби работает как daily claim для `10 000` `PLAY_CHIPS` раз в `24` часа. Это отдельная play-only механика: она не трогает `cash_usdt_micros`, не конвертируется в USDT и не показывается в cash-режиме. Backend должен отдавать состояние клейма вместе с профилем: `canClaim`, `claimedAt`, `availableAt`, `cooldownSeconds`, `amount`. При успешном claim сервер делает атомарную проверку cooldown, увеличивает play-баланс, пишет `ledger_entries` с `balance_bucket='play'` и возвращает обновлённый профиль. Frontend в `play` показывает активную кнопку только когда `canClaim=true`, иначе отображает таймер до следующей выдачи.
+**Решение:** В рейтинговом режиме отдельная карточка лобби работает как daily claim для `35 000` `PLAY_CHIPS` раз в `24` часа. Доступность зависит только от cooldown пользователя и не зависит от текущего play-баланса. Это отдельная play-only механика: она не трогает `cash_usdt_micros`, не конвертируется в USDT и не показывается в cash-режиме. Backend отдаёт состояние клейма вместе с профилем: `canClaim`, `claimedAt`, `availableAt`, `cooldownSeconds`, `amount`. При успешном claim сервер делает атомарную проверку cooldown, увеличивает play-баланс, пишет `ledger_entries` с `balance_bucket='play'` и возвращает обновлённый профиль. Frontend в `play` показывает активную кнопку только когда `canClaim=true`, иначе отображает таймер до следующей выдачи.
 
 **Почему:** UI уже содержит этот слот как часть дизайна, но без серверной логики карточка остаётся декоративной. Для MVP нужна простая и проверяемая механика удержания игроков в play-цикле без смешивания с cash-экономикой.
 
@@ -128,7 +212,7 @@ Disconnect/sit-out policy для cash/rating утверждён отдельно
 
 **Что обновлено:** Реализованы `daily_play_claims`, `POST /api/play/daily-claim`, блок `dailyPlayClaim` в profile/progression, play-ledger credit, memory fallback и regression-тесты. Frontend wiring остаётся отдельной задачей.
 
-**Открытые вопросы:** Нужен ли отдельный streak/bonus escalation, или остаёмся на фиксированных `10 000` каждые `24` часа.
+**Открытые вопросы:** Streak/bonus escalation не входит в beta; действует фиксированная выдача `35 000` каждые `24` часа.
 
 ## 2026-06-19: Lobby wallet hero and simplified bottom nav
 

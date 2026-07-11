@@ -4,6 +4,7 @@ import { resolveShowdown } from "./poker-evaluator.js";
 
 export const ACTION_TIMEOUT_MS = 20000;
 export const NEXT_HAND_DELAY_MS = 5000;
+export const SHOW_MUCK_TIMEOUT_MS = envMs("SHOW_MUCK_TIMEOUT_MS", 3000);
 export const START_INTRO_MS = 3500;
 export const RUNOUT_CARD_DELAY_MS = 900;
 export const REBUY_TIMEOUT_MS = 3 * 60 * 1000;
@@ -64,6 +65,7 @@ export function createTable(owner, body = {}, options = {}) {
     tableSessionId: "",
     tableSessionStartedAt: 0,
     handHistory: [],
+    showMuckWindow: null,
     departedContributions: [],
     fairnessProof: null,
     rakeCollected: 0,
@@ -314,6 +316,12 @@ export function prepareStartIntro(table) {
 
 export function startHand(table, user) {
   if (user && !canControlTestPlayers(table, user)) throwHttp(403, "Only table owner can start the hand");
+  if (table.showMuckWindow?.status === "open") {
+    if (Date.now() < Number(table.showMuckWindow.deadline || 0)) {
+      throwHttp(409, "Дождитесь завершения show/muck");
+    }
+    closeShowMuckWindow(table, "timeout");
+  }
   if (playableSeats(table).length < 2) {
     table.status = "waiting";
     table.message = "Ожидание игроков";
@@ -378,6 +386,7 @@ export function startHand(table, user) {
   table.status = "preflop";
   table.allInRunout = false;
   table.showdownRevealUserIds = [];
+  table.showMuckWindow = null;
 
   for (const seat of table.seats) {
     seat.cards = canReceiveHand(seat) ? [table.deck.pop(), table.deck.pop()] : [];
@@ -432,6 +441,56 @@ export function act(table, user, body = {}) {
   applyAction(table, seatIndex, body);
 }
 
+export function chooseShowMuck(table, user, choice) {
+  const normalizedChoice = String(choice || "").trim().toLowerCase();
+  if (!['show', 'muck'].includes(normalizedChoice)) {
+    throwHttp(400, "Выберите show или muck");
+  }
+
+  const userId = String(user?.id || "");
+  const windowState = table.showMuckWindow;
+  if (table.status === "showdown" && windowState?.eligibleUserIds?.includes(userId)
+    && windowState.choices?.[userId] === normalizedChoice) {
+    return publicShowMuckWindow(table, userId);
+  }
+  if (table.status !== "showdown" || !windowState || windowState.status !== "open") {
+    throwHttp(409, "Окно show/muck уже закрыто");
+  }
+
+  if (Date.now() >= Number(windowState.deadline || 0)) {
+    closeShowMuckWindow(table, "timeout");
+    throwHttp(409, "Время выбора show/muck истекло");
+  }
+
+  if (!windowState.eligibleUserIds.includes(userId)) {
+    throwHttp(403, "Для этой руки выбор show/muck недоступен");
+  }
+
+  const currentChoice = windowState.choices[userId];
+  if (currentChoice && currentChoice !== "pending") return publicShowMuckWindow(table, userId);
+
+  windowState.choices[userId] = normalizedChoice;
+  if (normalizedChoice === "show") {
+    const revealed = new Set(table.showdownRevealUserIds || []);
+    revealed.add(userId);
+    table.showdownRevealUserIds = [...revealed];
+  }
+
+  syncShowMuckHistory(table);
+  const seat = table.seats.find((candidate) => String(candidate.userId) === userId);
+  emitTableEvent(table, "show_muck_selected", {
+    userId,
+    choice: normalizedChoice,
+    cards: normalizedChoice === "show" ? [...(seat?.cards || [])] : []
+  });
+
+  if (windowState.eligibleUserIds.every((id) => windowState.choices[id] !== "pending")) {
+    closeShowMuckWindow(table, "completed");
+  }
+
+  return publicShowMuckWindow(table, userId);
+}
+
 export function autoAct(table, user) {
   if (!canControlTestPlayers(table, user)) throwHttp(403, "Only table owner can run auto action");
   if (table.activeSeatIndex < 0) throwHttp(409, "Сейчас нет активного игрока");
@@ -470,6 +529,10 @@ export function tickTables(tables) {
     if (table.status === "starting" && table.startIntroUntil && Date.now() >= table.startIntroUntil) {
       startHand(table);
       continue;
+    }
+
+    if (table.status === "showdown" && table.showMuckWindow?.status === "open" && Date.now() >= Number(table.showMuckWindow.deadline || 0)) {
+      closeShowMuckWindow(table, "timeout");
     }
 
     if (table.status === "showdown" && table.handFinishedAt && Date.now() - table.handFinishedAt >= NEXT_HAND_DELAY_MS) {
@@ -527,6 +590,7 @@ export function publicTable(table, viewerId = "") {
     handHistory: publicHandHistory(table, viewerId),
     fairness: publicCurrentFairness(table),
     events: publicTableEvents(table),
+    showMuck: publicShowMuckWindow(table, viewerId),
     viewer: {
       isSeated: Boolean(viewerSeat),
       canAct,
@@ -584,6 +648,11 @@ function publicHandHistory(table, viewerId = "") {
       handNumber: hand.handNumber,
       at: hand.at,
       board: hand.board,
+      showMuck: hand.showMuck ? {
+        status: hand.showMuck.status,
+        closeReason: hand.showMuck.closeReason || "",
+        choices: { ...(hand.showMuck.choices || {}) }
+      } : null,
       fairnessProof: hand.fairnessProof ? publicFairnessProof(hand.fairnessProof) : null,
       pots: hand.pots.map((pot) => ({
         label: pot.label,
@@ -591,12 +660,15 @@ function publicHandHistory(table, viewerId = "") {
         winners: pot.winners,
         handDescription: pot.handDescription
       })),
-      // Each viewer sees their OWN hole cards even when folded/mucked;
-      // other players' hidden cards stay hidden. privateCards never leaves
-      // the server for anyone but the owner.
+      // A dealt-in player may audit every non-folded showdown hand after the
+      // hand is complete. Folded cards remain private; the owner always sees
+      // their own cards. This mirrors the established "paid to see" online
+      // hand-history rule without exposing cards to spectators.
       seats: hand.seats.map((seat) => {
         const { privateCards, ...publicSeat } = seat;
-        if (viewerId && seat.userId === viewerId && Array.isArray(privateCards) && privateCards.length) {
+        const viewerWasDealtIn = Boolean(viewerId && hand.seats.some((candidate) => candidate.userId === viewerId));
+        const canAuditShowdown = viewerWasDealtIn && !seat.folded;
+        if ((seat.userId === viewerId || canAuditShowdown) && Array.isArray(privateCards) && privateCards.length) {
           return { ...publicSeat, cards: [...privateCards] };
         }
         return publicSeat;
@@ -895,6 +967,9 @@ function finishShowdown(table) {
     for (const seat of activeSeats(table)) revealedUserIds.add(seat.userId);
   }
   table.showdownRevealUserIds = [...revealedUserIds];
+  const showMuckEligibleSeats = table.allInRunout
+    ? []
+    : activeSeats(table).filter((seat) => !revealedUserIds.has(seat.userId));
   emitTableEvent(table, "showdown_reveal", {
     players: activeSeats(table).map((seat) => ({
       userId: seat.userId,
@@ -903,6 +978,7 @@ function finishShowdown(table) {
     })),
     allInRunout: Boolean(table.allInRunout)
   });
+  openShowMuckWindow(table, showMuckEligibleSeats);
   for (const event of payoutEvents) emitTableEvent(table, event.type, event.payload);
   table.rakeCollected += totalRake;
   markBustedSeats(table);
@@ -933,6 +1009,8 @@ function recordHandHistory(table, { pots, rake = 0 }) {
     board: [...table.communityCards],
     rake,
     fairnessProof: revealFairnessProof(table.fairnessProof),
+    persistenceReady: table.showMuckWindow?.status !== "open",
+    showMuck: table.showMuckWindow ? structuredClone(table.showMuckWindow) : null,
     pots,
     seats: [...table.seats, ...(table.departedContributions || [])]
       .filter((seat) => seat.cards.length > 0)
@@ -952,6 +1030,82 @@ function recordHandHistory(table, { pots, rake = 0 }) {
   };
   table.handHistory.unshift(record);
   table.handHistory = table.handHistory.slice(0, 20);
+}
+
+function openShowMuckWindow(table, eligibleSeats) {
+  if (!eligibleSeats.length) {
+    table.showMuckWindow = null;
+    return null;
+  }
+
+  const openedAt = Date.now();
+  const eligibleUserIds = eligibleSeats.map((seat) => String(seat.userId));
+  table.showMuckWindow = {
+    handNumber: Number(table.handNumber || 0),
+    openedAt,
+    deadline: openedAt + SHOW_MUCK_TIMEOUT_MS,
+    closedAt: 0,
+    status: "open",
+    closeReason: "",
+    eligibleUserIds,
+    choices: Object.fromEntries(eligibleUserIds.map((userId) => [userId, "pending"]))
+  };
+  emitTableEvent(table, "show_muck_window_open", {
+    eligibleUserIds,
+    deadline: table.showMuckWindow.deadline
+  });
+  return table.showMuckWindow;
+}
+
+function closeShowMuckWindow(table, reason = "completed") {
+  const windowState = table.showMuckWindow;
+  if (!windowState || windowState.status !== "open") return false;
+
+  for (const userId of windowState.eligibleUserIds) {
+    if (windowState.choices[userId] === "pending") windowState.choices[userId] = "auto-muck";
+  }
+  windowState.status = "closed";
+  windowState.closedAt = Date.now();
+  windowState.closeReason = reason;
+  syncShowMuckHistory(table);
+  emitTableEvent(table, "show_muck_window_closed", {
+    handNumber: windowState.handNumber,
+    reason,
+    choices: { ...windowState.choices }
+  });
+  return true;
+}
+
+function syncShowMuckHistory(table) {
+  const windowState = table.showMuckWindow;
+  const hand = (table.handHistory || []).find((item) => Number(item.handNumber) === Number(windowState?.handNumber));
+  if (!windowState || !hand) return;
+
+  hand.showMuck = structuredClone(windowState);
+  hand.persistenceReady = windowState.status !== "open";
+  const revealed = new Set(table.showdownRevealUserIds || []);
+  for (const seat of hand.seats || []) {
+    if (revealed.has(seat.userId) && !seat.folded) seat.cards = [...(seat.privateCards || seat.cards || [])];
+  }
+}
+
+function publicShowMuckWindow(table, viewerId = "") {
+  const windowState = table.showMuckWindow;
+  const userId = String(viewerId || "");
+  if (!windowState || !windowState.eligibleUserIds.includes(userId)) {
+    return {
+      canDecide: false,
+      deadline: 0,
+      choice: "",
+      status: "closed"
+    };
+  }
+  return {
+    canDecide: windowState.status === "open" && windowState.choices[userId] === "pending",
+    deadline: Number(windowState.deadline || 0),
+    choice: windowState.choices[userId] || "pending",
+    status: windowState.status
+  };
 }
 
 export function createProvablyFairDeck({

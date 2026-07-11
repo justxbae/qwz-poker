@@ -9174,6 +9174,73 @@ html.minimal-launch body.in-game .stats-row strong {
   white-space: nowrap !important;
 }
 
+/* Cash wallet actions occupy the complete row below the balance. */
+html.minimal-launch:not(.admin-mode) body[data-game-mode="cash"]:not(.in-game) .home-wallet-actions {
+  grid-area: auto !important;
+  grid-column: 1 / -1 !important;
+  grid-row: 2 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+html.minimal-launch:not(.admin-mode) body[data-game-mode="cash"]:not(.in-game) .home-wallet-actions button {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+/* Server-driven post-showdown choice. Auto-muck remains the timeout default. */
+html.minimal-launch body.in-game .show-muck-actions {
+  position: fixed !important;
+  left: 50% !important;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 18px) !important;
+  z-index: 48 !important;
+  display: grid !important;
+  grid-template-columns: 1fr auto auto !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: min(356px, calc(100vw - 32px)) !important;
+  min-height: 58px !important;
+  padding: 7px !important;
+  border: 0 !important;
+  border-radius: 22px !important;
+  background: color-mix(in srgb, var(--tg-bg, #191317) 88%, transparent) !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .30) !important;
+  backdrop-filter: blur(18px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(120%) !important;
+}
+
+html.minimal-launch body.in-game .show-muck-actions[hidden] {
+  display: none !important;
+}
+
+html.minimal-launch body.in-game .show-muck-actions > span {
+  padding-left: 10px !important;
+  color: var(--tg-text, #fff) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+}
+
+html.minimal-launch body.in-game .show-muck-actions button {
+  min-width: 82px !important;
+  min-height: 44px !important;
+  padding: 0 14px !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: var(--tg-button, #2aabee) !important;
+  color: var(--tg-button-text, #fff) !important;
+  font: 600 14px/1 var(--app-font, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif) !important;
+}
+
+html.minimal-launch body.in-game .show-muck-actions button.secondary {
+  background: color-mix(in srgb, var(--tg-text, #fff) 11%, transparent) !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 82%, transparent) !important;
+}
+
+html.minimal-launch body.in-game .show-muck-actions button:disabled {
+  opacity: .54 !important;
+}
+
 html.minimal-launch body.in-game .stats-row strong {
   color: var(--tg-text, #fff) !important;
   font-size: 13px !important;
@@ -11932,7 +11999,7 @@ html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-wallet-side 
 }
 
 html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-wallet-side > span {
-  white-space: nowrap !important;
+  display: none !important;
 }
 
 html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-wallet-side > small {
@@ -11970,6 +12037,7 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) #profileSessionList {
 }
 
 html.minimal-launch:not(.admin-mode) body:not(.in-game) #profileSessionList .settings-row {
+  position: relative !important;
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) auto !important;
   align-items: center !important;
@@ -11977,11 +12045,27 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) #profileSessionList .set
   width: 100% !important;
   min-height: 52px !important;
   height: 52px !important;
-  padding: 0 16px !important;
+  padding: 0 32px 0 16px !important;
   border: 0 !important;
   border-radius: 18px !important;
   background: var(--weez-game-row, rgba(255, 255, 255, .08)) !important;
   box-shadow: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) #profileSessionList .settings-row-button::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 50% !important;
+  right: 14px !important;
+  bottom: auto !important;
+  left: auto !important;
+  width: 7px !important;
+  height: 13px !important;
+  border: 0 !important;
+  background: color-mix(in srgb, var(--tg-text, #fff) 34%, transparent) !important;
+  -webkit-mask: url("/assets/ui/chevronright.svg") center / contain no-repeat !important;
+  mask: url("/assets/ui/chevronright.svg") center / contain no-repeat !important;
+  transform: translateY(-50%) !important;
 }
 
 html.minimal-launch:not(.admin-mode) body:not(.in-game) #profileSessionList .settings-row span,

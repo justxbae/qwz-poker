@@ -1,4 +1,20 @@
-# QWZ Poker — технический roadmap (до запуска и далее)
+# Weez Poker — технический roadmap (до запуска и далее)
+
+## 2026-07-11 controlled-beta product instrumentation
+
+Готово в code path и memory/unit coverage:
+
+- server-driven show/muck (`3s`, explicit show/muck, timeout auto-muck, no choice on all-in);
+- session hand-history privacy: dealt-in audit of non-folded showdown hands, folded cards stay hidden;
+- Telegram first/last-touch attribution с `source--campaign--creative--placement` и admin conversion card;
+- status/achievement catalog, persistence, profile contract и guarded selection;
+- daily claim синхронизирован с `35 000 / 24h` без скрытого low-balance condition.
+
+Документ ручной приёмки: `docs/WEEZ_CONTROLLED_BETA_READINESS.md`.
+
+Остаётся перед закрытой cash beta: device QA всех screen/button states. Инфраструктурные
+PG/Redis failure tests, provider E2E, backup/restore и always-on runtime осознанно выполняются
+после переноса на нормальный сервер и до публичного real-money трафика.
 
 ## 2026-06-21 real-money gameplay hardening
 
@@ -16,7 +32,7 @@
 ✅ Транзакционные wallet+ledger операции с `FOR UPDATE`
 ✅ Telegram Stars инвойсы (createInvoiceLink + pre_checkout + successful_payment)
 ✅ Stars payment confirmation: webhook readiness fail-closed, authenticated order polling, authoritative wallet refresh, duplicate webhook test
-✅ Daily rating claim: 10 000 PLAY_CHIPS / 24h per app_user_id, atomic play ledger, idempotent API
+✅ Daily rating claim: 35 000 PLAY_CHIPS / 24h per app_user_id, atomic play ledger, idempotent API
 ✅ Турниры MVP — MTT/SNG state machine, регистрация/отмена, scheduler, посадка/балансировка, blind clock, final table, atomic payout и история
 ✅ Admin commands в боте (`/balance`, `/grant`, `/deduct`) с идемпотентностью
 ✅ Admin API + панель в Mini App с диагностикой
@@ -491,13 +507,13 @@ create table user_risk_scores (
 - rating tables: isolated PLAY_CHIPS economy, leaderboard hooks, season-end ticket issuance for reward events;
 - tournaments/freerolls: admin-created cash events, level clock edge cases, move-table/final-table flow, payout audit, ticket-based post-season reward events;
 - animation hooks: server-driven action/event timeline для `hand_start`, blinds, card dealing, street reveal, showdown, pot push, bust-out, tournament level-up и payout completion;
-- optional feature review: rabbit hunt, Run It Twice, All-in Cash Out, chat/emoji, bounty/re-entry/add-on, table themes/sounds.
+- optional feature review: Run It Twice, All-in Cash Out, Rabbit Hunt, chat/emoji, bounty/re-entry/add-on, table themes/sounds — только после отдельного product discovery.
 
 Утверждённые ограничения этой итерации:
 
 - обычные cash tables и tournament events не смешиваются с PLAY_CHIPS;
 - rating tables не получают spontaneous tournament flow;
-- Rabbit Hunt запрещён в cash и турнирах;
+- Rabbit Hunt исключён из beta++ и первого публичного запуска; рабочие параметры `cash-only / 1 BB` не утверждены до отдельного ТЗ;
 - Run It Twice и All-in Cash Out допустимы только как отдельные cash-only decisions после rollout базового quality pass.
 
 ---

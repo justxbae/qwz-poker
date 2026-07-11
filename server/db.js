@@ -611,6 +611,106 @@ export async function getPlayerProfile(providerUserId, provider = "telegram") {
   return normalizePlayerProfileRow(result.rows[0]);
 }
 
+export async function upsertAchievementDefinitions(definitions = []) {
+  if (!pool) return false;
+  for (const item of definitions) {
+    await query(`
+      insert into achievement_definitions (
+        id, category, code, title, description, reward_type, reward_amount,
+        is_hidden, is_active, rules, updated_at
+      )
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, now())
+      on conflict (id) do update set
+        category = excluded.category,
+        code = excluded.code,
+        title = excluded.title,
+        description = excluded.description,
+        reward_type = excluded.reward_type,
+        reward_amount = excluded.reward_amount,
+        is_hidden = excluded.is_hidden,
+        is_active = excluded.is_active,
+        rules = excluded.rules,
+        updated_at = now()
+    `, [
+      item.id,
+      item.category || "general",
+      item.code,
+      item.title,
+      item.description || "",
+      item.rewardType || "none",
+      Math.max(0, Math.round(Number(item.rewardAmount || 0))),
+      Boolean(item.isHidden),
+      item.isActive !== false,
+      JSON.stringify(item.rules || {})
+    ]);
+  }
+  return true;
+}
+
+export async function listUserAchievements(providerUserId, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  await query("insert into player_profiles (app_user_id) values ($1) on conflict do nothing", [appUserId]);
+  const result = await query(`
+    select ad.id, ad.code, ad.category, ad.title, ad.description, ad.rules,
+           ua.progress, ua.status, ua.completed_at as "completedAt", ua.claimed_at as "claimedAt", ua.meta,
+           pp.selected_status_id as "selectedStatusId"
+    from achievement_definitions ad
+    cross join player_profiles pp
+    left join user_achievements ua
+      on ua.achievement_id = ad.id and ua.app_user_id = pp.app_user_id
+    where pp.app_user_id = $1 and ad.is_active = true and ad.is_hidden = false
+    order by (ua.completed_at is not null) desc, ad.category asc, ad.created_at asc
+  `, [appUserId]);
+  return result.rows.map(achievementRow);
+}
+
+export async function grantUserAchievement(providerUserId, code, {
+  sourceId = "",
+  meta = {}
+} = {}, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const definitionResult = await query("select id from achievement_definitions where code = $1 and is_active = true", [String(code || "")]);
+  if (!definitionResult.rowCount) return null;
+  const achievementId = definitionResult.rows[0].id;
+  const result = await query(`
+    insert into user_achievements (
+      app_user_id, achievement_id, progress, status, completed_at, meta, updated_at
+    )
+    values ($1, $2, 1, 'completed', now(), $3::jsonb, now())
+    on conflict (app_user_id, achievement_id) do update set
+      progress = greatest(user_achievements.progress, 1),
+      status = case when user_achievements.status = 'claimed' then 'claimed' else 'completed' end,
+      completed_at = coalesce(user_achievements.completed_at, now()),
+      meta = user_achievements.meta || excluded.meta,
+      updated_at = now()
+    returning progress, status, completed_at as "completedAt", claimed_at as "claimedAt", meta
+  `, [appUserId, achievementId, JSON.stringify({ ...meta, sourceId: String(sourceId || "") })]);
+  return { code: String(code || ""), ...result.rows[0] };
+}
+
+export async function selectUserStatus(providerUserId, code, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const result = await query(`
+    select ad.id, ad.code
+    from user_achievements ua
+    join achievement_definitions ad on ad.id = ua.achievement_id
+    where ua.app_user_id = $1
+      and ad.code = $2
+      and ua.status in ('completed', 'claimed')
+      and coalesce((ad.rules->>'isStatus')::boolean, false) = true
+  `, [appUserId, String(code || "")]);
+  if (!result.rowCount) return null;
+  await query(`
+    update player_profiles
+    set selected_status_id = $2, updated_at = now()
+    where app_user_id = $1
+  `, [appUserId, result.rows[0].id]);
+  return result.rows[0];
+}
+
 export async function recordProfileHandProgress({
   providerUserIds = [],
   provider = "telegram",
@@ -2557,10 +2657,50 @@ export async function recordAnalyticsEvent(event = {}) {
   return true;
 }
 
+export async function recordUserAttribution(providerUserId, touch = {}, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const values = normalizeAttributionTouch(touch);
+  const result = await query(`
+    insert into user_attributions (
+      app_user_id,
+      first_start_param, first_source, first_campaign, first_creative, first_placement, first_kind,
+      last_start_param, last_source, last_campaign, last_creative, last_placement, last_kind,
+      first_seen_at, last_seen_at
+    )
+    values ($1, $2, $3, $4, $5, $6, $7, $2, $3, $4, $5, $6, $7, now(), now())
+    on conflict (app_user_id) do update set
+      last_start_param = case when excluded.last_source <> 'direct' or user_attributions.last_source = 'direct' then excluded.last_start_param else user_attributions.last_start_param end,
+      last_source = case when excluded.last_source <> 'direct' or user_attributions.last_source = 'direct' then excluded.last_source else user_attributions.last_source end,
+      last_campaign = case when excluded.last_source <> 'direct' or user_attributions.last_source = 'direct' then excluded.last_campaign else user_attributions.last_campaign end,
+      last_creative = case when excluded.last_source <> 'direct' or user_attributions.last_source = 'direct' then excluded.last_creative else user_attributions.last_creative end,
+      last_placement = case when excluded.last_source <> 'direct' or user_attributions.last_source = 'direct' then excluded.last_placement else user_attributions.last_placement end,
+      last_kind = case when excluded.last_source <> 'direct' or user_attributions.last_source = 'direct' then excluded.last_kind else user_attributions.last_kind end,
+      last_seen_at = case when excluded.last_source <> 'direct' or user_attributions.last_source = 'direct' then now() else user_attributions.last_seen_at end
+    returning *
+  `, [
+    appUserId,
+    values.raw,
+    values.source,
+    values.campaign,
+    values.creative,
+    values.placement,
+    values.kind
+  ]);
+  return attributionRow(result.rows[0]);
+}
+
+export async function getUserAttribution(providerUserId, provider = "telegram") {
+  if (!pool) return null;
+  const appUserId = await ensureIdentity(provider, providerUserId);
+  const result = await query("select * from user_attributions where app_user_id = $1", [appUserId]);
+  return result.rowCount ? attributionRow(result.rows[0]) : null;
+}
+
 export async function analyticsOverview(days = 7) {
   if (!pool) return null;
   const windowDays = Math.max(1, Math.min(90, Math.round(Number(days) || 7)));
-  const [summary, daily, events] = await Promise.all([
+  const [summary, daily, events, attribution] = await Promise.all([
     query(`
       select
         count(*)::int as total_events,
@@ -2626,6 +2766,30 @@ export async function analyticsOverview(days = 7) {
       group by event_name, category
       order by count desc, event_name asc
       limit 30
+    `, [windowDays]),
+    query(`
+      select first_source as source,
+             first_campaign as campaign,
+             first_creative as creative,
+             first_placement as placement,
+             count(*)::int as users,
+             count(*) filter (where first_seen_at >= now() - ($1::int * interval '1 day'))::int as new_users,
+             count(*) filter (where exists (
+               select 1 from analytics_events ae
+               where ae.app_user_id = ua.app_user_id
+                 and ae.event_name = 'table_join'
+                 and ae.created_at >= now() - ($1::int * interval '1 day')
+             ))::int as table_players,
+             count(*) filter (where exists (
+               select 1 from analytics_events ae
+               where ae.app_user_id = ua.app_user_id
+                 and ae.event_name = 'deposit_paid'
+                 and ae.created_at >= now() - ($1::int * interval '1 day')
+             ))::int as payers
+      from user_attributions ua
+      group by first_source, first_campaign, first_creative, first_placement
+      order by users desc, source asc
+      limit 50
     `, [windowDays])
   ]);
 
@@ -2688,6 +2852,16 @@ export async function analyticsOverview(days = 7) {
       count: Number(item.count || 0),
       users: Number(item.users || 0),
       amount: Number(item.amount || 0)
+    })),
+    attribution: attribution.rows.map((item) => ({
+      source: item.source || "direct",
+      campaign: item.campaign || "",
+      creative: item.creative || "",
+      placement: item.placement || "",
+      users: Number(item.users || 0),
+      newUsers: Number(item.new_users || 0),
+      tablePlayers: Number(item.table_players || 0),
+      payers: Number(item.payers || 0)
     }))
   };
 }
@@ -3041,6 +3215,7 @@ async function migrate() {
     );
 
     alter table player_profiles add column if not exists cash_club_points bigint not null default 0 check (cash_club_points >= 0);
+    alter table player_profiles add column if not exists selected_status_id text not null default '';
     alter table player_profiles add column if not exists cash_rake_contributed bigint not null default 0 check (cash_rake_contributed >= 0);
     alter table player_profiles add column if not exists rating_peak_points bigint not null default 1000;
     alter table player_profiles add column if not exists rating_active_days integer not null default 0 check (rating_active_days >= 0);
@@ -3735,6 +3910,27 @@ async function migrate() {
     create index if not exists idx_analytics_events_name_created on analytics_events(event_name, created_at desc);
     create index if not exists idx_analytics_events_user_created on analytics_events(app_user_id, created_at desc) where app_user_id is not null;
     create index if not exists idx_analytics_events_context on analytics_events(context_id, created_at desc) where context_id <> '';
+
+    create table if not exists user_attributions (
+      app_user_id text primary key references app_users(id) on delete cascade,
+      first_start_param text not null default '',
+      first_source text not null default 'direct',
+      first_campaign text not null default '',
+      first_creative text not null default '',
+      first_placement text not null default 'telegram_miniapp',
+      first_kind text not null default 'direct',
+      last_start_param text not null default '',
+      last_source text not null default 'direct',
+      last_campaign text not null default '',
+      last_creative text not null default '',
+      last_placement text not null default 'telegram_miniapp',
+      last_kind text not null default 'direct',
+      first_seen_at timestamptz not null default now(),
+      last_seen_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_user_attributions_first_source on user_attributions(first_source, first_seen_at desc);
+    create index if not exists idx_user_attributions_last_source on user_attributions(last_source, last_seen_at desc);
     update tournaments set balance_bucket = 'cash' where balance_bucket <> 'cash';
     `);
     await client.query("commit");
@@ -3774,6 +3970,61 @@ function paymentRow(row) {
     createdAt: row.created_at,
     expiresAt: row.expires_at,
     paidAt: row.paid_at
+  };
+}
+
+function normalizeAttributionTouch(value = {}) {
+  return {
+    raw: String(value.raw || "").slice(0, 512),
+    source: normalizeLedgerCategory(value.source || "direct"),
+    campaign: normalizeLedgerCategory(value.campaign || ""),
+    creative: normalizeLedgerCategory(value.creative || ""),
+    placement: normalizeLedgerCategory(value.placement || "telegram_miniapp"),
+    kind: normalizeLedgerCategory(value.kind || "direct")
+  };
+}
+
+function attributionRow(row = {}) {
+  return {
+    first: {
+      raw: row.first_start_param || "",
+      source: row.first_source || "direct",
+      campaign: row.first_campaign || "",
+      creative: row.first_creative || "",
+      placement: row.first_placement || "telegram_miniapp",
+      kind: row.first_kind || "direct",
+      seenAt: row.first_seen_at || null
+    },
+    last: {
+      raw: row.last_start_param || "",
+      source: row.last_source || "direct",
+      campaign: row.last_campaign || "",
+      creative: row.last_creative || "",
+      placement: row.last_placement || "telegram_miniapp",
+      kind: row.last_kind || "direct",
+      seenAt: row.last_seen_at || null
+    }
+  };
+}
+
+function achievementRow(row = {}) {
+  const rules = row.rules && typeof row.rules === "object" ? row.rules : {};
+  return {
+    id: row.id,
+    code: row.code,
+    title: row.title,
+    description: row.description || "",
+    category: row.category || "general",
+    rarity: rules.rarity || "common",
+    trigger: rules.trigger || "manual",
+    isStatus: Boolean(rules.isStatus),
+    earned: row.status === "completed" || row.status === "claimed",
+    progress: Number(row.progress || 0),
+    status: row.status || "locked",
+    completedAt: row.completedAt || null,
+    claimedAt: row.claimedAt || null,
+    selected: Boolean(row.selectedStatusId && row.selectedStatusId === row.id),
+    meta: row.meta || {}
   };
 }
 
