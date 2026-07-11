@@ -1,4 +1,4 @@
-# QWZ Decisions
+# Weez Poker Decisions
 
 ## 2026-06-28: Cash UI uses dollar display instead of Tether mark
 
@@ -189,3 +189,13 @@ Disconnect/sit-out policy для cash/rating утверждён отдельно
 **Влияет на:** `public/app.js`, `public/index.html`, `public/lobby-qa.css`, admin tournament controls, reward event presentation.
 **Что обновлено:** Публичные cash tournament cards, мягкая обработка `409`, disable во время request, admin tournament management tab, reward tournament list, регрессионные фронтенд-тесты.
 **Открытые вопросы:** Для пользовательского reward flow нужен отдельный публичный endpoint; текущий фронт готов держать reward events отдельно, но публично их не показывает, пока backend не выдаёт `rewardTournaments` вне admin API.
+## 2026-07-11 — UI quality pass
+
+- Начальный режим лобби — `Rating`; порядок сегмента: `Рейтинг | Cash`.
+- Свободное место между аватаром и play-балансом используется для компактного значения рейтинга, без cash-терминов.
+- Денежные и рейтинговые крупные цифры используют системный `ui-rounded` с SF Pro Rounded fallback.
+- Нижняя навигация не должна зависеть от синтетического click после pointer-события: Telegram WebView может его не отправить.
+- Игровые toolbar-иконки берутся из готовых SVG; CSS-крестики и самодельные стрелки запрещены.
+- Рутинные poker events отображаются локально у мест/карт/банка, а не глобальным чёрным сообщением.
+- Showdown: лучшие пять карт + комбинация победителя + движение банка; отдельный крупный showdown overlay не используется.
+- История раздач остаётся session-scoped; строки активных сессий в профиле показываются компактно без номера текущей руки.

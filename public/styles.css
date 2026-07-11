@@ -2385,7 +2385,7 @@ body.in-game .game-toolbar [data-panel-tab="hands"] {
 }
 
 .board::after {
-  content: "QWZ POKER";
+  content: "WEEZ POKER";
   position: absolute;
   top: 43%;
   left: 50%;
@@ -2816,7 +2816,7 @@ body.in-game .game-toolbar [data-panel-tab="hands"] {
 }
 
 .viewer-made-hand-active .board::after {
-  content: "QWZ POKER";
+  content: "WEEZ POKER";
 }
 
 .betting-actions {
