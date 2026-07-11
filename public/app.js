@@ -2277,9 +2277,10 @@ function renderHomeWalletSide(profileData = {}) {
       homeWalletSideAction.disabled = true;
     }
   } else {
+    const ratingPoints = Number(state.user?.ratingPoints || state.progression?.rating?.startingRp || 1000);
     if (homeWalletSideLabel) homeWalletSideLabel.textContent = "Рейтинг";
-    homeWalletSideValue.textContent = formatNumber(activeBalance());
-    homeWalletSideHint.textContent = "play chips";
+    homeWalletSideValue.textContent = formatNumber(ratingPoints);
+    homeWalletSideHint.textContent = state.user?.ratingLeague || state.user?.ratingTier || "Bronze";
     if (homeWalletSideMeter) homeWalletSideMeter.style.width = "8%";
     if (homeWalletSideAction) {
       homeWalletSideAction.textContent = "";
@@ -2430,8 +2431,8 @@ function renderProfileSessions(activeTables) {
     row.type = "button";
     row.className = "settings-row settings-row-button";
     row.innerHTML = "<span></span><strong></strong>";
-    row.querySelector("span").textContent = `${table.name} · ${formatTableLimit(table)}`;
-    row.querySelector("strong").textContent = `${formatTableAmount(table, table.stack)} · #${table.handNumber}`;
+    row.querySelector("span").textContent = `NLH · ${formatTableLimit(table)}`;
+    row.querySelector("strong").textContent = formatTableAmount(table, table.stack);
     row.addEventListener("click", () => {
       state.currentTableId = table.id;
       continueGame();
@@ -4066,10 +4067,8 @@ function wireBottomNavGestures() {
     const button = event.target.closest(".bottom-nav button");
     if (!button || button.hidden) return;
     bottomNavPointer = { id: event.pointerId, button };
-    bottomNavSuppressClick = true;
-    nav.setPointerCapture?.(event.pointerId);
+    bottomNavSuppressClick = false;
     updateBottomNavIndicator(bottomNavKeyForButton(button));
-    event.preventDefault();
   });
   nav.addEventListener("pointermove", (event) => {
     if (!bottomNavPointer || bottomNavPointer.id !== event.pointerId) return;
@@ -4081,14 +4080,25 @@ function wireBottomNavGestures() {
   nav.addEventListener("pointercancel", (event) => {
     if (!bottomNavPointer || bottomNavPointer.id !== event.pointerId) return;
     bottomNavPointer = null;
+    bottomNavSuppressClick = false;
     updateBottomNavIndicator();
   });
   nav.addEventListener("pointerup", (event) => {
     if (!bottomNavPointer || bottomNavPointer.id !== event.pointerId) return;
-    const button = bottomNavButtonFromPoint(event.clientX, event.clientY) || bottomNavPointer.button;
+    const pressedButton = bottomNavPointer.button;
+    const button = bottomNavButtonFromPoint(event.clientX, event.clientY) || pressedButton;
     bottomNavPointer = null;
-    activateBottomNavButton(button);
-    event.preventDefault();
+    if (button) {
+      bottomNavSuppressClick = true;
+      activateBottomNavButton(button);
+      // The native click normally follows pointerup and is consumed above.
+      // iOS Telegram may omit it, so always release the guard shortly after.
+      window.setTimeout(() => { bottomNavSuppressClick = false; }, 320);
+    }
+    else {
+      bottomNavSuppressClick = false;
+      updateBottomNavIndicator();
+    }
   });
 }
 
@@ -5552,7 +5562,17 @@ function playTableEvent(event) {
   currentTable.classList.toggle("is-showdown", event.type === "showdown_reveal");
   currentTable.classList.toggle("is-pot-push", event.type === "pot_push" || event.type === "odd_chip_award");
   if (["seat_disconnected", "seat_return"].includes(event.type)) currentTable.classList.add("presence-pulse");
-  if (text) showTableEventToast(text);
+  // Routine actions are already visible on the seats, cards and pot.
+  // Keep the felt clear and reserve the toast for exceptional events.
+  const toastEventTypes = new Set([
+    "odd_chip_award",
+    "seat_busted",
+    "tournament_level_up",
+    "tournament_table_move",
+    "final_table_started",
+    "payout_complete"
+  ]);
+  if (text && toastEventTypes.has(event.type)) showTableEventToast(text);
 
   if (event.type === "street_reveal" || event.type === "runout_card_revealed" || event.type === "showdown_reveal" || event.type === "pot_push") {
     showStreetEventOverlay(event, text);
@@ -5737,7 +5757,7 @@ function renderCurrentTable(table) {
   currentTable.classList.toggle("viewer-busted", table.viewer?.status === "busted" || table.viewer?.busted === true);
   tableCode.textContent = `#${table.id.slice(-8)}`;
   renderLimitValue(blinds, table.smallBlind, table.bigBlind, table.gameMode === "cash");
-  tableDetails.textContent = `Texas NL · Блайнды ${formatTableLimit(table)} · #${table.handNumber || 1}`;
+  tableDetails.textContent = `NLH · ${formatTableLimit(table)} · #${table.handNumber || 1}`;
   const shouldCollectBets = shouldAnimateBetCollection(table);
   if (shouldCollectBets) animateBetStacksToPot();
   pot.replaceChildren("Банк: ");
@@ -5871,10 +5891,7 @@ function renderCurrentTable(table) {
     actionLabelNode.hidden = !actionLabel;
 
     const handLabel = node.querySelector(".seat-hand-label");
-    if (seat.userId === state.user?.id && viewerHand.label && viewerHand.rank >= 1) {
-      handLabel.textContent = viewerHand.label;
-      handLabel.hidden = false;
-    } else if (winningSeatIds.has(seat.userId) && seatHand.label) {
+    if (winningSeatIds.has(seat.userId) && seatHand.label) {
       handLabel.textContent = seatHand.label;
       handLabel.hidden = false;
     } else {
@@ -6024,7 +6041,10 @@ function openMenu() {
   window.clearTimeout(openDrawer.closeTimer);
   infoDrawer.hidden = true;
   infoDrawer.classList.remove("is-closing");
-  document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => button.classList.remove("is-open"));
+  document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => {
+    button.classList.remove("is-open");
+    button.setAttribute("aria-expanded", "false");
+  });
   sideMenu.classList.remove("is-closing");
   sideMenu.hidden = false;
   menuButton.classList.add("is-open");
@@ -6061,7 +6081,10 @@ function hideTablePanels({ updateBack = true } = {}) {
   infoDrawer.classList.remove("is-closing");
   menuButton.classList.remove("is-open");
   menuButton.setAttribute("aria-expanded", "false");
-  document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => button.classList.remove("is-open"));
+  document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => {
+    button.classList.remove("is-open");
+    button.setAttribute("aria-expanded", "false");
+  });
   if (updateBack) updateTelegramBackButton();
 }
 
@@ -6245,7 +6268,9 @@ function openDrawer(tab = "info") {
   menuButton.setAttribute("aria-expanded", "false");
   infoDrawer.classList.remove("is-closing");
   infoDrawer.hidden = false;
-  document.querySelector('.game-toolbar [data-panel-tab="info"]')?.classList.add("is-open");
+  const infoButton = document.querySelector('.game-toolbar [data-panel-tab="info"]');
+  infoButton?.classList.add("is-open");
+  infoButton?.setAttribute("aria-expanded", "true");
   if (state.currentTable) {
     renderActionLog(state.currentTable.actionLog || [], state.currentTable.handHistory || []);
     renderTableInfo(state.currentTable);
@@ -6257,7 +6282,10 @@ function openDrawer(tab = "info") {
 
 function closeDrawer() {
   if (infoDrawer.hidden) {
-    document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => button.classList.remove("is-open"));
+    document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => {
+      button.classList.remove("is-open");
+      button.setAttribute("aria-expanded", "false");
+    });
     updateTelegramBackButton();
     return;
   }
@@ -6266,7 +6294,10 @@ function closeDrawer() {
   openDrawer.closeTimer = window.setTimeout(() => {
     infoDrawer.hidden = true;
     infoDrawer.classList.remove("is-closing");
-    document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => button.classList.remove("is-open"));
+    document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => {
+      button.classList.remove("is-open");
+      button.setAttribute("aria-expanded", "false");
+    });
     updateTelegramBackButton();
   }, 170);
 }
@@ -6411,7 +6442,7 @@ function renderActionToast(table) {
     text &&
     text !== lastToastText &&
     table.status !== "starting" &&
-    (/(чек|колл|рейз|ставка|сбросил|забирает|Флоп|Терн|Ривер|авто)/i.test(text));
+    (/(авто-фолд|автоматически|тайм-аут|ошибка)/i.test(text));
 
   if (!shouldToast) return;
 
@@ -6467,10 +6498,9 @@ function streetOverlayFor(table) {
   if (table.status === "runout") {
     return { title: "All-in", subtitle: "Открываем карты", duration: 760 };
   }
-  const message = visibleTableMessage(table);
-  if (table.status === "showdown" && message) {
-    return { title: "Шоудаун", subtitle: message, duration: 980 };
-  }
+  // The winner, best five cards and pot movement are already rendered on
+  // the table. A second full-size showdown banner only hides that result.
+  if (table.status === "showdown") return null;
   return null;
 }
 
@@ -6532,7 +6562,7 @@ function renderTableInfo(table) {
   const stackBb = table.bigBlind ? Math.round((table.maxBuyIn || table.bigBlind * 100) / table.bigBlind) : 100;
   const buyInRange = `${formatTableAmount(table, table.minBuyIn || 0)} / ${formatTableAmount(table, table.maxBuyIn || 0)}`;
   const rows = [
-    ["Название стола", table.name || `Texas NL ${formatTableLimit(table)}`],
+    ["Название стола", displayTableName(table.name) || `Weez NL ${formatTableLimit(table)}`],
     ["Тип игры", "Texas Hold'em"],
     ["Стек", `${stackBb} BB`],
     ["Бай-ин", buyInRange],
@@ -6961,6 +6991,10 @@ function formatTableLimit(table) {
 
 function formatTableAmount(table, value) {
   return formatModeAmount(value, table?.gameMode === "cash");
+}
+
+function displayTableName(value) {
+  return String(value || "").replace(/^QWZ\b/i, "Weez");
 }
 
 function renderMoneyValue(node, value, cashMode, { append = false } = {}) {
