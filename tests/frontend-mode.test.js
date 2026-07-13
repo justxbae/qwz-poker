@@ -79,3 +79,9 @@ test("public tournaments UI treats the main lobby feed as cash-only and uses ide
   assert.match(appSource, /requestKey\(`admin-tournament-action-\$\{tournamentId\}-\$\{action\}`\)/);
   assert.match(htmlSource, /data-admin-tab="tournaments"/);
 });
+
+test("table drawer renders completed hands from the current session", () => {
+  assert.match(appSource, /function renderActionLog\(logItems, handHistory = \[\]\)/);
+  assert.match(appSource, /hands\.slice\(\)\.reverse\(\)\.map\(renderHandHistoryItem\)/);
+  assert.match(appSource, /renderActionLog\(table\.actionLog \|\| \[\], table\.handHistory \|\| \[\]\)/);
+});

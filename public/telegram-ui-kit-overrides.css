@@ -12301,6 +12301,8 @@ html.minimal-launch body.in-game .street-overlay span {
   font-size: 11px !important;
   line-height: 1.1 !important;
   font-weight: 500 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
 }
 
 html.minimal-launch body.in-game .seat-hand-label {
@@ -12454,4 +12456,103 @@ html.minimal-launch body.in-game .viewer-hand-badge strong {
   line-height: 1.1 !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
+}
+
+/* Final 2026-07-14 mobile overrides. Keep this block last in the cascade. */
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .scroll-reveal,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .scroll-reveal.is-visible {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+  transition-delay: 0s !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment::after {
+  transition: transform 280ms cubic-bezier(.22, .72, .18, 1) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-wallet-actions,
+html.minimal-launch:not(.admin-mode) body[data-game-mode="play"]:not(.in-game) .home-wallet-actions {
+  opacity: 1 !important;
+  transition: max-height 300ms cubic-bezier(.22, .72, .18, 1), min-height 300ms cubic-bezier(.22, .72, .18, 1), margin 300ms cubic-bezier(.22, .72, .18, 1) !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-wallet {
+  grid-template-columns: 52px minmax(76px, 1fr) minmax(112px, auto) !important;
+  align-items: start !important;
+  column-gap: 14px !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-account,
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-account .lobby-avatar {
+  width: 52px !important;
+  min-width: 52px !important;
+  height: 52px !important;
+  min-height: 52px !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-wallet-side,
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-balance {
+  align-self: start !important;
+  display: flex !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-wallet-side {
+  align-items: flex-start !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-balance {
+  align-items: flex-end !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-wallet-side > span {
+  display: block !important;
+  margin: 0 !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 48%, transparent) !important;
+  font-size: 14px !important;
+  line-height: 1.1 !important;
+  font-weight: 500 !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-wallet-side > small {
+  display: none !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-wallet-side > strong {
+  color: var(--tg-text, #fff) !important;
+  font-family: var(--weez-rounded-font) !important;
+  font-size: 25px !important;
+  line-height: .92 !important;
+  font-weight: 600 !important;
+  letter-spacing: -.035em !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active #profileSavedStack {
+  font-size: clamp(15px, calc(23px * var(--money-scale, 1)), 23px) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .tournament-history-card .section-title > span,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-sheet > .cashier-sheet-grabber {
+  display: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .tournament-history-card .tournament-history-list .empty {
+  min-height: 52px !important;
+  margin: 0 !important;
+  padding: 12px 16px !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+  background: var(--weez-game-row, rgba(255, 255, 255, .08)) !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) #homeWalletSideLabel {
+  letter-spacing: 0 !important;
+  text-transform: none !important;
 }

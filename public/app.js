@@ -2196,6 +2196,7 @@ function renderProfile(profileData) {
   renderUsdIconAmount(profileChips, profileData.cashBalanceMicros || 0);
   renderUsdIconAmount(profileTableStack, profileData.cashTableStackMicros || 0);
   profileSavedStack.textContent = formatChips(profileData.balance);
+  applyMoneyScale(profileSavedStack, profileData.balance, { play: true });
   lobbyTableStack.textContent = formatChips(profileData.tableStack);
   lobbyActiveTables.textContent = String(profileData.activeTableCount || 0);
   renderHomeWalletSide(profileData);
@@ -2285,8 +2286,8 @@ function renderHomeWalletSide(profileData = {}) {
     }
   } else {
     const ratingPoints = Number(state.user?.ratingPoints || state.progression?.rating?.startingRp || 1000);
-    if (homeWalletSideLabel) homeWalletSideLabel.textContent = "";
-    homeWalletSideValue.textContent = `${formatNumber(ratingPoints)} RP`;
+    if (homeWalletSideLabel) homeWalletSideLabel.textContent = "Рейтинг";
+    homeWalletSideValue.textContent = formatNumber(ratingPoints);
     homeWalletSideHint.textContent = state.user?.ratingLeague || state.user?.ratingTier || "Bronze";
     if (homeWalletSideMeter) homeWalletSideMeter.style.width = "8%";
     if (homeWalletSideAction) {
@@ -2357,7 +2358,6 @@ function animatePlayBalance(fromValue, toValue) {
     const progress = Math.min(1, (now - startedAt) / duration);
     const value = Math.round(from + (to - from) * easeOut(progress));
     if (lobbyBalance) lobbyBalance.textContent = formatChips(value);
-    if (homeWalletSideValue) homeWalletSideValue.textContent = formatNumber(value);
     if (progress < 1) window.requestAnimationFrame(paint);
     else {
       renderModeBalance();
@@ -4299,6 +4299,7 @@ function wireCashierSheetDrag(sheet, closeSheet = closeCashierSheet) {
   };
 
   sheet.addEventListener("pointerdown", (event) => {
+    if (event.target.closest("input, textarea, select, button, a") || document.body.classList.contains("keyboard-open")) return;
     if (!begin(event.clientY, event.pointerId)) return;
     sheet.setPointerCapture?.(event.pointerId);
   });
@@ -4311,6 +4312,7 @@ function wireCashierSheetDrag(sheet, closeSheet = closeCashierSheet) {
   sheet.addEventListener("pointercancel", finish);
 
   sheet.addEventListener("touchstart", (event) => {
+    if (event.target.closest("input, textarea, select, button, a") || document.body.classList.contains("keyboard-open")) return;
     const touch = event.touches?.[0];
     if (!touch) return;
     begin(touch.clientY);
@@ -4703,9 +4705,16 @@ function setupKeyboardAwareSheets() {
     sheet.addEventListener("pointerdown", (event) => {
       const interactive = event.target.closest("input, textarea, select, button, a");
       if (!interactive && document.activeElement instanceof HTMLElement) {
+        const sheetScrollTop = sheet.scrollTop;
+        const pageScrollY = window.scrollY;
+        event.preventDefault();
         document.activeElement.blur();
+        window.requestAnimationFrame(() => {
+          sheet.scrollTop = sheetScrollTop;
+          window.scrollTo(0, pageScrollY);
+        });
       }
-    });
+    }, { passive: false });
   });
   update();
 }
@@ -6580,7 +6589,12 @@ function streetOverlayFor(table) {
   return null;
 }
 
-function renderActionLog(logItems) {
+function renderActionLog(logItems, handHistory = []) {
+  const hands = Array.isArray(handHistory) ? handHistory.filter(Boolean) : [];
+  if (hands.length) {
+    actionLog.replaceChildren(...hands.slice().reverse().map(renderHandHistoryItem));
+    return;
+  }
   const empty = document.createElement("div");
   empty.className = "drawer-empty";
   empty.textContent = "История текущей сессии появится после первой завершённой раздачи.";
@@ -7009,7 +7023,7 @@ function applyMoneyScale(target, value, { play = false } = {}) {
     : formatUsdt(Math.abs(Number(value || 0))).split(".")[0];
   const digits = normalized.replace(/\D/g, "").length;
   const scale = play
-    ? Math.max(0.78, Math.min(1, 1 - Math.max(0, digits - 4) * 0.04))
+    ? Math.max(0.68, Math.min(1, 1 - Math.max(0, digits - 4) * 0.09))
     : Math.max(0.68, Math.min(1, 1 - Math.max(0, digits - 3) * 0.075));
   target.style.setProperty("--money-scale", String(scale));
   target.dataset.moneyDigits = String(digits);
@@ -7174,7 +7188,7 @@ function renderAvatar(node, user = {}) {
   const fallback = () => {
     node.style.backgroundImage = "";
     node.classList.remove("has-photo");
-    node.replaceChildren(initials(user.name));
+    node.replaceChildren(initials(user.username || user.name));
   };
   if (user.photoUrl) {
     const nextImage = document.createElement("img");
