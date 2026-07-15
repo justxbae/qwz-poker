@@ -7,7 +7,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="/styles.css?v=20260628-2" />
     <link rel="stylesheet" href="/lobby-qa.css?v=20260626-1" />
-    <link rel="stylesheet" href="/telegram-ui-kit-overrides.css?v=20260711-6" />
+    <link rel="stylesheet" href="/telegram-ui-kit-overrides.css?v=20260715-2" />
   </head>
   <body>
     <section class="app-boot" id="appBoot" aria-live="polite" aria-label="Загрузка Weez Poker">
@@ -249,6 +249,15 @@
             </span>
             <button type="button" id="dailyPlayClaimButton">Получить</button>
           </section>
+
+          <button type="button" class="rating-rules-card" data-doc="rating" hidden>
+            <span class="rating-rules-icon" aria-hidden="true">RP</span>
+            <span class="rating-rules-main">
+              <strong>Как работает рейтинг</strong>
+              <small>RP, сезон и защита от накрутки</small>
+            </span>
+            <span class="footer-lobby-chevron">›</span>
+          </button>
 
           <section class="lobby-card progression-card" id="progressionCard">
             <div class="section-title">
@@ -1111,6 +1120,6 @@
       </article>
     </template>
 
-    <script src="/app.js?v=20260711-6" type="module"></script>
+    <script src="/app.js?v=20260715-1" type="module"></script>
   </body>
 </html>

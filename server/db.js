@@ -120,12 +120,14 @@ export async function getDailyPlayClaim(providerUserId, provider = "telegram") {
 export async function claimDailyPlayChips(providerUserId, {
   amount = 35_000,
   cooldownSeconds = 24 * 60 * 60,
+  maxBalance = 34_999,
   idempotencyKey = ""
 } = {}, provider = "telegram") {
   if (!pool) return null;
   const appUserId = await ensureIdentity(provider, providerUserId);
   const normalizedAmount = Math.max(1, Math.round(Number(amount) || 35_000));
   const normalizedCooldown = Math.max(1, Math.round(Number(cooldownSeconds) || 24 * 60 * 60));
+  const normalizedMaxBalance = Math.max(0, Math.round(Number(maxBalance) || 34_999));
   const ledgerKey = normalizeIdempotencyKey(idempotencyKey);
   const client = await pool.connect();
 
@@ -180,6 +182,16 @@ export async function claimDailyPlayChips(providerUserId, {
         claimedAt: new Date(claimedAt).toISOString(),
         balance,
         cooldown: true
+      };
+    }
+
+    if (balance > normalizedMaxBalance) {
+      await client.query("commit");
+      return {
+        claimed: false,
+        claimedAt: claimState.rows[0]?.claimedAt || null,
+        balance,
+        balanceLimit: true
       };
     }
 

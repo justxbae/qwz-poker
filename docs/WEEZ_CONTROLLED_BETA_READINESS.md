@@ -19,7 +19,7 @@ Scope: продукт, базовый NL Hold'em, интерфейс, анали
 В beta входят:
 
 - Rating как начальный режим, `PLAY_CHIPS` полностью отделены от cash;
-- daily claim `35 000 PLAY_CHIPS` раз в 24 часа по `app_user_id`, независимо от остатка;
+- daily claim `35 000 PLAY_CHIPS` раз в 24 часа по `app_user_id`, только при play-балансе не выше `34 999`;
 - cash NL Hold'em 6-max на утверждённых стейках;
 - private cash tables;
 - MTT/SNG cash-only и freeroll как отдельный cash-event flow;
@@ -247,7 +247,7 @@ disabled — отдельное видимое и семантическое с�
 - Rating открыт по умолчанию;
 - cash controls не видны;
 - баланс — только `PLAY_CHIPS`;
-- daily claim доступен каждые 24 часа независимо от остатка;
+- daily claim доступен каждые 24 часа при остатке не выше `34 999`;
 - после claim +35 000 отражается из server response;
 - countdown обновляется каждую секунду и пересинхронизируется после reopen;
 - столы имеют фиксированные 100/200, 6-max;
@@ -385,7 +385,7 @@ PokerOK является полезным UX-референсом интерфе
 - attribution persistence и admin source/campaign report;
 - achievement/status catalog, persistence, profile contract и status selection guard;
 - automatic `first_cash_win` grant;
-- daily claim снова строго соответствует правилу `35 000 / 24h`, без скрытого low-balance gate;
+- daily claim строго соответствует refill-правилу `35 000 / 24h` при play-балансе не выше `34 999`;
 - Rabbit Hunt исключён из runtime и launch scope.
 
 ## 11. Что остаётся продуктовым QA, а не новой разработкой

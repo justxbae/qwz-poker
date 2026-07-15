@@ -12538,6 +12538,7 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profil
 }
 
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .tournament-history-card .section-title > span,
+html.minimal-launch:not(.admin-mode) body.lobby-menu-open:not(.in-game) .lobby-menu-sheet > .cashier-sheet-grabber,
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-sheet > .cashier-sheet-grabber {
   display: none !important;
 }
@@ -12555,4 +12556,184 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .tournament-history-card
 html.minimal-launch body[data-game-mode="play"]:not(.in-game) #homeWalletSideLabel {
   letter-spacing: 0 !important;
   text-transform: none !important;
+}
+
+/* 2026-07-15: rating eligibility and mobile sheet stability. Keep last. */
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-wallet {
+  grid-template-columns: 56px minmax(96px, 1fr) minmax(118px, auto) !important;
+  column-gap: 12px !important;
+  align-items: start !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-account,
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-account .lobby-avatar,
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-wallet-side,
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-balance {
+  width: auto !important;
+  min-width: 0 !important;
+  height: 56px !important;
+  min-height: 56px !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-account .lobby-avatar {
+  width: 56px !important;
+  min-width: 56px !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-wallet-side,
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-balance {
+  display: grid !important;
+  grid-template-rows: 17px minmax(0, 1fr) !important;
+  align-content: stretch !important;
+  justify-content: stretch !important;
+  padding: 0 !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-wallet-side {
+  align-items: start !important;
+  justify-items: start !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-balance {
+  align-items: start !important;
+  justify-items: end !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-wallet-side > span,
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-balance > span {
+  align-self: start !important;
+  height: 17px !important;
+  margin: 0 !important;
+  font-size: 14px !important;
+  line-height: 17px !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-wallet-side > strong,
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-balance > strong {
+  align-self: end !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  font-family: var(--weez-rounded-font) !important;
+  font-size: calc(30px * var(--money-scale, 1)) !important;
+  line-height: 34px !important;
+  font-weight: 600 !important;
+  font-variant-numeric: tabular-nums !important;
+  letter-spacing: -.045em !important;
+  transform: none !important;
+  white-space: nowrap !important;
+}
+
+html.minimal-launch body[data-game-mode="play"]:not(.in-game) .home-balance #lobbyBalance {
+  font-size: calc(30px * var(--money-scale, 1)) !important;
+  line-height: 34px !important;
+  transform: none !important;
+}
+
+html.minimal-launch body:not(.in-game) .rating-rules-card {
+  position: relative !important;
+  display: grid !important;
+  grid-template-columns: 42px minmax(0, 1fr) 9px !important;
+  align-items: center !important;
+  gap: 12px !important;
+  width: 100% !important;
+  min-height: 58px !important;
+  padding: 8px 16px !important;
+  border: 0 !important;
+  border-radius: 24px !important;
+  background: var(--tg-surface, #261b20) !important;
+  color: var(--tg-text, #fff) !important;
+  box-shadow: none !important;
+  text-align: left !important;
+}
+
+html.minimal-launch body:not(.in-game) .rating-rules-card[hidden] {
+  display: none !important;
+}
+
+html.minimal-launch body:not(.in-game) .rating-rules-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 14px !important;
+  background: color-mix(in srgb, var(--tg-button, #2aabee) 78%, var(--tg-surface, #261b20)) !important;
+  color: #fff !important;
+  font-family: var(--weez-rounded-font) !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+
+html.minimal-launch body:not(.in-game) .rating-rules-main {
+  display: grid !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+}
+
+html.minimal-launch body:not(.in-game) .rating-rules-main strong {
+  font-size: 16px !important;
+  line-height: 1.1 !important;
+  font-weight: 500 !important;
+}
+
+html.minimal-launch body:not(.in-game) .rating-rules-main small {
+  overflow: hidden !important;
+  color: color-mix(in srgb, var(--tg-text, #fff) 48%, transparent) !important;
+  font-size: 12px !important;
+  line-height: 1.1 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+html.minimal-launch body:not(.in-game) .daily-play-claim-card[data-state="balance-limit"] #dailyPlayClaimButton {
+  color: color-mix(in srgb, var(--tg-text, #fff) 48%, transparent) !important;
+  background: color-mix(in srgb, var(--tg-text, #fff) 8%, transparent) !important;
+  font-size: 13px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) [data-lobby-view="profile"].active #profileSavedStack {
+  font-size: calc(22px * var(--money-scale, 1)) !important;
+  line-height: 1 !important;
+  transform: none !important;
+}
+
+html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  touch-action: pan-y !important;
+}
+
+html.minimal-launch body.keyboard-open.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-topup-card,
+html.minimal-launch body.keyboard-open.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-withdraw-card {
+  bottom: var(--keyboard-height, 0px) !important;
+  max-height: calc(100dvh - var(--keyboard-height, 0px) - 8px) !important;
+  transform: translate3d(0, var(--sheet-drag-y, 0px), 0) !important;
+}
+
+html.minimal-launch:not(.admin-mode) body.lobby-menu-open:not(.in-game) .lobby-menu-sheet {
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  touch-action: pan-y !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-sheet > .cashier-sheet-grabber {
+  display: none !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-shell {
+  overscroll-behavior-y: contain !important;
+}
+
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .tournament-history-card,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .tournament-history-card .tournament-history-list,
+html.minimal-launch:not(.admin-mode) body:not(.in-game) .tournament-history-card .tournament-history-list > * {
+  border-radius: 24px !important;
+}
+
+html.minimal-launch:not(.admin-mode) body.lobby-menu-open:not(.in-game) .lobby-menu-sheet > .cashier-sheet-grabber {
+  display: none !important;
 }

@@ -541,12 +541,19 @@ test("daily play claim credits 35000 play chips once per cooldown without touchi
         idempotencyKey: `daily-existing-balance-${index}`
       });
     }
-    const otherClaim = await request("/api/play/daily-claim", {
+    const otherClaim = await requestResponse("/api/play/daily-claim", {
       method: "POST",
       token: otherAuth.token,
       idempotencyKey: "daily-claim-other-user"
     });
-    assert.equal(otherClaim.profile.balance, 75_000);
+    assert.equal(otherClaim.status, 409);
+    assert.match(otherClaim.data.error, /не более 34 999/);
+    assert.equal(otherClaim.data.dailyPlayClaim.balanceEligible, false);
+
+    const otherProfile = (await request("/api/profile", { token: otherAuth.token })).profile;
+    assert.equal(otherProfile.balance, 40_000);
+    assert.equal(otherProfile.dailyPlayClaim.canClaim, false);
+    assert.equal(otherProfile.dailyPlayClaim.reason, "balance_limit");
   } finally {
     server.kill();
   }

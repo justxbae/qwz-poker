@@ -62,6 +62,32 @@ const cashierState = {
 let adminAnalyticsDays = Number(window.localStorage.getItem("qwzAdminAnalyticsDays") || 7);
 if (![1, 7, 30].includes(adminAnalyticsDays)) adminAnalyticsDays = 7;
 const cashierSheetHomes = new Map();
+const modalScrollOwners = new Set();
+let modalScrollY = 0;
+
+function lockLobbyScroll(owner) {
+  if (!owner || modalScrollOwners.has(owner)) return;
+  if (!modalScrollOwners.size) {
+    modalScrollY = window.scrollY;
+    document.body.style.position = "fixed";
+    document.body.style.top = `${-modalScrollY}px`;
+    document.body.style.left = "0";
+    document.body.style.right = "0";
+    document.body.style.width = "100%";
+  }
+  modalScrollOwners.add(owner);
+}
+
+function unlockLobbyScroll(owner) {
+  modalScrollOwners.delete(owner);
+  if (modalScrollOwners.size) return;
+  document.body.style.removeProperty("position");
+  document.body.style.removeProperty("top");
+  document.body.style.removeProperty("left");
+  document.body.style.removeProperty("right");
+  document.body.style.removeProperty("width");
+  window.scrollTo({ top: modalScrollY, left: 0, behavior: "auto" });
+}
 
 const profile = document.querySelector("#profile");
 const appBoot = document.querySelector("#appBoot");
@@ -881,7 +907,9 @@ function setDailyPlayClaim(nextClaim) {
   const cooldownSeconds = Math.max(0, Number(nextClaim.cooldownSeconds || 0));
   state.dailyPlayClaim = {
     ...nextClaim,
-    canClaim: Boolean(nextClaim.canClaim || cooldownSeconds === 0),
+    canClaim: typeof nextClaim.canClaim === "boolean"
+      ? nextClaim.canClaim
+      : cooldownSeconds === 0 && nextClaim.balanceEligible !== false,
     cooldownSeconds
   };
 }
@@ -893,7 +921,7 @@ function tickDailyPlayClaim() {
   const remainingSeconds = availableAtMs
     ? Math.max(0, Math.ceil((availableAtMs - Date.now()) / 1000))
     : Math.max(0, Number(claim.cooldownSeconds || 0) - 1);
-  const canClaim = remainingSeconds === 0;
+  const canClaim = remainingSeconds === 0 && claim.balanceEligible !== false;
   state.dailyPlayClaim = {
     ...claim,
     canClaim,
@@ -1191,6 +1219,14 @@ function setupScrollReveal() {
   if (revealObserver) revealObserver.disconnect();
   const items = revealItems();
   if (!items.length) return;
+  if (MINIMAL_LAUNCH) {
+    items.forEach((item) => {
+      item.classList.remove("scroll-reveal");
+      item.classList.add("is-visible");
+      item.style.removeProperty("--reveal-delay");
+    });
+    return;
+  }
   if (!("IntersectionObserver" in window)) {
     items.forEach((item) => item.classList.add("scroll-reveal", "is-visible"));
     return;
@@ -2288,6 +2324,7 @@ function renderHomeWalletSide(profileData = {}) {
     const ratingPoints = Number(state.user?.ratingPoints || state.progression?.rating?.startingRp || 1000);
     if (homeWalletSideLabel) homeWalletSideLabel.textContent = "Рейтинг";
     homeWalletSideValue.textContent = formatNumber(ratingPoints);
+    applyMoneyScale(homeWalletSideValue, ratingPoints, { play: true });
     homeWalletSideHint.textContent = state.user?.ratingLeague || state.user?.ratingTier || "Bronze";
     if (homeWalletSideMeter) homeWalletSideMeter.style.width = "8%";
     if (homeWalletSideAction) {
@@ -2311,20 +2348,27 @@ function renderDailyPlayClaimCard() {
   if (!dailyPlayClaimCard || !dailyPlayClaimButton || !dailyPlayClaimMeta) return;
   const isRating = state.gameMode === "play";
   dailyPlayClaimCard.hidden = !isRating;
+  const ratingRulesCard = document.querySelector(".rating-rules-card");
+  if (ratingRulesCard) ratingRulesCard.hidden = !isRating;
   if (!isRating) return;
 
   const dailyPlayClaim = getDailyPlayClaimState(state.homeStats || {});
   const cooldownSeconds = Math.max(0, Number(dailyPlayClaim?.cooldownSeconds || 0));
-  const canClaim = Boolean(dailyPlayClaim?.canClaim || cooldownSeconds === 0);
+  const canClaim = typeof dailyPlayClaim?.canClaim === "boolean"
+    ? dailyPlayClaim.canClaim
+    : cooldownSeconds === 0 && dailyPlayClaim?.balanceEligible !== false;
   const amount = Number(dailyPlayClaim?.amount || 35000);
 
   if (!dailyPlayClaimCard.classList.contains("claim-success")) dailyPlayClaimMeta.textContent = "";
   dailyPlayClaimButton.disabled = !canClaim || pendingDailyPlayClaim;
-  dailyPlayClaimButton.textContent = canClaim ? "Получить" : formatCooldown(cooldownSeconds);
+  const balanceLimited = dailyPlayClaim?.balanceEligible === false || dailyPlayClaim?.reason === "balance_limit";
+  dailyPlayClaimButton.textContent = canClaim
+    ? "Получить"
+    : (balanceLimited ? "До 34 999" : formatCooldown(cooldownSeconds));
   dailyPlayClaimButton.title = canClaim
     ? "Получить ежедневные рейтинговые фишки"
     : `Следующая выдача через ${formatCooldown(cooldownSeconds)}`;
-  dailyPlayClaimCard.dataset.state = canClaim ? "ready" : "cooldown";
+  dailyPlayClaimCard.dataset.state = canClaim ? "ready" : (balanceLimited ? "balance-limit" : "cooldown");
 }
 
 function showDailyClaimSuccess(amount) {
@@ -4205,6 +4249,7 @@ function openCashierSheet(section = "deposit") {
   }
   cashierSheetBackdrop?.before(sheet);
   cashierState.sheet = normalized;
+  lockLobbyScroll("cashier");
   document.body.classList.add("cashier-sheet-open");
   if (cashierSheetBackdrop) cashierSheetBackdrop.hidden = false;
   sheet.classList.add("sheet-open");
@@ -4219,6 +4264,7 @@ function closeCashierSheet(options = {}) {
   const sheet = cashierState.sheet ? document.querySelector(`[data-cashier-sheet="${cashierState.sheet}"]`) : null;
   cashierState.sheet = "";
   document.body.classList.remove("cashier-sheet-open");
+  unlockLobbyScroll("cashier");
   cashierSheetBackdrop?.setAttribute("hidden", "");
   document.querySelectorAll("[data-cashier-sheet].sheet-open").forEach((item) => {
     item.classList.remove("sheet-visible", "sheet-open");
@@ -4706,13 +4752,11 @@ function setupKeyboardAwareSheets() {
       const interactive = event.target.closest("input, textarea, select, button, a");
       if (!interactive && document.activeElement instanceof HTMLElement) {
         const sheetScrollTop = sheet.scrollTop;
-        const pageScrollY = window.scrollY;
         event.preventDefault();
         document.activeElement.blur();
-        window.requestAnimationFrame(() => {
+        window.setTimeout(() => {
           sheet.scrollTop = sheetScrollTop;
-          window.scrollTo(0, pageScrollY);
-        });
+        }, 60);
       }
     }, { passive: false });
   });
@@ -6174,6 +6218,15 @@ function hideTablePanels({ updateBack = true } = {}) {
 }
 
 const DOC_SHEET_CONTENT = {
+  rating: {
+    title: "Как работает рейтинг",
+    sections: [
+      ["Зачем нужен RP", "RP определяет место в сезонном лидерборде и лигу игрока. Игровые фишки и RP не являются деньгами и не конвертируются в $."],
+      ["Как начисляется", "RP считается только за завершённые раздачи на публичных рейтинговых столах. Результат учитывается в больших блайндах; за одну раздачу действует лимит ±25 RP."],
+      ["Честная игра", "Раздачи с банком меньше 2 BB, приватные столы и подозрительные пары игроков не дают RP. В heads-up действует понижающий коэффициент."],
+      ["Лидерборд", "Для участия нужны минимум 100 рейтинговых раздач и 5 активных дней за сезон. Награды сезона публикуются отдельно."]
+    ]
+  },
   terms: {
     title: "Пользовательское соглашение",
     sections: [
@@ -6258,6 +6311,7 @@ function openLobbyMenu(options = {}) {
     lobbyMenuSheet.hidden = false;
     lobbyMenuSheet.classList.add("sheet-open");
     lobbyMenuSheet.style.setProperty("--sheet-drag-y", "0px");
+    lockLobbyScroll("menu");
     document.body.classList.add("lobby-menu-open");
     window.requestAnimationFrame(() => lobbyMenuSheet.classList.add("sheet-visible"));
     updateTelegramBackButton();
@@ -6268,6 +6322,7 @@ function closeLobbyMenu(options = {}) {
   if (!lobbyMenuSheet || !lobbyMenuBackdrop || lobbyMenuSheet.hidden) return;
   lobbyMenuSheet.classList.remove("sheet-visible");
   document.body.classList.remove("lobby-menu-open");
+  unlockLobbyScroll("menu");
   const finish = () => {
     lobbyMenuSheet.hidden = true;
     lobbyMenuBackdrop.hidden = true;
@@ -7023,7 +7078,7 @@ function applyMoneyScale(target, value, { play = false } = {}) {
     : formatUsdt(Math.abs(Number(value || 0))).split(".")[0];
   const digits = normalized.replace(/\D/g, "").length;
   const scale = play
-    ? Math.max(0.68, Math.min(1, 1 - Math.max(0, digits - 4) * 0.09))
+    ? Math.max(0.58, Math.min(1, 1 - Math.max(0, digits - 4) * 0.14))
     : Math.max(0.68, Math.min(1, 1 - Math.max(0, digits - 3) * 0.075));
   target.style.setProperty("--money-scale", String(scale));
   target.dataset.moneyDigits = String(digits);

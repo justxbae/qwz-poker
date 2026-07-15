@@ -66,7 +66,7 @@
 
 **Влияет на:** `MASTER_SPEC.md`, `docs/GPT56_SOL_BETA_PLUS_PLUS_BACKEND_TZ.md`, `docs/TECH_ROADMAP.md`, poker event contract, ledger scope и launch checklist.
 
-**Что обновлено:** Rabbit Hunt перенесён в отдельный future product discovery; из обязательных beta++ событий, тестов, админки и reconciliation он удалён. Заодно канонический daily claim синхронизирован с реализованными `35 000 PLAY_CHIPS / 24h` независимо от остатка play-баланса.
+**Что обновлено:** Rabbit Hunt перенесён в отдельный future product discovery; из обязательных beta++ событий, тестов, админки и reconciliation он удалён. Правило daily claim позднее уточнено решением от 2026-07-15 как refill при балансе не выше `34 999`.
 
 **Открытые вопросы:** Перед будущей реализацией отдельно утвердить eligibility, кто и сколько раз может купить reveal, цену/получателя fee, длительность окна, влияние на next-hand cadence, поведение при нескольких запросах, reconnect/replay, fairness proof и доступность на private cash tables. До этого видео конкурента не требуется.
 
@@ -213,6 +213,16 @@ Disconnect/sit-out policy для cash/rating утверждён отдельно
 **Что обновлено:** Реализованы `daily_play_claims`, `POST /api/play/daily-claim`, блок `dailyPlayClaim` в profile/progression, play-ledger credit, memory fallback и regression-тесты. Frontend wiring остаётся отдельной задачей.
 
 **Открытые вопросы:** Streak/bonus escalation не входит в beta; действует фиксированная выдача `35 000` каждые `24` часа.
+
+## 2026-07-15: Daily Bonus возвращён к refill-модели
+
+**Зона:** product / economy / frontend / backend
+
+**Решение:** Daily Bonus выдаёт `35 000 PLAY_CHIPS` не чаще одного раза в 24 часа только если текущий play-баланс пользователя не превышает `34 999`. Проверка cooldown и порога выполняется сервером под блокировкой play-wallet; frontend не может сделать недоступный claim доступным локальным таймером. API дополнительно возвращает `balanceEligible`, `maxBalance` и `reason`.
+
+**Почему:** Бонус является восстановлением игрового запаса, а не бесконечным накопительным начислением. Это сохраняет смысл игрового цикла и уменьшает возможность пассивного фарма play-баланса.
+
+**Влияет на:** `POST /api/play/daily-claim`, profile/progression `dailyPlayClaim`, play ledger и карточку Daily Bonus.
 
 ## 2026-06-19: Lobby wallet hero and simplified bottom nav
 

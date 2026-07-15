@@ -263,6 +263,7 @@ const RISK_LARGE_WITHDRAWAL_USDT_MICROS = Math.max(0, Math.round(Number(process.
 const RISK_LARGE_ADMIN_ADJUST_CHIPS = Math.max(0, Math.round(Number(process.env.RISK_LARGE_ADMIN_ADJUST_CHIPS || ADMIN_GRANT_MAX_CHIPS / 2)));
 const BONUS_EXPIRY_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const DAILY_PLAY_CLAIM_COOLDOWN_SECONDS = 24 * 60 * 60;
+const DAILY_PLAY_CLAIM_MAX_BALANCE = 34_999;
 let lastReconciliationAlertKey = "";
 let telegramWebhookDiagnostics = null;
 let lastTelegramWebhookAlertKey = "";
@@ -655,7 +656,9 @@ async function handleApi(req, res, url) {
         return {
           status: 409,
           body: {
-            error: "Ежедневные игровые фишки уже получены. Следующая выдача доступна позже.",
+            error: result.balanceLimit
+              ? "Daily Bonus доступен при балансе не более 34 999 фишек."
+              : "Ежедневные игровые фишки уже получены. Следующая выдача доступна позже.",
             dailyPlayClaim
           }
         };
@@ -2896,6 +2899,7 @@ async function progressionView(user) {
 
 async function dailyPlayClaimView(user, now = Date.now()) {
   const dbState = await dbGetDailyPlayClaim(user.id);
+  const balance = await getWallet(String(user.id));
   const claimedAtValue = dbState ? dbState.claimedAt : dailyPlayClaims.get(String(user.id)) || null;
   const claimedAtMs = claimedAtValue ? new Date(claimedAtValue).getTime() : 0;
   const availableAtMs = claimedAtMs
@@ -2904,12 +2908,17 @@ async function dailyPlayClaimView(user, now = Date.now()) {
   const cooldownSeconds = claimedAtMs
     ? Math.max(0, Math.ceil((availableAtMs - now) / 1000))
     : 0;
+  const balanceEligible = balance <= DAILY_PLAY_CLAIM_MAX_BALANCE;
+  const cooldownReady = cooldownSeconds === 0;
   return {
-    canClaim: cooldownSeconds === 0,
+    canClaim: cooldownReady && balanceEligible,
     claimedAt: claimedAtMs ? new Date(claimedAtMs).toISOString() : null,
     availableAt: new Date(availableAtMs).toISOString(),
     cooldownSeconds,
-    amount: ECONOMY.play.dailyRefillChips
+    amount: ECONOMY.play.dailyRefillChips,
+    balanceEligible,
+    maxBalance: DAILY_PLAY_CLAIM_MAX_BALANCE,
+    reason: !cooldownReady ? "cooldown" : (!balanceEligible ? "balance_limit" : null)
   };
 }
 
@@ -2917,6 +2926,7 @@ async function claimDailyPlayReward(user, idempotencyKey = "") {
   const dbResult = await dbClaimDailyPlayChips(user.id, {
     amount: ECONOMY.play.dailyRefillChips,
     cooldownSeconds: DAILY_PLAY_CLAIM_COOLDOWN_SECONDS,
+    maxBalance: DAILY_PLAY_CLAIM_MAX_BALANCE,
     idempotencyKey
   });
   if (dbResult) {
@@ -2931,6 +2941,11 @@ async function claimDailyPlayReward(user, idempotencyKey = "") {
   const claimedAtMs = claimedAtValue ? new Date(claimedAtValue).getTime() : 0;
   if (claimedAtMs && claimedAtMs + DAILY_PLAY_CLAIM_COOLDOWN_SECONDS * 1000 > now) {
     return { claimed: false, claimedAt: claimedAtValue, balance: await getWallet(userId), cooldown: true };
+  }
+
+  const currentBalance = await getWallet(userId);
+  if (currentBalance > DAILY_PLAY_CLAIM_MAX_BALANCE) {
+    return { claimed: false, claimedAt: claimedAtValue, balance: currentBalance, balanceLimit: true };
   }
 
   const balance = await recordTransaction(user, {
