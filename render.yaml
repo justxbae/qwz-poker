@@ -67,6 +67,14 @@ services:
         sync: false
       - key: ADMIN_USER_IDS
         sync: false
+      - key: ADMIN_OWNER_IDS
+        sync: false
+      - key: ADMIN_FINANCE_IDS
+        sync: false
+      - key: ADMIN_SUPPORT_IDS
+        sync: false
+      - key: ADMIN_RISK_IDS
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: REDIS_URL
@@ -79,6 +87,8 @@ services:
         sync: false
       - key: MINIMAL_LAUNCH
         value: "true"
+      - key: WITHDRAWAL_RAKE_THRESHOLD_PERCENT
+        value: "0"
       - key: SENTRY_DSN
         sync: false
       - key: SENTRY_TRACES_SAMPLE_RATE
