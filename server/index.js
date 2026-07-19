@@ -191,16 +191,6 @@ const ADMIN_OWNER_IDS = parseIdList(process.env.ADMIN_OWNER_IDS || process.env.A
 const ADMIN_FINANCE_IDS = parseIdList(process.env.ADMIN_FINANCE_IDS || "");
 const ADMIN_SUPPORT_IDS = parseIdList(process.env.ADMIN_SUPPORT_IDS || "");
 const ADMIN_RISK_IDS = parseIdList(process.env.ADMIN_RISK_IDS || "");
-const BETA_ACCESS_ENABLED = process.env.BETA_ACCESS_ENABLED === "true";
-const BETA_ALLOWED_USER_IDS = parseIdList(process.env.BETA_ALLOWED_USER_IDS || "");
-const BETA_ACCESS_USER_IDS = new Set([
-  ...BETA_ALLOWED_USER_IDS,
-  ...ADMIN_USER_IDS,
-  ...ADMIN_OWNER_IDS,
-  ...ADMIN_FINANCE_IDS,
-  ...ADMIN_SUPPORT_IDS,
-  ...ADMIN_RISK_IDS
-]);
 const ADMIN_TELEGRAM_EVENT_TYPES = parseAdminTelegramEventTypes(process.env.ADMIN_TELEGRAM_EVENT_TYPES || "");
 const ADMIN_DAILY_REPORT_ENABLED = process.env.ADMIN_DAILY_REPORT_ENABLED !== "false";
 const ADMIN_DAILY_REPORT_HOUR = Math.max(0, Math.min(23, Number(process.env.ADMIN_DAILY_REPORT_HOUR || 21)));
@@ -229,6 +219,8 @@ const REAL_MONEY_ENABLED = process.env.REAL_MONEY_ENABLED === "true";
 // opt out explicitly with MINIMAL_LAUNCH=false.
 const MINIMAL_LAUNCH = process.env.MINIMAL_LAUNCH !== "false";
 const isProduction = process.env.NODE_ENV === "production";
+const TEST_PLAYERS_ENABLED = process.env.TEST_PLAYERS_ENABLED === "true"
+  || (!isProduction && process.env.TEST_PLAYERS_ENABLED !== "false");
 const HOST = process.env.HOST || (isProduction ? "0.0.0.0" : "127.0.0.1");
 const startedAt = Date.now();
 
@@ -596,7 +588,6 @@ async function handleApi(req, res, url) {
       botUsername: BOT_USERNAME,
       realMoneyEnabled: REAL_MONEY_ENABLED,
       minimalLaunch: MINIMAL_LAUNCH,
-      betaAccessEnabled: BETA_ACCESS_ENABLED,
       play: playSettings(),
       cash: cashSettings()
     });
@@ -638,14 +629,6 @@ async function handleApi(req, res, url) {
       sendJson(res, 401, { error: auth.error });
       return;
     }
-    if (BETA_ACCESS_ENABLED && !BETA_ACCESS_USER_IDS.has(String(auth.user.id))) {
-      sendJson(res, 403, {
-        error: "Закрытая beta доступна только по приглашению.",
-        code: "beta_access_denied"
-      });
-      return;
-    }
-
     const token = randomId("session");
     const user = await normalizeUser(auth.user);
     const attribution = await recordTrafficAttribution(user, body.startParam);
@@ -1511,6 +1494,7 @@ async function handleApi(req, res, url) {
     }
 
     if (req.method === "POST" && action === "add-test-player") {
+      assertTestPlayersEnabled();
       if (table.gameMode === "cash" || table.tournamentId) {
         const error = new Error("Тестовые игроки недоступны за денежным столом");
         error.status = 409;
@@ -1525,6 +1509,7 @@ async function handleApi(req, res, url) {
     }
 
     if (req.method === "POST" && action === "auto-act") {
+      assertTestPlayersEnabled();
       autoAct(table, user);
       await persistCompletedHands(table);
       await persistActiveTableSnapshot(table);
@@ -1533,6 +1518,7 @@ async function handleApi(req, res, url) {
     }
 
     if (req.method === "POST" && action === "test-bot-act") {
+      assertTestPlayersEnabled();
       const body = await readJson(req);
       testBotAct(table, user, body);
       await persistCompletedHands(table);
@@ -6635,7 +6621,19 @@ function tableView(table, user) {
   view.ante = table.ante || 0;
   view.viewer.balance = tableWalletBalance(user, table);
   view.viewer.canBuyIn = !table.tournamentId && view.viewer.canBuyIn && view.viewer.balance > 0;
+  if (!TEST_PLAYERS_ENABLED) {
+    view.viewer.canControlTestBot = false;
+    view.viewer.testBotName = "";
+    view.viewer.testBotToCall = 0;
+  }
   return view;
+}
+
+function assertTestPlayersEnabled() {
+  if (TEST_PLAYERS_ENABLED) return;
+  const error = new Error("Not found");
+  error.status = 404;
+  throw error;
 }
 
 function clamp(value, min, max) {
@@ -7015,9 +7013,6 @@ function validateEnvironment() {
   }
   if (REAL_MONEY_ENABLED && ADMIN_OWNER_IDS.size === 0 && ADMIN_USER_IDS.size === 0) {
     problems.push("At least one ADMIN_OWNER_IDS or ADMIN_USER_IDS entry is required in real-money production");
-  }
-  if (BETA_ACCESS_ENABLED && BETA_ACCESS_USER_IDS.size === 0) {
-    problems.push("BETA_ALLOWED_USER_IDS or an admin ID is required when BETA_ACCESS_ENABLED=true");
   }
   if (REAL_MONEY_ENABLED && process.env.WITHDRAWALS_ENABLED === "true" && ADMIN_FINANCE_IDS.size === 0) {
     problems.push("ADMIN_FINANCE_IDS is required when withdrawals are enabled");

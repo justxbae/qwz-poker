@@ -81,10 +81,8 @@ services:
         sync: false
       - key: REAL_MONEY_ENABLED
         value: "true"
-      - key: BETA_ACCESS_ENABLED
-        value: "true"
-      - key: BETA_ALLOWED_USER_IDS
-        sync: false
+      - key: TEST_PLAYERS_ENABLED
+        value: "false"
       - key: MINIMAL_LAUNCH
         value: "true"
       - key: WITHDRAWAL_RAKE_THRESHOLD_PERCENT

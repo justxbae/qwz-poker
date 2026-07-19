@@ -212,37 +212,6 @@ test("Telegram auth rejects future timestamps and missing user ids", async () =>
   }
 });
 
-test("closed beta auth admits only allowed users and administrators", async () => {
-  const server = await startServer({
-    BETA_ACCESS_ENABLED: "true",
-    BETA_ALLOWED_USER_IDS: "444",
-    ADMIN_USER_IDS: "999"
-  });
-  try {
-    const allowed = await requestResponse("/api/auth", {
-      method: "POST",
-      body: { initData: telegramInitData({ id: 444, first_name: "Tester" }) }
-    });
-    assert.equal(allowed.status, 200);
-
-    const admin = await requestResponse("/api/auth", {
-      method: "POST",
-      body: { initData: telegramInitData({ id: 999, first_name: "Owner" }) }
-    });
-    assert.equal(admin.status, 200);
-
-    const denied = await requestResponse("/api/auth", {
-      method: "POST",
-      body: { initData: telegramInitData({ id: 555, first_name: "Unknown" }) }
-    });
-    assert.equal(denied.status, 403);
-    assert.equal(denied.data.code, "beta_access_denied");
-    assert.equal(denied.data.error, "Закрытая beta доступна только по приглашению.");
-  } finally {
-    server.kill();
-  }
-});
-
 test("table SSE replays events and presence heartbeat marks the seat connected", async () => {
   const server = await startServer({ ADMIN_USER_IDS: "dev-user" });
   const controller = new AbortController();
@@ -350,6 +319,29 @@ test("seated player can control test bots at public system tables", async () => 
     })).table;
 
     assert.equal(table.seats.some((seat) => seat.folded), true);
+  } finally {
+    server.kill();
+  }
+});
+
+test("test-player endpoints are disabled server-side outside dev mode", async () => {
+  const server = await startServer({ TEST_PLAYERS_ENABLED: "false" });
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await topUp(auth.token, 2);
+    const lobby = await request("/api/tables", { token: auth.token });
+    const publicTable = lobby.tables.find((table) => !table.isPrivate && table.smallBlind === 100);
+    const joined = await request(`/api/tables/${publicTable.id}/join`, {
+      method: "POST",
+      token: auth.token,
+      body: { buyInAmount: 10000 }
+    });
+
+    assert.equal(joined.table.viewer.canControlTestBot, false);
+    await assert.rejects(
+      request(`/api/tables/${publicTable.id}/add-test-player`, { method: "POST", token: auth.token }),
+      /Not found/
+    );
   } finally {
     server.kill();
   }

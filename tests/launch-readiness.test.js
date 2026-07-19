@@ -5,6 +5,7 @@ import { evaluateLaunchReadiness } from "../server/launch-readiness.js";
 const validEnv = {
   NODE_ENV: "production",
   REAL_MONEY_ENABLED: "true",
+  TEST_PLAYERS_ENABLED: "false",
   APP_NAME: "Weez Poker",
   APP_PUBLIC_URL: "https://poker.weez.example",
   BOT_USERNAME: "weezpokerbot",
@@ -16,8 +17,6 @@ const validEnv = {
   DEVICE_HASH_SECRET: "d".repeat(32),
   ADMIN_OWNER_IDS: "1",
   ADMIN_FINANCE_IDS: "2",
-  BETA_ACCESS_ENABLED: "true",
-  BETA_ALLOWED_USER_IDS: "3,4,5",
   WITHDRAWALS_ENABLED: "true",
   WITHDRAWAL_RAKE_THRESHOLD_PERCENT: "0",
   STARS_USDT_RATE: "0.01",
@@ -34,6 +33,7 @@ test("launch readiness fails closed on missing financial infrastructure and secr
   const result = evaluateLaunchReadiness({
     NODE_ENV: "production",
     REAL_MONEY_ENABLED: "true",
+    TEST_PLAYERS_ENABLED: "true",
     APP_NAME: "QWZ Poker",
     BOT_USERNAME: "qwzpokerbot",
     WITHDRAWALS_ENABLED: "true"
@@ -48,7 +48,7 @@ test("launch readiness fails closed on missing financial infrastructure and secr
     "ops.metrics_token",
     "risk.device_hash_secret",
     "admin.finance",
-    "beta.access_gate"
+    "runtime.test_players"
   ]) assert.equal(codes.has(code), true, code);
 });
 
