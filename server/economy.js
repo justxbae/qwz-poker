@@ -411,8 +411,14 @@ export function ratingLeague(points) {
 // Anti-abuse policy (docs/RATING_INTEGRITY.md): private tables never rate,
 // short-handed farming is dampened, and blind-steal micro-hands don't count.
 export const RATING_INTEGRITY = {
+  formulaVersion: "rp-v2-beta",
   minPotBigBlinds: 2,
-  headsUpMultiplier: 0.5
+  headsUpMultiplier: 0.5,
+  dailyPositiveCap: 150,
+  pairWindowDays: 7,
+  pairShareThreshold: 0.6,
+  pairMinimumHands: 20,
+  minimumDistinctOpponents: 3
 };
 
 export function ratingDeltaForHand({ profit = 0, bigBlind = 1, isPrivate = false, activePlayers = 0, potSize = null } = {}) {
@@ -431,7 +437,42 @@ export function ratingDeltaForHand({ profit = 0, bigBlind = 1, isPrivate = false
 }
 
 export function nextRatingPoints(currentPoints, delta) {
-  return Math.max(RATING.minRp, Math.round(Number(currentPoints || RATING.seasonStartingRp) + Number(delta || 0)));
+  return Math.max(RATING.minRp, Math.round(Number(currentPoints ?? RATING.seasonStartingRp) + Number(delta || 0)));
+}
+
+export function applyRatingIntegrityLimits({
+  baseDelta = 0,
+  dailyPositiveAccrued = 0,
+  pairHands = 0,
+  totalHands = 0,
+  frozen = false
+} = {}) {
+  const normalizedBase = Math.round(Number(baseDelta || 0));
+  const normalizedTotalHands = Math.max(0, Math.round(Number(totalHands || 0)));
+  const normalizedPairHands = Math.max(0, Math.round(Number(pairHands || 0)));
+  const pairShare = normalizedTotalHands > 0 ? normalizedPairHands / normalizedTotalHands : 0;
+  const pairFarm = normalizedTotalHands >= RATING_INTEGRITY.pairMinimumHands
+    && pairShare > RATING_INTEGRITY.pairShareThreshold;
+
+  if (frozen) {
+    return { delta: Math.min(0, normalizedBase), pairShare, pairFarm, capped: false, reasons: ["risk_freeze"] };
+  }
+  if (pairFarm) {
+    return { delta: Math.min(0, normalizedBase), pairShare, pairFarm, capped: false, reasons: ["pair_farm"] };
+  }
+  if (normalizedBase <= 0) {
+    return { delta: normalizedBase, pairShare, pairFarm: false, capped: false, reasons: [] };
+  }
+
+  const remaining = Math.max(0, RATING_INTEGRITY.dailyPositiveCap - Math.max(0, Math.round(Number(dailyPositiveAccrued || 0))));
+  const delta = Math.min(normalizedBase, remaining);
+  return {
+    delta,
+    pairShare,
+    pairFarm: false,
+    capped: delta < normalizedBase,
+    reasons: delta < normalizedBase ? ["daily_positive_cap"] : []
+  };
 }
 
 export function cashClubPointsFromRake(rakeMicros) {

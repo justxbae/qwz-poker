@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-QWZ Poker is a Telegram Mini App poker room: a Node.js (ESM, Node >= 20) backend that
+Weez Poker is a Telegram Mini App poker room: a Node.js (ESM, Node >= 20) backend that
 serves both the JSON API and a static vanilla-JS frontend, backed by PostgreSQL and Redis.
 The Texas Hold'em engine is already working. There is no build step and no framework —
 the server is raw `node:http`, the client is hand-written JS/CSS in `public/`.

@@ -12121,7 +12121,7 @@ button:active,
 }
 
 /* ============================================================
-   QWZ Lobby v2 — final layer
+   Weez Lobby v2 — final layer
    Calm hierarchy, one signature accent (emerald), premium density.
    Touches lobby only (body:not(.in-game)). HTML/JS untouched.
    ============================================================ */
@@ -12884,7 +12884,7 @@ body:not(.in-game) .lobby-menu-list button .menu-icon {
 }
 
 /* =====================================================================
-   QWZ Lobby v2 — Telegram-native breathing room
+   Weez Lobby v2 — Telegram-native breathing room
    ТЗ: Telegram-dark, голубой акцент, минимум градиентов и контуров,
    без казино-стиля. Минимум подписей, плотность по референсам
    (Tribute, major, TonPoker). Одна карта одной высоты, ровные отступы.
@@ -13464,7 +13464,7 @@ body:not(.in-game) [data-lobby-view="home"].active .product-mode-title {
 }
 
 /* =====================================================================
-   QWZ Lobby v3 — polish: promo carousel back, balance pop,
+   Weez Lobby v3 — polish: promo carousel back, balance pop,
    colour variety (blue primary + accent palette), menu icons,
    tab scroll affordance.
    ===================================================================== */
@@ -13992,7 +13992,7 @@ body:not(.in-game) .home-wallet-actions button:not(.home-withdraw) {
 }
 
 /* =====================================================================
-   QWZ Lobby v4 — authoritative pass
+   Weez Lobby v4 — authoritative pass
    Balance hero · mode-aware actions w/ transition · segmented mode
    toggle · format pills fit · promo carousel + animated dots ·
    tighter table header · robust menu sheet.

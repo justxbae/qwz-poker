@@ -7,6 +7,9 @@ const htmlSource = await readFile(new URL("../public/index.html", import.meta.ur
 const cssSource = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
 const renderConfig = await readFile(new URL("../render.yaml", import.meta.url), "utf8");
 const dbSource = await readFile(new URL("../server/db.js", import.meta.url), "utf8");
+const tonConnectManifest = JSON.parse(await readFile(new URL("../public/tonconnect-manifest.json", import.meta.url), "utf8"));
+const publicTerms = await readFile(new URL("../public/terms.html", import.meta.url), "utf8");
+const publicPrivacy = await readFile(new URL("../public/privacy.html", import.meta.url), "utf8");
 
 test("lobby starts in Rating mode with the Рейтинг | Cash switch order", () => {
   assert.match(appSource, /gameMode:\s*"play"/);
@@ -27,6 +30,14 @@ test("rating mode hides cash-only game formats", () => {
 test("Render starts the production server with real money enabled", () => {
   assert.match(renderConfig, /startCommand:\s*npm start/);
   assert.match(renderConfig, /key:\s*REAL_MONEY_ENABLED\s*\n\s*value:\s*"true"/);
+});
+
+test("TonConnect publishes real Weez terms and privacy documents", () => {
+  assert.equal(tonConnectManifest.name, "Weez Poker");
+  assert.match(tonConnectManifest.termsOfUseUrl, /\/terms$/);
+  assert.match(tonConnectManifest.privacyPolicyUrl, /\/privacy$/);
+  assert.match(publicTerms, /Условия использования Weez Poker/);
+  assert.match(publicPrivacy, /Политика конфиденциальности Weez Poker/);
 });
 
 test("Telegram loader stays visible until the lobby is hydrated", () => {
@@ -82,6 +93,24 @@ test("public tournaments UI treats the main lobby feed as cash-only and uses ide
 
 test("table drawer renders completed hands from the current session", () => {
   assert.match(appSource, /function renderActionLog\(logItems, handHistory = \[\]\)/);
-  assert.match(appSource, /hands\.slice\(\)\.reverse\(\)\.map\(renderHandHistoryItem\)/);
+  assert.match(appSource, /hands\.map\(renderHandHistoryItem\)/);
   assert.match(appSource, /renderActionLog\(table\.actionLog \|\| \[\], table\.handHistory \|\| \[\]\)/);
+});
+
+test("interactive markup has unique ids and explicit button behavior", () => {
+  const ids = [...htmlSource.matchAll(/\bid=["']([^"']+)["']/g)].map((match) => match[1]);
+  assert.equal(new Set(ids).size, ids.length);
+  for (const match of htmlSource.matchAll(/<button\b([^>]*)>/g)) {
+    assert.match(match[1], /\btype=["'](?:button|submit)["']/);
+  }
+});
+
+test("player table mutations send idempotency keys", () => {
+  assert.match(appSource, /table-act-\$\{tableId\}/);
+  assert.match(appSource, /table-show-muck-\$\{state\.currentTableId\}/);
+  assert.match(appSource, /table-stand-\$\{tableId\}/);
+  assert.match(appSource, /table-sit-out-\$\{tableId\}/);
+  assert.match(appSource, /table-sit-in-\$\{tableId\}/);
+  assert.match(appSource, /fairness-commit:\$\{table\.id\}/);
+  assert.match(appSource, /fairness-reveal:\$\{table\.id\}/);
 });

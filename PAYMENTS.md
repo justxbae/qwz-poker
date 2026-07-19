@@ -1,4 +1,4 @@
-# QWZ Poker payments
+# Weez Poker payments
 
 ## Current production rule
 
@@ -36,7 +36,7 @@ The rate remains configurable through `STARS_USDT_RATE`; production currently us
 
 ## Client confirmation rule
 
-Telegram's `openInvoice(..., status='paid')` callback only confirms that Telegram accepted the payment. It is not proof that QWZ has committed wallet+ledger state.
+Telegram's `openInvoice(..., status='paid')` callback only confirms that Telegram accepted the payment. It is not proof that Weez has committed wallet+ledger state.
 
 - Never show “Баланс пополнен” from the client callback alone.
 - Poll `GET /api/cashier/payment-orders/:orderId`.
@@ -185,13 +185,23 @@ The webhook:
 
 Withdrawals should not be automated at launch.
 
-Recommended first production version:
+Controlled-beta version:
 
 1. User creates withdrawal request.
 2. Funds move from wallet to `withdrawal_hold`.
 3. Admin reviews risk flags, deposit history, game volume, and wagering.
-4. Admin approves payout manually.
-5. System records provider tx/hash and final status.
+4. Admin sends the net payout externally.
+5. Admin confirms the already-sent payout with a unique provider tx/hash.
+6. The same transaction releases the hold, records the visible fee, stores actor/time/audit, and moves the order directly to terminal `paid`.
+
+The admin endpoint still uses the legacy action name `approve` for compatibility,
+but it is a **payout confirmation**, not permission to pay later. It fails closed
+without an external transaction id. A tx/hash cannot be reused for another order.
+
+Current beta quote is fully visible: `2% + method network fee`. The global
+deposit playthrough gate is disabled by default
+(`WITHDRAWAL_RAKE_THRESHOLD_PERCENT=0`); suspicious deposit-to-withdrawal flows
+go to risk/manual review instead of silently blocking every player.
 
 Minimum withdrawal fees should cover:
 
@@ -200,4 +210,6 @@ Minimum withdrawal fees should cover:
 - payment operations reserve;
 - marketing and business margin from the economics model.
 
-Until legal/compliance is settled, withdrawals should remain disabled in UI or marked as manual beta.
+Until provider E2E, legal/compliance review, PostgreSQL/Redis failure-injection
+tests, and an operator runbook are complete, withdrawals must remain disabled in
+public UI or explicitly limited to a controlled manual beta.

@@ -1,5 +1,54 @@
 # Weez Poker Decisions
 
+## 2026-07-19: единое enterprise-ТЗ развития Weez
+
+**Зона:** product / gameplay / architecture / operations / brand / growth
+
+**Решение:** Документ `docs/WEEZ_ENTERPRISE_MASTER_TZ.md` используется как единая
+программа развития от текущей controlled beta до публичного real-money продукта и
+масштаба в тысячи пользователей. Он не меняет приоритет `MASTER_SPEC.md` и более
+новых датированных решений, а связывает существующие ТЗ в work packages, release
+gates, критерии приёмки, SRE/операционные процессы и Definition of Done.
+
+**Почему:** Отдельные backend, UI, beta и roadmap документы накопили полезные детали,
+но не давали одного ответа по готовности продукта, владельцам процессов и запретам
+перехода к real-money/public трафику.
+
+**Влияет на:** планирование задач, отчёты агентов, launch readiness, admin/support,
+finance/risk, design/brand, analytics и масштабирование.
+
+**Что не меняется:** Rabbit Hunt и другие optional-механики остаются deferred;
+daily refill работает по решению 2026-07-15; продуктовая экономика меняется только
+отдельным решением владельца.
+
+## 2026-07-19: Rating formula `rp-v2-beta` и первые anti-abuse ограничения
+
+**Зона:** rating / risk / leaderboard / audit
+
+**Решение:** Rating работает отдельными календарными UTC-сезонами со стартом
+`1 000 RP` и нижней границей `0 RP`. Публичная rating-рука начисляет результат в
+BB с капом `±25 RP`; heads-up имеет множитель `0.5`, банк меньше `2 BB` не
+рейтингуется. Положительный прирост ограничен `+150 RP` за UTC-день. Если после
+20 рук более 60% рейтинговых рук за последние 7 дней сыграны против одного
+соперника, положительная дельта блокируется и создаётся HIGH risk-флаг. При
+открытом HIGH/CRITICAL `rating_*` флаге положительный прирост заморожен, но
+отрицательная дельта сохраняется, чтобы флаг нельзя было использовать как защиту
+от потери RP. Для попадания в квалифицированный leaderboard нужны минимум 100
+рук, 5 активных UTC-дней и 3 разных соперника.
+
+**Почему:** Простая симметричная формула без дневного лимита, opponent diversity
+и auditable season state позволяла двум аккаунтам фармить leaderboard. Полная
+заморозка всех дельт также была бы эксплуатируема, поскольку защищала бы от
+проигрышей.
+
+**Влияет на:** `rating_seasons`, `rating_season_players`, `rating_pair_hands`,
+`rating_entries`, `risk_flags`, profile read model, memory/demo parity,
+leaderboard eligibility и `docs/RATING_INTEGRITY.md`.
+
+**Открытые вопросы:** Пороги являются beta-калибровкой. До материальных наград
+обязательны device/IP clusters, chip-dumping/ring detection, RP correction entries,
+review/appeal workflow, immutable season close и публичный tie-break.
+
 ## 2026-07-11: Show/muck — короткое server-driven окно и отдельная история
 
 **Зона:** gameplay / frontend / audit
@@ -293,3 +342,13 @@ Disconnect/sit-out policy для cash/rating утверждён отдельно
 - Рутинные poker events отображаются локально у мест/карт/банка, а не глобальным чёрным сообщением.
 - Showdown: лучшие пять карт + комбинация победителя + движение банка; отдельный крупный showdown overlay не используется.
 - История раздач остаётся session-scoped; строки активных сессий в профиле показываются компактно без номера текущей руки.
+
+## 2026-07-20 — Weez Design System 2.0
+
+**Зона:** frontend / design / accessibility
+
+**Решение:** `docs/DESIGN_SYSTEM.md` полностью заменён единым каноном Weez Design System 2.0. Цвета компонентов семантически наследуются от Telegram Mini Apps Theme API, размеры и interaction-паттерны опираются на Apple HIG, а иконки берутся из утверждённых локальных SVG. Зафиксированы единые токены, сетка 4 px, touch target 44 px, grouped-list 52 px, money typography, segment/bottom-nav/sheet contracts, motion и обязательная mobile QA-матрица.
+
+**Почему:** исторический CSS содержит несколько поколений взаимоисключающих overrides, из-за которых одинаковые компоненты выглядят и ведут себя по-разному. Новый документ запрещает добавление очередных датированных заплаток и задаёт направление миграции к одному token/primitives layer.
+
+**Влияет на:** весь frontend, особенно lobby hero, mode switch, bottom navigation, cashier/menu sheets и in-game panels.

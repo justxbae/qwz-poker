@@ -1,29 +1,57 @@
 # Rating Integrity — anti-abuse policy
 
-Статус: v1, действует с 2026-07-10. Backend-хуки: `server/economy.js` (`RATING_INTEGRITY`, `ratingDeltaForHand`).
+Статус: `rp-v2-beta`, действует с 2026-07-19. Источник конфигурации:
+`server/economy.js` (`RATING`, `RATING_INTEGRITY`). Пороговые значения считаются
+beta-калибровкой: менять их можно только датированным продуктовым решением с
+последующим анализом реальных когорт.
 
-## Что уже enforced в коде (v1)
+## Формула и eligibility
 
-| Правило | Значение | Где |
-|---|---|---|
-| Private tables не рейтингуются | delta = 0 | `ratingDeltaForHand(isPrivate)` + private = cash-only в UI/API |
-| Минимум активных игроков | ≥ 2 | `activePlayers < 2 → 0` |
-| Микро-банк не рейтингуется | pot < 2 BB → 0 RP | `RATING_INTEGRITY.minPotBigBlinds` (анти fold-farm: мгновенные фолды блайндов не двигают RP) |
-| Heads-up demping | ×0.5 к дельте | `RATING_INTEGRITY.headsUpMultiplier` (перекачка фишек между двумя аккаунтами вдвое медленнее и симметрично убыточна) |
-| Кап за руку | ±25 RP | `RATING.maxHandDelta` |
-| Турнирные руки | не считаются | `ratingEligible` в progress-хуках |
-| Лидерборд-порог | ≥100 рук и ≥5 активных дней | `RATING.minActiveHandsForLeaderboard/minActiveDaysForLeaderboard` — калибровка отсекает свежие фермы |
+| Правило | Значение |
+|---|---|
+| Старт сезона | 1 000 RP |
+| Нижняя граница | 0 RP; ноль не сбрасывается обратно на 1 000 |
+| Базовая дельта | результат руки в BB × `tableMultiplier` |
+| Кап за руку | от -25 до +25 RP |
+| Heads-up | множитель 0.5 |
+| Минимальный банк | 2 BB; меньший банк даёт 0 RP |
+| Допустимый стол | только публичный rating/play; private, cash и tournament не рейтингуются |
+| Сезон | календарный UTC-месяц, отдельный `rating_season_players` |
+| Лидерборд eligibility | не менее 100 рук, 5 активных UTC-дней и 3 разных соперников |
 
-## v2 — требует хранения (не реализовано, план)
+## Enforced anti-abuse
 
-1. **Дневной кап RP** на аккаунт (например +150/день): нужна таблица `rating_daily_accrual (app_user_id, day, rp_gained)`.
-2. **Пара-детектор**: доля рук против одного и того же оппонента за 7д > 60% → RP-множитель 0 для пары + risk-флаг `rating_pair_farm`.
-3. **Кластеры устройство/IP/Telegram**: совпадение `device_sessions.ip_hash/device_id_hash` у оппонентов → флаг `rating_cluster`, руки идут в аудит.
-4. **Паттерн all-in/fold**: N подряд рук с preflop all-in→fold между теми же местами → флаг `rating_dump_pattern`.
-5. Флаги пишутся в существующий `risk_flags`, отображаются в админке (risk tab), RP-начисление при активном HIGH-флаге замораживается (delta 0, руки копятся в аудит).
+1. Положительное начисление ограничено `+150 RP` за UTC-день. Отрицательная
+   дельта не обрезается дневным лимитом.
+2. Для каждого игрока считается доля рук против доминирующего соперника за
+   скользящие 7 дней. После 20 рейтинговых рук доля свыше 60% блокирует только
+   положительное начисление и создаёт deduplicated HIGH-флаг
+   `rating_pair_farm`. Отрицательная дельта сохраняется.
+3. Пока у игрока открыт HIGH/CRITICAL `rating_*` risk-флаг, положительная
+   дельта заморожена, отрицательная продолжает применяться. Игра не блокируется.
+4. Каждая eligible-рука имеет стабильный `handId`, идемпотентно отмечается в
+   `profile_hand_progress` и создаёт `rating_entries` с formula version,
+   исходной дельтой и результатом integrity-проверки, включая нулевую дельту.
+5. PostgreSQL-обновление season state, pair history, risk flag, entry и profile
+   snapshot выполняется одной транзакцией с блокировкой строки игрока. Demo
+   memory-path повторяет формулу, дневной кап, pair detector и freeze.
 
-## Инварианты
+## Хранилище и аудит
 
-- Ничего из этого не блокирует саму игру — только начисление RP.
-- Play chips ↔ cash конверсии нет ни при каком статусе.
-- Все пороги — конфиг, не хардкод в вызовах.
+- `rating_seasons` — границы и versioned rules сезона;
+- `rating_season_players` — points/peak/hands/days текущего сезона;
+- `rating_pair_hands` — opponent diversity и 7-day pair concentration;
+- `rating_entries` — неизменяемая история начислений по рукам;
+- `risk_flags` — review/dismiss/resolve контур без скрытого удаления истории;
+- `player_profiles` — только текущий read-model snapshot, не источник аудита.
+
+## Не реализовано и не должно считаться готовым
+
+- device/IP cluster detection между оппонентами;
+- chip-dumping/all-in-fold pattern detector и ring/collusion graph;
+- операторский review с RP correction/reversal entry и апелляцией;
+- immutable season close snapshot, prizes/tickets и публичная методика tie-break;
+- калибровка порогов по реальным данным.
+
+Эти пункты обязательны до денежных/материальных наград за рейтинг. PLAY_CHIPS
+никогда не конвертируются в cash; rating-флаги не меняют cash wallet.

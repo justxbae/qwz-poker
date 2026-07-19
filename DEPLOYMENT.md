@@ -1,4 +1,4 @@
-# Deploy QWZ Poker
+# Deploy Weez Poker
 
 ## Recommended MVP hosting
 
@@ -45,14 +45,14 @@ Required environment variables:
 ```text
 NODE_ENV=production
 HOST=0.0.0.0
-BOT_USERNAME=qwzpokerbot
+BOT_USERNAME=weezpokerbot
 BOT_TOKEN=<token from BotFather>
 REAL_MONEY_ENABLED=false
 TELEGRAM_WEBHOOK_SECRET=<random hex, см. setWebhook ниже>
 ADMIN_CHAT_ID=<your Telegram numeric user id for private admin logs>
 ADMIN_USER_IDS=<comma-separated Telegram user ids allowed to use admin commands>
 ADMIN_GRANT_MAX_CHIPS=500000
-APP_NAME=QWZ Poker
+APP_NAME=Weez Poker
 SENTRY_DSN=<optional, Sentry/GlitchTip DSN>
 SENTRY_TRACES_SAMPLE_RATE=0.1
 ```

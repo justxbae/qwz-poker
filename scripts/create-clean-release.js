@@ -24,7 +24,7 @@ for (const entry of ["server", "public", "package.json", "package-lock.json", "r
 await writeFile(
   path.join(out, "README_RELEASE.txt"),
   [
-    "QWZ Poker clean runtime export.",
+    "Weez Poker clean runtime export.",
     "",
     "Included: server/, public/, package files, render.yaml.",
     "Excluded: docs/, tests/, markdown specs, git metadata, local env files.",

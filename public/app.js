@@ -1,5 +1,5 @@
 const tg = window.Telegram?.WebApp;
-const BOT_USERNAME = "qwzpokerbot";
+let botUsername = "weezpokerbot";
 const params = new URLSearchParams(window.location.search);
 const DEV_MODE = params.has("dev1")
   || params.get("dev") === "1";
@@ -107,10 +107,6 @@ const homeWalletSideCurrency = document.querySelector("#homeWalletSideCurrency")
 const homeWalletSideHint = document.querySelector("#homeWalletSideHint");
 const homeWalletSideMeter = document.querySelector("#homeWalletSideMeter");
 const homeWalletSideAction = document.querySelector("#homeWalletSideAction");
-const homeActivityText = document.querySelector("#homeActivityText");
-const homeSessionPill = document.querySelector("#homeSessionPill");
-const homeScreenInstallButton = document.querySelector("#homeScreenInstallButton");
-const homeScreenInstallStatus = document.querySelector("#homeScreenInstallStatus");
 const homeOfferMeta = document.querySelector("#homeOfferMeta");
 const productModeHub = document.querySelector("#productModeHub");
 const dailyPlayClaimCard = document.querySelector("#dailyPlayClaimCard");
@@ -128,10 +124,6 @@ const promoCarousel = document.querySelector(".home-promo-banners");
 const promoDots = document.querySelector("#homePromoDots");
 const gameModeSwitch = document.querySelector("#gameModeSwitch");
 const lobbyBalanceCurrency = document.querySelector("#lobbyBalanceCurrency");
-const modeBanner = document.querySelector("#modeBanner");
-const modeBannerKicker = document.querySelector("#modeBannerKicker");
-const modeBannerTitle = document.querySelector("#modeBannerTitle");
-const modeBannerText = document.querySelector("#modeBannerText");
 const publicGamesTitle = document.querySelector("#publicGamesTitle");
 const privateGamesTitle = document.querySelector("#privateGamesTitle");
 const cashierBalance = document.querySelector("#cashierBalance");
@@ -150,7 +142,6 @@ const cashierWithdrawSubmit = document.querySelector("#cashierWithdrawSubmit");
 const cashierWithdrawStatus = document.querySelector("#cashierWithdrawStatus");
 const cashierWithdrawAvailable = document.querySelector("#cashierWithdrawAvailable");
 const cashierWithdrawBonus = document.querySelector("#cashierWithdrawBonus");
-const cashierPrimaryButton = document.querySelector("#cashierPrimaryButton");
 const cashierSheetBackdrop = document.querySelector("#cashierSheetBackdrop");
 const cashierSheetCloseButtons = document.querySelectorAll("[data-cashier-sheet-close]");
 const walletTopupButton = document.querySelector("#walletTopupButton");
@@ -182,7 +173,6 @@ const profileTables = document.querySelector("#profileTables");
 const profileChips = document.querySelector("#profileChips");
 const profileTableStack = document.querySelector("#profileTableStack");
 const profileSavedStack = document.querySelector("#profileSavedStack");
-const profileStatus = document.querySelector("#profileStatus");
 const profileSessionBadge = document.querySelector("#profileSessionBadge");
 const profileSessionList = document.querySelector("#profileSessionList");
 const profileRefreshButton = document.querySelector("#profileRefreshButton");
@@ -211,7 +201,7 @@ const adminTournamentDescription = document.querySelector("#adminTournamentDescr
 const adminTournamentStatusInput = document.querySelector("#adminTournamentStatus");
 const adminTournamentSubmit = document.querySelector("#adminTournamentSubmit");
 const adminTournamentReset = document.querySelector("#adminTournamentReset");
-const adminTournamentUiStatus = document.querySelector("#adminTournamentStatus");
+const adminTournamentUiStatus = document.querySelector("#adminTournamentUiStatus");
 const adminTournamentFormMeta = document.querySelector("#adminTournamentFormMeta");
 const adminTournamentCount = document.querySelector("#adminTournamentCount");
 const adminRewardTournamentCount = document.querySelector("#adminRewardTournamentCount");
@@ -249,10 +239,8 @@ const adminSettingsList = document.querySelector("#adminSettingsList");
 const tournamentList = document.querySelector("#tournamentList");
 const tournamentStatus = document.querySelector("#tournamentStatus");
 const tournamentHistoryList = document.querySelector("#tournamentHistoryList");
-const tournamentHistoryMeta = document.querySelector("#tournamentHistoryMeta");
 const tournamentDetailBackdrop = document.querySelector("#tournamentDetailBackdrop");
 const tournamentDetailSheet = document.querySelector("#tournamentDetailSheet");
-const tournamentDetailClose = document.querySelector("#tournamentDetailClose");
 const tournamentDetailSecondary = document.querySelector("#tournamentDetailSecondary");
 const tournamentDetailTitle = document.querySelector("#tournamentDetailTitle");
 const tournamentDetailBadge = document.querySelector("#tournamentDetailBadge");
@@ -266,9 +254,6 @@ const tournamentDetailGrid = document.querySelector("#tournamentDetailGrid");
 const tournamentDetailStructure = document.querySelector("#tournamentDetailStructure");
 const tournamentDetailNote = document.querySelector("#tournamentDetailNote");
 const tournamentDetailAction = document.querySelector("#tournamentDetailAction");
-const tournamentRegistrationNotice = document.querySelector("#tournamentRegistrationNotice");
-const tournamentRegistrationTitle = document.querySelector("#tournamentRegistrationTitle");
-const tournamentRegistrationMeta = document.querySelector("#tournamentRegistrationMeta");
 const tournamentRegistrationBadge = document.querySelector("#tournamentRegistrationBadge");
 const tournamentDetailHome = tournamentDetailSheet && tournamentDetailBackdrop ? {
   sheetParent: tournamentDetailSheet.parentNode,
@@ -283,7 +268,6 @@ const onlineStatus = document.querySelector("#onlineStatus");
 const publicTablesStatus = document.querySelector("#publicTablesStatus");
 const privateTablesStatus = document.querySelector("#privateTablesStatus");
 const quickPlayButton = document.querySelector("#quickPlayButton");
-const quickPrivateButton = document.querySelector("#quickPrivateButton");
 const limitPills = document.querySelector("#limitPills");
 const tableLimitPills = document.querySelector("#tableLimitPills");
 const tablesFilterStatus = document.querySelector("#tablesFilterStatus");
@@ -316,7 +300,6 @@ const tableInfo = document.querySelector("#tableInfo");
 const statsTable = document.querySelector("#statsTable");
 const lobby = document.querySelector("#lobby");
 const createTableForm = document.querySelector("#createTableForm");
-const refreshButton = document.querySelector("#refreshButton");
 const addTestPlayerButton = document.querySelector("#addTestPlayerButton");
 const autoActButton = document.querySelector("#autoActButton");
 const botActions = document.querySelector("#botActions");
@@ -404,6 +387,7 @@ let rebuyPromptKey = "";
 let queuedPreAction = "";
 let queuedPreActionKey = "";
 let pendingBetAction = "";
+let pendingPokerAction = false;
 let pendingBuyIn = null;
 let pendingDailyPlayClaim = false;
 let bottomNavPointer = null;
@@ -416,7 +400,6 @@ const tournamentEventLastSequence = new Map();
 let currentLobbyTab = "home";
 let fairnessSeedSyncing = false;
 let tournamentCountdownTimer = 0;
-let tournamentRegistrationNoticeTimer = 0;
 const fairnessSeedSyncedTables = new Set();
 let revealObserver = null;
 
@@ -425,6 +408,7 @@ boot().then(completeBoot).catch(showBootError);
 async function boot() {
   resetScroll();
   setupTapGuards();
+  setupOverlayKeyboardControls();
   setupScrollDynamics();
   setupLobbyOverscroll();
   tg?.expand();
@@ -446,11 +430,7 @@ async function boot() {
   if (/^tbl_[A-Za-z0-9_-]+$/.test(String(startParam || ""))) await joinTable(startParam);
 
   createTableForm.addEventListener("submit", onCreateTable);
-  refreshButton?.addEventListener("click", loadTables);
   profileRefreshButton?.addEventListener("click", () => runAction(loadProfile));
-  cashierPrimaryButton?.addEventListener("click", () => {
-    document.querySelector(".cashier-topup-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
   walletTopupButton?.addEventListener("click", () => runAction(openCashierTopup));
   cashierSheetBackdrop?.addEventListener("click", closeCashierSheet);
   document.querySelectorAll("[data-cashier-sheet]").forEach((sheet) => {
@@ -478,7 +458,6 @@ async function boot() {
   setupKeyboardAwareSheets();
   tournamentList?.addEventListener("click", onTournamentAction);
   tournamentDetailBackdrop?.addEventListener("click", closeTournamentDetails);
-  tournamentDetailClose?.addEventListener("click", closeTournamentDetails);
   tournamentDetailSecondary?.addEventListener("click", closeTournamentDetails);
   tournamentDetailAction?.addEventListener("click", onTournamentDetailAction);
   tournamentDetailSheet?.addEventListener("click", onTournamentDetailTabSelect);
@@ -493,7 +472,6 @@ async function boot() {
   homeTableList?.addEventListener("pointerup", onFooterLobbyPointerEnd, { passive: true });
   homeTableList?.addEventListener("pointercancel", onFooterLobbyPointerEnd, { passive: true });
   quickPlayButton.addEventListener("click", () => runAction(quickPlay));
-  quickPrivateButton?.addEventListener("click", () => runAction(quickCreatePrivateTable));
   homeWalletSideAction?.addEventListener("click", () => runAction(claimDailyPlayBonus));
   dailyPlayClaimButton?.addEventListener("click", () => runAction(claimDailyPlayBonus));
   continueGameButton.addEventListener("click", continueGame);
@@ -535,7 +513,7 @@ async function boot() {
     });
   });
   wireBottomNavGestures();
-  lobbyMenuButton?.addEventListener("click", openLobbyMenu);
+  lobbyMenuButton?.addEventListener("click", toggleLobbyMenu);
   lobbyMenuBackdrop?.addEventListener("click", closeLobbyMenu);
   lobbyMenuSheet?.addEventListener("click", onLobbyMenuAction);
   if (DEV_MODE) {
@@ -721,6 +699,11 @@ function adminWebSecret() {
 
 async function loadConfig() {
   state.config = await api("/api/config", { auth: false });
+  botUsername = String(state.config?.botUsername || botUsername).replace(/^@/, "");
+  const affiliateLinkPreview = document.querySelector(".affiliate-link-preview");
+  if (affiliateLinkPreview) {
+    affiliateLinkPreview.textContent = `t.me/${botUsername}?startapp=ref_your_code`;
+  }
   MINIMAL_LAUNCH = Boolean(state.config?.minimalLaunch || MINIMAL_LAUNCH);
   document.documentElement.classList.toggle("minimal-launch", MINIMAL_LAUNCH);
   applyMinimalLaunchMode();
@@ -796,7 +779,6 @@ function onGameFormatSelect(event) {
       return;
     }
     selectLobbyTab("tournaments");
-    document.querySelector("#sitGoPreview")?.scrollIntoView({ behavior: "smooth", block: "start" });
     showStatus("Sit&Go: быстрые столы будут открываться из турнирного раздела.");
     return;
   }
@@ -955,14 +937,6 @@ function renderModeBalance() {
 function renderModeContext() {
   const cashMode = state.gameMode === "cash";
   document.body.dataset.gameMode = cashMode ? "cash" : "play";
-  if (modeBanner) {
-    if (modeBannerKicker) modeBannerKicker.textContent = cashMode ? "Cash" : "Рейтинг";
-    if (modeBannerTitle) {
-      if (cashMode) modeBannerTitle.textContent = "Денежная игра";
-      else modeBannerTitle.textContent = "Рейтинговый режим";
-    }
-    modeBanner.dataset.mode = cashMode ? "cash" : "play";
-  }
   if (homeGamesTitle) homeGamesTitle.textContent = "Техасский холдем";
   if (publicGamesTitle) publicGamesTitle.textContent = cashMode ? "Cash-столы" : "Рейтинговые столы";
   if (privateGamesTitle) privateGamesTitle.textContent = "Мои приватные столы";
@@ -1004,43 +978,19 @@ function renderLimitOptions() {
 
 function setupTelegramControls() {
   applyTelegramTheme();
-  try {
-    tg?.disableVerticalSwipes?.();
-  } catch {
-    // Older Telegram WebViews do not expose this API.
+  if (telegramVersionAtLeast("7.7")) {
+    try {
+      tg?.disableVerticalSwipes?.();
+    } catch {
+      // Telegram capabilities may still differ between clients.
+    }
   }
   tg?.onEvent?.("themeChanged", applyTelegramTheme);
-  setupTelegramHomeScreenInstall();
-  tg?.BackButton?.onClick?.(() => {
-    runAction(handleTelegramBack);
-  });
-}
-
-function setupTelegramHomeScreenInstall() {
-  if (!homeScreenInstallButton) return;
-
-  const canInstall = Boolean(tg?.addToHomeScreen && tg?.checkHomeScreenStatus && telegramVersionAtLeast("8.0"));
-  if (!canInstall) {
-    homeScreenInstallButton.hidden = true;
-    return;
+  if (telegramVersionAtLeast("6.1")) {
+    tg?.BackButton?.onClick?.(() => {
+      runAction(handleTelegramBack);
+    });
   }
-
-  homeScreenInstallButton.addEventListener("click", () => {
-    haptic("selection");
-    if (homeScreenInstallStatus) homeScreenInstallStatus.textContent = "откройте подсказку";
-    try {
-      tg.addToHomeScreen();
-    } catch {
-      homeScreenInstallButton.hidden = true;
-    }
-  });
-
-  tg?.onEvent?.("homeScreenAdded", () => {
-    updateHomeScreenInstallRow("added");
-    haptic("success");
-  });
-
-  refreshHomeScreenInstallStatus();
 }
 
 function telegramVersionAtLeast(target) {
@@ -1054,27 +1004,6 @@ function telegramVersionAtLeast(target) {
     if (current < expected) return false;
   }
   return true;
-}
-
-function refreshHomeScreenInstallStatus() {
-  try {
-    tg?.checkHomeScreenStatus?.((status) => {
-      updateHomeScreenInstallRow(status || "unknown");
-    });
-  } catch {
-    homeScreenInstallButton.hidden = true;
-  }
-}
-
-function updateHomeScreenInstallRow(status) {
-  if (!homeScreenInstallButton) return;
-  const normalized = String(status || "unknown");
-  const shouldShow = normalized === "unknown" || normalized === "missed";
-  homeScreenInstallButton.hidden = !shouldShow;
-  if (!homeScreenInstallStatus) return;
-  if (normalized === "missed") homeScreenInstallStatus.textContent = "можно добавить";
-  else if (normalized === "added") homeScreenInstallStatus.textContent = "уже добавлено";
-  else homeScreenInstallStatus.textContent = "быстрый вход";
 }
 
 function applyTelegramTheme() {
@@ -1121,8 +1050,10 @@ function applyTelegramTheme() {
     target.style.setProperty("--tg-button", theme.button);
     target.style.setProperty("--tg-button-text", theme.buttonText);
   }
-  tg?.setHeaderColor?.(theme.secondaryBg);
-  tg?.setBackgroundColor?.(theme.secondaryBg);
+  if (telegramVersionAtLeast("6.1")) {
+    tg?.setHeaderColor?.(theme.secondaryBg);
+    tg?.setBackgroundColor?.(theme.secondaryBg);
+  }
 }
 
 function setupTapGuards() {
@@ -1397,6 +1328,7 @@ async function handleTelegramBack() {
 }
 
 function updateTelegramBackButton() {
+  if (!telegramVersionAtLeast("6.1")) return;
   const shouldShow = Boolean(pendingBetAction)
     || Boolean(state.selectedTournamentId)
     || !buyInOverlay.hidden
@@ -1415,6 +1347,7 @@ function updateTelegramBackButton() {
 }
 
 function haptic(type = "light") {
+  if (!telegramVersionAtLeast("6.1")) return;
   try {
     if (type === "selection") {
       tg?.HapticFeedback?.selectionChanged?.();
@@ -1937,7 +1870,7 @@ function renderCashierHistory(transactions, cashMode = false, withdrawals = []) 
 }
 
 function withdrawalStatusTitle(status = "") {
-  if (status === "approved") return "Выплачено";
+  if (["paid", "approved"].includes(status)) return "Выплачено";
   if (status === "rejected") return "Отменено";
   if (status === "failed") return "Ошибка";
   return "В обработке";
@@ -2225,7 +2158,7 @@ function renderProfile(profileData) {
   profileName.textContent = user.name || "Игрок";
   profileUsername.textContent = user.username ? `@${user.username}` : `id ${user.id || ""}`;
   const ratingLeagueText = MINIMAL_LAUNCH ? "Play chips" : (profile.ratingLeague || profile.ratingTier || "Bronze");
-  const ratingPointsText = `${formatNumber(profile.ratingPoints || 1000)} RP`;
+  const ratingPointsText = `${formatNumber(profile.ratingPoints ?? 1000)} RP`;
   const cashRankText = MINIMAL_LAUNCH ? "Cash" : cashLevelLabel(profile);
   if (lobbyRank) lobbyRank.textContent = cashRankText;
   renderUsdIconAmount(profileBalance, profileData.cashBalanceMicros || 0);
@@ -2237,15 +2170,6 @@ function renderProfile(profileData) {
   lobbyActiveTables.textContent = String(profileData.activeTableCount || 0);
   renderHomeWalletSide(profileData);
   renderDailyPlayClaimCard();
-  if (homeActivityText) {
-    homeActivityText.textContent = profileData.activeTableCount
-      ? `${profileData.activeTableCount} ${plural(profileData.activeTableCount, "стол", "стола", "столов")} · ${formatChips(profileData.tableStack)} за столами`
-      : "Выберите стол и начните игру.";
-  }
-  if (homeSessionPill) {
-    homeSessionPill.textContent = profileData.activeTableCount ? "активно" : "нет активных";
-    homeSessionPill.dataset.status = profileData.activeTableCount ? "active" : "idle";
-  }
   if (profileCashTitle) profileCashTitle.textContent = cashRankText;
   if (profileCashXpLabel) profileCashXpLabel.textContent = MINIMAL_LAUNCH
     ? `${formatNumber(profile.cashHandsPlayed || 0)} cash-рук`
@@ -2258,7 +2182,6 @@ function renderProfile(profileData) {
   if (profileRatingSeason) profileRatingSeason.textContent = MINIMAL_LAUNCH ? "—" : (profile.ratingSeasonId || "текущий");
   profileHands.textContent = formatNumber(profileData.handsPlayed || profile.handsPlayed || 0);
   profileTables.textContent = String(profileData.activeTableCount || 0);
-  if (profileStatus) profileStatus.textContent = "";
   profileSessionBadge.textContent = profileData.activeTableCount
     ? `${profileData.activeTableCount} ${plural(profileData.activeTableCount, "стол", "стола", "столов")}`
     : "";
@@ -2321,7 +2244,7 @@ function renderHomeWalletSide(profileData = {}) {
       homeWalletSideAction.disabled = true;
     }
   } else {
-    const ratingPoints = Number(state.user?.ratingPoints || state.progression?.rating?.startingRp || 1000);
+    const ratingPoints = Number(state.user?.ratingPoints ?? state.progression?.rating?.startingRp ?? 1000);
     if (homeWalletSideLabel) homeWalletSideLabel.textContent = "Рейтинг";
     homeWalletSideValue.textContent = formatNumber(ratingPoints);
     applyMoneyScale(homeWalletSideValue, ratingPoints, { play: true });
@@ -2419,7 +2342,7 @@ function renderProgression(progression) {
   renderProfileTournamentStats(state.homeStats || {});
   if (MINIMAL_LAUNCH) {
     if (homeRatingLeague) homeRatingLeague.textContent = "Play";
-    if (homeRatingPoints) homeRatingPoints.textContent = formatNumber(profile.ratingPoints || rating.startingRp || 1000);
+    if (homeRatingPoints) homeRatingPoints.textContent = formatNumber(profile.ratingPoints ?? rating.startingRp ?? 1000);
     if (homeCashClub) homeCashClub.textContent = "Cash";
     if (ratingLeaderboardMeta) ratingLeaderboardMeta.textContent = "игра на фишки";
     if (ratingLeaderboardList) {
@@ -2432,7 +2355,7 @@ function renderProgression(progression) {
     return;
   }
   const league = profile.ratingLeague || profile.ratingTier || "Bronze";
-  const ratingPoints = Number(profile.ratingPoints || rating.startingRp || 1000);
+  const ratingPoints = Number(profile.ratingPoints ?? rating.startingRp ?? 1000);
   if (homeRatingLeague) homeRatingLeague.textContent = league;
   if (homeRatingPoints) homeRatingPoints.textContent = formatNumber(ratingPoints);
   if (homeCashClub) homeCashClub.textContent = cashLevelLabel({
@@ -3637,14 +3560,16 @@ async function adjustAdminPlayerWallet() {
     return;
   }
   adminStatus.textContent = "Применяем операцию...";
+  const requestId = `admin-${Date.now()}-${cryptoRandomHex(12)}`;
   const data = await api("/api/admin/wallet-adjust", {
     method: "POST",
+    idempotencyKey: requestId,
     body: {
       telegramId,
       type: adminAdjustType.value,
       amount,
       reason: adminAdjustReason.value,
-      requestId: `admin-${Date.now()}-${cryptoRandomHex(12)}`
+      requestId
     }
   });
   renderAdminPlayer(data.player);
@@ -3755,7 +3680,7 @@ function renderAdminWithdrawals(withdrawals) {
 
   for (const withdrawal of withdrawals) {
     const row = document.createElement("div");
-    row.className = `cashier-transaction admin-payment-row ${withdrawal.status === "approved" ? "credit" : "debit"}`;
+    row.className = `cashier-transaction admin-payment-row ${["paid", "approved"].includes(withdrawal.status) ? "credit" : "debit"}`;
     const main = document.createElement("div");
     const title = document.createElement("strong");
     const cashMode = Number(withdrawal.grossUsdtMicros || 0) > 0 || withdrawal.asset === "USDT";
@@ -3766,7 +3691,7 @@ function renderAdminWithdrawals(withdrawals) {
     const financeMeta = cashMode
       ? [
           `hold ${formatUsdt(withdrawal.grossUsdtMicros || 0)} USDT`,
-          `hidden fee ${formatUsdt(withdrawal.feeUsdtMicros || 0)} USDT`,
+          `service fee ${formatUsdt(withdrawal.feeUsdtMicros || 0)} USDT`,
           `net payout ${formatUsdt(withdrawal.payoutUsdtMicros || 0)} USDT`
         ]
       : [
@@ -3777,6 +3702,7 @@ function renderAdminWithdrawals(withdrawals) {
       withdrawal.userName || withdrawal.username || withdrawal.userId,
       ...financeMeta,
       formatDateTime(withdrawal.createdAt),
+      withdrawal.externalTxId ? `tx ${withdrawal.externalTxId}` : "",
       withdrawal.id
     ].filter(Boolean).join(" · ");
     main.append(title, meta);
@@ -3804,12 +3730,18 @@ async function onAdminWithdrawalAction(event) {
   if (!button) return;
   const withdrawalId = button.dataset.withdrawalId;
   const action = button.dataset.withdrawalAction;
+  let externalTxId = "";
+  if (action === "approve") {
+    externalTxId = String(window.prompt("Вставьте tx hash / transaction id уже отправленной выплаты") || "").trim();
+    if (!externalTxId) return;
+  }
   adminStatus.textContent = action === "approve" ? "Подтверждаем вывод..." : "Отклоняем вывод...";
   await api(`/api/admin/withdrawals/${encodeURIComponent(withdrawalId)}/${action}`, {
     method: "POST",
     idempotencyKey: requestKey(`admin-withdrawal-${action}-${withdrawalId}`),
     body: {
-      reason: action === "approve" ? "manual_withdrawal_approval" : "manual_withdrawal_reject"
+      reason: action === "approve" ? "manual_payout_confirmed" : "manual_withdrawal_reject",
+      externalTxId
     }
   });
   adminStatus.textContent = action === "approve" ? "Вывод подтвержден." : "Вывод отклонен.";
@@ -4252,10 +4184,14 @@ function openCashierSheet(section = "deposit") {
   lockLobbyScroll("cashier");
   document.body.classList.add("cashier-sheet-open");
   if (cashierSheetBackdrop) cashierSheetBackdrop.hidden = false;
+  sheet.setAttribute("role", "dialog");
+  sheet.setAttribute("aria-modal", "true");
+  sheet.tabIndex = -1;
   sheet.classList.add("sheet-open");
   sheet.removeAttribute("hidden");
   window.requestAnimationFrame(() => {
     sheet.classList.add("sheet-visible");
+    sheet.focus({ preventScroll: true });
   });
   updateTelegramBackButton();
 }
@@ -4269,6 +4205,9 @@ function closeCashierSheet(options = {}) {
   document.querySelectorAll("[data-cashier-sheet].sheet-open").forEach((item) => {
     item.classList.remove("sheet-visible", "sheet-open");
     item.style.removeProperty("--sheet-drag-y");
+    item.removeAttribute("role");
+    item.removeAttribute("aria-modal");
+    item.removeAttribute("tabindex");
     const home = cashierSheetHomes.get(item);
     if (home?.parent) {
       home.parent.insertBefore(item, home.nextSibling);
@@ -4532,13 +4471,6 @@ function renderTournaments() {
     emptyText: "История участия появится после первого завершённого турнира.",
     limit: 6
   });
-  if (tournamentHistoryMeta) {
-    const count = Number(state.tournamentHistory?.length || 0);
-    tournamentHistoryMeta.textContent = count
-      ? `${count} ${plural(count, "результат", "результата", "результатов")}`
-      : "история";
-  }
-
   if (!state.tournaments.length) {
     const empty = document.createElement("p");
     empty.className = "empty";
@@ -4600,36 +4532,10 @@ function renderTournamentRegistrationNotice() {
     const playerStatus = tournament.playerState?.status;
     return tournament.registered || playerStatus === "registered" || playerStatus === "playing";
   });
-  if (tournamentRegistrationNotice) {
-    tournamentRegistrationNotice.hidden = !registered;
-    tournamentRegistrationNotice.style.setProperty("display", registered ? "" : "none", registered ? "" : "important");
-  }
   if (tournamentRegistrationBadge) {
     tournamentRegistrationBadge.hidden = !registered;
     tournamentRegistrationBadge.style.setProperty("display", registered ? "" : "none", registered ? "" : "important");
   }
-  window.clearInterval(tournamentRegistrationNoticeTimer);
-  const updateMeta = () => {
-    if (!tournamentRegistrationMeta || !registered) return;
-    const startsAt = new Date(registered.startsAt || "").getTime();
-    const remaining = startsAt - Date.now();
-    if (Number.isFinite(startsAt) && remaining > 0 && remaining <= 12 * 60 * 60 * 1000) {
-      const totalSeconds = Math.floor(remaining / 1000);
-      const hours = Math.floor(totalSeconds / 3600);
-      const minutes = Math.floor((totalSeconds % 3600) / 60);
-      const seconds = totalSeconds % 60;
-      tournamentRegistrationMeta.textContent = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-      return;
-    }
-    tournamentRegistrationMeta.textContent = formatTournamentStartLabel(registered);
-  };
-  if (registered) {
-    updateMeta();
-    tournamentRegistrationNoticeTimer = window.setInterval(updateMeta, 1000);
-  } else if (tournamentRegistrationMeta) {
-    tournamentRegistrationMeta.textContent = "Открыть";
-  }
-  if (tournamentRegistrationTitle) tournamentRegistrationTitle.textContent = registered?.title || "Турнир";
 }
 
 async function onTournamentAction(event) {
@@ -4748,19 +4654,36 @@ function setupKeyboardAwareSheets() {
   viewport?.addEventListener("scroll", update);
   window.addEventListener("resize", update);
   document.querySelectorAll("[data-cashier-sheet]").forEach((sheet) => {
-    sheet.addEventListener("pointerdown", (event) => {
+    sheet.addEventListener("click", (event) => {
       const interactive = event.target.closest("input, textarea, select, button, a");
-      if (!interactive && document.activeElement instanceof HTMLElement) {
-        const sheetScrollTop = sheet.scrollTop;
-        event.preventDefault();
+      if (!interactive && document.activeElement?.matches?.("input, textarea, select, [contenteditable='true']")) {
         document.activeElement.blur();
-        window.setTimeout(() => {
-          sheet.scrollTop = sheetScrollTop;
-        }, 60);
       }
-    }, { passive: false });
+    });
   });
   update();
+}
+
+function setupOverlayKeyboardControls() {
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    if (lobbyMenuSheet && !lobbyMenuSheet.hidden) {
+      closeLobbyMenu();
+      return;
+    }
+    if (document.querySelector("#docSheet:not([hidden])")) {
+      closeDocSheet();
+      return;
+    }
+    if (state.selectedTournamentId) {
+      closeTournamentDetails();
+      return;
+    }
+    if (document.querySelector("[data-cashier-sheet].sheet-open")) {
+      closeCashierSheet();
+      return;
+    }
+  });
 }
 
 function onTournamentDetailTabSelect(event) {
@@ -4913,7 +4836,10 @@ async function openTournamentDetails(id) {
   tournamentDetailSheet.classList.remove("sheet-visible");
   tournamentDetailSheet.classList.add("sheet-open");
   document.body.classList.add("cashier-sheet-open", "tournament-sheet-open");
-  window.requestAnimationFrame(() => tournamentDetailSheet.classList.add("sheet-visible"));
+  window.requestAnimationFrame(() => {
+    tournamentDetailSheet.classList.add("sheet-visible");
+    tournamentDetailSheet.focus({ preventScroll: true });
+  });
   updateTelegramBackButton();
   try {
     await refreshOpenTournamentDetails(id);
@@ -5176,6 +5102,7 @@ function openBuyInOverlay(intent) {
   buyInSheet?.style.removeProperty("--buyin-drag-y");
   window.requestAnimationFrame(() => {
     buyInSheet?.classList.add("sheet-visible");
+    buyInSheet?.focus({ preventScroll: true });
   });
   updateTelegramBackButton();
 }
@@ -5316,10 +5243,15 @@ async function ensurePlayerFairnessSeed(table) {
     const seed = getLocalFairnessSeed();
     let data;
     if (table.status === "starting" && table.fairness?.phase === "commit_reveal" && viewerSeat.fairnessSeedSource === "player-commit-pending") {
-      data = await api(`/api/tables/${table.id}/fairness-reveal`, { method: "POST", body: { seed } });
+      data = await api(`/api/tables/${table.id}/fairness-reveal`, {
+        method: "POST",
+        idempotencyKey: `fairness-reveal:${table.id}:${table.handNumber || 0}:${state.user.id}`,
+        body: { seed }
+      });
     } else if (["waiting", "showdown", "starting"].includes(table.status) && !["player-commit-pending", "player-commit-reveal"].includes(viewerSeat.fairnessSeedSource)) {
       data = await api(`/api/tables/${table.id}/fairness-commit`, {
         method: "POST",
+        idempotencyKey: `fairness-commit:${table.id}:${Number(table.handNumber || 0) + 1}:${state.user.id}`,
         body: { seedHash: await sha256Hex(seed) }
       });
     } else {
@@ -5365,16 +5297,24 @@ async function onConfirmBet() {
 }
 
 async function submitPokerAction(action) {
+  if (pendingPokerAction || !state.currentTableId) return;
+  pendingPokerAction = true;
   haptic(action === "fold" ? "warning" : "medium");
   const body = { action };
   if (action === "raise" || action === "bet") body.amount = Number(actionAmount.value || 0);
-  await runAction(async () => {
-    const data = await api(`/api/tables/${state.currentTableId}/act`, {
-      method: "POST",
-      body
+  try {
+    await runAction(async () => {
+      const tableId = state.currentTableId;
+      const data = await api(`/api/tables/${tableId}/act`, {
+        method: "POST",
+        idempotencyKey: requestKey(`table-act-${tableId}-${state.currentTable?.handNumber || 0}`),
+        body
+      });
+      renderCurrentTable(data.table);
     });
-    renderCurrentTable(data.table);
-  });
+  } finally {
+    pendingPokerAction = false;
+  }
 }
 
 async function onShowMuckChoice(event) {
@@ -5387,6 +5327,7 @@ async function onShowMuckChoice(event) {
   await runAction(async () => {
     const data = await api(`/api/tables/${state.currentTableId}/show-muck`, {
       method: "POST",
+      idempotencyKey: requestKey(`table-show-muck-${state.currentTableId}-${state.currentTable?.handNumber || 0}`),
       body: { choice }
     });
     renderCurrentTable(data.table);
@@ -5419,7 +5360,11 @@ async function testBotAct(action) {
 
 async function standFromTable() {
   if (!state.currentTableId) return;
-  const data = await api(`/api/tables/${state.currentTableId}/stand`, { method: "POST" });
+  const tableId = state.currentTableId;
+  const data = await api(`/api/tables/${tableId}/stand`, {
+    method: "POST",
+    idempotencyKey: requestKey(`table-stand-${tableId}`)
+  });
   closeMenu();
   await auth();
   if (data.table) {
@@ -5465,7 +5410,10 @@ async function sitAtTable() {
     await joinTable(state.currentTableId);
     return;
   }
-  const data = await api(`/api/tables/${state.currentTableId}/join`, { method: "POST" });
+  const data = await api(`/api/tables/${state.currentTableId}/join`, {
+    method: "POST",
+    idempotencyKey: requestKey(`table-return-${state.currentTableId}`)
+  });
   closeMenu();
   renderCurrentTable(data.table);
 }
@@ -5485,7 +5433,11 @@ async function returnToSeat() {
 
 async function sitOut() {
   if (!state.currentTableId) return;
-  const data = await api(`/api/tables/${state.currentTableId}/sit-out`, { method: "POST" });
+  const tableId = state.currentTableId;
+  const data = await api(`/api/tables/${tableId}/sit-out`, {
+    method: "POST",
+    idempotencyKey: requestKey(`table-sit-out-${tableId}`)
+  });
   closeMenu();
   closeSitOutPopover();
   renderCurrentTable(data.table);
@@ -5493,7 +5445,11 @@ async function sitOut() {
 
 async function sitIn() {
   if (!state.currentTableId) return;
-  const data = await api(`/api/tables/${state.currentTableId}/sit-in`, { method: "POST" });
+  const tableId = state.currentTableId;
+  const data = await api(`/api/tables/${tableId}/sit-in`, {
+    method: "POST",
+    idempotencyKey: requestKey(`table-sit-in-${tableId}`)
+  });
   closeMenu();
   renderCurrentTable(data.table);
 }
@@ -6286,7 +6242,10 @@ function openDocSheet(docId) {
     }));
   }
   sheet.hidden = false;
-  window.requestAnimationFrame(() => sheet.classList.add("sheet-visible"));
+  window.requestAnimationFrame(() => {
+    sheet.classList.add("sheet-visible");
+    sheet.focus({ preventScroll: true });
+  });
   haptic("light");
 }
 
@@ -6304,6 +6263,7 @@ function openLobbyMenu(options = {}) {
   if (!options.silentHaptic) haptic("light");
   closeCashierSheet({ silent: true });
   lobbyMenuButton?.classList.add("active", "nav-pressed");
+  lobbyMenuButton?.setAttribute("aria-expanded", "true");
   window.setTimeout(() => lobbyMenuButton?.classList.remove("nav-pressed"), 360);
   updateBottomNavIndicator("__menu");
   window.setTimeout(() => {
@@ -6313,9 +6273,21 @@ function openLobbyMenu(options = {}) {
     lobbyMenuSheet.style.setProperty("--sheet-drag-y", "0px");
     lockLobbyScroll("menu");
     document.body.classList.add("lobby-menu-open");
-    window.requestAnimationFrame(() => lobbyMenuSheet.classList.add("sheet-visible"));
+    window.requestAnimationFrame(() => {
+      lobbyMenuSheet.classList.add("sheet-visible");
+      lobbyMenuSheet.focus({ preventScroll: true });
+    });
     updateTelegramBackButton();
   }, 120);
+}
+
+function toggleLobbyMenu(event) {
+  event?.preventDefault?.();
+  if (lobbyMenuSheet && !lobbyMenuSheet.hidden) {
+    closeLobbyMenu();
+    return;
+  }
+  openLobbyMenu();
 }
 
 function closeLobbyMenu(options = {}) {
@@ -6329,6 +6301,7 @@ function closeLobbyMenu(options = {}) {
     lobbyMenuSheet.classList.remove("sheet-open");
     lobbyMenuSheet.style.removeProperty("--sheet-drag-y");
     lobbyMenuButton?.classList.remove("active");
+    lobbyMenuButton?.setAttribute("aria-expanded", "false");
     updateBottomNavIndicator();
     if (!options.silent) updateTelegramBackButton();
   };
@@ -6381,7 +6354,7 @@ async function inviteToTable() {
 }
 
 function tableInviteLink(tableId) {
-  return `https://t.me/${BOT_USERNAME}?startapp=${encodeURIComponent(tableId)}`;
+  return `https://t.me/${botUsername}?startapp=${encodeURIComponent(tableId)}`;
 }
 
 function openSitOutPopover() {
@@ -6647,7 +6620,7 @@ function streetOverlayFor(table) {
 function renderActionLog(logItems, handHistory = []) {
   const hands = Array.isArray(handHistory) ? handHistory.filter(Boolean) : [];
   if (hands.length) {
-    actionLog.replaceChildren(...hands.slice().reverse().map(renderHandHistoryItem));
+    actionLog.replaceChildren(...hands.map(renderHandHistoryItem));
     return;
   }
   const empty = document.createElement("div");
@@ -6732,7 +6705,7 @@ function renderStats(table) {
   statsTable.replaceChildren(
     headerRow(["Ник", "Бай-ин", "Результат"]),
     ...seats.map((seat) => {
-      const buyIn = Number(seat.buyIn ?? seat.initialStack ?? seat.handStartStack ?? seat.stack + seat.totalBet);
+      const buyIn = Number(seat.totalBuyIn ?? seat.initialStack ?? seat.handStartStack ?? seat.stack + seat.totalBet);
       const result = Number(seat.stack || 0) + Number(seat.totalBet || 0) - buyIn;
       const row = document.createElement("div");
       row.className = "stats-row";

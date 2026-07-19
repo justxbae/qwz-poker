@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
   RATING,
+  RATING_INTEGRITY,
+  applyRatingIntegrityLimits,
   advanceWelcomeBonusWagering,
   cashClubPointsFromRake,
   cashClubProgress,
@@ -735,131 +737,248 @@ export async function recordProfileHandProgress({
   const uniqueIds = [...new Set(providerUserIds.map(String).filter(Boolean))];
   if (!uniqueIds.length) return [];
   const cashMode = gameMode === "cash";
-  const ratingEligible = gameMode === "play" && !Boolean(table?.isPrivate) && !Boolean(table?.tournamentId);
-  const seasonId = activeRatingSeasonId();
+  const ratingModeEligible = gameMode === "play" && !Boolean(table?.isPrivate) && !Boolean(table?.tournamentId);
+  const season = ratingSeasonWindow();
+  const progressKey = String(handId || hand?.id || "");
   const handSeats = Array.isArray(hand?.seats) ? hand.seats : [];
   const seatByUserId = new Map(handSeats.map((seat) => [String(seat.userId || ""), seat]));
   const activePlayers = handSeats.filter((seat) => seat.userId).length;
-  const changes = [];
+  const appUserIdByProviderId = new Map();
   for (const providerUserId of uniqueIds) {
-    const appUserId = await ensureIdentity(provider, providerUserId);
-    await query("insert into player_profiles (app_user_id) values ($1) on conflict do nothing", [appUserId]);
-    const progressKey = String(handId || "");
-    if (progressKey) {
-      const mark = await query(`
-        insert into profile_hand_progress (hand_id, app_user_id, game_mode)
-        values ($1, $2, $3)
-        on conflict do nothing
-        returning hand_id
-      `, [progressKey, appUserId, gameMode === "tournament" ? "tournament" : cashMode ? "cash" : "play"]);
-      if (!mark.rowCount) continue;
+    appUserIdByProviderId.set(providerUserId, await ensureIdentity(provider, providerUserId));
+  }
+
+  const client = await pool.connect();
+  const changes = [];
+  try {
+    await client.query("begin");
+    if (ratingModeEligible) {
+      await client.query(`
+        insert into rating_seasons (id, title, status, starts_at, ends_at, rules)
+        values ($1, $2, 'active', $3, $4, $5::jsonb)
+        on conflict (id) do nothing
+      `, [season.id, season.title, season.startsAt, season.endsAt, JSON.stringify({ formulaVersion: RATING_INTEGRITY.formulaVersion })]);
     }
-    const seatResult = seatByUserId.get(String(providerUserId)) || {};
-    const rakeShare = cashMode ? Math.max(0, Number(seatResult.rakeContributed || 0)) : 0;
-    const ratingDelta = ratingEligible ? ratingDeltaForHand({
-      profit: Number(seatResult.profit || 0),
-      bigBlind: Number(table?.bigBlind || 0),
-      isPrivate: Boolean(table?.isPrivate),
-      activePlayers,
-      potSize: (hand?.pots || []).reduce((sum, pot) => sum + Number(pot.grossAmount ?? pot.amount ?? 0), 0)
-    }) : 0;
-    const clubPointsDelta = cashMode ? cashClubPointsFromRake(rakeShare) : 0;
-    const currentResult = await query(`
-      select cash_xp, cash_club_points, cash_rake_contributed, rating_points, rating_peak_points,
-             cash_hands_played, rating_hands_played
-      from player_profiles
-      where app_user_id = $1
-      for update
-    `, [appUserId]);
-    const current = currentResult.rows[0] || {};
-    const currentClubPoints = Number(current.cash_club_points ?? current.cash_xp ?? 0);
-    const nextClubPoints = currentClubPoints + clubPointsDelta;
-    const clubStatus = cashClubStatus(nextClubPoints);
-    const nextRatingPointsValue = cashMode
-      ? Number(current.rating_points || RATING.seasonStartingRp)
-      : nextRatingPoints(Number(current.rating_points || RATING.seasonStartingRp), ratingDelta);
-    const nextRatingPeak = Math.max(Number(current.rating_peak_points || 0), nextRatingPointsValue);
-    const nextRatingTier = ratingLeague(nextRatingPointsValue).title;
-    const updated = await query(`
-      update player_profiles
-      set cash_xp = $2,
-          cash_club_points = $2,
-          cash_level = $3,
-          cash_status = $4,
-          cash_rake_contributed = cash_rake_contributed + $5,
-          rating_points = $6,
-          rating_peak_points = $7,
-          rating_tier = $8,
-          rating_season_id = case when $9 <> '' then $9 else rating_season_id end,
-          rating_active_days = rating_active_days + case
-            when $10::boolean and not exists (
-              select 1 from profile_hand_progress php
-              where php.app_user_id = player_profiles.app_user_id
-                and php.game_mode = 'play'
-                and php.created_at::date = now()::date
-                and php.hand_id <> $11
-            ) then 1 else 0 end,
-          hands_played = hands_played + 1,
-          cash_hands_played = cash_hands_played + $12,
-          rating_hands_played = rating_hands_played + $13,
-          updated_at = now()
-      where app_user_id = $1
-      returning cash_level, cash_xp, cash_status, rating_points, rating_tier, rating_season_id,
-                cash_club_points, cash_rake_contributed, rating_peak_points, rating_active_days,
-                tournament_entries, tournament_itm, tournament_final_tables, tournament_wins,
-                tournament_fees_paid, tournament_cash_fees_paid_micros, tournament_play_fees_paid, tournament_prize_won,
-                tournament_cash_prize_won_micros, tournament_play_prize_won,
-                sng_played, sng_wins, sng_fees_paid, sng_cash_fees_paid_micros, sng_play_fees_paid, sng_prize_won,
-                sng_cash_prize_won_micros, sng_play_prize_won,
-                hands_played, cash_hands_played, rating_hands_played, tournaments_played
-    `, [
-      appUserId,
-      nextClubPoints,
-      profileCashLevel(nextClubPoints),
-      clubStatus.title,
-      cashMode ? rakeShare : 0,
-      nextRatingPointsValue,
-      nextRatingPeak,
-      nextRatingTier,
-      ratingEligible ? seasonId : "",
-      ratingEligible,
-      progressKey,
-      cashMode ? 1 : 0,
-      ratingEligible ? 1 : 0
-    ]);
-    if (ratingEligible && ratingDelta !== 0) {
-      await query(`
-        insert into rating_entries (
-          id, season_id, app_user_id, provider, provider_user_id, type,
-          points_delta, points_after, source_id, meta
-        )
-        values ($1, $2, $3, $4, $5, 'hand', $6, $7, $8, $9::jsonb)
-      `, [
-        id("rating"),
-        seasonId,
-        appUserId,
-        provider,
-        String(providerUserId),
-        ratingDelta,
-        nextRatingPointsValue,
-        progressKey,
-        JSON.stringify({
+    const seasonState = ratingModeEligible
+      ? await client.query("select status from rating_seasons where id = $1 for share", [season.id])
+      : { rows: [] };
+    const ratingEligible = ratingModeEligible && Boolean(progressKey) && seasonState.rows[0]?.status === "active";
+
+    for (const providerUserId of uniqueIds) {
+      const appUserId = appUserIdByProviderId.get(providerUserId);
+      await client.query("insert into player_profiles (app_user_id) values ($1) on conflict do nothing", [appUserId]);
+      if (progressKey) {
+        const mark = await client.query(`
+          insert into profile_hand_progress (hand_id, app_user_id, game_mode)
+          values ($1, $2, $3)
+          on conflict do nothing
+          returning hand_id
+        `, [progressKey, appUserId, gameMode === "tournament" ? "tournament" : cashMode ? "cash" : "play"]);
+        if (!mark.rowCount) continue;
+      }
+
+      const currentResult = await client.query(`
+        select cash_xp, cash_club_points, cash_rake_contributed, rating_points, rating_peak_points
+        from player_profiles
+        where app_user_id = $1
+        for update
+      `, [appUserId]);
+      const current = currentResult.rows[0] || {};
+      const seatResult = seatByUserId.get(providerUserId) || {};
+      const rakeShare = cashMode ? Math.max(0, Number(seatResult.rakeContributed || 0)) : 0;
+      const clubPointsDelta = cashMode ? cashClubPointsFromRake(rakeShare) : 0;
+      const nextClubPoints = Number(current.cash_club_points ?? current.cash_xp ?? 0) + clubPointsDelta;
+      const clubStatus = cashClubStatus(nextClubPoints);
+      let ratingDelta = 0;
+      let ratingIntegrity = { delta: 0, pairShare: 0, pairFarm: false, capped: false, reasons: [] };
+      let seasonPlayer = null;
+
+      if (ratingEligible) {
+        await client.query(`
+          insert into rating_season_players (season_id, app_user_id, points, peak_points)
+          values ($1, $2, $3, $3)
+          on conflict do nothing
+        `, [season.id, appUserId, RATING.seasonStartingRp]);
+        const seasonPlayerResult = await client.query(`
+          select points, peak_points, hands_played, active_days, last_active_date
+          from rating_season_players
+          where season_id = $1 and app_user_id = $2
+          for update
+        `, [season.id, appUserId]);
+        const before = seasonPlayerResult.rows[0];
+        const baseDelta = ratingDeltaForHand({
           profit: Number(seatResult.profit || 0),
           bigBlind: Number(table?.bigBlind || 0),
+          isPrivate: Boolean(table?.isPrivate),
           activePlayers,
-          tableId: table?.id || ""
-        })
-      ]);
+          potSize: (hand?.pots || []).reduce((sum, pot) => sum + Number(pot.grossAmount ?? pot.amount ?? 0), 0)
+        });
+        const opponentAppUserIds = uniqueIds
+          .filter((candidate) => candidate !== providerUserId)
+          .map((candidate) => appUserIdByProviderId.get(candidate))
+          .filter(Boolean);
+        const pairWindow = `${RATING_INTEGRITY.pairWindowDays} days`;
+        const totalResult = await client.query(`
+          select count(distinct hand_id)::int as hands
+          from rating_pair_hands
+          where season_id = $1 and app_user_id = $2 and created_at >= now() - $3::interval
+        `, [season.id, appUserId, pairWindow]);
+        const pairResult = opponentAppUserIds.length ? await client.query(`
+          select opponent_app_user_id, count(distinct hand_id)::int as hands
+          from rating_pair_hands
+          where season_id = $1 and app_user_id = $2
+            and opponent_app_user_id = any($3::text[])
+            and created_at >= now() - $4::interval
+          group by opponent_app_user_id
+          order by hands desc, opponent_app_user_id asc
+          limit 1
+        `, [season.id, appUserId, opponentAppUserIds, pairWindow]) : { rows: [] };
+        const dailyResult = await client.query(`
+          select coalesce(sum(points_delta), 0)::bigint as gained
+          from rating_entries
+          where season_id = $1 and app_user_id = $2 and points_delta > 0
+            and created_at >= date_trunc('day', now() at time zone 'utc') at time zone 'utc'
+        `, [season.id, appUserId]);
+        const freezeResult = await client.query(`
+          select exists(
+            select 1 from risk_flags
+            where app_user_id = $1 and flag_type like 'rating_%'
+              and severity in ('high', 'critical') and status in ('open', 'review')
+          ) as frozen
+        `, [appUserId]);
+        const historicalHands = Number(totalResult.rows[0]?.hands || 0);
+        const dominantPairHands = Number(pairResult.rows[0]?.hands || 0);
+        ratingIntegrity = applyRatingIntegrityLimits({
+          baseDelta,
+          dailyPositiveAccrued: Number(dailyResult.rows[0]?.gained || 0),
+          pairHands: opponentAppUserIds.length ? dominantPairHands + 1 : 0,
+          totalHands: historicalHands + 1,
+          frozen: freezeResult.rows[0]?.frozen === true
+        });
+        ratingDelta = ratingIntegrity.delta;
+        const nextPoints = nextRatingPoints(Number(before.points ?? RATING.seasonStartingRp), ratingDelta);
+        const nextPeak = Math.max(Number(before.peak_points ?? RATING.seasonStartingRp), nextPoints);
+        const seasonUpdate = await client.query(`
+          update rating_season_players
+          set points = $3,
+              peak_points = $4,
+              hands_played = hands_played + 1,
+              active_days = active_days + case when last_active_date is distinct from current_date then 1 else 0 end,
+              last_active_date = current_date,
+              updated_at = now()
+          where season_id = $1 and app_user_id = $2
+          returning points, peak_points, hands_played, active_days
+        `, [season.id, appUserId, nextPoints, nextPeak]);
+        seasonPlayer = seasonUpdate.rows[0];
+
+        for (const opponentAppUserId of opponentAppUserIds) {
+          await client.query(`
+            insert into rating_pair_hands (season_id, hand_id, app_user_id, opponent_app_user_id, table_id)
+            values ($1, $2, $3, $4, $5)
+            on conflict do nothing
+          `, [season.id, progressKey, appUserId, opponentAppUserId, String(table?.id || "")]);
+        }
+        if (ratingIntegrity.pairFarm) {
+          const dominantOpponentId = pairResult.rows[0]?.opponent_app_user_id || opponentAppUserIds[0] || "";
+          const sourceId = `${season.id}:${appUserId}:${dominantOpponentId}`;
+          await client.query(`
+            insert into risk_flags (
+              id, app_user_id, provider, provider_user_id, flag_type,
+              severity, status, reason, source_id, meta
+            )
+            select $1, $2, $3, $4, 'rating_pair_farm', 'high', 'open', $5, $6, $7::jsonb
+            where not exists (
+              select 1 from risk_flags
+              where source_id = $6 and flag_type = 'rating_pair_farm' and status in ('open', 'review')
+            )
+          `, [
+            id("risk"), appUserId, provider, providerUserId,
+            "Более 60% рейтинговых рук за 7 дней сыграно против одного соперника",
+            sourceId,
+            JSON.stringify({
+              seasonId: season.id,
+              opponentAppUserId: dominantOpponentId,
+              pairShare: ratingIntegrity.pairShare,
+              pairHands: dominantPairHands + 1,
+              totalHands: historicalHands + 1,
+              handId: progressKey,
+              tableId: String(table?.id || "")
+            })
+          ]);
+        }
+        await client.query(`
+          insert into rating_entries (
+            id, season_id, app_user_id, provider, provider_user_id, type,
+            points_delta, points_after, source_id, meta
+          )
+          values ($1, $2, $3, $4, $5, 'hand', $6, $7, $8, $9::jsonb)
+        `, [
+          id("rating"), season.id, appUserId, provider, providerUserId,
+          ratingDelta, Number(seasonPlayer.points), progressKey,
+          JSON.stringify({
+            formulaVersion: RATING_INTEGRITY.formulaVersion,
+            baseDelta,
+            integrity: ratingIntegrity,
+            profit: Number(seatResult.profit || 0),
+            bigBlind: Number(table?.bigBlind || 0),
+            activePlayers,
+            tableId: table?.id || ""
+          })
+        ]);
+      }
+
+      let updated;
+      if (cashMode) {
+        updated = await client.query(`
+          update player_profiles
+          set cash_xp = $2, cash_club_points = $2, cash_level = $3, cash_status = $4,
+              cash_rake_contributed = cash_rake_contributed + $5,
+              hands_played = hands_played + 1, cash_hands_played = cash_hands_played + 1,
+              updated_at = now()
+          where app_user_id = $1
+          returning *
+        `, [appUserId, nextClubPoints, profileCashLevel(nextClubPoints), clubStatus.title, rakeShare]);
+      } else if (ratingEligible && seasonPlayer) {
+        updated = await client.query(`
+          update player_profiles
+          set rating_points = $2, rating_peak_points = $3, rating_tier = $4,
+              rating_season_id = $5, rating_active_days = $6, rating_hands_played = $7,
+              hands_played = hands_played + 1, updated_at = now()
+          where app_user_id = $1
+          returning *
+        `, [
+          appUserId,
+          Number(seasonPlayer.points),
+          Number(seasonPlayer.peak_points),
+          ratingLeague(Number(seasonPlayer.points)).title,
+          season.id,
+          Number(seasonPlayer.active_days),
+          Number(seasonPlayer.hands_played)
+        ]);
+      } else {
+        updated = await client.query(`
+          update player_profiles set hands_played = hands_played + 1, updated_at = now()
+          where app_user_id = $1 returning *
+        `, [appUserId]);
+      }
+
+      changes.push({
+        providerUserId,
+        handId,
+        ratingDelta,
+        ratingIntegrity,
+        clubPointsDelta,
+        profile: normalizePlayerProfileRow(updated.rows[0])
+      });
     }
-    changes.push({
-      providerUserId,
-      handId,
-      ratingDelta,
-      clubPointsDelta,
-      profile: normalizePlayerProfileRow(updated.rows[0])
-    });
+    await client.query("commit");
+    return changes;
+  } catch (error) {
+    await client.query("rollback").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
   }
-  return changes;
 }
 
 export async function recordPlatformLedgerEntry(entry) {
@@ -2240,7 +2359,11 @@ export async function reviewWithdrawalOrder(orderId, review) {
   if (!pool) return null;
   const client = await pool.connect();
   const action = review.action === "approve" ? "approve" : "reject";
-  const reviewedStatus = action === "approve" ? "approved" : "rejected";
+  const reviewedStatus = action === "approve" ? "paid" : "rejected";
+  const externalTxId = String(review.externalTxId || "").trim();
+  if (action === "approve" && (externalTxId.length < 8 || externalTxId.length > 240)) {
+    throw new Error("Withdrawal payout requires external tx hash / transaction id");
+  }
 
   try {
     await client.query("begin");
@@ -2312,7 +2435,7 @@ export async function reviewWithdrawalOrder(orderId, review) {
           insert into platform_ledger_entries (
             id, type, category, title, amount, context_id, meta, idempotency_key, asset, balance_bucket
           )
-          values ($1, 'credit', 'withdrawal_fee', 'Withdrawal hidden fee', $2, $3, $4, $5, 'USDT', 'cash')
+          values ($1, 'credit', 'withdrawal_fee', 'Withdrawal service fee', $2, $3, $4, $5, 'USDT', 'cash')
           on conflict do nothing
         `, [
           id("platform"),
@@ -2330,13 +2453,16 @@ export async function reviewWithdrawalOrder(orderId, review) {
           admin_reason = $3,
           reviewed_by_provider_user_id = $4,
           reviewed_at = now(),
-          raw = coalesce(raw, '{}'::jsonb) || $5::jsonb
+          external_tx_id = $5,
+          paid_at = case when $2 = 'paid' then now() else paid_at end,
+          raw = coalesce(raw, '{}'::jsonb) || $6::jsonb
       where id = $1
     `, [
       order.id,
       reviewedStatus,
       review.reason || "",
       String(review.adminId || ""),
+      externalTxId,
       JSON.stringify({ review })
     ]);
     await client.query("commit");
@@ -2346,6 +2472,10 @@ export async function reviewWithdrawalOrder(orderId, review) {
     };
   } catch (error) {
     await client.query("rollback");
+    if (error?.code === "23505" && String(error?.constraint || "").includes("external_tx_id")) {
+      error.status = 409;
+      error.message = "Этот tx hash / transaction id уже привязан к другой выплате";
+    }
     throw error;
   } finally {
     client.release();
@@ -2737,9 +2867,9 @@ export async function analyticsOverview(days = 7) {
         coalesce(sum(amount) filter (where event_name = 'deposit_paid'), 0)::bigint as paid_deposit_amount,
         count(*) filter (where event_name = 'withdrawal_requested')::int as withdrawal_requests,
         coalesce(sum(amount) filter (where event_name = 'withdrawal_requested'), 0)::bigint as withdrawal_amount,
-        count(*) filter (where event_name = 'withdrawal_approved')::int as withdrawal_approved,
+        count(*) filter (where event_name in ('withdrawal_paid', 'withdrawal_approved'))::int as withdrawal_approved,
         count(*) filter (where event_name = 'withdrawal_rejected')::int as withdrawal_rejected,
-        coalesce(sum(amount) filter (where event_name = 'withdrawal_approved'), 0)::bigint as withdrawal_approved_amount,
+        coalesce(sum(amount) filter (where event_name in ('withdrawal_paid', 'withdrawal_approved')), 0)::bigint as withdrawal_approved_amount,
         coalesce(sum(amount) filter (where event_name = 'withdrawal_rejected'), 0)::bigint as withdrawal_rejected_amount,
         count(*) filter (where event_name = 'table_join')::int as table_joins,
         count(distinct app_user_id) filter (where event_name = 'table_join' and app_user_id is not null)::int as table_join_users,
@@ -2905,8 +3035,14 @@ export async function dashboardStats() {
       (select count(*)::int from withdrawal_orders where status in ('pending', 'manual_review')) as pending_withdrawals,
       (select coalesce(sum(chips), 0)::bigint from withdrawal_orders where status in ('pending', 'manual_review')) as pending_withdrawal_chips_total,
       (select coalesce(sum(gross_usdt_micros), 0)::bigint from withdrawal_orders where status in ('pending', 'manual_review')) as pending_withdrawal_usdt_total,
-      (select coalesce(sum(fee_usdt_micros), 0)::bigint from withdrawal_orders where status = 'approved') as approved_withdrawal_fee_usdt_total,
-      (select coalesce(sum(payout_usdt_micros), 0)::bigint from withdrawal_orders where status = 'approved') as approved_withdrawal_payout_usdt_total,
+      (select count(*)::int from withdrawal_orders
+        where status in ('paid', 'approved')
+          and trim(coalesce(external_tx_id, '')) = '') as paid_withdrawals_missing_external_tx,
+      (select count(*)::int from withdrawal_orders
+        where gross_usdt_micros > 0
+          and gross_usdt_micros <> fee_usdt_micros + payout_usdt_micros) as withdrawal_quote_mismatch_count,
+      (select coalesce(sum(fee_usdt_micros), 0)::bigint from withdrawal_orders where status in ('paid', 'approved')) as approved_withdrawal_fee_usdt_total,
+      (select coalesce(sum(payout_usdt_micros), 0)::bigint from withdrawal_orders where status in ('paid', 'approved')) as approved_withdrawal_payout_usdt_total,
       (select coalesce(sum(cash_usdt_micros), 0)::bigint from wallets) as cash_wallet_total,
       (select coalesce(sum(locked_usdt_micros), 0)::bigint from wallets) as locked_usdt_total,
       (select coalesce(sum(
@@ -2951,6 +3087,8 @@ export async function dashboardStats() {
     pendingWithdrawals: Number(result.rows[0].pending_withdrawals || 0),
     pendingWithdrawalChipsTotal: Number(result.rows[0].pending_withdrawal_chips_total || 0),
     pendingWithdrawalUsdtTotal: Number(result.rows[0].pending_withdrawal_usdt_total || 0),
+    paidWithdrawalsMissingExternalTx: Number(result.rows[0].paid_withdrawals_missing_external_tx || 0),
+    withdrawalQuoteMismatchCount: Number(result.rows[0].withdrawal_quote_mismatch_count || 0),
     approvedWithdrawalFeeUsdtTotal: Number(result.rows[0].approved_withdrawal_fee_usdt_total || 0),
     approvedWithdrawalPayoutUsdtTotal: Number(result.rows[0].approved_withdrawal_payout_usdt_total || 0),
     cashWalletTotal: Number(result.rows[0].cash_wallet_total || 0),
@@ -3037,17 +3175,21 @@ export async function listRatingLeaderboard({ seasonId = activeRatingSeasonId(),
       au.display_name as name,
       au.username,
       au.photo_url as "photoUrl",
-      pp.rating_points as "ratingPoints",
-      pp.rating_peak_points as "ratingPeakPoints",
-      pp.rating_tier as "ratingTier",
-      pp.rating_hands_played as "ratingHandsPlayed",
-      pp.rating_active_days as "ratingActiveDays",
-      pp.updated_at as "updatedAt"
-    from player_profiles pp
-    join app_users au on au.id = pp.app_user_id
+      rsp.points as "ratingPoints",
+      rsp.peak_points as "ratingPeakPoints",
+      rsp.hands_played as "ratingHandsPlayed",
+      rsp.active_days as "ratingActiveDays",
+      rsp.updated_at as "updatedAt",
+      coalesce((
+        select count(distinct rph.opponent_app_user_id)::int
+        from rating_pair_hands rph
+        where rph.season_id = rsp.season_id and rph.app_user_id = rsp.app_user_id
+      ), 0) as "distinctOpponents"
+    from rating_season_players rsp
+    join app_users au on au.id = rsp.app_user_id
     join user_identities ui on ui.app_user_id = au.id and ui.provider = 'telegram'
-    where pp.rating_season_id = $1 or pp.rating_hands_played > 0
-    order by pp.rating_points desc, pp.rating_hands_played desc, pp.updated_at asc
+    where rsp.season_id = $1
+    order by rsp.points desc, rsp.hands_played desc, rsp.updated_at asc
     limit $2
   `, [seasonId, normalizedLimit]);
   return result.rows.map((row, index) => ({
@@ -3056,13 +3198,15 @@ export async function listRatingLeaderboard({ seasonId = activeRatingSeasonId(),
     name: row.name || "Player",
     username: row.username || "",
     photoUrl: row.photoUrl || "",
-    ratingPoints: Number(row.ratingPoints || RATING.seasonStartingRp),
-    ratingPeakPoints: Number(row.ratingPeakPoints || RATING.seasonStartingRp),
-    ratingTier: row.ratingTier || ratingLeague(row.ratingPoints).title,
+    ratingPoints: Number(row.ratingPoints ?? RATING.seasonStartingRp),
+    ratingPeakPoints: Number(row.ratingPeakPoints ?? RATING.seasonStartingRp),
+    ratingTier: ratingLeague(row.ratingPoints).title,
     ratingHandsPlayed: Number(row.ratingHandsPlayed || 0),
     ratingActiveDays: Number(row.ratingActiveDays || 0),
+    distinctOpponents: Number(row.distinctOpponents || 0),
     eligible: Number(row.ratingHandsPlayed || 0) >= RATING.minActiveHandsForLeaderboard
-      && Number(row.ratingActiveDays || 0) >= RATING.minActiveDaysForLeaderboard,
+      && Number(row.ratingActiveDays || 0) >= RATING.minActiveDaysForLeaderboard
+      && Number(row.distinctOpponents || 0) >= RATING_INTEGRITY.minimumDistinctOpponents,
     updatedAt: row.updatedAt
   }));
 }
@@ -3618,7 +3762,7 @@ async function migrate() {
       provider text not null,
       provider_user_id text not null,
       method text not null,
-      status text not null check (status in ('pending', 'manual_review', 'approved', 'rejected', 'cancelled', 'failed')),
+      status text not null check (status in ('pending', 'manual_review', 'approved', 'paid', 'rejected', 'cancelled', 'failed')),
       chips bigint not null default 0 check (chips >= 0),
       fee_chips bigint not null default 0 check (fee_chips >= 0),
       payout_chips bigint not null default 0 check (payout_chips >= 0),
@@ -3630,10 +3774,12 @@ async function migrate() {
       destination text not null default '',
       admin_reason text not null default '',
       reviewed_by_provider_user_id text not null default '',
+      external_tx_id text not null default '',
       idempotency_key text,
       raw jsonb not null default '{}'::jsonb,
       created_at timestamptz not null default now(),
-      reviewed_at timestamptz
+      reviewed_at timestamptz,
+      paid_at timestamptz
     );
 
     alter table withdrawal_orders drop constraint if exists withdrawal_orders_chips_check;
@@ -3646,7 +3792,14 @@ async function migrate() {
     alter table withdrawal_orders add column if not exists payout_usdt_micros bigint not null default 0 check (payout_usdt_micros >= 0);
     alter table withdrawal_orders add column if not exists asset text not null default 'PLAY_CHIPS';
     alter table withdrawal_orders add column if not exists balance_bucket text not null default 'play';
+    alter table withdrawal_orders add column if not exists external_tx_id text not null default '';
+    alter table withdrawal_orders add column if not exists paid_at timestamptz;
+    alter table withdrawal_orders drop constraint if exists withdrawal_orders_status_check;
+    alter table withdrawal_orders add constraint withdrawal_orders_status_check
+      check (status in ('pending', 'manual_review', 'approved', 'paid', 'rejected', 'cancelled', 'failed'));
     create unique index if not exists idx_withdrawal_orders_idempotency_key on withdrawal_orders(idempotency_key) where idempotency_key is not null;
+    create unique index if not exists idx_withdrawal_orders_external_tx_id
+      on withdrawal_orders(external_tx_id) where external_tx_id <> '';
 
     create table if not exists rating_seasons (
       id text primary key,
@@ -3662,6 +3815,22 @@ async function migrate() {
     );
 
     create index if not exists idx_rating_seasons_status_dates on rating_seasons(status, starts_at, ends_at);
+
+    create table if not exists rating_season_players (
+      season_id text not null references rating_seasons(id) on delete cascade,
+      app_user_id text not null references app_users(id) on delete cascade,
+      points bigint not null default 1000 check (points >= 0),
+      peak_points bigint not null default 1000 check (peak_points >= 0),
+      hands_played integer not null default 0 check (hands_played >= 0),
+      active_days integer not null default 0 check (active_days >= 0),
+      last_active_date date,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      primary key (season_id, app_user_id)
+    );
+
+    create index if not exists idx_rating_season_players_leaderboard
+      on rating_season_players(season_id, points desc, hands_played desc, updated_at asc);
 
     create table if not exists rating_entries (
       id text primary key,
@@ -3679,6 +3848,24 @@ async function migrate() {
 
     create index if not exists idx_rating_entries_season_user on rating_entries(season_id, app_user_id, created_at desc);
     create index if not exists idx_rating_entries_leaderboard on rating_entries(season_id, points_after desc, created_at desc);
+    create index if not exists idx_rating_entries_daily_positive
+      on rating_entries(season_id, app_user_id, created_at desc) where points_delta > 0;
+
+    create table if not exists rating_pair_hands (
+      season_id text not null references rating_seasons(id) on delete cascade,
+      hand_id text not null,
+      app_user_id text not null references app_users(id) on delete cascade,
+      opponent_app_user_id text not null references app_users(id) on delete cascade,
+      table_id text not null default '',
+      created_at timestamptz not null default now(),
+      primary key (season_id, hand_id, app_user_id, opponent_app_user_id),
+      check (app_user_id <> opponent_app_user_id)
+    );
+
+    create index if not exists idx_rating_pair_hands_user_window
+      on rating_pair_hands(season_id, app_user_id, created_at desc);
+    create index if not exists idx_rating_pair_hands_pair_window
+      on rating_pair_hands(season_id, app_user_id, opponent_app_user_id, created_at desc);
 
     create table if not exists achievement_definitions (
       id text primary key,
@@ -3945,6 +4132,36 @@ async function migrate() {
     create index if not exists idx_user_attributions_last_source on user_attributions(last_source, last_seen_at desc);
     update tournaments set balance_bucket = 'cash' where balance_bucket <> 'cash';
     `);
+    const currentRatingSeason = ratingSeasonWindow();
+    await client.query(`
+      insert into rating_seasons (id, title, status, starts_at, ends_at, rules)
+      values ($1, $2, 'active', $3, $4, $5::jsonb)
+      on conflict (id) do update
+      set title = excluded.title,
+          starts_at = excluded.starts_at,
+          ends_at = excluded.ends_at,
+          rules = rating_seasons.rules || excluded.rules,
+          updated_at = now()
+    `, [
+      currentRatingSeason.id,
+      currentRatingSeason.title,
+      currentRatingSeason.startsAt,
+      currentRatingSeason.endsAt,
+      JSON.stringify({ formulaVersion: RATING_INTEGRITY.formulaVersion })
+    ]);
+    await client.query(`
+      insert into rating_season_players (
+        season_id, app_user_id, points, peak_points, hands_played,
+        active_days, last_active_date, updated_at
+      )
+      select $1, pp.app_user_id, pp.rating_points, pp.rating_peak_points,
+             pp.rating_hands_played, pp.rating_active_days,
+             case when pp.rating_hands_played > 0 then pp.updated_at::date else null end,
+             pp.updated_at
+      from player_profiles pp
+      where pp.rating_season_id = $1 and pp.rating_hands_played > 0
+      on conflict (season_id, app_user_id) do nothing
+    `, [currentRatingSeason.id]);
     await client.query("commit");
   } catch (error) {
     await client.query("rollback").catch(() => {});
@@ -4060,9 +4277,11 @@ function withdrawalRow(row) {
     destination: row.destination || "",
     adminReason: row.admin_reason || "",
     reviewedBy: row.reviewed_by_provider_user_id || "",
+    externalTxId: row.external_tx_id || "",
     idempotencyKey: row.idempotency_key || "",
     createdAt: row.created_at,
-    reviewedAt: row.reviewed_at
+    reviewedAt: row.reviewed_at,
+    paidAt: row.paid_at
   };
 }
 
@@ -4142,11 +4361,19 @@ function normalizePlayerProfileRow(row = {}) {
   };
 }
 
-function activeRatingSeasonId() {
-  const now = new Date();
+function ratingSeasonWindow(now = new Date()) {
   const year = now.getUTCFullYear();
   const month = String(now.getUTCMonth() + 1).padStart(2, "0");
-  return `rating-${year}-${month}`;
+  return {
+    id: `rating-${year}-${month}`,
+    title: `Season ${year}-${month}`,
+    startsAt: new Date(Date.UTC(year, now.getUTCMonth(), 1)),
+    endsAt: new Date(Date.UTC(year, now.getUTCMonth() + 1, 1))
+  };
+}
+
+function activeRatingSeasonId() {
+  return ratingSeasonWindow().id;
 }
 
 function profileCashLevel(xp) {

@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
@@ -13,6 +13,8 @@ import {
   ECONOMY,
   PLAY_TABLE_LIMITS,
   RATING,
+  RATING_INTEGRITY,
+  applyRatingIntegrityLimits,
   advanceWelcomeBonusWagering,
   cashClubPointsFromRake,
   cashClubProgress,
@@ -179,7 +181,7 @@ loadEnv(path.join(rootDir, ".env"));
 
 const PORT = Number(process.env.PORT || 3000);
 const BOT_TOKEN = process.env.BOT_TOKEN || "";
-const BOT_USERNAME = normalizeBotUsername(process.env.BOT_USERNAME || "qwzpokerbot");
+const BOT_USERNAME = normalizeBotUsername(process.env.BOT_USERNAME || "weezpokerbot");
 const APP_NAME = process.env.APP_NAME || "Weez Poker";
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || "";
 const ADMIN_USER_IDS = parseIdList(process.env.ADMIN_USER_IDS || ADMIN_CHAT_ID);
@@ -229,6 +231,8 @@ const bonusWallets = new Map();
 const bonusGrants = new Map();
 const bonusLedgerEntries = new Map();
 const dailyPlayClaims = new Map();
+const memoryRatingHands = new Map();
+const memoryRatingActiveDates = new Map();
 const memoryWelcomeBonusUsers = new Set();
 const memoryBonusWageringEvents = new Set();
 const transactions = new Map();
@@ -254,11 +258,18 @@ const pendingIdempotencyResults = new Map();
 const adminAuditLogs = [];
 const deviceSessions = new Map();
 const riskFlags = [];
+const authRateLimits = new Map();
 const DEFAULT_STACK = 0;
 const DEFAULT_WALLET = 0;
 const RECONCILIATION_INTERVAL_MS = Number(process.env.RECONCILIATION_INTERVAL_MS || 15 * 60 * 1000);
 const RECONCILIATION_DRIFT_ALERT_CHIPS = Number(process.env.RECONCILIATION_DRIFT_ALERT_CHIPS || 1);
 const SESSION_TTL_MS = Number(process.env.SESSION_TTL_SECONDS || 24 * 60 * 60) * 1000;
+const configuredMaxRequestBodyBytes = Number(process.env.MAX_REQUEST_BODY_BYTES || 1_048_576);
+const MAX_REQUEST_BODY_BYTES = Number.isFinite(configuredMaxRequestBodyBytes)
+  ? Math.max(16_384, Math.floor(configuredMaxRequestBodyBytes))
+  : 1_048_576;
+const AUTH_RATE_LIMIT_WINDOW_MS = 60_000;
+const AUTH_RATE_LIMIT_MAX_ATTEMPTS = Math.max(5, Number(process.env.AUTH_RATE_LIMIT_MAX_ATTEMPTS || 30));
 const RISK_LARGE_WITHDRAWAL_USDT_MICROS = Math.max(0, Math.round(Number(process.env.RISK_LARGE_WITHDRAWAL_USDT || 1000) * 1_000_000));
 const RISK_LARGE_ADMIN_ADJUST_CHIPS = Math.max(0, Math.round(Number(process.env.RISK_LARGE_ADMIN_ADJUST_CHIPS || ADMIN_GRANT_MAX_CHIPS / 2)));
 const BONUS_EXPIRY_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -274,6 +285,7 @@ const tournaments = seedTournaments();
 
 const server = createServer(async (req, res) => {
   try {
+    applySecurityHeaders(req, res);
     const url = new URL(req.url || "/", `http://${req.headers.host}`);
 
     if (url.pathname.startsWith("/api/")) {
@@ -457,6 +469,9 @@ setInterval(() => {
     sessionExpirations.delete(token);
     sessions.delete(token);
   }
+  for (const [key, entry] of authRateLimits.entries()) {
+    if (entry.resetAt <= now) authRateLimits.delete(key);
+  }
 }, Math.min(SESSION_TTL_MS, 60 * 1000));
 
 async function handleApi(req, res, url) {
@@ -555,6 +570,10 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/auth") {
+    if (!consumeAuthAttempt(req)) {
+      sendJson(res, 429, { error: "Слишком много попыток. Повторите позже." });
+      return;
+    }
     const body = await readJson(req);
     if (Object.hasOwn(body, "adminSecret")) {
       const webAdmin = authenticateWebAdmin(body.adminSecret || "");
@@ -1142,6 +1161,14 @@ async function handleApi(req, res, url) {
     const [, tableId, action] = tableMatch;
     const table = tables.get(tableId);
     if (!table) {
+      if (req.method === "POST" && (action === "leave" || action === "stand")) {
+        await sendIdempotentJson(req, res, user, `table_${action}:${tableId}`, async () => {
+          const error = new Error("Table not found");
+          error.status = 404;
+          throw error;
+        });
+        return;
+      }
       sendJson(res, 404, { error: "Table not found" });
       return;
     }
@@ -1209,37 +1236,37 @@ async function handleApi(req, res, url) {
         sendJson(res, 409, { error: "Покинуть турнирный стол с возвратом стека нельзя" });
         return;
       }
-      const operationId = req.headers["x-idempotency-key"] || randomId("table_leave");
-      const departingStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
-      const result = leaveTable(table, user);
-      await persistCompletedHands(table);
-      clearTableSessionIfEmpty(table);
-      const deleteSnapshot = result.tableEmpty && table.isPrivate;
-      await settleLeftTableStack(user, table, departingStack || result.stack, {
-        returnToWallet: true,
-        deleteSnapshot,
-        idempotencyKey: operationId
+      await sendIdempotentJson(req, res, user, `table_leave:${table.id}`, async (idempotencyKey) => {
+        const operationId = idempotencyKey || randomId("table_leave");
+        const departingStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
+        const result = leaveTable(table, user);
+        await persistCompletedHands(table);
+        clearTableSessionIfEmpty(table);
+        const deleteSnapshot = result.tableEmpty && table.isPrivate;
+        await settleLeftTableStack(user, table, departingStack || result.stack, {
+          returnToWallet: true,
+          deleteSnapshot,
+          idempotencyKey: operationId
+        });
+        if (deleteSnapshot) tables.delete(table.id);
+        notifyAdmin("table_leave", "Игрок вышел из стола", {
+          user,
+          lines: [
+            `Стол: ${table.name}`,
+            `${table.gameMode === "cash" ? "Возврат" : "Возврат на баланс"}: ${formatTableAmount(table, result.stack)}`,
+            `Баланс: ${formatAvailableBalance(user, table)}`
+          ]
+        });
+        await trackAnalytics("table_leave", {
+          user,
+          category: "gameplay",
+          amount: result.stack || 0,
+          asset: table.gameMode === "cash" ? "USDT" : "PLAY_CHIPS",
+          contextId: table.id,
+          meta: { tableName: table.name, gameMode: table.gameMode, returnToWallet: true }
+        });
+        return { ok: true, balance: user.balance };
       });
-      if (deleteSnapshot) {
-        tables.delete(table.id);
-      }
-      notifyAdmin("table_leave", "Игрок вышел из стола", {
-        user,
-        lines: [
-          `Стол: ${table.name}`,
-          `${table.gameMode === "cash" ? "Возврат" : "Возврат на баланс"}: ${formatTableAmount(table, result.stack)}`,
-          `Баланс: ${formatAvailableBalance(user, table)}`
-        ]
-      });
-      await trackAnalytics("table_leave", {
-        user,
-        category: "gameplay",
-        amount: result.stack || 0,
-        asset: table.gameMode === "cash" ? "USDT" : "PLAY_CHIPS",
-        contextId: table.id,
-        meta: { tableName: table.name, gameMode: table.gameMode, returnToWallet: true }
-      });
-      sendJson(res, 200, { ok: true, balance: user.balance });
       return;
     }
 
@@ -1248,49 +1275,55 @@ async function handleApi(req, res, url) {
         sendJson(res, 409, { error: "Встать из-за турнирного стола нельзя" });
         return;
       }
-      const operationId = req.headers["x-idempotency-key"] || randomId("table_stand");
-      const departingStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
-      const result = leaveTable(table, user);
-      await persistCompletedHands(table);
-      clearTableSessionIfEmpty(table);
-      const deleteSnapshot = result.tableEmpty && table.isPrivate;
-      await settleLeftTableStack(user, table, departingStack || result.stack, { deleteSnapshot, idempotencyKey: operationId });
-      if (deleteSnapshot) {
-        tables.delete(table.id);
-      } else if (table.gameMode !== "cash") {
-        await persistActiveTableSnapshot(table);
-      }
-      notifyAdmin("table_stand", "Игрок встал из-за стола", {
-        user,
-        lines: [
-          `Стол: ${table.name}`,
-          `${table.gameMode === "cash" ? "Возврат" : "Сохраненный стек"}: ${formatTableAmount(table, result.stack)}`,
-          `Баланс: ${formatAvailableBalance(user, table)}`
-        ]
+      await sendIdempotentJson(req, res, user, `table_stand:${table.id}`, async (idempotencyKey) => {
+        const operationId = idempotencyKey || randomId("table_stand");
+        const departingStack = table.seats.find((seat) => seat.userId === user.id)?.stack || 0;
+        const result = leaveTable(table, user);
+        await persistCompletedHands(table);
+        clearTableSessionIfEmpty(table);
+        const deleteSnapshot = result.tableEmpty && table.isPrivate;
+        await settleLeftTableStack(user, table, departingStack || result.stack, { deleteSnapshot, idempotencyKey: operationId });
+        if (deleteSnapshot) {
+          tables.delete(table.id);
+        } else if (table.gameMode !== "cash") {
+          await persistActiveTableSnapshot(table);
+        }
+        notifyAdmin("table_stand", "Игрок встал из-за стола", {
+          user,
+          lines: [
+            `Стол: ${table.name}`,
+            `${table.gameMode === "cash" ? "Возврат" : "Сохраненный стек"}: ${formatTableAmount(table, result.stack)}`,
+            `Баланс: ${formatAvailableBalance(user, table)}`
+          ]
+        });
+        await trackAnalytics("table_leave", {
+          user,
+          category: "gameplay",
+          amount: result.stack || 0,
+          asset: table.gameMode === "cash" ? "USDT" : "PLAY_CHIPS",
+          contextId: table.id,
+          meta: { tableName: table.name, gameMode: table.gameMode, standOnly: true }
+        });
+        return { table: result.tableEmpty && table.isPrivate ? null : tableView(table, user), balance: user.balance };
       });
-      await trackAnalytics("table_leave", {
-        user,
-        category: "gameplay",
-        amount: result.stack || 0,
-        asset: table.gameMode === "cash" ? "USDT" : "PLAY_CHIPS",
-        contextId: table.id,
-        meta: { tableName: table.name, gameMode: table.gameMode, standOnly: true }
-      });
-      sendJson(res, 200, { table: result.tableEmpty && table.isPrivate ? null : tableView(table, user), balance: user.balance });
       return;
     }
 
     if (req.method === "POST" && action === "sit-out") {
-      sitOut(table, user);
-      await persistActiveTableSnapshot(table);
-      sendJson(res, 200, { table: tableView(table, user), balance: user.balance });
+      await sendIdempotentJson(req, res, user, `table_sit_out:${table.id}`, async () => {
+        sitOut(table, user);
+        await persistActiveTableSnapshot(table);
+        return { table: tableView(table, user), balance: user.balance };
+      });
       return;
     }
 
     if (req.method === "POST" && action === "sit-in") {
-      sitIn(table, user);
-      await persistActiveTableSnapshot(table);
-      sendJson(res, 200, { table: tableView(table, user), balance: user.balance });
+      await sendIdempotentJson(req, res, user, `table_sit_in:${table.id}`, async () => {
+        sitIn(table, user);
+        await persistActiveTableSnapshot(table);
+        return { table: tableView(table, user), balance: user.balance };
+      });
       return;
     }
 
@@ -1372,59 +1405,67 @@ async function handleApi(req, res, url) {
     }
 
     if (req.method === "POST" && action === "fairness-commit") {
-      const body = await readJson(req);
-      const fairnessSeed = commitPlayerFairnessSeed(table, user, body.seedHash);
-      await persistActiveTableSnapshot(table);
-      sendJson(res, 200, { fairnessSeed, table: tableView(table, user) });
+      await sendIdempotentJson(req, res, user, `table_fairness_commit:${table.id}`, async () => {
+        const body = await readJson(req);
+        const fairnessSeed = commitPlayerFairnessSeed(table, user, body.seedHash);
+        await persistActiveTableSnapshot(table);
+        return { fairnessSeed, table: tableView(table, user) };
+      });
       return;
     }
 
     if (req.method === "POST" && action === "fairness-reveal") {
-      const body = await readJson(req);
-      const fairnessSeed = revealPlayerFairnessSeed(table, user, body.seed);
-      await persistActiveTableSnapshot(table);
-      sendJson(res, 200, { fairnessSeed, table: tableView(table, user) });
+      await sendIdempotentJson(req, res, user, `table_fairness_reveal:${table.id}`, async () => {
+        const body = await readJson(req);
+        const fairnessSeed = revealPlayerFairnessSeed(table, user, body.seed);
+        await persistActiveTableSnapshot(table);
+        return { fairnessSeed, table: tableView(table, user) };
+      });
       return;
     }
 
     if (req.method === "POST" && action === "act") {
-      const body = await readJson(req);
-      act(table, user, body);
-      await persistCompletedHands(table);
-      await persistActiveTableSnapshot(table);
-      await trackAnalytics("poker_action", {
-        user,
-        category: "gameplay",
-        amount: Number(body.amount || 0),
-        asset: table.gameMode === "cash" ? "USDT" : "PLAY_CHIPS",
-        contextId: table.id,
-        meta: {
-          action: body.action || "",
-          tableName: table.name,
-          gameMode: table.gameMode,
-          handNumber: table.handNumber
-        }
+      await sendIdempotentJson(req, res, user, `table_act:${table.id}`, async () => {
+        const body = await readJson(req);
+        act(table, user, body);
+        await persistCompletedHands(table);
+        await persistActiveTableSnapshot(table);
+        await trackAnalytics("poker_action", {
+          user,
+          category: "gameplay",
+          amount: Number(body.amount || 0),
+          asset: table.gameMode === "cash" ? "USDT" : "PLAY_CHIPS",
+          contextId: table.id,
+          meta: {
+            action: body.action || "",
+            tableName: table.name,
+            gameMode: table.gameMode,
+            handNumber: table.handNumber
+          }
+        });
+        return { table: tableView(table, user) };
       });
-      sendJson(res, 200, { table: tableView(table, user) });
       return;
     }
 
     if (req.method === "POST" && action === "show-muck") {
-      const body = await readJson(req);
-      const showMuck = chooseShowMuck(table, user, body.choice);
-      await persistCompletedHands(table);
-      await persistActiveTableSnapshot(table);
-      await trackAnalytics("show_muck_selected", {
-        user,
-        category: "gameplay",
-        contextId: table.id,
-        meta: {
-          choice: String(body.choice || ""),
-          handNumber: table.handNumber,
-          gameMode: table.gameMode
-        }
+      await sendIdempotentJson(req, res, user, `table_show_muck:${table.id}`, async () => {
+        const body = await readJson(req);
+        const showMuck = chooseShowMuck(table, user, body.choice);
+        await persistCompletedHands(table);
+        await persistActiveTableSnapshot(table);
+        await trackAnalytics("show_muck_selected", {
+          user,
+          category: "gameplay",
+          contextId: table.id,
+          meta: {
+            choice: String(body.choice || ""),
+            handNumber: table.handNumber,
+            gameMode: table.gameMode
+          }
+        });
+        return { showMuck, table: tableView(table, user) };
       });
-      sendJson(res, 200, { showMuck, table: tableView(table, user) });
       return;
     }
 
@@ -1738,7 +1779,8 @@ async function handleAdminApi(req, res, url, adminUser) {
         admin: adminUser,
         withdrawalId,
         action,
-        reason: body.reason || ""
+        reason: body.reason || "",
+        externalTxId: body.externalTxId || body.txHash || ""
       });
       await recordAdminAudit({
         req,
@@ -1748,7 +1790,10 @@ async function handleAdminApi(req, res, url, adminUser) {
         targetId: withdrawalId,
         result: action === "reject" ? "failed" : "ok",
         reason: body.reason || "",
-        meta: { status: result.order?.status || result.status || "" }
+        meta: {
+          status: result.order?.status || result.status || "",
+          externalTxId: result.order?.externalTxId || ""
+        }
       });
       return { withdrawal: result.order || result, admin: await adminDashboardView() };
     });
@@ -1769,6 +1814,13 @@ async function adminDashboardView(options = {}) {
     .filter((order) => ["pending", "manual_review"].includes(order.status))
     .reduce((sum, order) => sum + Number(order.grossUsdtMicros || 0), 0);
   const lockedUsdtTotal = dbStats ? dbStats.lockedUsdtTotal : pendingWithdrawalUsdtTotal;
+  const paidWithdrawalsMissingExternalTx = dbStats ? dbStats.paidWithdrawalsMissingExternalTx : [...withdrawalOrders.values()]
+    .filter((order) => ["paid", "approved"].includes(order.status) && !String(order.externalTxId || "").trim())
+    .length;
+  const withdrawalQuoteMismatchCount = dbStats ? dbStats.withdrawalQuoteMismatchCount : [...withdrawalOrders.values()]
+    .filter((order) => Number(order.grossUsdtMicros || 0) > 0)
+    .filter((order) => Number(order.grossUsdtMicros || 0) !== Number(order.feeUsdtMicros || 0) + Number(order.payoutUsdtMicros || 0))
+    .length;
   const tableStacks = activeTableStackTotals();
   const tableStackTotal = tableStacks.play;
   const cashTableStackTotal = tableStacks.cash;
@@ -1797,7 +1849,11 @@ async function adminDashboardView(options = {}) {
     cashLedgerCreditTotal,
     cashLedgerDebitTotal,
     paidStarsChipsTotal,
-    depositStarsLedgerTotal
+    depositStarsLedgerTotal,
+    lockedUsdtTotal,
+    pendingWithdrawalUsdtTotal,
+    paidWithdrawalsMissingExternalTx,
+    withdrawalQuoteMismatchCount
   });
   const paidStars = [...starOrders.values()].filter((order) => order.status === "paid");
   const pendingStars = [...starOrders.values()].filter((order) => order.status === "pending");
@@ -1846,10 +1902,10 @@ async function adminDashboardView(options = {}) {
       cashTableStackTotal,
       lockedUsdtTotal,
       approvedWithdrawalFeeUsdtTotal: dbStats ? dbStats.approvedWithdrawalFeeUsdtTotal : [...withdrawalOrders.values()]
-        .filter((order) => order.status === "approved")
+        .filter((order) => ["paid", "approved"].includes(order.status))
         .reduce((sum, order) => sum + Number(order.feeUsdtMicros || 0), 0),
       approvedWithdrawalPayoutUsdtTotal: dbStats ? dbStats.approvedWithdrawalPayoutUsdtTotal : [...withdrawalOrders.values()]
-        .filter((order) => order.status === "approved")
+        .filter((order) => ["paid", "approved"].includes(order.status))
         .reduce((sum, order) => sum + Number(order.payoutUsdtMicros || 0), 0),
       paidStarsChipsTotal,
       depositStarsLedgerTotal,
@@ -1865,6 +1921,8 @@ async function adminDashboardView(options = {}) {
         .filter((order) => ["pending", "manual_review"].includes(order.status))
         .reduce((sum, order) => sum + Number(order.chips || 0), 0),
       pendingWithdrawalUsdtTotal,
+      paidWithdrawalsMissingExternalTx,
+      withdrawalQuoteMismatchCount,
       analyticsEvents: dbStats ? dbStats.analyticsEventCount : analytics.totalEvents
     },
     analytics,
@@ -1893,7 +1951,9 @@ async function adminDashboardView(options = {}) {
         "playerFundsTotal = wallets + active table stacks + saved stacks + tournament escrow",
         "walletLedgerDrift must stay at 0: play walletTotal should match play ledger credits minus debits",
         "cashWalletLedgerDrift must stay at 0: cash wallet should match cash ledger credits minus debits",
-        "starsDepositDrift must stay at 0: paid Stars orders should match deposit_stars ledger credits"
+        "starsDepositDrift must stay at 0: paid Stars orders should match deposit_stars ledger credits",
+        "lockedWithdrawalDrift must stay at 0: locked USDT should match pending/manual-review withdrawal gross",
+        "paid withdrawals require a unique external transaction id and gross = fee + payout"
       ]
     },
     recentFundMovements: recentFundMovements(20),
@@ -2063,9 +2123,9 @@ async function analyticsDashboard(days = 7) {
     paidDepositAmount: amount("deposit_paid"),
     withdrawalRequests: count("withdrawal_requested"),
     withdrawalAmount: amount("withdrawal_requested"),
-    withdrawalApproved: count("withdrawal_approved"),
+    withdrawalApproved: count("withdrawal_paid") + count("withdrawal_approved"),
     withdrawalRejected: count("withdrawal_rejected"),
-    withdrawalApprovedAmount: amount("withdrawal_approved"),
+    withdrawalApprovedAmount: amount("withdrawal_paid") + amount("withdrawal_approved"),
     withdrawalRejectedAmount: amount("withdrawal_rejected"),
     tableJoins: count("table_join"),
     tableJoinUsers,
@@ -2217,19 +2277,34 @@ function buildReconciliationAudit({
   cashLedgerCreditTotal = 0,
   cashLedgerDebitTotal = 0,
   paidStarsChipsTotal,
-  depositStarsLedgerTotal
+  depositStarsLedgerTotal,
+  lockedUsdtTotal = 0,
+  pendingWithdrawalUsdtTotal = 0,
+  paidWithdrawalsMissingExternalTx = 0,
+  withdrawalQuoteMismatchCount = 0
 }) {
   const ledgerNetTotal = Number(ledgerCreditTotal || 0) - Number(ledgerDebitTotal || 0);
   const cashLedgerNetTotal = Number(cashLedgerCreditTotal || 0) - Number(cashLedgerDebitTotal || 0);
   const walletLedgerDrift = Number(walletTotal || 0) - ledgerNetTotal;
   const cashWalletLedgerDrift = Number(cashWalletTotal || 0) - cashLedgerNetTotal;
   const starsDepositDrift = Number(paidStarsChipsTotal || 0) - Number(depositStarsLedgerTotal || 0);
-  const maxDrift = Math.max(Math.abs(walletLedgerDrift), Math.abs(cashWalletLedgerDrift), Math.abs(starsDepositDrift));
+  const lockedWithdrawalDrift = Number(lockedUsdtTotal || 0) - Number(pendingWithdrawalUsdtTotal || 0);
+  const maxDrift = Math.max(
+    Math.abs(walletLedgerDrift),
+    Math.abs(cashWalletLedgerDrift),
+    Math.abs(starsDepositDrift),
+    Math.abs(lockedWithdrawalDrift)
+  );
+  const invalidWithdrawalCount = Number(paidWithdrawalsMissingExternalTx || 0) + Number(withdrawalQuoteMismatchCount || 0);
   return {
-    ok: maxDrift < RECONCILIATION_DRIFT_ALERT_CHIPS,
+    ok: maxDrift < RECONCILIATION_DRIFT_ALERT_CHIPS && invalidWithdrawalCount === 0,
     walletLedgerDrift,
     cashWalletLedgerDrift,
     starsDepositDrift,
+    lockedWithdrawalDrift,
+    paidWithdrawalsMissingExternalTx: Number(paidWithdrawalsMissingExternalTx || 0),
+    withdrawalQuoteMismatchCount: Number(withdrawalQuoteMismatchCount || 0),
+    invalidWithdrawalCount,
     maxDrift,
     checkedAt: new Date().toISOString()
   };
@@ -2246,7 +2321,10 @@ async function runReconciliationCheck(reason = "manual") {
   const alertKey = [
     reconciliation.walletLedgerDrift,
     reconciliation.cashWalletLedgerDrift,
-    reconciliation.starsDepositDrift
+    reconciliation.starsDepositDrift,
+    reconciliation.lockedWithdrawalDrift,
+    reconciliation.paidWithdrawalsMissingExternalTx,
+    reconciliation.withdrawalQuoteMismatchCount
   ].join(":");
   if (alertKey === lastReconciliationAlertKey) return reconciliation;
   lastReconciliationAlertKey = alertKey;
@@ -2257,6 +2335,9 @@ async function runReconciliationCheck(reason = "manual") {
       `Wallet/Ledger drift: ${formatNumber(reconciliation.walletLedgerDrift)} chips`,
       `Cash/Ledger drift: ${formatUsdtMicros(reconciliation.cashWalletLedgerDrift || 0)} USDT`,
       `Stars paid/Ledger drift: ${formatNumber(reconciliation.starsDepositDrift)} chips`,
+      `Locked/Pending withdrawal drift: ${formatUsdtMicros(reconciliation.lockedWithdrawalDrift || 0)} USDT`,
+      `Paid withdrawals without TX: ${formatNumber(reconciliation.paidWithdrawalsMissingExternalTx || 0)}`,
+      `Withdrawal quote mismatches: ${formatNumber(reconciliation.withdrawalQuoteMismatchCount || 0)}`,
       `Wallet total: ${formatNumber(dashboard.stats.walletTotal)} chips`,
       `Ledger net: ${formatNumber(dashboard.stats.ledgerNetTotal)} chips`,
       `Cash wallet total: ${formatUsdtMicros(dashboard.stats.cashWalletTotal || 0)} USDT`,
@@ -2349,7 +2430,7 @@ async function persistCompletedHands(table) {
           ? hand.seats.map((seat) => seat.userId).filter(Boolean)
           : [];
         if (progressUserIds.length) {
-          updateMemoryProfileProgress(progressUserIds, table.gameMode, hand, table);
+          await updateMemoryProfileProgress(progressUserIds, table.gameMode, hand, table);
           await dbRecordProfileHandProgress({
             providerUserIds: progressUserIds,
             gameMode: table.gameMode,
@@ -2519,6 +2600,8 @@ function normalizeHydratedTable(table, now = Date.now()) {
     seat.bet = Math.max(0, Math.round(Number(seat.bet) || 0));
     seat.totalBet = Math.max(0, Math.round(Number(seat.totalBet) || 0));
     seat.handStartStack = Math.max(0, Math.round(Number(seat.handStartStack) || seat.stack || 0));
+    seat.initialStack = Math.max(0, Math.round(Number(seat.initialStack) || seat.handStartStack || seat.stack || 0));
+    seat.totalBuyIn = Math.max(0, Math.round(Number(seat.totalBuyIn) || seat.initialStack || 0));
     seat.sittingOutUntil = Number(seat.sittingOutUntil || 0);
     seat.fairnessSeed = seat.fairnessSeed && typeof seat.fairnessSeed === "object" ? seat.fairnessSeed : null;
   }
@@ -2635,23 +2718,35 @@ function authenticateTelegram(initData) {
   const secretKey = createHmac("sha256", "WebAppData").update(BOT_TOKEN).digest();
   const calculatedHash = createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
 
-  if (calculatedHash !== hash) {
+  if (!constantTimeEqual(calculatedHash, hash)) {
     return { ok: false, error: "Invalid Telegram signature" };
   }
 
   const authDate = Number(params.get("auth_date") || 0);
   const maxAgeSeconds = 60 * 60 * 24;
-  if (Date.now() / 1000 - authDate > maxAgeSeconds) {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (!Number.isSafeInteger(authDate) || authDate <= 0 || authDate > nowSeconds + 30) {
+    return { ok: false, error: "Invalid Telegram auth date" };
+  }
+  if (nowSeconds - authDate > maxAgeSeconds) {
     return { ok: false, error: "Telegram auth expired" };
   }
 
-  const user = JSON.parse(params.get("user") || "{}");
+  let user;
+  try {
+    user = JSON.parse(params.get("user") || "{}");
+  } catch {
+    return { ok: false, error: "Invalid Telegram user" };
+  }
+  if (!user || typeof user !== "object" || !["string", "number"].includes(typeof user.id) || !String(user.id).trim()) {
+    return { ok: false, error: "Invalid Telegram user" };
+  }
   return { ok: true, user };
 }
 
 function authenticateWebAdmin(secret) {
   if (!ADMIN_WEB_SECRET) return { ok: false, error: "ADMIN_WEB_SECRET is not configured" };
-  if (String(secret || "") !== ADMIN_WEB_SECRET) return { ok: false, error: "Invalid admin secret" };
+  if (!constantTimeEqual(secret, ADMIN_WEB_SECRET)) return { ok: false, error: "Invalid admin secret" };
   return {
     ok: true,
     user: {
@@ -2971,6 +3066,7 @@ function cashClubStatusesView() {
 }
 
 function memoryRatingLeaderboard(limit = 50) {
+  const seasonId = activeRatingSeasonId();
   const rows = [...userProfiles.entries()]
     .map(([id, user]) => {
       const profile = user.profile || defaultPlayerProfile();
@@ -2979,11 +3075,14 @@ function memoryRatingLeaderboard(limit = 50) {
         name: user.name || "Player",
         username: user.username || "",
         photoUrl: user.photoUrl || "",
-        ratingPoints: Number(profile.ratingPoints || RATING.seasonStartingRp),
-        ratingPeakPoints: Number(profile.ratingPeakPoints || RATING.seasonStartingRp),
+        ratingPoints: Number(profile.ratingPoints ?? RATING.seasonStartingRp),
+        ratingPeakPoints: Number(profile.ratingPeakPoints ?? RATING.seasonStartingRp),
         ratingTier: profile.ratingTier || ratingLeague(profile.ratingPoints).title,
         ratingHandsPlayed: Number(profile.ratingHandsPlayed || 0),
         ratingActiveDays: Number(profile.ratingActiveDays || 0),
+        distinctOpponents: new Set((memoryRatingHands.get(id) || [])
+          .filter((entry) => entry.seasonId === seasonId)
+          .flatMap((entry) => entry.opponents || [])).size,
         updatedAt: new Date().toISOString()
       };
     })
@@ -2995,6 +3094,7 @@ function memoryRatingLeaderboard(limit = 50) {
     rank: index + 1,
     eligible: row.ratingHandsPlayed >= RATING.minActiveHandsForLeaderboard
       && row.ratingActiveDays >= RATING.minActiveDaysForLeaderboard
+      && row.distinctOpponents >= RATING_INTEGRITY.minimumDistinctOpponents
   }));
 }
 
@@ -3047,7 +3147,7 @@ function defaultPlayerProfile() {
   };
 }
 
-function updateMemoryProfileProgress(userIds, gameMode, hand = null, table = null) {
+async function updateMemoryProfileProgress(userIds, gameMode, hand = null, table = null) {
   const cashMode = gameMode === "cash";
   const ratingEligible = gameMode === "play" && !Boolean(table?.isPrivate) && !Boolean(table?.tournamentId);
   const handSeats = Array.isArray(hand?.seats) ? hand.seats : [];
@@ -3077,18 +3177,88 @@ function updateMemoryProfileProgress(userIds, gameMode, hand = null, table = nul
       profile.cashXpProgress = progress.progress;
       profile.cashClubNextStatus = progress.nextStatus?.title || "";
     } else if (ratingEligible) {
+      const seasonId = activeRatingSeasonId();
+      if (profile.ratingSeasonId !== seasonId) {
+        profile.ratingPoints = RATING.seasonStartingRp;
+        profile.ratingPeakPoints = RATING.seasonStartingRp;
+        profile.ratingHandsPlayed = 0;
+        profile.ratingActiveDays = 0;
+        profile.ratingSeasonId = seasonId;
+      }
       profile.ratingHandsPlayed += 1;
       const seatResult = seatByUserId.get(id) || {};
-      const delta = ratingDeltaForHand({
+      const baseDelta = ratingDeltaForHand({
         profit: Number(seatResult.profit || 0),
         bigBlind: Number(table?.bigBlind || 0),
         isPrivate: Boolean(table?.isPrivate),
         activePlayers,
         potSize: (hand?.pots || []).reduce((sum, pot) => sum + Number(pot.grossAmount ?? pot.amount ?? 0), 0)
       });
+      const now = Date.now();
+      const today = new Date(now).toISOString().slice(0, 10);
+      const history = (memoryRatingHands.get(id) || []).filter((entry) => entry.seasonId === seasonId);
+      const windowStart = now - RATING_INTEGRITY.pairWindowDays * 24 * 60 * 60 * 1000;
+      const recent = history.filter((entry) => entry.at >= windowStart);
+      const opponents = [...new Set(userIds.map(String).filter((candidate) => candidate && candidate !== id))];
+      const pairHands = opponents.reduce((maximum, opponentId) => Math.max(
+        maximum,
+        recent.filter((entry) => entry.opponents?.includes(opponentId)).length + 1
+      ), 0);
+      const dayStart = Date.parse(`${today}T00:00:00.000Z`);
+      const dailyPositiveAccrued = history
+        .filter((entry) => entry.at >= dayStart && entry.delta > 0)
+        .reduce((sum, entry) => sum + entry.delta, 0);
+      const frozen = riskFlags.some((flag) => String(flag.userId || "") === id
+        && String(flag.type || "").startsWith("rating_")
+        && ["high", "critical"].includes(String(flag.severity || "").toLowerCase())
+        && !["resolved", "dismissed"].includes(String(flag.status || "open").toLowerCase()));
+      const integrity = applyRatingIntegrityLimits({
+        baseDelta,
+        dailyPositiveAccrued,
+        pairHands,
+        totalHands: recent.length + 1,
+        frozen
+      });
+      const delta = integrity.delta;
       profile.ratingPoints = nextRatingPoints(profile.ratingPoints, delta);
       profile.ratingPeakPoints = Math.max(Number(profile.ratingPeakPoints || 0), profile.ratingPoints);
-      profile.ratingSeasonId = activeRatingSeasonId();
+      profile.ratingSeasonId = seasonId;
+      const activeDates = memoryRatingActiveDates.get(id) || new Set();
+      activeDates.add(`${seasonId}:${today}`);
+      memoryRatingActiveDates.set(id, activeDates);
+      profile.ratingActiveDays = [...activeDates].filter((value) => value.startsWith(`${seasonId}:`)).length;
+      history.push({
+        seasonId,
+        handId: String(hand?.id || ""),
+        opponents,
+        at: now,
+        delta,
+        formulaVersion: RATING_INTEGRITY.formulaVersion,
+        integrity
+      });
+      memoryRatingHands.set(id, history.slice(-2000));
+      if (integrity.pairFarm) {
+        const dominantOpponentId = opponents
+          .map((opponentId) => ({
+            opponentId,
+            hands: recent.filter((entry) => entry.opponents?.includes(opponentId)).length + 1
+          }))
+          .sort((a, b) => b.hands - a.hands || a.opponentId.localeCompare(b.opponentId))[0]?.opponentId || "";
+        await recordRiskFlag({
+          userId: id,
+          type: "rating_pair_farm",
+          severity: "high",
+          reason: "Более 60% рейтинговых рук за 7 дней сыграно против одного соперника",
+          sourceId: `${seasonId}:${id}:${dominantOpponentId}`,
+          meta: {
+            seasonId,
+            opponentId: dominantOpponentId,
+            pairShare: integrity.pairShare,
+            handId: String(hand?.id || ""),
+            tableId: String(table?.id || "")
+          }
+        });
+      }
       const league = ratingLeague(profile.ratingPoints);
       profile.ratingTier = league.title;
       profile.ratingLeague = league.title;
@@ -5399,7 +5569,7 @@ async function maybeFlagWithdrawalRisk(user, order) {
   });
 }
 
-async function handleAdminWithdrawalAction({ admin, withdrawalId, action, reason = "" }) {
+async function handleAdminWithdrawalAction({ admin, withdrawalId, action, reason = "", externalTxId = "" }) {
   const order = await withdrawalOrderFromId(withdrawalId);
   if (!order) {
     const error = new Error("Заявка на вывод не найдена");
@@ -5414,10 +5584,17 @@ async function handleAdminWithdrawalAction({ admin, withdrawalId, action, reason
 
   const adminProfile = admin || { id: "system", name: "Admin", username: "" };
   const normalizedReason = String(reason || "").trim() || `manual_${action}`;
+  const normalizedExternalTxId = String(externalTxId || "").trim();
+  if (action === "approve" && (normalizedExternalTxId.length < 8 || normalizedExternalTxId.length > 240)) {
+    const error = new Error("Для подтверждения выплаты укажите корректный внешний tx hash / transaction id");
+    error.status = 400;
+    throw error;
+  }
   const dbResult = await dbReviewWithdrawalOrder(order.id, {
     action,
     reason: normalizedReason,
-    adminId: adminProfile.id
+    adminId: adminProfile.id,
+    externalTxId: normalizedExternalTxId
   });
   if (dbResult?.order) {
     withdrawalOrders.set(dbResult.order.id, dbResult.order);
@@ -5438,6 +5615,7 @@ async function handleAdminWithdrawalAction({ admin, withdrawalId, action, reason
       meta: {
         adminId: adminProfile.id,
         reason: normalizedReason,
+        externalTxId: dbResult.order.externalTxId || "",
         payoutUsdtMicros: dbResult.order.payoutUsdtMicros || 0,
         feeUsdtMicros: dbResult.order.feeUsdtMicros || 0
       }
@@ -5445,13 +5623,15 @@ async function handleAdminWithdrawalAction({ admin, withdrawalId, action, reason
     return dbResult;
   }
 
-  const nextStatus = action === "approve" ? "approved" : "rejected";
+  const nextStatus = action === "approve" ? "paid" : "rejected";
   const reviewed = {
     ...order,
     status: nextStatus,
     adminReason: normalizedReason,
     reviewedBy: adminProfile.id,
-    reviewedAt: new Date().toISOString()
+    reviewedAt: new Date().toISOString(),
+    externalTxId: normalizedExternalTxId,
+    paidAt: action === "approve" ? new Date().toISOString() : null
   };
   withdrawalOrders.set(order.id, reviewed);
   let balance = null;
@@ -5471,7 +5651,7 @@ async function handleAdminWithdrawalAction({ admin, withdrawalId, action, reason
     await recordPlatformLedger({
       type: "credit",
       category: "withdrawal_fee",
-      title: "Withdrawal hidden fee",
+      title: "Withdrawal service fee",
       amount: order.feeUsdtMicros,
       contextId: order.id,
       meta: `${order.method} · gross ${order.grossUsdtMicros} · payout ${order.payoutUsdtMicros}`,
@@ -5490,6 +5670,7 @@ async function handleAdminWithdrawalAction({ admin, withdrawalId, action, reason
     meta: {
       adminId: adminProfile.id,
       reason: normalizedReason,
+      externalTxId: reviewed.externalTxId || "",
       payoutUsdtMicros: reviewed.payoutUsdtMicros || 0,
       feeUsdtMicros: reviewed.feeUsdtMicros || 0
     }
@@ -5614,7 +5795,7 @@ function notifyWithdrawalCreated(user, order, balance) {
 
 function notifyWithdrawalReviewed(admin, order, reason) {
   const cashMode = Number(order.grossUsdtMicros || 0) > 0;
-  notifyAdmin(`withdrawal_${order.status}`, order.status === "approved" ? "Вывод подтвержден" : "Вывод отклонен", {
+  notifyAdmin(`withdrawal_${order.status}`, order.status === "paid" ? "Вывод выплачен" : "Вывод отклонен", {
     user: { id: order.userId, name: order.userName, username: order.username },
     lines: [
       `Админ: ${formatUser(admin)}`,
@@ -5622,8 +5803,9 @@ function notifyWithdrawalReviewed(admin, order, reason) {
       `Метод: ${order.method}`,
       cashMode ? `Сумма: ${formatUsdtMicros(order.grossUsdtMicros)} USDT` : `Сумма: ${formatNumber(order.chips)} chips`,
       `Статус: ${order.status}`,
+      order.externalTxId ? `TX: ${order.externalTxId}` : "",
       `Причина: ${reason}`
-    ]
+    ].filter(Boolean)
   });
 }
 
@@ -6199,6 +6381,7 @@ function parseAdminTelegramEventTypes(value) {
     "payment_approved",
     "payment_rejected",
     "withdrawal_request",
+    "withdrawal_paid",
     "withdrawal_approved",
     "withdrawal_rejected",
     // Incident/ops alerts (TZ E4: reconciliation drift, payment/server incidents).
@@ -6269,11 +6452,16 @@ async function recordAdminAudit({ req, admin, action, targetType = "", targetId 
 }
 
 async function recordRiskFlag(flag = {}) {
+  const duplicate = flag.sourceId && riskFlags.find((entry) => entry.sourceId === flag.sourceId
+    && entry.type === (flag.type || "risk")
+    && !["resolved", "dismissed"].includes(String(entry.status || "open").toLowerCase()));
+  if (duplicate) return { id: duplicate.id, duplicate: true };
   const entry = {
     id: flag.id || randomId("risk"),
     userId: flag.userId || "",
     type: flag.type || "risk",
     severity: flag.severity || "medium",
+    status: flag.status || "open",
     reason: flag.reason || "",
     sourceId: flag.sourceId || "",
     meta: flag.meta || {},
@@ -6367,8 +6555,20 @@ async function requireSession(req) {
 }
 
 async function serveStatic(req, res, url) {
-  let filePath = path.join(publicDir, (url.pathname === "/" || url.pathname === "/admin") ? "index.html" : url.pathname);
-  if (!filePath.startsWith(publicDir)) {
+  const publicPage = {
+    "/terms": "terms.html",
+    "/privacy": "privacy.html"
+  }[url.pathname];
+  let requestedPath;
+  try {
+    requestedPath = decodeURIComponent(publicPage || ((url.pathname === "/" || url.pathname === "/admin") ? "index.html" : url.pathname));
+  } catch {
+    sendJson(res, 400, { error: "Invalid path" });
+    return;
+  }
+  let filePath = path.resolve(publicDir, requestedPath.replace(/^[/\\]+/, ""));
+  const relativePath = path.relative(publicDir, filePath);
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
     sendJson(res, 403, { error: "Forbidden" });
     return;
   }
@@ -6385,25 +6585,46 @@ async function serveStatic(req, res, url) {
     ".jpeg": "image/jpeg"
   };
 
-  res.writeHead(200, { "content-type": types[ext] || "application/octet-stream" });
+  res.writeHead(200, {
+    "content-type": types[ext] || "application/octet-stream",
+    "cache-control": ext === ".html" ? "no-store" : "public, max-age=3600"
+  });
   res.end(await readFile(filePath));
 }
 
 async function readJson(req) {
   const raw = await readRawBody(req);
-  return raw ? JSON.parse(raw) : {};
+  try {
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    const error = new Error("Некорректный JSON");
+    error.status = 400;
+    throw error;
+  }
 }
 
 async function readRawBody(req) {
   if (Object.hasOwn(req, "__qwzRawBody")) return req.__qwzRawBody;
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  let totalBytes = 0;
+  for await (const chunk of req) {
+    totalBytes += chunk.length;
+    if (totalBytes > MAX_REQUEST_BODY_BYTES) {
+      const error = new Error("Запрос слишком большой");
+      error.status = 413;
+      throw error;
+    }
+    chunks.push(chunk);
+  }
   req.__qwzRawBody = Buffer.concat(chunks).toString("utf8");
   return req.__qwzRawBody;
 }
 
 function sendJson(res, status, payload) {
-  res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
+  res.writeHead(status, {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store"
+  });
   res.end(JSON.stringify(payload));
 }
 
@@ -6523,6 +6744,15 @@ function buildPrometheusMetrics(health, stats = null) {
     "# HELP qwz_stars_deposit_drift_chips Difference between paid Stars chips and ledger deposits.",
     "# TYPE qwz_stars_deposit_drift_chips gauge",
     `qwz_stars_deposit_drift_chips ${reconciliation.starsDepositDrift}`,
+    "# HELP qwz_locked_withdrawal_drift_micros Difference between locked USDT and active withdrawal gross in micro-USDT.",
+    "# TYPE qwz_locked_withdrawal_drift_micros gauge",
+    `qwz_locked_withdrawal_drift_micros ${reconciliation.lockedWithdrawalDrift}`,
+    "# HELP qwz_paid_withdrawals_missing_external_tx Paid withdrawals without an external transaction id.",
+    "# TYPE qwz_paid_withdrawals_missing_external_tx gauge",
+    `qwz_paid_withdrawals_missing_external_tx ${Number(stats?.paidWithdrawalsMissingExternalTx || 0)}`,
+    "# HELP qwz_withdrawal_quote_mismatch_total Withdrawal orders where gross does not equal fee plus payout.",
+    "# TYPE qwz_withdrawal_quote_mismatch_total gauge",
+    `qwz_withdrawal_quote_mismatch_total ${Number(stats?.withdrawalQuoteMismatchCount || 0)}`,
     "# HELP qwz_process_resident_memory_bytes Resident set size.",
     "# TYPE qwz_process_resident_memory_bytes gauge",
     `qwz_process_resident_memory_bytes ${Number(memory.rss || 0)}`,
@@ -6551,10 +6781,13 @@ function buildMetricsReconciliation(stats) {
   const cashLedgerDebitTotal = Number(stats?.cashLedgerDebitTotal || 0);
   const paidStarsChipsTotal = Number(stats?.paidStarsChipsTotal || 0);
   const depositStarsLedgerTotal = Number(stats?.depositStarsLedgerTotal || 0);
+  const lockedUsdtTotal = Number(stats?.lockedUsdtTotal || 0);
+  const pendingWithdrawalUsdtTotal = Number(stats?.pendingWithdrawalUsdtTotal || 0);
   return {
     walletLedgerDrift: walletTotal - (ledgerCreditTotal - ledgerDebitTotal),
     cashWalletLedgerDrift: cashWalletTotal - (cashLedgerCreditTotal - cashLedgerDebitTotal),
-    starsDepositDrift: paidStarsChipsTotal - depositStarsLedgerTotal
+    starsDepositDrift: paidStarsChipsTotal - depositStarsLedgerTotal,
+    lockedWithdrawalDrift: lockedUsdtTotal - pendingWithdrawalUsdtTotal
   };
 }
 
@@ -6656,11 +6889,33 @@ function validateEnvironment() {
   if (REAL_MONEY_ENABLED && !process.env.REDIS_URL) {
     problems.push("REDIS_URL is required in production; sessions and active table state cannot use memory fallback");
   }
+  if (REAL_MONEY_ENABLED && !/^https:\/\//i.test(APP_PUBLIC_URL)) {
+    problems.push("APP_PUBLIC_URL must be a public HTTPS URL in real-money production");
+  }
+  if (REAL_MONEY_ENABLED && String(process.env.DEVICE_HASH_SECRET || "").length < 32) {
+    problems.push("DEVICE_HASH_SECRET must contain at least 32 characters in real-money production");
+  }
+  if (REAL_MONEY_ENABLED && ADMIN_OWNER_IDS.size === 0 && ADMIN_USER_IDS.size === 0) {
+    problems.push("At least one ADMIN_OWNER_IDS or ADMIN_USER_IDS entry is required in real-money production");
+  }
+  if (REAL_MONEY_ENABLED && process.env.WITHDRAWALS_ENABLED === "true" && ADMIN_FINANCE_IDS.size === 0) {
+    problems.push("ADMIN_FINANCE_IDS is required when withdrawals are enabled");
+  }
   if (!REAL_MONEY_ENABLED && (!process.env.DATABASE_URL || !process.env.REDIS_URL)) {
     console.warn("[warn] REAL_MONEY_ENABLED=false — PostgreSQL/Redis fallback allowed only for demo/play mode.");
   }
   if (!TELEGRAM_WEBHOOK_SECRET) {
-    console.warn("[warn] TELEGRAM_WEBHOOK_SECRET is empty — webhook endpoint is unprotected.");
+    problems.push("TELEGRAM_WEBHOOK_SECRET is required in production");
+  } else if (!/^[A-Za-z0-9_-]{16,256}$/.test(TELEGRAM_WEBHOOK_SECRET)) {
+    problems.push("TELEGRAM_WEBHOOK_SECRET must contain 16-256 characters: A-Z, a-z, 0-9, _ or -");
+  }
+  if (!METRICS_TOKEN) {
+    problems.push("METRICS_TOKEN is required in production");
+  } else if (METRICS_TOKEN.length < 32) {
+    problems.push("METRICS_TOKEN must contain at least 32 characters");
+  }
+  if (ADMIN_WEB_SECRET && ADMIN_WEB_SECRET.length < 32) {
+    problems.push("ADMIN_WEB_SECRET must contain at least 32 characters when web admin login is enabled");
   }
   if ((process.env.TON_PAYMENTS_ENABLED === "true" || process.env.USDT_TRC20_PAYMENTS_ENABLED === "true") && !CRYPTO_WEBHOOK_SECRET) {
     console.warn("[warn] CRYPTO_WEBHOOK_SECRET is empty — crypto confirmations will be rejected in production.");
@@ -6693,11 +6948,13 @@ function registerProcessHandlers() {
   process.on("uncaughtException", (error) => {
     console.error("uncaughtException:", error);
     reportError(error, { kind: "uncaughtException" });
+    process.exit(1);
   });
   process.on("unhandledRejection", (reason) => {
     const error = reason instanceof Error ? reason : new Error(String(reason));
     console.error("unhandledRejection:", error);
     reportError(error, { kind: "unhandledRejection" });
+    if (isProduction || REAL_MONEY_ENABLED) process.exit(1);
   });
 }
 
@@ -6719,22 +6976,54 @@ function reportError(error, context = {}) {
 }
 
 function verifyTelegramWebhook(req) {
-  if (!TELEGRAM_WEBHOOK_SECRET) return true;
+  if (!TELEGRAM_WEBHOOK_SECRET) return !isProduction;
   const provided = req.headers["x-telegram-bot-api-secret-token"] || "";
-  return provided === TELEGRAM_WEBHOOK_SECRET;
+  return constantTimeEqual(provided, TELEGRAM_WEBHOOK_SECRET);
 }
 
 function verifyMetricsAccess(req) {
-  if (!METRICS_TOKEN) return true;
+  if (!METRICS_TOKEN) return !isProduction;
   const provided = req.headers["x-qwz-metrics-token"] || req.headers["authorization"] || "";
   const token = String(provided).replace(/^Bearer\s+/i, "").trim();
-  return token === METRICS_TOKEN;
+  return constantTimeEqual(token, METRICS_TOKEN);
 }
 
 function verifyCryptoWebhook(req) {
   if (!CRYPTO_WEBHOOK_SECRET) return !isProduction;
   const provided = req.headers["x-qwz-crypto-secret"] || req.headers["x-webhook-secret"] || "";
-  return provided === CRYPTO_WEBHOOK_SECRET;
+  return constantTimeEqual(provided, CRYPTO_WEBHOOK_SECRET);
+}
+
+function constantTimeEqual(left, right) {
+  const leftBuffer = Buffer.from(String(left || ""));
+  const rightBuffer = Buffer.from(String(right || ""));
+  if (leftBuffer.length !== rightBuffer.length) return false;
+  return leftBuffer.length > 0 && timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function requestIp(req) {
+  const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
+  return forwarded || req.socket?.remoteAddress || "unknown";
+}
+
+function consumeAuthAttempt(req) {
+  const now = Date.now();
+  const key = requestIp(req);
+  const current = authRateLimits.get(key);
+  if (!current || current.resetAt <= now) {
+    authRateLimits.set(key, { count: 1, resetAt: now + AUTH_RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  current.count += 1;
+  return current.count <= AUTH_RATE_LIMIT_MAX_ATTEMPTS;
+}
+
+function applySecurityHeaders(req, res) {
+  res.setHeader("x-content-type-options", "nosniff");
+  res.setHeader("referrer-policy", "strict-origin-when-cross-origin");
+  res.setHeader("permissions-policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("x-xss-protection", "0");
+  if (isProduction) res.setHeader("strict-transport-security", "max-age=31536000; includeSubDomains");
 }
 
 function ensureCryptoPaymentMethodEnabled(method) {

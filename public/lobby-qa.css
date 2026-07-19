@@ -1780,7 +1780,7 @@ html:not(.admin-mode) body:not(.in-game) .lobby-menu-list {
   background: var(--tg-native-surface) !important;
 }
 
-/* 2026-06-26 correction: keep Telegram geometry, restore QWZ spacing/sheets. */
+/* 2026-06-26 correction: keep Telegram geometry, restore Weez spacing/sheets. */
 :root {
   --tg-native-bg: #0f151d;
   --tg-native-surface: #172330;

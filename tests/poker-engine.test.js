@@ -34,6 +34,8 @@ test("table seats expose Telegram profile photos", () => {
 
   assert.equal(view.seats[0].photoUrl, "https://example.com/owner.jpg");
   assert.equal(view.seats[1].photoUrl, "https://example.com/player-2.jpg");
+  assert.equal(view.seats[0].initialStack, 10_000);
+  assert.equal(view.seats[0].totalBuyIn, 10_000);
 });
 
 test("cash table messages expose dollars instead of raw micros or chips", () => {
@@ -798,7 +800,10 @@ test("sit out keeps the seat but skips future hands until sit in", () => {
 
 test("top-up is capped by the table maximum stack", () => {
   const table = createTable(owner, { maxPlayers: 2, smallBlind: 25 });
+  const initialBuyIn = table.seats[0].totalBuyIn;
   assert.equal(addBuyIn(table, owner, 50_000), table.maxBuyIn);
+  assert.equal(table.seats[0].totalBuyIn, table.maxBuyIn);
+  assert.equal(publicTable(table, owner.id).seats[0].totalBuyIn, table.maxBuyIn);
   assert.throws(() => addBuyIn(table, owner, 1), /максимума стола/);
 });
 

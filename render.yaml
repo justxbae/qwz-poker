@@ -16,10 +16,14 @@ services:
       - key: ADMIN_TELEGRAM_EVENT_TYPES
         value: open,stars_order,crypto_order,stars_paid,crypto_paid,crypto_manual_review,payment_approved,payment_rejected,withdrawal_request,withdrawal_approved,withdrawal_rejected,reconciliation_alert,crypto_webhook_error,telegram_webhook_unhealthy
       - key: BOT_USERNAME
-        value: qwzpokerbot
+        sync: false
       - key: BOT_TOKEN
         sync: false
       - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+      - key: METRICS_TOKEN
+        sync: false
+      - key: DEVICE_HASH_SECRET
         sync: false
       - key: CRYPTO_WEBHOOK_SECRET
         sync: false

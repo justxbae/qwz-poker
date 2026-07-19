@@ -1,5 +1,5 @@
 {
-  "name": "qwz-poker",
+  "name": "weez-poker",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -7,6 +7,7 @@
     "dev": "node server/index.js",
     "start": "NODE_ENV=production node server/index.js",
     "test": "node --test tests/*.test.js",
+    "preflight:launch": "node scripts/launch-preflight.js",
     "release:clean": "node scripts/create-clean-release.js"
   },
   "dependencies": {

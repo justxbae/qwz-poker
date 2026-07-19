@@ -31,7 +31,7 @@ export function createTable(owner, body = {}, options = {}) {
 
   const table = {
     id: randomId("tbl"),
-    name: String(body.name || `${owner?.name || "QWZ"}'s table`).slice(0, 40),
+    name: String(body.name || `${owner?.name || "Weez"}'s table`).slice(0, 40),
     ownerId: owner?.id || "system",
     isPrivate,
     isSystem,
@@ -81,15 +81,19 @@ export function joinTable(table, user) {
   if (table.seats.some((seat) => seat.userId === user.id)) return;
   if (table.seats.length >= table.maxPlayers) throwHttp(409, "Table is full");
 
+  const startingStack = Math.max(0, Math.round(Number(user.stack) || 10_000));
+
   table.seats.push({
     userId: user.id,
     name: user.name,
     username: user.username,
     photoUrl: user.photoUrl || "",
-    stack: user.stack || 10000,
+    stack: startingStack,
+    initialStack: startingStack,
+    totalBuyIn: startingStack,
     bet: 0,
     totalBet: 0,
-    handStartStack: user.stack || 10000,
+    handStartStack: startingStack,
     folded: false,
     acted: false,
     sittingOut: false,
@@ -217,7 +221,12 @@ export function addBuyIn(table, user, amount) {
   const availableTopUp = Math.max(0, Number(table.maxBuyIn || 10_000_000_000) - seat.stack);
   if (availableTopUp <= 0) throwHttp(409, "Стек уже достиг максимума стола");
   const chips = clamp(Number(amount || 0), 1, availableTopUp);
+  const recordedBuyIn = Math.max(
+    0,
+    Math.round(Number(seat.totalBuyIn ?? seat.initialStack ?? seat.handStartStack ?? seat.stack) || 0)
+  );
   seat.stack += chips;
+  seat.totalBuyIn = recordedBuyIn + chips;
   seat.sittingOut = false;
   seat.sittingOutUntil = 0;
   seat.sittingOutReason = "";
@@ -616,6 +625,8 @@ export function publicTable(table, viewerId = "") {
       username: seat.username,
       photoUrl: seat.photoUrl || "",
       stack: seat.stack,
+      initialStack: seat.initialStack,
+      totalBuyIn: seat.totalBuyIn,
       handStartStack: seat.handStartStack,
       bet: seat.bet,
       totalBet: seat.totalBet,

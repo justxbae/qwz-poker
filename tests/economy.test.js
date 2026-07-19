@@ -11,6 +11,7 @@ import {
   quoteWithdrawal,
   quoteWelcomeBonus,
   ratingDeltaForHand,
+  applyRatingIntegrityLimits,
   ratingLeague,
   toUsdtMicros
 } from "../server/economy.js";
@@ -99,7 +100,26 @@ test("rating uses BB result caps and ignores private or inactive hands", () => {
   assert.equal(ratingDeltaForHand({ profit: 500, bigBlind: 50, activePlayers: 3, potSize: 100 }), 10);
   assert.equal(nextRatingPoints(1000, -25), 975);
   assert.equal(nextRatingPoints(10, -25), 0);
+  assert.equal(nextRatingPoints(0, 10), 10);
   assert.equal(ratingLeague(1600).title, "Gold");
+});
+
+test("rating integrity caps daily gains and freezes repeated opponent farming", () => {
+  assert.deepEqual(applyRatingIntegrityLimits({ baseDelta: 25, dailyPositiveAccrued: 140 }), {
+    delta: 10,
+    pairShare: 0,
+    pairFarm: false,
+    capped: true,
+    reasons: ["daily_positive_cap"]
+  });
+  assert.equal(applyRatingIntegrityLimits({ baseDelta: -25, dailyPositiveAccrued: 150 }).delta, -25);
+  const pairFarm = applyRatingIntegrityLimits({ baseDelta: 10, pairHands: 13, totalHands: 20 });
+  assert.equal(pairFarm.delta, 0);
+  assert.equal(pairFarm.pairFarm, true);
+  const frozenLoss = applyRatingIntegrityLimits({ baseDelta: -10, frozen: true });
+  assert.equal(frozenLoss.delta, -10);
+  assert.deepEqual(frozenLoss.reasons, ["risk_freeze"]);
+  assert.equal(applyRatingIntegrityLimits({ baseDelta: -10, pairHands: 13, totalHands: 20 }).delta, -10);
 });
 
 test("cash club points come from rake, not from hand count or deposits", () => {

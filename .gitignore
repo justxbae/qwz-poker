@@ -7,3 +7,7 @@ references photo/
 *.docx
 .docx_render_qwz_economics/
 .docx_render_tz/
+.docx_render_*/
+release/
+tmp/
+output/playwright/

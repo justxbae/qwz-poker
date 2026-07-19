@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/styles.css?v=20260628-2" />
     <link rel="stylesheet" href="/lobby-qa.css?v=20260626-1" />
     <link rel="stylesheet" href="/telegram-ui-kit-overrides.css?v=20260715-2" />
+    <link rel="stylesheet" href="/weez-design-system-v2.css?v=20260720-6" />
   </head>
   <body>
     <section class="app-boot" id="appBoot" aria-live="polite" aria-label="Загрузка Weez Poker">
@@ -27,18 +28,18 @@
 
       <section class="table-panel game-screen" id="currentTable" hidden>
         <div class="game-toolbar">
-          <button id="menuButton" class="icon-control" title="Меню" aria-label="Меню" aria-expanded="false">
+          <button type="button" id="menuButton" class="icon-control" title="Меню" aria-label="Меню" aria-expanded="false">
             <img class="control-glyph control-glyph--closed" src="/assets/ui/ic_list.svg" alt="" aria-hidden="true" />
             <img class="control-glyph control-glyph--open" src="/assets/ui/cancel.svg" alt="" aria-hidden="true" />
           </button>
           <div class="table-id" id="tableCode">#table</div>
-          <button id="quickBuyInButton" class="icon-control" title="Докупить фишки" aria-label="Докупить фишки">+</button>
+          <button type="button" id="quickBuyInButton" class="icon-control" title="Докупить фишки" aria-label="Докупить фишки">+</button>
           <div class="toolbar-spacer"></div>
-          <button class="icon-control" data-panel-tab="info" title="Инфо" aria-label="Инфо" aria-expanded="false">
+          <button type="button" class="icon-control" data-panel-tab="info" title="Инфо" aria-label="Инфо" aria-expanded="false">
             <svg class="control-glyph control-glyph--closed" viewBox="0 0 28 28" fill="none" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M15.25 8.75C15.25 9.44036 14.6904 10 14 10C13.3096 10 12.75 9.44036 12.75 8.75C12.75 8.05964 13.3096 7.5 14 7.5C14.6904 7.5 15.25 8.05964 15.25 8.75ZM11.165 12.5C11.165 12.0388 11.5389 11.665 12 11.665H14.25C14.7112 11.665 15.085 12.0388 15.085 12.5V18.665H16.5C16.9612 18.665 17.335 19.0388 17.335 19.5C17.335 19.9612 16.9612 20.335 16.5 20.335H12C11.5389 20.335 11.165 19.9612 11.165 19.5C11.165 19.0388 11.5389 18.665 12 18.665H13.415V13.335H12C11.5389 13.335 11.165 12.9611 11.165 12.5Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M14 3C20.0751 3 25 7.92487 25 14C25 20.0751 20.0751 25 14 25C7.92487 25 3 20.0751 3 14C3 7.92487 7.92487 3 14 3ZM14 4.5C8.75329 4.5 4.5 8.75329 4.5 14C4.5 19.2467 8.75329 23.5 14 23.5C19.2467 23.5 23.5 19.2467 23.5 14C23.5 8.75329 19.2467 4.5 14 4.5Z" fill="currentColor"/></svg>
             <img class="control-glyph control-glyph--open" src="/assets/ui/cancel.svg" alt="" aria-hidden="true" />
           </button>
-          <button id="sitButton" class="sit-button" hidden>Сесть за стол</button>
+          <button type="button" id="sitButton" class="sit-button" hidden>Сесть за стол</button>
         </div>
         <div class="board">
           <div class="start-overlay" id="startOverlay" hidden>
@@ -55,7 +56,7 @@
               <strong>Вы наблюдаете за столом</strong>
               <span id="observerHint">Можно сесть за свободное место и войти в игру.</span>
             </div>
-            <button id="observerSitButton">Сесть за стол</button>
+            <button type="button" id="observerSitButton">Сесть за стол</button>
           </div>
           <div class="community" id="communityCards"></div>
           <div class="table-center">
@@ -79,17 +80,17 @@
             <button type="button" data-bet-preset="max">Макс.</button>
           </div>
           <button type="button" class="sitout-action" id="quickSitOutButton" title="Отойти" aria-label="Отойти">□</button>
-          <button data-poker-action="fold" class="danger">Fold</button>
-          <button data-poker-action="check" class="secondary">Check</button>
-          <button data-poker-action="call">Call</button>
+          <button type="button" data-poker-action="fold" class="danger">Fold</button>
+          <button type="button" data-poker-action="check" class="secondary">Check</button>
+          <button type="button" data-poker-action="call">Call</button>
           <label>
             <span id="amountLabel">Raise +</span>
             <input id="actionAmount" inputmode="numeric" pattern="[0-9]*" value="50" />
           </label>
           <input class="bet-slider" id="betSlider" type="range" min="1" max="10000" step="1" value="50" />
           <button type="button" class="bet-confirm" id="confirmBetButton">Подтвердить<br /><span>50</span></button>
-          <button data-poker-action="bet">Bet</button>
-          <button data-poker-action="raise">Raise</button>
+          <button type="button" data-poker-action="bet">Bet</button>
+          <button type="button" data-poker-action="raise">Raise</button>
         </div>
         <div class="show-muck-actions" id="showMuckActions" hidden aria-live="polite">
           <span>Показать карты?</span>
@@ -107,23 +108,23 @@
           <button type="button" data-pre-action="call-any">Чек/Колл любой</button>
         </div>
         <div class="dev-floating">
-          <button id="addTestPlayerButton" class="secondary">Dev: игрок</button>
-          <button id="autoActButton" class="secondary">Dev: автоход</button>
+          <button type="button" id="addTestPlayerButton" class="secondary">Dev: игрок</button>
+          <button type="button" id="autoActButton" class="secondary">Dev: автоход</button>
         </div>
         <div class="bot-actions" id="botActions" hidden>
           <span id="botActionLabel">Ход dev-игрока</span>
-          <button id="botFoldButton" class="danger">Dev fold</button>
-          <button id="botCallButton">Dev call</button>
+          <button type="button" id="botFoldButton" class="danger">Dev fold</button>
+          <button type="button" id="botCallButton">Dev call</button>
         </div>
       </section>
 
       <section class="buyin-overlay" id="buyInOverlay" hidden>
-        <div class="buyin-sheet">
+        <div class="buyin-sheet" role="dialog" aria-modal="true" aria-labelledby="buyInTitle" tabindex="-1">
           <div class="buyin-sheet-grabber" aria-hidden="true"></div>
           <button type="button" class="buyin-close" id="closeBuyInOverlay" aria-label="Закрыть" hidden>×</button>
           <header class="buyin-head">
             <p class="buyin-kicker">Weez Poker</p>
-            <h2 class="buyin-title">Buy-in</h2>
+            <h2 class="buyin-title" id="buyInTitle">Buy-in</h2>
             <span id="buyInGameType">БЛ Холдем 25/50</span>
           </header>
           <div class="buyin-summary">
@@ -445,7 +446,7 @@
               </div>
             </div>
           </section>
-          <section class="lobby-card cashier-topup-card" data-cashier-sheet="deposit" aria-modal="true">
+          <section class="lobby-card cashier-topup-card" data-cashier-sheet="deposit">
             <div class="cashier-sheet-grabber" aria-hidden="true"></div>
             <div class="section-title">
               <div>
@@ -480,7 +481,7 @@
               <button type="button" class="cashier-pay-button" id="cashierPayButton">Пополнить</button>
             </div>
           </section>
-          <section class="lobby-card cashier-withdraw-card" data-cashier-sheet="withdraw" aria-modal="true">
+          <section class="lobby-card cashier-withdraw-card" data-cashier-sheet="withdraw">
             <div class="cashier-sheet-grabber" aria-hidden="true"></div>
             <div class="section-title">
               <button type="button" class="cashier-sheet-close" data-cashier-sheet-close aria-label="Закрыть">×</button>
@@ -568,7 +569,7 @@
             <div class="tournament-history-list" id="tournamentHistoryList"></div>
           </section>
           <div class="tournament-detail-backdrop" id="tournamentDetailBackdrop" hidden></div>
-          <section class="tournament-detail-sheet" id="tournamentDetailSheet" hidden aria-modal="true" aria-label="Детали турнира">
+          <section class="tournament-detail-sheet" id="tournamentDetailSheet" hidden role="dialog" aria-modal="true" aria-labelledby="tournamentDetailTitle" tabindex="-1">
             <div class="cashier-sheet-grabber tournament-detail-grabber" aria-hidden="true"></div>
             <header class="tournament-detail-head">
               <div>
@@ -711,7 +712,7 @@
               </div>
               <span>скоро</span>
             </div>
-            <div class="affiliate-link-preview">t.me/qwzpokerbot/app?ref=your_code</div>
+            <div class="affiliate-link-preview">t.me/weezpokerbot?startapp=ref_your_code</div>
           </section>
         </section>
 
@@ -892,7 +893,7 @@
                     <button type="button" id="adminTournamentReset">Сбросить</button>
                   </div>
                 </form>
-                <div class="cashier-status" id="adminTournamentStatus" role="status"></div>
+                <div class="cashier-status" id="adminTournamentUiStatus" role="status"></div>
               </section>
 
               <section class="lobby-card">
@@ -991,7 +992,7 @@
             <span class="nav-icon" aria-hidden="true"><img src="/assets/nav/botprofile2.svg" alt="" /></span>
             <span class="nav-label">Профиль</span>
           </button>
-          <button type="button" id="lobbyMenuButton" data-lobby-menu-trigger>
+          <button type="button" id="lobbyMenuButton" data-lobby-menu-trigger aria-expanded="false" aria-controls="lobbyMenuSheet">
             <span class="nav-icon" aria-hidden="true"><img src="/assets/nav/ic_bot2.svg" alt="" /></span>
             <span class="nav-label">Меню</span>
           </button>
@@ -1001,7 +1002,7 @@
           </button>
         </nav>
         <div class="lobby-menu-backdrop" id="lobbyMenuBackdrop" hidden></div>
-        <section class="lobby-menu-sheet" id="lobbyMenuSheet" hidden aria-modal="true" aria-label="Меню">
+        <section class="lobby-menu-sheet" id="lobbyMenuSheet" hidden role="dialog" aria-modal="true" aria-label="Меню" tabindex="-1">
           <div class="cashier-sheet-grabber" aria-hidden="true"></div>
           <div class="lobby-menu-list footer-lobby tg-menu-group">
             <button type="button" class="footer-lobby-row footer-lobby-row--private" data-menu-action="cashier">
@@ -1069,7 +1070,7 @@
       </section>
     </main>
 
-    <section class="lobby-menu-sheet doc-sheet" id="docSheet" hidden aria-modal="true" aria-label="Документ">
+    <section class="lobby-menu-sheet doc-sheet" id="docSheet" hidden role="dialog" aria-modal="true" aria-labelledby="docSheetTitle" tabindex="-1">
       <div class="cashier-sheet-grabber" aria-hidden="true"></div>
       <header class="lobby-menu-head">
         <p>Weez Poker</p>
@@ -1080,20 +1081,20 @@
     </section>
 
     <aside class="side-menu" id="sideMenu" hidden>
-      <button class="close-button" id="closeMenuButton" aria-label="Закрыть меню">×</button>
-      <button id="standButton">Покинуть стол</button>
-      <button id="sitOutButton">Отойти</button>
-      <button id="buyInButton">Добавить средства на стол</button>
-      <button id="inviteButton">Пригласить</button>
-      <button id="backToLobbyButton">Назад в лобби</button>
+      <button type="button" class="close-button" id="closeMenuButton" aria-label="Закрыть меню">×</button>
+      <button type="button" id="standButton">Покинуть стол</button>
+      <button type="button" id="sitOutButton">Отойти</button>
+      <button type="button" id="buyInButton">Добавить средства на стол</button>
+      <button type="button" id="inviteButton">Пригласить</button>
+      <button type="button" id="backToLobbyButton">Назад в лобби</button>
     </aside>
 
     <aside class="info-drawer" id="infoDrawer" hidden>
       <div class="drawer-tabs">
-        <button data-drawer-tab="log" aria-label="История"><span class="dt-icon" aria-hidden="true"></span><span class="dt-label">История</span></button>
-        <button data-drawer-tab="info" aria-label="Информация"><span class="dt-icon" aria-hidden="true"></span><span class="dt-label">Информация</span></button>
-        <button data-drawer-tab="stats" aria-label="Статистика"><span class="dt-icon" aria-hidden="true"></span><span class="dt-label">Статистика</span></button>
-        <button class="close-button" id="closeDrawerButton" aria-label="Закрыть панель">×</button>
+        <button type="button" data-drawer-tab="log" aria-label="История"><span class="dt-icon" aria-hidden="true"></span><span class="dt-label">История</span></button>
+        <button type="button" data-drawer-tab="info" aria-label="Информация"><span class="dt-icon" aria-hidden="true"></span><span class="dt-label">Информация</span></button>
+        <button type="button" data-drawer-tab="stats" aria-label="Статистика"><span class="dt-icon" aria-hidden="true"></span><span class="dt-label">Статистика</span></button>
+        <button type="button" class="close-button" id="closeDrawerButton" aria-label="Закрыть панель">×</button>
       </div>
       <section class="drawer-page" id="drawerLog">
         <div class="log-list drawer-log" id="actionLog"></div>
@@ -1116,10 +1117,10 @@
           </div>
           <span data-field="meta"></span>
         </div>
-        <button data-action="join">Войти</button>
+        <button type="button" data-action="join">Войти</button>
       </article>
     </template>
 
-    <script src="/app.js?v=20260715-1" type="module"></script>
+    <script src="/app.js?v=20260720-3" type="module"></script>
   </body>
 </html>

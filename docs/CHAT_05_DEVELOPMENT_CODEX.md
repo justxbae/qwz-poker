@@ -1,8 +1,8 @@
-# QWZ Poker - Development / Codex Tasks Chat Instructions
+# Weez Poker — Development / Codex Tasks Chat Instructions
 
 ## Роль этого чата
 
-Ты Development Codex агент QWZ Poker. Твоя зона: реализация конкретных задач в коде, тесты, рефакторинг, маленькие PR, фиксы, безопасное изменение server/public/tests.
+Ты Development Codex агент Weez Poker. Твоя зона: реализация конкретных задач в коде, тесты, рефакторинг, маленькие PR, фиксы, безопасное изменение server/public/tests.
 
 Этот чат не место для больших философских обсуждений. Здесь делаются маленькие понятные задачи по уже принятой архитектуре, продукту и экономике.
 
@@ -20,7 +20,7 @@
 
 При конфликте документов:
 1. Сначала смотри `docs/13-decisions.md`, если там есть более свежее решение.
-2. Потом смотри `docs/01-master-spec.md`.
+2. Потом смотри `MASTER_SPEC.md`.
 3. Потом профильный документ: экономика, архитектура, frontend и т.д.
 4. Если конфликт нельзя решить безопасно, не гадай. Запиши конфликт в `docs/13-decisions.md` как `Open Question` и попроси решение у пользователя.
 
@@ -31,8 +31,8 @@
 - `docs/13-decisions.md`, если появилось устойчивое решение;
 - свой профильный документ;
 - чужой профильный документ, если решение влияет на другую область;
-- `docs/12-tech-roadmap.md`, если появилась новая техническая задача;
-- `docs/00-brief.md`, если изменился смысл MVP или позиционирование продукта.
+- `docs/TECH_ROADMAP.md`, если появилась новая техническая задача;
+- `MASTER_SPEC.md`, если изменился смысл MVP или позиционирование продукта.
 
 Формат записи в `docs/13-decisions.md`:
 
@@ -57,8 +57,8 @@
 
 ```text
 AGENTS.md
-docs/01-master-spec.md
-docs/12-tech-roadmap.md
+MASTER_SPEC.md
+docs/TECH_ROADMAP.md
 docs/13-decisions.md
 ```
 
@@ -67,32 +67,32 @@ docs/13-decisions.md
 ### Backend / API / DB
 
 ```text
-docs/03-architecture.md
-docs/04-database.md
-docs/11-backend.md
+AGENTS.md
+DATABASE.md
+docs/TECH_ROADMAP.md
 ```
 
 ### Payments / money / withdrawal / bonus
 
 ```text
-docs/04-database.md
-docs/05-economy.md
-docs/06-payments.md
-docs/07-bonus-withdrawal.md
+DATABASE.md
+docs/ECONOMICS.md
+PAYMENTS.md
+docs/BONUS_WITHDRAWAL.md
 ```
 
 ### Poker engine / fairness
 
 ```text
-docs/03-architecture.md
-docs/08-fairness.md
+AGENTS.md
+docs/FAIRNESS.md
 ```
 
 ### Frontend
 
 ```text
-docs/02-product.md
-docs/10-frontend.md
+MASTER_SPEC.md
+docs/DESIGN_SYSTEM.md
 ```
 
 ## Главные правила разработки
@@ -160,8 +160,8 @@ docs/10-frontend.md
 ```text
 Read:
 - AGENTS.md
-- docs/03-architecture.md
-- docs/04-database.md
+- MASTER_SPEC.md
+- DATABASE.md
 - docs/13-decisions.md
 
 Task:
@@ -231,9 +231,9 @@ After work:
 ## Стартовый промпт для этого чата
 
 ```text
-Ты Development / Codex Tasks агент проекта QWZ Poker.
+Ты Development / Codex Tasks агент проекта Weez Poker.
 
-Перед работой прочитай AGENTS.md, docs/01-master-spec.md, docs/12-tech-roadmap.md и docs/13-decisions.md, а затем профильные docs по задаче.
+Перед работой прочитай AGENTS.md, MASTER_SPEC.md, docs/TECH_ROADMAP.md и docs/13-decisions.md, а затем профильные docs по задаче.
 
 Твоя задача: делать маленькие безопасные изменения в коде, писать тесты и обновлять docs после реализации. Не меняй архитектуру, экономику и продуктовые правила без явного решения в docs/13-decisions.md. Если важный контекст нужен другим чатам, сам запиши его в docs/.
 ```

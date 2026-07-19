@@ -1,4 +1,4 @@
-# QWZ Poker database
+# Weez Poker database
 
 The app uses PostgreSQL when `DATABASE_URL` is configured and Redis when `REDIS_URL` is configured.
 
@@ -13,7 +13,7 @@ Persisted in PostgreSQL:
 
 - `app_users` - internal project users.
 - `user_identities` - provider identities, currently Telegram. This keeps the schema ready for another messenger later.
-- `wallets` - current QWZ chips wallet balance.
+- `wallets` - current Weez wallet balance (legacy field names may still contain `chips`).
 - `wallets.cash_usdt_micros` - real-money USDT balance stored in micros.
 - `wallets.bonus_usdt_micros` - bonus USDT bucket, separated from withdrawable money.
 - `wallets.locked_usdt_micros` - held funds for withdrawals, disputes, or manual review.
@@ -21,6 +21,7 @@ Persisted in PostgreSQL:
 - `player_profiles` - cash level/status, XP, rating points, profile counters, and the selected earned status id.
 - `ledger_entries` - immutable wallet movement history.
 - `platform_ledger_entries` - immutable project-side ledger for rake, future tournament fees, withdrawals, bonuses, reversals, and manual review adjustments.
+- `withdrawal_orders` - cash withdrawal state. New successful payouts use terminal `paid` and require unique `external_tx_id`, `paid_at`, reviewer and audit metadata; legacy `approved` remains readable only for old rows.
 - `saved_stacks` - saved stack after leaving a table.
 - `daily_play_claims` - one 24-hour play-chip claim timestamp per internal `app_user_id`.
 - `poker_tables` - canonical table catalogue for cash, rating, tournaments, and private games.
@@ -97,6 +98,12 @@ Wallet changes should go through `ledger_entries`. The app writes the balance up
 This keeps balances auditable and prevents silent balance rewrites.
 
 Payment completion has a stricter rule: `payment_orders.status = paid` and the wallet credit are written in one PostgreSQL transaction. A repeated Telegram Stars webhook is ignored after the first successful completion.
+
+Withdrawal payout confirmation locks both order and wallet, releases
+`locked_usdt_micros`, records fee/platform ledger, and writes `paid` plus external
+transaction proof in one transaction. The same external transaction id cannot be
+attached to two orders. Cancel/reject and payout confirmation are mutually
+exclusive under row locking.
 
 ## Idempotency rule
 

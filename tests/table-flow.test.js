@@ -147,7 +147,66 @@ test("metrics endpoint exposes prometheus text", async () => {
     assert.match(metrics, /# TYPE qwz_app_up gauge/);
     assert.match(metrics, /qwz_app_up 1/);
     assert.match(metrics, /qwz_uptime_seconds \d+/);
+    assert.match(metrics, /qwz_locked_withdrawal_drift_micros 0/);
+    assert.match(metrics, /qwz_paid_withdrawals_missing_external_tx 0/);
     assert.match(metrics, /qwz_process_resident_memory_bytes \d+/);
+  } finally {
+    server.kill();
+  }
+});
+
+test("metrics token, security headers, and malformed JSON are enforced", async () => {
+  const metricsToken = "m".repeat(32);
+  const server = await startServer({ METRICS_TOKEN: metricsToken });
+  try {
+    const denied = await fetch(`${BASE_URL}/api/metrics`);
+    assert.equal(denied.status, 403);
+
+    const allowed = await fetch(`${BASE_URL}/api/metrics`, {
+      headers: { authorization: `Bearer ${metricsToken}` }
+    });
+    assert.equal(allowed.status, 200);
+    assert.match(await allowed.text(), /qwz_app_up 1/);
+
+    const health = await fetch(`${BASE_URL}/api/health`);
+    assert.equal(health.headers.get("x-content-type-options"), "nosniff");
+    assert.equal(health.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
+    assert.equal(health.headers.get("cache-control"), "no-store");
+
+    const malformed = await fetch(`${BASE_URL}/api/auth`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{not-json"
+    });
+    assert.equal(malformed.status, 400);
+    assert.equal((await malformed.json()).error, "Некорректный JSON");
+  } finally {
+    server.kill();
+  }
+});
+
+test("Telegram auth rejects future timestamps and missing user ids", async () => {
+  const server = await startServer();
+  try {
+    const future = await requestResponse("/api/auth", {
+      method: "POST",
+      body: {
+        initData: telegramInitData(
+          { id: 901, first_name: "Future" },
+          "test-token",
+          Math.floor(Date.now() / 1000) + 300
+        )
+      }
+    });
+    assert.equal(future.status, 401);
+    assert.equal(future.data.error, "Invalid Telegram auth date");
+
+    const missingId = await requestResponse("/api/auth", {
+      method: "POST",
+      body: { initData: telegramInitData({ first_name: "Missing" }) }
+    });
+    assert.equal(missingId.status, 401);
+    assert.equal(missingId.data.error, "Invalid Telegram user");
   } finally {
     server.kill();
   }
@@ -193,6 +252,8 @@ test("production real-money mode refuses to start without PostgreSQL and Redis",
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /DATABASE_URL is required in production/);
   assert.match(result.stderr, /REDIS_URL is required in production/);
+  assert.match(result.stderr, /TELEGRAM_WEBHOOK_SECRET is required in production/);
+  assert.match(result.stderr, /METRICS_TOKEN is required in production/);
 });
 
 test("player can set fairness seed before the hand starts", async () => {
@@ -603,6 +664,63 @@ test("idempotency key prevents duplicated wallet money operations", async () => 
     const dashboard = (await request("/api/admin", { token: auth.token })).admin;
     assert.equal(dashboard.audit.reconciliation.walletLedgerDrift, 0);
     assert.equal(dashboard.audit.reconciliation.starsDepositDrift, 0);
+    assert.equal(dashboard.audit.reconciliation.lockedWithdrawalDrift, 0);
+    assert.equal(dashboard.audit.reconciliation.invalidWithdrawalCount, 0);
+  } finally {
+    server.kill();
+  }
+});
+
+test("idempotency key prevents duplicated table actions and replays a completed leave", async () => {
+  const server = await startServer();
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await topUp(auth.token, 10);
+
+    let table = (await request("/api/tables", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "table-action-create",
+      body: { name: "Action idempotency", maxPlayers: 2, smallBlind: 25, buyInAmount: 10000 }
+    })).table;
+    table = (await request(`/api/tables/${table.id}/add-test-player`, {
+      method: "POST",
+      token: auth.token
+    })).table;
+    table = (await request(`/api/tables/${table.id}/start-hand`, {
+      method: "POST",
+      token: auth.token
+    })).table;
+
+    const actionRequest = {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "same-table-action",
+      body: { action: "raise", amount: 200 }
+    };
+    const firstAction = await request(`/api/tables/${table.id}/act`, actionRequest);
+    const replayAction = await request(`/api/tables/${table.id}/act`, actionRequest);
+    assert.deepEqual(replayAction, firstAction);
+
+    const current = (await request(`/api/tables/${table.id}`, { token: auth.token })).table;
+    assert.equal(current.currentBet, 250);
+    assert.equal(current.pot, 300);
+    assert.equal(current.eventSequence, firstAction.table.eventSequence);
+
+    const leaveTableResult = (await request("/api/tables", {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "table-leave-create",
+      body: { name: "Leave idempotency", maxPlayers: 2, smallBlind: 25, buyInAmount: 2500 }
+    })).table;
+    const leaveRequest = {
+      method: "POST",
+      token: auth.token,
+      idempotencyKey: "same-table-leave"
+    };
+    const firstLeave = await request(`/api/tables/${leaveTableResult.id}/leave`, leaveRequest);
+    const replayLeave = await request(`/api/tables/${leaveTableResult.id}/leave`, leaveRequest);
+    assert.deepEqual(replayLeave, firstLeave);
   } finally {
     server.kill();
   }
@@ -1230,11 +1348,21 @@ test("cash withdrawal hold, reject refund, and approve fee accounting stay balan
       body: { currency: "USDT", method: "ton", usdtAmount: 20, destination: testTonAddress2 }
     })).withdrawal;
 
+    await assert.rejects(
+      request(`/api/admin/withdrawals/${approvedWithdrawal.id}/approve`, {
+        method: "POST",
+        token: auth.token,
+        idempotencyKey: "withdrawal-lifecycle-approve-without-tx",
+        body: { reason: "test_missing_tx" }
+      }),
+      /tx hash \/ transaction id/
+    );
+
     await request(`/api/admin/withdrawals/${approvedWithdrawal.id}/approve`, {
       method: "POST",
       token: auth.token,
       idempotencyKey: "withdrawal-lifecycle-approve-review",
-      body: { reason: "test_approve" }
+      body: { reason: "test_approve", externalTxId: "ton-test-withdrawal-tx-001" }
     });
 
     cashier = (await request("/api/cashier", { token: auth.token })).cashier;
@@ -1245,6 +1373,9 @@ test("cash withdrawal hold, reject refund, and approve fee accounting stay balan
     assert.equal(dashboard.stats.approvedWithdrawalFeeUsdtTotal, 550_000);
     assert.equal(dashboard.stats.platformLedgerNetTotal, 550_000);
     assert.equal(dashboard.audit.reconciliation.cashWalletLedgerDrift, 0);
+    assert.equal(dashboard.audit.reconciliation.lockedWithdrawalDrift, 0);
+    assert.equal(dashboard.audit.reconciliation.paidWithdrawalsMissingExternalTx, 0);
+    assert.equal(dashboard.audit.reconciliation.withdrawalQuoteMismatchCount, 0);
     assert.ok(dashboard.recentRiskFlags.some((flag) => flag.type === "large_withdrawal"));
     assert.ok(dashboard.recentAdminAudit.some((entry) => entry.action === "withdrawal_approve"));
     assert.ok(dashboard.recentAdminAudit.some((entry) => entry.action === "withdrawal_reject"));
@@ -1256,7 +1387,7 @@ test("cash withdrawal hold, reject refund, and approve fee accounting stay balan
         idempotencyKey: "withdrawal-lifecycle-double-approve",
         body: { reason: "double_approve" }
       }),
-      /Заявка уже в статусе approved/
+      /Заявка уже в статусе paid/
     );
   } finally {
     server.kill();
@@ -1813,10 +1944,10 @@ function signXRocketWebhook(body, secretKey) {
   return createHmac("sha256", secret).update(body).digest("hex");
 }
 
-function telegramInitData(user, botToken = "test-token") {
+function telegramInitData(user, botToken = "test-token", authDate = Math.floor(Date.now() / 1000)) {
   const params = new URLSearchParams({
-    auth_date: String(Math.floor(Date.now() / 1000)),
-    query_id: `test-${user.id}`,
+    auth_date: String(authDate),
+    query_id: `test-${user.id || "missing"}`,
     user: JSON.stringify(user)
   });
   const dataCheckString = [...params.entries()]

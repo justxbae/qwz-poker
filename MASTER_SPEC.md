@@ -162,10 +162,11 @@ Stars — один из способов оплаты депозита. Курс
 1. Касса → раздел "Вывод"
 2. Видит: доступно к выводу (real balance), pending withdrawals, history
 3. Вводит сумму → выбирает метод → вводит реквизиты
-4. Система проверяет: KYC уровень, risk score, min withdrawal, дневной лимит
+4. Система проверяет: метод, адрес, risk flags, min/max withdrawal и доступный cash
 5. Если проверки прошли → статус "pending" → funds перемещаются в locked_usdt_micros
 6. Ручная проверка администратором
-7. Одобрено → статус "approved" → выплата → статус "paid"
+7. После реальной внешней выплаты администратор обязан указать уникальный tx hash;
+   только тогда hold закрывается и заявка атомарно получает terminal status "paid"
    Отклонено → статус "rejected" → funds возвращаются в cash_usdt_micros
 ```
 
@@ -417,32 +418,33 @@ Re-entry fee = такой же fee за каждый re-entry.
 ```
 1. Игрок запрашивает вывод в UI: касса → вывод → сумма + метод + реквизиты
 2. Бэкенд проверяет:
-   a. KYC tier соответствует сумме вывода
-   b. Risk score игрока (yellow/orange/red — требует manual)
-   c. Min withdrawal threshold
-   d. Wagering: real_balance - bonus_origin_amount должно быть ≥ 0
-      (нельзя вывести "незаработанный" бонус)
-   e. Velocity: нет подозрительного паттерна (deposit → immediate withdrawal)
+   a. метод и адрес назначения;
+   b. min/max withdrawal;
+   c. доступный `cash_usdt_micros` (bonus/play не участвуют);
+   d. risk flags и deposit → immediate withdrawal pattern для manual review;
+   e. опциональный emergency rake gate, если оператор явно включил его через env.
 3. Если всё ок → withdrawal_request создаётся со статусом 'pending'
-4. chips перемещаются: cash_usdt_micros → locked_usdt_micros
+4. USDT micros перемещаются: cash_usdt_micros → locked_usdt_micros
 5. Игрок видит: "Заявка принята, ожидает проверки"
 6. Администратор в панели видит withdrawal queue:
    - Игрок, сумма, метод, реквизиты, risk flags, история депозитов/игры
-7. Admin одобряет → провайдер получает запрос на выплату → статус 'approved' → 'paid'
-   Admin отклоняет → chips возвращаются в cash_usdt_micros → статус 'rejected'
+7. Admin сначала отправляет net payout, затем подтверждает его уникальным внешним
+   tx hash → hold закрывается и статус сразу становится 'paid'. Подтверждение без
+   tx hash запрещено. Admin отклоняет → средства возвращаются в cash_usdt_micros
+   → статус 'rejected'.
 8. Игрок получает push-уведомление о статусе
 ```
 
 **Комиссии при выводе:**
 
-| Метод | Комиссия | Min вывод | Max в сутки |
+| Метод | Видимая комиссия | Min вывод | Max одной заявки |
 |---|---|---|---|
-| TON | 3% + ~$0.05 сеть | 25 000 chips | 500 000 chips |
-| USDT (CryptoBot/xRocket) | 4% + 1 USDT сеть | 50 000 chips | 1 000 000 chips |
-| USDT TRC20 | 4% + 1 USDT сеть | 50 000 chips | 1 000 000 chips |
-| Stars Gifts | 12% | 25 000 chips | 100 000 chips |
+| TON | 2% + $0.15 network fee | $10 | $5,000 |
+| USDT TRC20 | 2% + $1.00 network fee | $10 | $5,000 |
 
-На старте (Фаза 1) вывод работает только в ручном режиме.
+На controlled beta вывод работает только вручную. Глобальный обязательный
+playthrough выключен (`WITHDRAWAL_RAKE_THRESHOLD_PERCENT=0`); подозрительные
+заявки уходят в manual review вместо скрытой блокировки всех игроков.
 
 ---
 
@@ -724,15 +726,13 @@ Net rake реферала = рейк реферала – рейкбек реф�
 
 KYC провайдер: Sumsub / Veriff (webhook → `kyc_status` обновляется).
 
-### 9.4. Правило "min play before withdrawal"
+### 9.4. Deposit → withdrawal risk policy
 
-```
-Перед первым выводом игрок должен сыграть рейк не менее:
-  min_rake_for_withdrawal = max(2 500 chips, 10% от суммы депозита)
-
-Цель: предотвратить использование клуба для отмывания (deposit → instant withdraw).
-Реализация: поле player_profiles.total_rake_paid проверяется при запросе вывода.
-```
+Обязательного min-play для каждого игрока нет. Production default
+`WITHDRAWAL_RAKE_THRESHOLD_PERCENT=0`. Сервер сохраняет объём депозитов, cash
+rake, device/IP signals и risk flags; подозрительный транзит переводится в ручную
+проверку. Аварийный процентный gate может быть временно включён оператором, но
+должен быть явно показан в API/UI и не считается базовым правилом продукта.
 
 ### 9.5. Геофенс
 

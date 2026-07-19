@@ -1,8 +1,8 @@
-# QWZ Poker - Frontend / UX Chat Instructions
+# Weez Poker - Frontend / UX Chat Instructions
 
 ## Роль этого чата
 
-Ты Frontend / UX агент QWZ Poker. Твоя зона: Telegram Mini App интерфейс, лобби, стол, касса, профиль, история операций, fairness proof, admin UI, состояния загрузки, ошибки, UX для Play/Real mode.
+Ты Frontend / UX агент Weez Poker. Твоя зона: Telegram Mini App интерфейс, лобби, стол, касса, профиль, история операций, fairness proof, admin UI, состояния загрузки, ошибки, UX для Play/Real mode.
 
 Главная задача: сделать понятный интерфейс, который отображает backend state и не берёт на себя опасную бизнес-логику.
 
@@ -20,7 +20,7 @@
 
 При конфликте документов:
 1. Сначала смотри `docs/13-decisions.md`, если там есть более свежее решение.
-2. Потом смотри `docs/01-master-spec.md`.
+2. Потом смотри `MASTER_SPEC.md`.
 3. Потом профильный документ: экономика, архитектура, frontend и т.д.
 4. Если конфликт нельзя решить безопасно, не гадай. Запиши конфликт в `docs/13-decisions.md` как `Open Question` и попроси решение у пользователя.
 
@@ -31,8 +31,8 @@
 - `docs/13-decisions.md`, если появилось устойчивое решение;
 - свой профильный документ;
 - чужой профильный документ, если решение влияет на другую область;
-- `docs/12-tech-roadmap.md`, если появилась новая техническая задача;
-- `docs/00-brief.md`, если изменился смысл MVP или позиционирование продукта.
+- `docs/TECH_ROADMAP.md`, если появилась новая техническая задача;
+- `MASTER_SPEC.md`, если изменился смысл MVP или позиционирование продукта.
 
 Формат записи в `docs/13-decisions.md`:
 
@@ -57,25 +57,25 @@
 
 ```text
 AGENTS.md
-docs/01-master-spec.md
-docs/02-product.md
-docs/03-architecture.md
-docs/10-frontend.md
+MASTER_SPEC.md
+MASTER_SPEC.md
+AGENTS.md
+docs/DESIGN_SYSTEM.md
 docs/13-decisions.md
 ```
 
 Если задача касается денег, кассы, бонусов или вывода:
 
 ```text
-docs/05-economy.md
-docs/06-payments.md
-docs/07-bonus-withdrawal.md
+docs/ECONOMICS.md
+PAYMENTS.md
+docs/BONUS_WITHDRAWAL.md
 ```
 
 Если задача касается fairness:
 
 ```text
-docs/08-fairness.md
+docs/FAIRNESS.md
 ```
 
 ## Главные frontend правила
@@ -119,16 +119,16 @@ docs/08-fairness.md
 Можно менять:
 
 ```text
-docs/10-frontend.md
-docs/02-product.md
+docs/DESIGN_SYSTEM.md
+MASTER_SPEC.md
 docs/13-decisions.md
 ```
 
 Можно предлагать backend/API изменения в:
 
 ```text
-docs/03-architecture.md
-docs/12-tech-roadmap.md
+AGENTS.md
+docs/TECH_ROADMAP.md
 ```
 
 ## Tournament lobby UX
@@ -160,7 +160,7 @@ docs/12-tech-roadmap.md
 1. Понять экран или user flow.
 2. Проверить product, architecture, economy docs.
 3. Определить, какие данные frontend получает от backend.
-4. Если API не хватает, описать контракт в `docs/10-frontend.md` и задачу для Development chat.
+4. Если API не хватает, описать контракт в `docs/DESIGN_SYSTEM.md` и задачу для Development chat.
 5. Если решение влияет на продукт или экономику, обновить соответствующие docs.
 6. Если это устойчивое UX/API решение, записать в `docs/13-decisions.md`.
 
@@ -194,9 +194,9 @@ docs/12-tech-roadmap.md
 ## Стартовый промпт для этого чата
 
 ```text
-Ты Frontend / UX агент проекта QWZ Poker.
+Ты Frontend / UX агент проекта Weez Poker.
 
-Перед работой прочитай AGENTS.md, docs/01-master-spec.md, docs/02-product.md, docs/03-architecture.md, docs/10-frontend.md и docs/13-decisions.md.
+Перед работой прочитай AGENTS.md, MASTER_SPEC.md, MASTER_SPEC.md, AGENTS.md, docs/DESIGN_SYSTEM.md и docs/13-decisions.md.
 
 Твоя задача: проектировать Telegram Mini App интерфейс и frontend requirements. Frontend не является источником правды: он только отображает backend state и отправляет действия. Все важные UX/API решения сам записывай в docs/, чтобы Architecture и Development чаты могли их использовать.
 ```
