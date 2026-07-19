@@ -5,6 +5,9 @@ import {
   advanceWelcomeBonusWagering,
   cashClubPointsFromRake,
   cashClubStatus,
+  CASH_TABLE_LIMITS,
+  PLAY_TABLE_LIMITS,
+  desiredPublicTableCount,
   formatUsdtMicros,
   nextRatingPoints,
   quoteCashDeposit,
@@ -15,6 +18,24 @@ import {
   ratingLeague,
   toUsdtMicros
 } from "../server/economy.js";
+
+test("beta table pool exposes one fixed rating table and three launch cash stakes", () => {
+  assert.deepEqual(PLAY_TABLE_LIMITS, [{ smallBlind: 100, bigBlind: 200, count: 1 }]);
+  assert.deepEqual(CASH_TABLE_LIMITS.map(({ smallBlind, bigBlind, count }) => [smallBlind, bigBlind, count]), [
+    [toUsdtMicros(0.01), toUsdtMicros(0.02), 1],
+    [toUsdtMicros(0.02), toUsdtMicros(0.05), 1],
+    [toUsdtMicros(0.05), toUsdtMicros(0.10), 1]
+  ]);
+});
+
+test("public table pool opens one overflow table at 5/6 and removes spare empties", () => {
+  const table = (seats) => ({ maxPlayers: 6, seats: Array.from({ length: seats }, (_, index) => ({ index })) });
+  assert.equal(desiredPublicTableCount([], { baseCount: 1 }), 1);
+  assert.equal(desiredPublicTableCount([table(4)], { baseCount: 1 }), 1);
+  assert.equal(desiredPublicTableCount([table(5)], { baseCount: 1 }), 2);
+  assert.equal(desiredPublicTableCount([table(5), table(1)], { baseCount: 1 }), 2);
+  assert.equal(desiredPublicTableCount([table(5), table(5)], { baseCount: 1 }), 3);
+});
 
 test("cash uses USDT micros directly and Stars quote 100 per USDT", () => {
   assert.equal(toUsdtMicros(14.5), 14_500_000);

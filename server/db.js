@@ -2876,7 +2876,7 @@ export async function analyticsOverview(days = 7) {
         count(*) filter (where event_name = 'table_leave')::int as table_leaves,
         count(*) filter (where event_name = 'poker_action')::int as poker_actions,
         count(*) filter (where event_name = 'hand_completed')::int as hands_completed,
-        coalesce(sum(amount) filter (where event_name = 'hand_completed'), 0)::bigint as rake_amount,
+        coalesce(sum(amount) filter (where event_name = 'hand_completed' and asset = 'USDT'), 0)::bigint as rake_amount,
         count(*) filter (where event_name = 'tournament_register')::int as tournament_registers,
         count(*) filter (where event_name = 'tournament_cancel')::int as tournament_cancels
       from analytics_events
@@ -2893,7 +2893,7 @@ export async function analyticsOverview(days = 7) {
         coalesce(sum(amount) filter (where event_name = 'deposit_paid'), 0)::bigint as deposit_amount,
         count(*) filter (where event_name = 'table_join')::int as table_joins,
         count(*) filter (where event_name = 'hand_completed')::int as hands_completed,
-        coalesce(sum(amount) filter (where event_name = 'hand_completed'), 0)::bigint as rake_amount
+        coalesce(sum(amount) filter (where event_name = 'hand_completed' and asset = 'USDT'), 0)::bigint as rake_amount
       from analytics_events
       where created_at >= now() - ($1::int * interval '1 day')
       group by 1

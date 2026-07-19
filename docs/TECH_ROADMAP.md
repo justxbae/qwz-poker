@@ -12,6 +12,15 @@
 
 ## Проверенный baseline
 
+Controlled-beta configuration от 2026-07-20:
+
+- Первый экран — Rating; публичный rating фиксирован на `100/200`, `6-max`, один готовый стол плюс overflow при `5/6`.
+- Cash показывает только `$0.01/$0.02`, `$0.02/$0.05`, `$0.05/$0.10`, по одному готовому столу на лимит плюс overflow при `5/6`.
+- Автоматические demo-турниры отключены; публично видны только cash-турниры, созданные администратором.
+- Daily Bonus: `35 000 PLAY_CHIPS` раз в 24 часа только при балансе `<= 34 999`.
+- Касса: депозит от `$1`, вывод от `$5`, видимая комиссия `2% + network fee`, ручной SLA до 24 часов.
+- Timing contract реализован (`20s` action, `3s` show/muck, `5s` next hand, `30s` reconnect, `300s` cash/rating sit-out), но до приглашения пользователей требует QA на двух реальных устройствах.
+
 - Node.js monolith, PostgreSQL, Redis, Telegram Mini App.
 - NL Hold'em cash/rating core: strict table stakes, blinds/HU, side pots, odd chips, uncalled return, all-in runout, showdown/muck, contributed rake, hand history, fairness proof.
 - Cash и PLAY_CHIPS разделены по bucket и никогда не конвертируются друг в друга.

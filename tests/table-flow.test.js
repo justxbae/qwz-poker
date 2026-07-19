@@ -92,7 +92,7 @@ test("public lobby tables are seeded and stay available when empty", async () =>
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
     await topUp(auth.token, 2);
     const lobby = await request("/api/tables", { token: auth.token });
-    const publicTable = lobby.tables.find((table) => !table.isPrivate && table.smallBlind === 25);
+    const publicTable = lobby.tables.find((table) => !table.isPrivate && table.smallBlind === 100);
 
     assert.ok(publicTable);
     assert.equal(publicTable.seats.length, 0);
@@ -290,7 +290,7 @@ test("seated player can control test bots at public system tables", async () => 
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
     await topUp(auth.token, 2);
     const lobby = await request("/api/tables", { token: auth.token });
-    const publicTable = lobby.tables.find((table) => !table.isPrivate && table.smallBlind === 25);
+    const publicTable = lobby.tables.find((table) => !table.isPrivate && table.smallBlind === 100);
 
     let table = (await request(`/api/tables/${publicTable.id}/join`, {
       method: "POST",
@@ -1773,7 +1773,7 @@ test("admin can issue post-season reward tickets from leaderboard", async () => 
     const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
     await topUp(auth.token, 2);
     const lobby = await request("/api/tables", { token: auth.token });
-    const publicTable = lobby.tables.find((table) => !table.isPrivate && table.smallBlind === 25);
+    const publicTable = lobby.tables.find((table) => !table.isPrivate && table.smallBlind === 100);
     assert.ok(publicTable);
     let table = (await request(`/api/tables/${publicTable.id}/join`, {
       method: "POST",
@@ -2018,6 +2018,7 @@ async function startServerAndWaitForExit(extraEnv = {}) {
         PORT: String(PORT),
         BOT_TOKEN: "test-token",
         NODE_ENV: "test",
+        AUTO_SEED_TOURNAMENTS: "true",
         ...extraEnv
       },
       stdio: ["ignore", "pipe", "pipe"]
@@ -2081,6 +2082,7 @@ async function startServer(extraEnv = {}) {
         PORT: String(PORT),
         BOT_TOKEN: "test-token",
         NODE_ENV: "test",
+        AUTO_SEED_TOURNAMENTS: "true",
         ...extraEnv
       },
       stdio: ["ignore", "pipe", "pipe"]

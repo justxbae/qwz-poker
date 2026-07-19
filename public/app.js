@@ -1495,7 +1495,7 @@ function renderWithdrawalControls(cashier, cashMode) {
     return;
   }
 
-  const minUsdt = Number(withdrawals.minimumUsdtMicros || 10_000_000) / 1_000_000;
+  const minUsdt = Number(withdrawals.minimumUsdtMicros || 5_000_000) / 1_000_000;
   const maxUsdt = Number(withdrawals.maximumUsdtMicros || 5_000_000_000) / 1_000_000;
   if (cashierWithdrawAvailable) cashierWithdrawAvailable.textContent = `$${formatUsdt(cashier.cashBalanceMicros || 0)}`;
   if (cashierWithdrawBonus) cashierWithdrawBonus.textContent = `$${formatUsdt(cashier.bonusBalanceMicros || 0)}`;
@@ -1565,7 +1565,7 @@ function normalizeCashierAmountInput() {
 function normalizeWithdrawAmountInput() {
   if (!cashierWithdrawAmount) return;
   const withdrawals = cashierState.withdrawals || {};
-  const minUsdt = Number(withdrawals.minimumUsdtMicros || 10_000_000) / 1_000_000;
+  const minUsdt = Number(withdrawals.minimumUsdtMicros || 5_000_000) / 1_000_000;
   const maxUsdt = Number(withdrawals.maximumUsdtMicros || 5_000_000_000) / 1_000_000;
   cashierWithdrawAmount.value = clampAmount(Number(cashierWithdrawAmount.value || minUsdt), minUsdt, maxUsdt).toFixed(2);
   updateWithdrawalManualNotice();
@@ -4474,7 +4474,7 @@ function renderTournaments() {
   if (!state.tournaments.length) {
     const empty = document.createElement("p");
     empty.className = "empty";
-    empty.textContent = "Cash-турниров пока нет.";
+    empty.textContent = "Предстоящих турниров пока нет.";
     tournamentList.append(empty);
     return;
   }
@@ -6207,7 +6207,7 @@ const DOC_SHEET_CONTENT = {
     title: "Платежи и вывод",
     sections: [
       ["Пополнение", "Stars, Crypto Bot, xRocket, TON. Баланс зачисляется после подтверждения оплаты провайдером."],
-      ["Вывод", "Минимум $10. Комиссия 2% + сетевой сбор — расходы на услуги платёжных агрегаторов; итоговая сумма видна до создания заявки."],
+      ["Вывод", "Минимум $5. Комиссия 2% + сетевой сбор — расходы на услуги платёжных агрегаторов; итоговая сумма видна до создания заявки."],
       ["Проверка", "На старте заявки обрабатываются вручную. При подозрительной активности проверка может занять больше времени."],
       ["Обработка", "На старте все заявки проходят ручную проверку — обычно до 24 часов. Заявку можно отменить до обработки."],
       ["Бонусы", "Бонусный баланс не выводится до выполнения условий отыгрыша."]

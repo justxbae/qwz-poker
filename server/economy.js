@@ -16,22 +16,16 @@ export const WELCOME_BONUS = {
 };
 
 export const PLAY_TABLE_LIMITS = [
-  { smallBlind: 25, bigBlind: 50, count: 4 },
-  { smallBlind: 50, bigBlind: 100, count: 4 },
-  { smallBlind: 100, bigBlind: 200, count: 3 }
+  { smallBlind: 100, bigBlind: 200, count: 1 }
 ];
 
 // Values are stored as micro-USDT. All cash accounting remains integer based.
 // Cash limits follow a poker-room style ladder: Low tables for liquidity,
 // Mid tables for regulars, and VIP kept sparse until the room has demand.
 export const CASH_TABLE_LIMITS = [
-  cashLimit("0.02", "0.05", 2, { tier: "low", minBuyIn: "2.50", maxBuyIn: "12.50" }),
-  cashLimit("0.05", "0.10", 2, { tier: "low", minBuyIn: "2.50", maxBuyIn: "25.00" }),
-  cashLimit("0.10", "0.25", 2, { tier: "low", minBuyIn: "6.25", maxBuyIn: "62.50" }),
-  cashLimit("0.25", "0.50", 1, { tier: "mid", minBuyIn: "12.50", maxBuyIn: "125.00" }),
-  cashLimit("0.50", "1.00", 1, { tier: "mid", minBuyIn: "25.00", maxBuyIn: "250.00" }),
-  cashLimit("1.00", "2.00", 1, { tier: "mid", minBuyIn: "50.00", maxBuyIn: "500.00" }),
-  cashLimit("2.00", "5.00", 1, { tier: "vip", minBuyIn: "250.00", maxBuyIn: "1250.00" })
+  cashLimit("0.01", "0.02", 1, { tier: "micro", minBuyIn: "0.40", maxBuyIn: "2.00" }),
+  cashLimit("0.02", "0.05", 1, { tier: "micro", minBuyIn: "1.00", maxBuyIn: "5.00" }),
+  cashLimit("0.05", "0.10", 1, { tier: "low", minBuyIn: "2.00", maxBuyIn: "10.00" })
 ];
 
 export const ECONOMY = {
@@ -63,7 +57,7 @@ export const ECONOMY = {
   },
   withdrawals: {
     enabled: false,
-    minimumUsdtMicros: toUsdtMicros(10),
+    minimumUsdtMicros: toUsdtMicros(5),
     maximumUsdtMicros: toUsdtMicros(5000),
     // Launch policy (product decision 2026-07-08): one flat, fully visible
     // 2% service fee framed as payment-aggregator costs. No hidden spread —
@@ -167,6 +161,13 @@ export function cashSettings() {
     starsUsdtRate: Number(process.env.STARS_USDT_RATE || 0.01),
     tonUsdtRate: Number(process.env.TON_USDT_RATE || 3)
   };
+}
+
+export function desiredPublicTableCount(tables = [], { baseCount = 1, overflowAt = 5 } = {}) {
+  const occupied = tables.filter((table) => Number(table?.seats?.length || 0) > 0);
+  const needsReadyTable = occupied.length === 0
+    || occupied.every((table) => Number(table.seats.length || 0) >= Math.min(overflowAt, Number(table.maxPlayers || 6)));
+  return Math.max(1, Number(baseCount || 1), occupied.length + (needsReadyTable ? 1 : 0));
 }
 
 // Kept for the development/play faucet until daily play-chip claims replace it.

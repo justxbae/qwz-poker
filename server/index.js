@@ -21,6 +21,7 @@ import {
   cashClubStatus,
   cashSettings,
   depositSettings,
+  desiredPublicTableCount,
   formatUsdtMicros,
   playSettings,
   quoteCashDeposit,
@@ -191,6 +192,8 @@ const ADMIN_FINANCE_IDS = parseIdList(process.env.ADMIN_FINANCE_IDS || "");
 const ADMIN_SUPPORT_IDS = parseIdList(process.env.ADMIN_SUPPORT_IDS || "");
 const ADMIN_RISK_IDS = parseIdList(process.env.ADMIN_RISK_IDS || "");
 const ADMIN_TELEGRAM_EVENT_TYPES = parseAdminTelegramEventTypes(process.env.ADMIN_TELEGRAM_EVENT_TYPES || "");
+const ADMIN_DAILY_REPORT_ENABLED = process.env.ADMIN_DAILY_REPORT_ENABLED !== "false";
+const ADMIN_DAILY_REPORT_HOUR = Math.max(0, Math.min(23, Number(process.env.ADMIN_DAILY_REPORT_HOUR || 21)));
 const ADMIN_WEB_SECRET = process.env.ADMIN_WEB_SECRET || "";
 const ADMIN_WEB_USER_ID = "web-admin";
 const ADMIN_GRANT_MAX_CHIPS = Number(process.env.ADMIN_GRANT_MAX_CHIPS || 500000);
@@ -280,9 +283,13 @@ let lastReconciliationAlertKey = "";
 let telegramWebhookDiagnostics = null;
 let lastTelegramWebhookAlertKey = "";
 let tournamentTickRunning = false;
+let lastPublicTableReconcileAt = 0;
 
 seedPublicTables();
-const tournaments = seedTournaments();
+const AUTO_SEED_TOURNAMENTS = process.env.AUTO_SEED_TOURNAMENTS === "true"
+  || (process.env.NODE_ENV === "test" && process.env.TOURNAMENT_TEST_MODE === "true");
+const LEGACY_SEEDED_TOURNAMENT_IDS = new Set(["sng-nightly-cash", "freezeout-daily", "mtt-weekly"]);
+const tournaments = AUTO_SEED_TOURNAMENTS ? seedTournaments() : new Map();
 
 const server = createServer(async (req, res) => {
   try {
@@ -336,6 +343,9 @@ server.listen(PORT, HOST, () => {
   checkTelegramWebhookConfiguration().catch((error) => {
     reportError(error, { kind: "telegram_webhook_check" });
   });
+  setTimeout(() => maybeSendDailyOwnerReport().catch((error) => {
+    reportError(error, { kind: "daily_owner_report" });
+  }), 30_000);
 });
 
 setInterval(async () => {
@@ -370,6 +380,10 @@ async function tickActiveTables() {
     } catch (error) {
       if (error.status !== 409) throw error;
     }
+  }
+  if (Date.now() - lastPublicTableReconcileAt >= 5_000) {
+    lastPublicTableReconcileAt = Date.now();
+    await stateWithTableLock("__public_table_pool__", () => reconcileSystemPublicTables(), { ttlMs: 5_000, waitMs: 100 });
   }
 }
 
@@ -462,6 +476,12 @@ setInterval(async () => {
     console.error("Bonus expiry failed:", error.message);
   }
 }, BONUS_EXPIRY_INTERVAL_MS);
+
+setInterval(() => {
+  maybeSendDailyOwnerReport().catch((error) => {
+    reportError(error, { kind: "daily_owner_report" });
+  });
+}, 60 * 1000);
 
 setInterval(() => {
   const now = Date.now();
@@ -2066,6 +2086,9 @@ async function analyticsDashboard(days = 7) {
   }
   const count = (name) => byName.get(name)?.count || 0;
   const amount = (name) => byName.get(name)?.amount || 0;
+  const cashRakeAmount = events
+    .filter((event) => event.name === "hand_completed" && event.asset === "USDT")
+    .reduce((sum, event) => sum + Number(event.amount || 0), 0);
   const userCount = (name) => usersByEvent.get(name)?.size || 0;
   const appOpenUsers = userCount("app_open");
   const cashierUsers = userCount("cashier_open");
@@ -2133,7 +2156,7 @@ async function analyticsDashboard(days = 7) {
     tableLeaves: count("table_leave"),
     pokerActions: count("poker_action"),
     handsCompleted: count("hand_completed"),
-    rakeAmount: amount("hand_completed"),
+    rakeAmount: cashRakeAmount,
     tournamentRegisters: count("tournament_register"),
     tournamentCancels: count("tournament_cancel"),
     conversion: {
@@ -3608,7 +3631,13 @@ async function reconcileSystemPublicTables() {
     ...PLAY_TABLE_LIMITS.map((limit) => ({ ...limit, gameMode: "play" })),
     ...(REAL_MONEY_ENABLED ? CASH_TABLE_LIMITS.map((limit) => ({ ...limit, gameMode: "cash" })) : [])
   ];
-  const targetCounts = new Map(targets.map((limit) => [systemTableKey(limit), Number(limit.count || 0)]));
+  const targetCounts = new Map();
+  for (const limit of targets) {
+    const key = systemTableKey(limit);
+    const matching = [...tables.values()].filter((table) => table.isSystem && !table.isPrivate && systemTableKey(table) === key);
+    const desiredCount = desiredPublicTableCount(matching, { baseCount: limit.count, overflowAt: 5 });
+    targetCounts.set(key, desiredCount);
+  }
   const seen = new Map();
 
   for (const table of [...tables.values()]) {
@@ -3630,7 +3659,7 @@ async function reconcileSystemPublicTables() {
 
   for (const limit of targets) {
     const key = systemTableKey(limit);
-    const desiredCount = Number(limit.count || 0);
+    const desiredCount = targetCounts.get(key) || 0;
     const currentCount = seen.get(key) || 0;
     for (let index = currentCount + 1; index <= desiredCount; index += 1) {
       const cashMode = limit.gameMode === "cash";
@@ -4138,6 +4167,7 @@ async function hydrateTournamentDefinitions() {
   if (!definitions) return;
   tournaments.clear();
   for (const definition of definitions) {
+    if (!AUTO_SEED_TOURNAMENTS && LEGACY_SEEDED_TOURNAMENT_IDS.has(definition.id)) continue;
     tournaments.set(definition.id, createTournamentRuntime(definition));
   }
 }
@@ -6340,6 +6370,54 @@ async function sendBotMessage(chatId, text) {
   });
 }
 
+function yekaterinburgClock(now = new Date()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Yekaterinburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(now).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return {
+    dayKey: `${parts.year}-${parts.month}-${parts.day}`,
+    hour: Number(parts.hour || 0)
+  };
+}
+
+async function maybeSendDailyOwnerReport(now = new Date()) {
+  if (!isProduction || !ADMIN_DAILY_REPORT_ENABLED || !ADMIN_CHAT_ID || !BOT_TOKEN) return false;
+  if (!ADMIN_TELEGRAM_EVENT_TYPES.has("daily_owner_report")) return false;
+  const clock = yekaterinburgClock(now);
+  if (clock.hour < ADMIN_DAILY_REPORT_HOUR) return false;
+  const reportKey = `Ключ отчета: ${clock.dayKey}`;
+  const recent = (await dbListAdminEvents(100)) || adminEvents;
+  if (recent.some((event) => event.type === "daily_owner_report" && (event.lines || []).includes(reportKey))) return false;
+
+  const [analytics, stats] = await Promise.all([
+    analyticsDashboard(1),
+    dbDashboardStats()
+  ]);
+  const activeTables = [...tables.values()].filter((table) => !table.tournamentId && table.seats.length > 0);
+  const seatedPlayers = activeTables.reduce((sum, table) => sum + table.seats.length, 0);
+  const connectedPlayers = activeTables.reduce((sum, table) => sum + table.seats.filter((seat) => seat.connected !== false).length, 0);
+  const leadingSource = analytics.attribution?.find((item) => item.source && item.source !== "direct") || analytics.attribution?.[0];
+  const lines = [
+    reportKey,
+    `Открыли приложение: ${analytics.appOpenUsers || 0}`,
+    `Играли за столами: ${analytics.tableJoinUsers || 0}`,
+    `Раздач завершено: ${analytics.handsCompleted || 0}`,
+    `Cash rake: $${formatUsdtMicros(analytics.rakeAmount || 0)}`,
+    `Депозиты: ${analytics.paidDeposits || 0} · $${formatUsdtMicros(analytics.paidDepositAmount || 0)}`,
+    `Заявки на вывод: ${analytics.withdrawalRequests || 0}`,
+    `Сейчас за столами: ${seatedPlayers} · online ${connectedPlayers} · столов ${activeTables.length}`,
+    `Ожидают вывода: ${stats?.pendingWithdrawals || 0}`,
+    leadingSource ? `Ведущий источник: ${leadingSource.source} · игроков ${leadingSource.tablePlayers || 0}` : "Ведущий источник: direct"
+  ];
+  notifyAdmin("daily_owner_report", "Ежедневная beta-сводка", { lines });
+  return true;
+}
+
 function notifyAdmin(type, title, { user, lines = [] } = {}) {
   adminEvents.unshift({
     id: randomId("event"),
@@ -6395,7 +6473,8 @@ function parseAdminTelegramEventTypes(value) {
     // Incident/ops alerts (TZ E4: reconciliation drift, payment/server incidents).
     "reconciliation_alert",
     "crypto_webhook_error",
-    "telegram_webhook_unhealthy"
+    "telegram_webhook_unhealthy",
+    "daily_owner_report"
   ];
   const raw = String(value || "").trim();
   if (!raw) return new Set(defaults);

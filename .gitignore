@@ -11,3 +11,4 @@ references photo/
 release/
 tmp/
 output/playwright/
+*.inspect.ndjson
