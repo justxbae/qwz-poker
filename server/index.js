@@ -194,6 +194,8 @@ const ADMIN_RISK_IDS = parseIdList(process.env.ADMIN_RISK_IDS || "");
 const ADMIN_TELEGRAM_EVENT_TYPES = parseAdminTelegramEventTypes(process.env.ADMIN_TELEGRAM_EVENT_TYPES || "");
 const ADMIN_DAILY_REPORT_ENABLED = process.env.ADMIN_DAILY_REPORT_ENABLED !== "false";
 const ADMIN_DAILY_REPORT_HOUR = Math.max(0, Math.min(23, Number(process.env.ADMIN_DAILY_REPORT_HOUR || 21)));
+let dailyOwnerReportInFlight = false;
+let lastDailyOwnerReportKey = "";
 const ADMIN_WEB_SECRET = process.env.ADMIN_WEB_SECRET || "";
 const ADMIN_WEB_USER_ID = "web-admin";
 const ADMIN_GRANT_MAX_CHIPS = Number(process.env.ADMIN_GRANT_MAX_CHIPS || 500000);
@@ -6391,31 +6393,42 @@ async function maybeSendDailyOwnerReport(now = new Date()) {
   const clock = yekaterinburgClock(now);
   if (clock.hour < ADMIN_DAILY_REPORT_HOUR) return false;
   const reportKey = `Ключ отчета: ${clock.dayKey}`;
-  const recent = (await dbListAdminEvents(100)) || adminEvents;
-  if (recent.some((event) => event.type === "daily_owner_report" && (event.lines || []).includes(reportKey))) return false;
+  if (dailyOwnerReportInFlight || lastDailyOwnerReportKey === reportKey) return false;
+  dailyOwnerReportInFlight = true;
 
-  const [analytics, stats] = await Promise.all([
-    analyticsDashboard(1),
-    dbDashboardStats()
-  ]);
-  const activeTables = [...tables.values()].filter((table) => !table.tournamentId && table.seats.length > 0);
-  const seatedPlayers = activeTables.reduce((sum, table) => sum + table.seats.length, 0);
-  const connectedPlayers = activeTables.reduce((sum, table) => sum + table.seats.filter((seat) => seat.connected !== false).length, 0);
-  const leadingSource = analytics.attribution?.find((item) => item.source && item.source !== "direct") || analytics.attribution?.[0];
-  const lines = [
-    reportKey,
-    `Открыли приложение: ${analytics.appOpenUsers || 0}`,
-    `Играли за столами: ${analytics.tableJoinUsers || 0}`,
-    `Раздач завершено: ${analytics.handsCompleted || 0}`,
-    `Cash rake: $${formatUsdtMicros(analytics.rakeAmount || 0)}`,
-    `Депозиты: ${analytics.paidDeposits || 0} · $${formatUsdtMicros(analytics.paidDepositAmount || 0)}`,
-    `Заявки на вывод: ${analytics.withdrawalRequests || 0}`,
-    `Сейчас за столами: ${seatedPlayers} · online ${connectedPlayers} · столов ${activeTables.length}`,
-    `Ожидают вывода: ${stats?.pendingWithdrawals || 0}`,
-    leadingSource ? `Ведущий источник: ${leadingSource.source} · игроков ${leadingSource.tablePlayers || 0}` : "Ведущий источник: direct"
-  ];
-  notifyAdmin("daily_owner_report", "Ежедневная beta-сводка", { lines });
-  return true;
+  try {
+    const recent = (await dbListAdminEvents(100)) || adminEvents;
+    if (recent.some((event) => event.type === "daily_owner_report" && (event.lines || []).includes(reportKey))) {
+      lastDailyOwnerReportKey = reportKey;
+      return false;
+    }
+
+    const [analytics, stats] = await Promise.all([
+      analyticsDashboard(1),
+      dbDashboardStats()
+    ]);
+    const activeTables = [...tables.values()].filter((table) => !table.tournamentId && table.seats.length > 0);
+    const seatedPlayers = activeTables.reduce((sum, table) => sum + table.seats.length, 0);
+    const connectedPlayers = activeTables.reduce((sum, table) => sum + table.seats.filter((seat) => seat.connected !== false).length, 0);
+    const leadingSource = analytics.attribution?.find((item) => item.source && item.source !== "direct") || analytics.attribution?.[0];
+    const lines = [
+      reportKey,
+      `Открыли приложение: ${analytics.appOpenUsers || 0}`,
+      `Играли за столами: ${analytics.tableJoinUsers || 0}`,
+      `Раздач завершено: ${analytics.handsCompleted || 0}`,
+      `Cash rake: $${formatUsdtMicros(analytics.rakeAmount || 0)}`,
+      `Депозиты: ${analytics.paidDeposits || 0} · $${formatUsdtMicros(analytics.paidDepositAmount || 0)}`,
+      `Заявки на вывод: ${analytics.withdrawalRequests || 0}`,
+      `Сейчас за столами: ${seatedPlayers} · online ${connectedPlayers} · столов ${activeTables.length}`,
+      `Ожидают вывода: ${stats?.pendingWithdrawals || 0}`,
+      leadingSource ? `Ведущий источник: ${leadingSource.source} · игроков ${leadingSource.tablePlayers || 0}` : "Ведущий источник: direct"
+    ];
+    notifyAdmin("daily_owner_report", "Ежедневная beta-сводка", { lines });
+    lastDailyOwnerReportKey = reportKey;
+    return true;
+  } finally {
+    dailyOwnerReportInFlight = false;
+  }
 }
 
 function notifyAdmin(type, title, { user, lines = [] } = {}) {
