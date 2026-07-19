@@ -65,7 +65,11 @@ Still process-local in demo mode:
 - timers and auto-actions;
 - short-lived auth sessions when Redis is unavailable.
 
-`active_table_snapshots` protects against a single process restart: the server reloads open tables, seats, current hand state, deck, pot, cards, and stacks from PostgreSQL. Redis mirrors the same snapshots for faster boot and short-lived runtime recovery. This is not a multi-server game-state engine. Before scaling to multiple Node processes, active table ownership should move to a dedicated authoritative game layer, usually one game process per table cluster with Redis/PostgreSQL coordination or a queue/lock layer.
+`active_table_snapshots` protects against a single process restart: the server reloads open tables, seats, current hand state, deck, pot, cards, and stacks from PostgreSQL. Redis mirrors the same snapshots for faster boot and short-lived runtime recovery. Redis snapshot writes use a compare-and-set rule over `stateRevision`, so an older writer cannot overwrite a newer cached table. On startup the server compares PostgreSQL and Redis per table and restores the highest revision; PostgreSQL wins equal revisions because wallet/ledger/table-snapshot money commits are durable there. If PostgreSQL is selected, Redis is healed from that snapshot.
+
+Table mutation is serialized with a Redis lock and refreshes the latest snapshot before mutation. Buy-in, rebuy, and stack return commit wallet, ledger, fund movement, and the durable PostgreSQL table snapshot in one transaction; Redis is updated only as the realtime mirror after commit.
+
+This is still not a complete multi-server game-state engine. Runtime objects and timers remain process-local, and lock ownership is not yet a durable table-routing/fencing model. Before scaling to multiple Node game writers, active table ownership must move to an authoritative owner per table/cluster with fencing tokens, lock-loss handling, deterministic routing, and recovery tests.
 
 ## Environment
 

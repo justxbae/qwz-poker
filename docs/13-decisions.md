@@ -352,3 +352,31 @@ Disconnect/sit-out policy для cash/rating утверждён отдельно
 **Почему:** исторический CSS содержит несколько поколений взаимоисключающих overrides, из-за которых одинаковые компоненты выглядят и ведут себя по-разному. Новый документ запрещает добавление очередных датированных заплаток и задаёт направление миграции к одному token/primitives layer.
 
 **Влияет на:** весь frontend, особенно lobby hero, mode switch, bottom navigation, cashier/menu sheets и in-game panels.
+
+## 2026-07-20: Проверяемая CSS-миграция и staging-контур
+
+**Зона:** frontend / architecture / development
+
+**Решение:** `public/weez-design-system-v2.css` является единственным финальным слоем для переносимых компонентов. Первым в него перенесён игровой chrome: toolbar, felt, служебные подписи, action controls, левое меню и правый info drawer; совпадающий legacy-блок удалён. Автотест фиксирует последний порядок подключения, запрещает рост трёх legacy-стилей и ограничивает новый `!important`-долг. Для проверки до production добавлен отдельный Render blueprint ветки `staging` с отдельными PostgreSQL/Redis/Telegram secrets, выключенными payments/withdrawals и включённым real-money fail-closed режимом.
+
+**Почему:** поздние CSS overrides делали исправления нестабильными, а прямой deploy `main` не давал безопасно проверить финансовый продукт. Budget-test не заменяет визуальную регрессию, но останавливает дальнейшее разрастание долга; staging отделяет QA от production data и bot traffic.
+
+**Влияет на:** `public/weez-design-system-v2.css`, legacy stylesheets, CI, Render setup, device QA и release flow.
+
+**Что обновлено:** Design System, CSS architecture tests, `render.staging.yaml`, `docs/STAGING.md`, CI для ветки `staging`.
+
+**Открытые вопросы:** автоматизированные screenshot regressions для Telegram viewports/themes и физическая iPhone/Android QA остаются обязательными до удаления следующих legacy-компонентов.
+
+## 2026-07-20: Revision-safe восстановление active tables
+
+**Зона:** architecture / database / development
+
+**Решение:** Redis принимает snapshot стола только если его `stateRevision` не меньше сохранённой ревизии. При запуске сервер сравнивает PostgreSQL и Redis для каждого стола, восстанавливает максимальную ревизию и выбирает PostgreSQL при равенстве; выбранный PostgreSQL snapshot лечит Redis. Redis lock продолжает сериализовать mutation, а денежные table operations сохраняют wallet, ledger, fund movement и PostgreSQL snapshot в одной транзакции.
+
+**Почему:** прежний startup всегда предпочитал наличие Redis, даже если PostgreSQL содержал более свежий durable snapshot. Это создавало риск восстановить устаревший стек после частичного сбоя между PostgreSQL commit и Redis mirror.
+
+**Влияет на:** table recovery, Redis cache consistency, restart safety, `server/state-store.js`, `server/index.js`, `DATABASE.md`.
+
+**Что обновлено:** Redis revision CAS, объединение snapshot источников, тест выбора максимальной ревизии и tie-break в пользу PostgreSQL.
+
+**Открытые вопросы:** process-local runtime/timers ещё не заменены полноценным authoritative game owner. Multi-process запуск запрещён до fencing/routing/lock-loss модели и infrastructure failure-injection tests.

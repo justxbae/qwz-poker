@@ -1,6 +1,6 @@
 # Weez Poker — technical roadmap
 
-Дата актуализации: 2026-07-19.
+Дата актуализации: 2026-07-20.
 
 ## Как читать
 
@@ -21,7 +21,10 @@
 - Cash MTT/SNG/freeroll runtime, tickets для post-season reward events, admin actions и payout flow реализованы.
 - Deposit/withdrawal lifecycle, manual review, reconciliation, admin live-table view и Telegram incident whitelist присутствуют.
 - Server-driven event contract, attribution, achievement/status foundation и session-scoped hand-history contract присутствуют.
-- Локальный suite: 106 tests, 97 pass, 0 fail, 9 infrastructure/provider skips.
+- Добавлен отдельный staging blueprint для ветки `staging`: отдельные PostgreSQL/Redis/Telegram secrets, real-money fail-closed, payments/withdrawals выключены.
+- Redis snapshot writes защищены revision CAS; при старте выбирается максимальная ревизия PostgreSQL/Redis, а PostgreSQL побеждает при равенстве.
+- Начата проверяемая CSS-миграция: игровой chrome перенесён в финальный Design System 2.0 layer, legacy-бюджет закреплён тестом.
+- Локальный suite: 121 tests, 112 pass, 0 fail, 9 infrastructure/provider skips.
 
 ## Gate A — перед приглашением controlled-beta пользователей
 
@@ -38,7 +41,7 @@
 ## Gate B — перед публичным real-money трафиком
 
 1. Юридическая готовность по территориям: оператор, лицензирование/геоблок, Terms, Privacy, AML/KYC, Responsible Gaming 18+, dispute handling и data retention.
-2. Отдельное test environment с PostgreSQL/Redis. Запустить 9 gated integration tests; production data не использовать.
+2. Создать окружение из `render.staging.yaml` по `docs/STAGING.md`, подключить отдельные PostgreSQL/Redis/Telegram secrets и запустить 9 gated integration tests; production data не использовать.
 3. Failure injection:
    - restart during hand;
    - Redis unavailable/lock expiry;
@@ -72,7 +75,7 @@
 - Перевести scheduler/notifications/reconciliation в durable jobs с retry/dead-letter semantics.
 - Data warehouse/event pipeline с версионированной схемой и privacy controls.
 - Controlled upgrade `@sentry/node` 8 → актуальная major-версия: сейчас `npm audit` показывает 19 moderate OpenTelemetry advisories, без high/critical.
-- CSS consolidation только после автоматизированной screenshot regression Telegram viewports/themes.
+- Продолжить component-by-component CSS consolidation. Текущий budget-test запрещает рост legacy, но перед массовым удалением всё ещё нужны автоматизированные screenshot regression для Telegram viewports/themes.
 
 ## P3 — только после отдельного продуктового решения
 

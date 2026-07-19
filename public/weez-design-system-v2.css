@@ -19,6 +19,12 @@
   --weez-accent-text: var(--tg-button-text, #fff);
   --weez-separator: color-mix(in srgb, var(--weez-text) 14%, transparent);
   --weez-danger: #ff453a;
+  --weez-game-panel: var(--weez-section);
+  --weez-game-row: var(--weez-cell);
+  --weez-game-divider: var(--weez-separator);
+  --weez-felt-top: #1d6a56;
+  --weez-felt-middle: #124d3e;
+  --weez-felt-bottom: #082d27;
   --weez-radius-section: 26px;
   --weez-radius-row: 18px;
   --weez-radius-control: 16px;
@@ -654,6 +660,439 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .tournament-history-card
   box-shadow: none !important;
 }
 
+/* Game chrome: canonical Telegram-native controls and overlays. */
+html.minimal-launch body.in-game,
+html.minimal-launch body.in-game .app,
+html.minimal-launch body.in-game .game-screen {
+  background: var(--weez-bg) !important;
+  color: var(--weez-text) !important;
+  font-family: var(--weez-font) !important;
+}
+
+html.minimal-launch body.in-game *,
+html.minimal-launch body.in-game *::before,
+html.minimal-launch body.in-game *::after {
+  box-sizing: border-box;
+}
+
+html.minimal-launch body.in-game button,
+html.minimal-launch body.in-game input {
+  font: inherit;
+}
+
+html.minimal-launch body.in-game .game-toolbar {
+  position: absolute !important;
+  z-index: 70 !important;
+  top: max(14px, env(safe-area-inset-top)) !important;
+  right: 14px !important;
+  left: 14px !important;
+  display: grid !important;
+  grid-template-columns: 44px minmax(0, 1fr) 44px !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: auto !important;
+  height: 44px !important;
+  padding: 0 !important;
+  pointer-events: none !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar #menuButton,
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"] {
+  position: relative !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 44px !important;
+  min-width: 44px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: var(--weez-game-panel) !important;
+  color: color-mix(in srgb, var(--weez-text) 88%, transparent) !important;
+  box-shadow: none !important;
+  transform: none !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar #menuButton {
+  grid-column: 1 !important;
+  justify-self: start !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"] {
+  grid-column: 3 !important;
+  justify-self: end !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar .table-id,
+html.minimal-launch body.in-game .game-toolbar #quickBuyInButton,
+html.minimal-launch body.in-game .game-toolbar .toolbar-spacer,
+html.minimal-launch body.in-game .game-toolbar .sit-button {
+  display: none !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar #menuButton::before,
+html.minimal-launch body.in-game .game-toolbar #menuButton::after,
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"]::before,
+html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"]::after {
+  content: none !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar .control-glyph {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 23px !important;
+  height: 23px !important;
+  object-fit: contain !important;
+  opacity: .88 !important;
+  filter: brightness(0) invert(1) !important;
+  transform: translate(-50%, -50%) scale(1) !important;
+  transition: opacity 160ms ease, transform 220ms var(--weez-ease) !important;
+  pointer-events: none !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar .control-glyph--open {
+  width: 17px !important;
+  height: 17px !important;
+  opacity: 0 !important;
+  transform: translate(-50%, -50%) scale(.82) !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar .icon-control.is-open {
+  background: var(--weez-game-row) !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar .icon-control.is-open .control-glyph--closed {
+  opacity: 0 !important;
+  transform: translate(-50%, -50%) scale(.82) !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar .icon-control.is-open .control-glyph--open {
+  opacity: .9 !important;
+  transform: translate(-50%, -50%) scale(1) !important;
+}
+
+html.minimal-launch body.in-game .game-toolbar .icon-control:active {
+  background: var(--weez-cell-pressed) !important;
+}
+
+html.minimal-launch body.in-game .board {
+  background:
+    radial-gradient(72% 42% at 50% 30%, rgba(75, 151, 121, .16), transparent 72%),
+    linear-gradient(180deg, var(--weez-felt-top) 0%, var(--weez-felt-middle) 48%, var(--weez-felt-bottom) 100%) !important;
+  box-shadow:
+    0 20px 44px rgba(0, 0, 0, .34),
+    0 0 0 4px rgba(111, 171, 151, .24),
+    0 0 0 9px rgba(29, 76, 66, .42) !important;
+}
+
+html.minimal-launch body.in-game .pot,
+html.minimal-launch body.in-game .blinds,
+html.minimal-launch body.in-game .table-details,
+html.minimal-launch body.in-game .viewer-hand-badge {
+  border: 0 !important;
+  background: rgba(5, 20, 17, .30) !important;
+  color: rgba(255, 255, 255, .70) !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+html.minimal-launch body.in-game .table-details {
+  padding: 0 10px !important;
+  font-size: 10.5px !important;
+  font-weight: 500 !important;
+}
+
+html.minimal-launch body.in-game .action-toast {
+  top: 31% !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: 50% !important;
+  width: auto !important;
+  max-width: min(220px, calc(100% - 48px)) !important;
+  min-height: 0 !important;
+  padding: 6px 10px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: rgba(5, 20, 17, .42) !important;
+  color: rgba(255, 255, 255, .72) !important;
+  box-shadow: none !important;
+  font-size: 11px !important;
+  font-weight: 550 !important;
+  line-height: 1.15 !important;
+  text-align: center !important;
+  transform: translate(-50%, -4px) scale(.98) !important;
+}
+
+html.minimal-launch body.in-game .action-toast.show {
+  transform: translate(-50%, 0) scale(1) !important;
+}
+
+html.minimal-launch body.in-game .start-overlay,
+html.minimal-launch body.in-game .street-overlay {
+  top: 42% !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: 50% !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: calc(100% - 56px) !important;
+  padding: 8px 12px !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: rgba(5, 20, 17, .52) !important;
+  box-shadow: none !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+html.minimal-launch body.in-game .start-title,
+html.minimal-launch body.in-game .street-overlay strong {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  line-height: 1.1 !important;
+  letter-spacing: -.02em !important;
+  white-space: nowrap !important;
+}
+
+html.minimal-launch body.in-game .start-subtitle,
+html.minimal-launch body.in-game .street-overlay span {
+  margin-top: 2px !important;
+  color: rgba(255, 255, 255, .58) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  line-height: 1.1 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+html.minimal-launch body.in-game .seat-hand-label {
+  border: 0 !important;
+  background: rgba(7, 19, 17, .76) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+html.minimal-launch body.in-game .card.best-card,
+html.minimal-launch body.in-game .seat.winner .card.best-card {
+  box-shadow: 0 0 0 2px #f5c54b, 0 5px 14px rgba(0, 0, 0, .28) !important;
+  filter: brightness(1.03) !important;
+}
+
+/* Both game panels use one component and one state owner (`hidden`). */
+html.minimal-launch body.in-game .side-menu,
+html.minimal-launch body.in-game .info-drawer {
+  position: fixed !important;
+  z-index: 69 !important;
+  top: max(14px, env(safe-area-inset-top)) !important;
+  width: min(300px, calc(100vw - 40px)) !important;
+  max-width: min(300px, calc(100vw - 40px)) !important;
+  max-height: calc(100dvh - 28px - env(safe-area-inset-top)) !important;
+  padding: 52px 8px 8px !important;
+  border: 0 !important;
+  border-radius: var(--weez-radius-section) !important;
+  background: var(--weez-game-panel) !important;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, .32) !important;
+  overflow: hidden !important;
+  opacity: 1 !important;
+}
+
+html.minimal-launch body.in-game .side-menu {
+  right: auto !important;
+  left: 14px !important;
+}
+
+html.minimal-launch body.in-game .info-drawer {
+  right: 14px !important;
+  left: auto !important;
+}
+
+html.minimal-launch body.in-game .side-menu[hidden],
+html.minimal-launch body.in-game .info-drawer[hidden],
+html.minimal-launch body.in-game .drawer-page[hidden] {
+  display: none !important;
+}
+
+html.minimal-launch body.in-game .side-menu button:not(.close-button) {
+  position: relative !important;
+  width: 100% !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  padding: 0 14px !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: transparent !important;
+  color: color-mix(in srgb, var(--weez-text) 92%, transparent) !important;
+  box-shadow: none !important;
+  font-size: 15px !important;
+  font-weight: 400 !important;
+  line-height: 20px !important;
+  text-align: left !important;
+}
+
+html.minimal-launch body.in-game .side-menu button:not(.close-button)::after {
+  content: "" !important;
+  position: absolute !important;
+  right: 14px !important;
+  bottom: 0 !important;
+  left: 14px !important;
+  height: 1px !important;
+  background: var(--weez-game-divider) !important;
+}
+
+html.minimal-launch body.in-game .side-menu button:not(.close-button):last-child::after {
+  content: none !important;
+}
+
+html.minimal-launch body.in-game .side-menu button:not(.close-button):active {
+  background: var(--weez-cell-pressed) !important;
+}
+
+html.minimal-launch body.in-game .side-menu .close-button,
+html.minimal-launch body.in-game .info-drawer .drawer-tabs .close-button {
+  display: none !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .drawer-tabs {
+  display: flex !important;
+  align-items: center !important;
+  height: 42px !important;
+  margin: 0 0 8px !important;
+  padding: 0 !important;
+  gap: 6px !important;
+  background: transparent !important;
+  overflow: hidden !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button:not(.close-button) {
+  display: inline-flex !important;
+  flex: 0 0 42px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  width: 42px !important;
+  min-width: 42px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: var(--weez-game-row) !important;
+  color: color-mix(in srgb, var(--weez-text) 52%, transparent) !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+  transition: flex-basis 240ms var(--weez-ease), color 160ms ease, background-color 160ms ease !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button.active {
+  flex-basis: 118px !important;
+  width: 118px !important;
+  min-width: 118px !important;
+  background: var(--weez-accent) !important;
+  color: var(--weez-accent-text) !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .drawer-tabs .dt-label {
+  display: none !important;
+  overflow: hidden !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 16px !important;
+  white-space: nowrap !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .drawer-tabs button.active .dt-label {
+  display: inline !important;
+}
+
+html.minimal-launch body.in-game .info-drawer .drawer-page:not([hidden]) {
+  display: block !important;
+  max-height: calc(100dvh - 100px - env(safe-area-inset-top)) !important;
+  margin: 0 !important;
+  padding: 4px 10px 10px !important;
+  border: 0 !important;
+  border-radius: 20px !important;
+  background: var(--weez-game-row) !important;
+  overflow: auto !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+html.minimal-launch body.in-game .info-row,
+html.minimal-launch body.in-game .stats-row,
+html.minimal-launch body.in-game .stats-row.stats-head {
+  min-height: 44px !important;
+  border-bottom-color: var(--weez-game-divider) !important;
+}
+
+html.minimal-launch body.in-game .info-row span,
+html.minimal-launch body.in-game .stats-row span {
+  color: color-mix(in srgb, var(--weez-text) 54%, transparent) !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+}
+
+html.minimal-launch body.in-game .info-row strong,
+html.minimal-launch body.in-game .stats-row strong {
+  color: var(--weez-text) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+html.minimal-launch body.in-game .betting-actions,
+html.minimal-launch body.in-game .pre-actions,
+html.minimal-launch body.in-game .bot-actions,
+html.minimal-launch body.in-game .show-muck-actions {
+  border: 0 !important;
+  border-radius: 22px !important;
+  background: color-mix(in srgb, var(--weez-bg) 90%, transparent) !important;
+  box-shadow: 0 -12px 34px rgba(0, 0, 0, .28) !important;
+}
+
+html.minimal-launch body.in-game .betting-actions button,
+html.minimal-launch body.in-game .pre-actions button,
+html.minimal-launch body.in-game .bot-actions button,
+html.minimal-launch body.in-game .show-muck-actions button {
+  border: 0 !important;
+  border-radius: var(--weez-radius-control) !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+}
+
+html.minimal-launch body.in-game .game-screen.has-actions .viewer-hand-badge:not([hidden]),
+html.minimal-launch body.in-game .game-screen.has-pre-actions .viewer-hand-badge:not([hidden]) {
+  position: fixed !important;
+  z-index: 44 !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 74px) !important;
+  left: 50% !important;
+  display: flex !important;
+  width: auto !important;
+  max-width: min(220px, calc(100vw - 48px)) !important;
+  min-height: 22px !important;
+  padding: 3px 9px !important;
+  border-radius: 999px !important;
+  transform: translateX(-50%) !important;
+}
+
+html.minimal-launch body.in-game .viewer-hand-badge span {
+  display: none !important;
+}
+
+html.minimal-launch body.in-game .viewer-hand-badge strong {
+  overflow: hidden !important;
+  color: rgba(255, 255, 255, .66) !important;
+  font-size: 11px !important;
+  font-weight: 550 !important;
+  line-height: 1.1 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
 @media (max-width: 360px) {
   html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-wallet {
     grid-template-columns: 52px minmax(70px, 1fr) minmax(82px, auto) !important;
@@ -674,9 +1113,9 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .tournament-history-card
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html.minimal-launch body:not(.in-game) *,
-  html.minimal-launch body:not(.in-game) *::before,
-  html.minimal-launch body:not(.in-game) *::after {
+  html.minimal-launch body *,
+  html.minimal-launch body *::before,
+  html.minimal-launch body *::after {
     scroll-behavior: auto !important;
     transition-duration: .01ms !important;
     animation-duration: .01ms !important;

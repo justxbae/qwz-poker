@@ -125,6 +125,7 @@ import {
   getSession as stateGetSession,
   initStateStore,
   listTableSnapshots as stateListTableSnapshots,
+  newestTableSnapshots,
   setSession as stateSetSession,
   setTableSnapshot as stateSetTableSnapshot,
   subscribeTableEvents as stateSubscribeTableEvents,
@@ -2526,8 +2527,11 @@ async function persistCompletedHands(table) {
 }
 
 async function hydrateActiveTables() {
-  const redisSnapshots = await stateListTableSnapshots();
-  const snapshots = redisSnapshots?.length ? redisSnapshots : await dbListActiveTableSnapshots();
+  const [redisSnapshots, databaseSnapshots] = await Promise.all([
+    stateListTableSnapshots(),
+    dbListActiveTableSnapshots()
+  ]);
+  const snapshots = newestTableSnapshots(redisSnapshots, databaseSnapshots);
   if (!snapshots || snapshots.length === 0) return;
 
   tables.clear();
@@ -2536,6 +2540,9 @@ async function hydrateActiveTables() {
     const table = normalizeHydratedTable(snapshot.raw, now);
     if (!table?.id || !Array.isArray(table.seats)) continue;
     tables.set(table.id, table);
+    if (snapshot.source === "PostgreSQL" && stateStoreEnabled()) {
+      await stateSetTableSnapshot(table);
+    }
   }
 
   if (tables.size === 0) {
@@ -2544,7 +2551,8 @@ async function hydrateActiveTables() {
   }
 
   await reconcileSystemPublicTables();
-  console.log(`Restored ${tables.size} table snapshot${tables.size === 1 ? "" : "s"} from ${redisSnapshots?.length ? "Redis" : "PostgreSQL"}`);
+  const restoredSources = [...new Set(snapshots.map((snapshot) => snapshot.source))].join(" + ");
+  console.log(`Restored ${tables.size} table snapshot${tables.size === 1 ? "" : "s"} from ${restoredSources}`);
 }
 
 function normalizeHydratedTable(table, now = Date.now()) {

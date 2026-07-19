@@ -1,0 +1,53 @@
+services:
+  - type: web
+    name: weez-poker-staging
+    runtime: node
+    plan: free
+    branch: staging
+    autoDeploy: true
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_NAME
+        value: Weez Poker Staging
+      - key: APP_PUBLIC_URL
+        sync: false
+      - key: REAL_MONEY_ENABLED
+        value: "true"
+      - key: WITHDRAWALS_ENABLED
+        value: "false"
+      - key: MINIMAL_LAUNCH
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: BOT_USERNAME
+        sync: false
+      - key: BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+      - key: ADMIN_USER_IDS
+        sync: false
+      - key: ADMIN_CHAT_ID
+        sync: false
+      - key: METRICS_TOKEN
+        sync: false
+      - key: DEVICE_HASH_SECRET
+        sync: false
+      - key: STARS_USDT_RATE
+        value: "0.01"
+      - key: TON_PAYMENTS_ENABLED
+        value: "false"
+      - key: TON_POLLING_ENABLED
+        value: "false"
+      - key: USDT_TRC20_PAYMENTS_ENABLED
+        value: "false"
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        value: "1"

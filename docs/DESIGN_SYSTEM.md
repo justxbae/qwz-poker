@@ -16,7 +16,7 @@ Weez — Telegram Mini App, поэтому интерфейс должен ощ�
 ## 2. Источники правды
 
 - Цвета: `Telegram.WebApp.themeParams`, затем query-параметры dev-preview, затем тёмные fallback.
-- Компоненты и токены: этот документ и канонический блок `Weez Design System 2.0` в `public/telegram-ui-kit-overrides.css`.
+- Компоненты и токены: этот документ и финально подключаемый stylesheet `public/weez-design-system-v2.css`.
 - Иконки: `figma/` → оптимизированные копии в `public/assets/`.
 - Тексты и доступность действий: только API/server state.
 - Денежные значения: `$` перед числом без пробела, кроме специально утверждённых русскоязычных юридических текстов.
@@ -216,4 +216,8 @@ font-variant-numeric: tabular-nums;
 
 ## 13. Технический долг миграции
 
-Сейчас интерфейс загружает исторические `styles.css`, `lobby-qa.css` и `telegram-ui-kit-overrides.css`. В них много повторных селекторов и `!important`. До удаления legacy-файлов новые компоненты должны добавляться только в каноническую секцию Design System 2.0, а затронутые старые правила — удаляться, не дублироваться. Финальная цель — один token layer, один primitives layer и экранные стили без каскада датированных override-блоков.
+Интерфейс всё ещё загружает исторические `styles.css`, `lobby-qa.css` и `telegram-ui-kit-overrides.css`. В них много повторных селекторов и `!important`. Новые компоненты добавляются только в финальный `weez-design-system-v2.css`; при переносе компонента соответствующие legacy-правила удаляются, а не остаются вторым источником поведения.
+
+Первым перенесён игровой chrome: toolbar, felt, служебные подписи, action controls, левое меню и правый info drawer. Совпадающий legacy-блок удалён из `telegram-ui-kit-overrides.css`. Архитектурный тест фиксирует порядок подключения и запрещает рост legacy-файлов/`!important` сверх текущего бюджета. Это промежуточная защита, а не завершение миграции.
+
+Финальная цель — один token layer, один primitives layer и экранные стили без каскада датированных override-блоков. Следующие компоненты переносятся по одному после визуальной проверки: cashier sheets, lobby/profile cards, tournaments/private tables, затем table seats/cards/action states.

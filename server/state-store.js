@@ -168,21 +168,30 @@ export async function updateUserSessions(userId, patch = {}, ttlSeconds = sessio
 }
 
 export async function setTableSnapshot(table) {
+  const revision = Math.max(0, Number(table.stateRevision || 0));
   const payload = JSON.stringify({
     tableId: table.id,
-    revision: Number(table.stateRevision || 0),
+    revision,
     events: Array.isArray(table.events) ? table.events.slice(-20) : []
   });
   if (!redis) {
     for (const listener of tableListeners.get(table.id) || []) listener(payload);
     return false;
   }
-  const transaction = redis.multi();
-  transaction.set(tableKey(table.id), JSON.stringify(table));
-  transaction.sadd(TABLE_SET_KEY, table.id);
-  transaction.publish(tableEventsChannel(table.id), payload);
-  await transaction.exec();
-  return true;
+  const stored = await redis.eval(`
+    local current = redis.call('get', KEYS[1])
+    if current then
+      local ok, decoded = pcall(cjson.decode, current)
+      if ok and tonumber(decoded.stateRevision or 0) > tonumber(ARGV[1]) then
+        return 0
+      end
+    end
+    redis.call('set', KEYS[1], ARGV[2])
+    redis.call('sadd', KEYS[2], ARGV[3])
+    redis.call('publish', KEYS[3], ARGV[4])
+    return 1
+  `, 3, tableKey(table.id), TABLE_SET_KEY, tableEventsChannel(table.id), revision, JSON.stringify(table), table.id, payload);
+  return Number(stored) === 1;
 }
 
 export async function getTableSnapshot(tableId) {
@@ -254,6 +263,25 @@ export async function listTableSnapshots() {
   return values
     .filter(Boolean)
     .map((raw) => ({ raw: JSON.parse(raw) }));
+}
+
+export function newestTableSnapshots(redisSnapshots = [], databaseSnapshots = []) {
+  const snapshotsById = new Map();
+  for (const [source, sourceSnapshots] of [
+    ["Redis", redisSnapshots],
+    ["PostgreSQL", databaseSnapshots]
+  ]) {
+    for (const snapshot of sourceSnapshots || []) {
+      const tableId = String(snapshot?.raw?.id || snapshot?.id || "");
+      if (!tableId) continue;
+      const revision = Math.max(0, Number(snapshot?.raw?.stateRevision || 0));
+      const current = snapshotsById.get(tableId);
+      if (!current || revision > current.revision || (revision === current.revision && source === "PostgreSQL")) {
+        snapshotsById.set(tableId, { ...snapshot, source, revision });
+      }
+    }
+  }
+  return [...snapshotsById.values()];
 }
 
 function sessionTtlSeconds() {
