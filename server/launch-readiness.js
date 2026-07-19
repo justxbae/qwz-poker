@@ -52,7 +52,14 @@ export function evaluateLaunchReadiness(env = {}) {
 
   const owners = csvValues(env.ADMIN_OWNER_IDS || env.ADMIN_USER_IDS || env.ADMIN_CHAT_ID);
   const finance = csvValues(env.ADMIN_FINANCE_IDS);
+  const betaUsers = csvValues(env.BETA_ALLOWED_USER_IDS);
   add(owners.length > 0, "admin.owner", "Нужен хотя бы один owner/admin Telegram ID.");
+  add(env.BETA_ACCESS_ENABLED === "true", "beta.access_gate", "Для controlled beta должен быть включён BETA_ACCESS_ENABLED=true.");
+  add(
+    env.BETA_ACCESS_ENABLED !== "true" || betaUsers.length > 0 || owners.length > 0,
+    "beta.allowed_users",
+    "Для закрытой beta нужен BETA_ALLOWED_USER_IDS или owner/admin ID."
+  );
   add(env.WITHDRAWALS_ENABLED === "true", "withdrawals.enabled", "WITHDRAWALS_ENABLED должен быть true для полного денежного запуска.");
   if (env.WITHDRAWALS_ENABLED === "true") {
     add(finance.length > 0, "admin.finance", "Для ручного вывода нужен отдельный ADMIN_FINANCE_IDS.");

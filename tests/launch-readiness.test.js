@@ -16,6 +16,8 @@ const validEnv = {
   DEVICE_HASH_SECRET: "d".repeat(32),
   ADMIN_OWNER_IDS: "1",
   ADMIN_FINANCE_IDS: "2",
+  BETA_ACCESS_ENABLED: "true",
+  BETA_ALLOWED_USER_IDS: "3,4,5",
   WITHDRAWALS_ENABLED: "true",
   WITHDRAWAL_RAKE_THRESHOLD_PERCENT: "0",
   STARS_USDT_RATE: "0.01",
@@ -45,7 +47,8 @@ test("launch readiness fails closed on missing financial infrastructure and secr
     "telegram.webhook_secret",
     "ops.metrics_token",
     "risk.device_hash_secret",
-    "admin.finance"
+    "admin.finance",
+    "beta.access_gate"
   ]) assert.equal(codes.has(code), true, code);
 });
 

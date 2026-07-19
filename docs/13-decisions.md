@@ -14,6 +14,10 @@
 
 **Ограничение запуска:** наличие работающего кода не является юридическим разрешением публичной real-money эксплуатации. До открытого запуска для России требуется отдельное юридическое заключение и платёжный/compliance контур. Закрытая техническая beta не снимает этот риск.
 
+**Контроль доступа:** closed beta обеспечивается сервером, а не скрытой ссылкой. При
+`BETA_ACCESS_ENABLED=true` авторизация разрешена только Telegram ID из `BETA_ALLOWED_USER_IDS`
+и административным ID. До приглашения тестеров владелец обязан заполнить allowlist в Render.
+
 **Влияет на:** `server/economy.js`, public-table reconciliation, tournament bootstrap, cashier settings, onboarding, analytics, admin reports, operations runbooks.
 
 **Что обновлено:** конфигурация table pool, tournament bootstrap, withdrawal minimum и продуктовые документы.

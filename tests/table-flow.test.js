@@ -212,6 +212,37 @@ test("Telegram auth rejects future timestamps and missing user ids", async () =>
   }
 });
 
+test("closed beta auth admits only allowed users and administrators", async () => {
+  const server = await startServer({
+    BETA_ACCESS_ENABLED: "true",
+    BETA_ALLOWED_USER_IDS: "444",
+    ADMIN_USER_IDS: "999"
+  });
+  try {
+    const allowed = await requestResponse("/api/auth", {
+      method: "POST",
+      body: { initData: telegramInitData({ id: 444, first_name: "Tester" }) }
+    });
+    assert.equal(allowed.status, 200);
+
+    const admin = await requestResponse("/api/auth", {
+      method: "POST",
+      body: { initData: telegramInitData({ id: 999, first_name: "Owner" }) }
+    });
+    assert.equal(admin.status, 200);
+
+    const denied = await requestResponse("/api/auth", {
+      method: "POST",
+      body: { initData: telegramInitData({ id: 555, first_name: "Unknown" }) }
+    });
+    assert.equal(denied.status, 403);
+    assert.equal(denied.data.code, "beta_access_denied");
+    assert.equal(denied.data.error, "Закрытая beta доступна только по приглашению.");
+  } finally {
+    server.kill();
+  }
+});
+
 test("table SSE replays events and presence heartbeat marks the seat connected", async () => {
   const server = await startServer({ ADMIN_USER_IDS: "dev-user" });
   const controller = new AbortController();

@@ -17,6 +17,10 @@ services:
         sync: false
       - key: REAL_MONEY_ENABLED
         value: "true"
+      - key: BETA_ACCESS_ENABLED
+        value: "true"
+      - key: BETA_ALLOWED_USER_IDS
+        sync: false
       - key: WITHDRAWALS_ENABLED
         value: "false"
       - key: MINIMAL_LAUNCH

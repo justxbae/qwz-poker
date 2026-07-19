@@ -191,6 +191,16 @@ const ADMIN_OWNER_IDS = parseIdList(process.env.ADMIN_OWNER_IDS || process.env.A
 const ADMIN_FINANCE_IDS = parseIdList(process.env.ADMIN_FINANCE_IDS || "");
 const ADMIN_SUPPORT_IDS = parseIdList(process.env.ADMIN_SUPPORT_IDS || "");
 const ADMIN_RISK_IDS = parseIdList(process.env.ADMIN_RISK_IDS || "");
+const BETA_ACCESS_ENABLED = process.env.BETA_ACCESS_ENABLED === "true";
+const BETA_ALLOWED_USER_IDS = parseIdList(process.env.BETA_ALLOWED_USER_IDS || "");
+const BETA_ACCESS_USER_IDS = new Set([
+  ...BETA_ALLOWED_USER_IDS,
+  ...ADMIN_USER_IDS,
+  ...ADMIN_OWNER_IDS,
+  ...ADMIN_FINANCE_IDS,
+  ...ADMIN_SUPPORT_IDS,
+  ...ADMIN_RISK_IDS
+]);
 const ADMIN_TELEGRAM_EVENT_TYPES = parseAdminTelegramEventTypes(process.env.ADMIN_TELEGRAM_EVENT_TYPES || "");
 const ADMIN_DAILY_REPORT_ENABLED = process.env.ADMIN_DAILY_REPORT_ENABLED !== "false";
 const ADMIN_DAILY_REPORT_HOUR = Math.max(0, Math.min(23, Number(process.env.ADMIN_DAILY_REPORT_HOUR || 21)));
@@ -586,6 +596,7 @@ async function handleApi(req, res, url) {
       botUsername: BOT_USERNAME,
       realMoneyEnabled: REAL_MONEY_ENABLED,
       minimalLaunch: MINIMAL_LAUNCH,
+      betaAccessEnabled: BETA_ACCESS_ENABLED,
       play: playSettings(),
       cash: cashSettings()
     });
@@ -625,6 +636,13 @@ async function handleApi(req, res, url) {
     const auth = authenticateTelegram(body.initData || "");
     if (!auth.ok) {
       sendJson(res, 401, { error: auth.error });
+      return;
+    }
+    if (BETA_ACCESS_ENABLED && !BETA_ACCESS_USER_IDS.has(String(auth.user.id))) {
+      sendJson(res, 403, {
+        error: "Закрытая beta доступна только по приглашению.",
+        code: "beta_access_denied"
+      });
       return;
     }
 
@@ -6997,6 +7015,9 @@ function validateEnvironment() {
   }
   if (REAL_MONEY_ENABLED && ADMIN_OWNER_IDS.size === 0 && ADMIN_USER_IDS.size === 0) {
     problems.push("At least one ADMIN_OWNER_IDS or ADMIN_USER_IDS entry is required in real-money production");
+  }
+  if (BETA_ACCESS_ENABLED && BETA_ACCESS_USER_IDS.size === 0) {
+    problems.push("BETA_ALLOWED_USER_IDS or an admin ID is required when BETA_ACCESS_ENABLED=true");
   }
   if (REAL_MONEY_ENABLED && process.env.WITHDRAWALS_ENABLED === "true" && ADMIN_FINANCE_IDS.size === 0) {
     problems.push("ADMIN_FINANCE_IDS is required when withdrawals are enabled");
