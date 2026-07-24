@@ -5,7 +5,7 @@ Scope: структура репозитория, runtime-код, статиче
 
 ## Итог
 
-Кодовая база запускается и проходит локальный memory-mode suite: **121 tests / 112 pass / 0 fail / 9 skipped**. Девять пропусков — тесты, которым нужны отдельные тестовые PostgreSQL/Redis или внешние платёжные провайдеры. Синтаксическая проверка JS, `git diff --check` и проверка статических asset-ссылок прошли без ошибок.
+Кодовая база запускается и проходит локальный memory-mode suite: **125 tests / 116 pass / 0 fail / 9 skipped**. Девять пропусков — тесты, которым нужны отдельные тестовые PostgreSQL/Redis или внешние платёжные провайдеры. Синтаксическая проверка JS, `git diff --check` и проверка статических asset-ссылок прошли без ошибок.
 
 Репозиторий очищен от сгенерированной runtime-копии, временных preview-файлов, неиспользуемых тяжёлых изображений, пустых документов и устаревших заметок, противоречивших актуальному канону.
 
@@ -23,6 +23,7 @@ Scope: структура репозитория, runtime-код, статиче
 ## Что приведено в порядок
 
 - Runtime-бренд и package name переведены на `Weez Poker` / `weez-poker`.
+- Новые Stars/CryptoBot/xRocket/TON payment payloads используют namespace `weez:`; входящие `qwz:` продолжают приниматься, чтобы не потерять ранее созданные заявки.
 - Клиент больше не зависит от захардкоженного старого Telegram username: он получает `botUsername` из `/api/config` с безопасным fallback.
 - Affiliate preview и table invite используют актуальный username из конфигурации.
 - `render.yaml` больше не фиксирует старый username в репозитории: значение задаётся в Render environment.
@@ -73,7 +74,7 @@ Scope: структура репозитория, runtime-код, статиче
 
 ## Проверки
 
-- `env -u DATABASE_URL -u REDIS_URL npm test`: 112 pass, 0 fail, 9 skipped.
+- `env -u DATABASE_URL -u REDIS_URL npm test`: 116 pass, 0 fail, 9 skipped.
 - `node --check`: server, public, tests и scripts — успешно.
 - `git diff --check`: успешно.
 - Static asset reference scan: 30 references, 0 missing.

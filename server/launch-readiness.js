@@ -68,6 +68,12 @@ export function evaluateLaunchReadiness(env = {}) {
     "warning"
   );
   add(configuredSecret(env.SENTRY_DSN, 10), "ops.error_tracking", "SENTRY_DSN не настроен: инциденты могут остаться только в логах.", "warning");
+  add(
+    Boolean(env.CRYPTOBOT_API_KEY || env.XROCKET_PAY_API_KEY || env.TON_PAYMENTS_ENABLED === "true"),
+    "payments.crypto_rail",
+    "Отдельный crypto-провайдер не настроен: пополнение будет доступно только через Telegram Stars.",
+    "warning"
+  );
 
   if (env.TON_PAYMENTS_ENABLED === "true") {
     add(Boolean(String(env.TON_RECEIVER_ADDRESS || "").trim()), "payments.ton_address", "Для TON нужен TON_RECEIVER_ADDRESS.");

@@ -344,8 +344,11 @@ server.listen(PORT, HOST, () => {
       `State store: ${stateStoreEnabled() ? "Redis" : "memory"}`
     ]
   });
-  checkTelegramWebhookConfiguration().catch((error) => {
+  ensureTelegramWebhookConfiguration().catch((error) => {
     reportError(error, { kind: "telegram_webhook_check" });
+  });
+  configureTelegramBotInterface().catch((error) => {
+    reportError(error, { kind: "telegram_bot_interface" });
   });
   setTimeout(() => maybeSendDailyOwnerReport().catch((error) => {
     reportError(error, { kind: "daily_owner_report" });
@@ -836,7 +839,7 @@ async function handleApi(req, res, url) {
       const body = await readJson(req);
       const quote = quoteCashDeposit({ ...body, method: "stars" });
       const orderId = randomId("stars");
-      const payload = `qwz:${orderId}`;
+      const payload = `weez:${orderId}`;
       const order = {
         id: orderId,
         userId: user.id,
@@ -903,7 +906,7 @@ async function handleApi(req, res, url) {
 
       const orderId = randomId(quote.method);
       const expiresAt = new Date(Date.now() + 20 * 60 * 1000).toISOString();
-      const payload = `qwz:${orderId}`;
+      const payload = `weez:${orderId}`;
       const order = {
         id: orderId,
         userId: user.id,
@@ -2734,7 +2737,7 @@ function authenticateTelegram(initData) {
       user: {
         id: "dev-user",
         first_name: "Игрок",
-        username: "qwz_player"
+        username: "weez_player"
       }
     };
   }
@@ -5331,6 +5334,11 @@ async function handleAdminCommand(message) {
   const [rawCommand, ...args] = text.split(/\s+/);
   const command = rawCommand.toLowerCase().replace(`@${BOT_USERNAME.toLowerCase()}`, "");
 
+  if (["/start", "/help", "/support"].includes(command)) {
+    await handlePlayerBotCommand(message, command);
+    return;
+  }
+
   if (!["/balance", "/grant", "/deduct"].includes(command)) return;
 
   if (!isAdminUser(fromId)) {
@@ -5352,6 +5360,52 @@ async function handleAdminCommand(message) {
   } catch (error) {
     await sendBotMessage(message.chat.id, `Ошибка: ${error.message}`);
   }
+}
+
+async function handlePlayerBotCommand(message, command) {
+  const openAppButton = APP_PUBLIC_URL
+    ? [{ text: "Играть", web_app: { url: APP_PUBLIC_URL } }]
+    : [{ text: "Открыть Weez Poker", url: `https://t.me/${BOT_USERNAME}` }];
+  const commonKeyboard = {
+    inline_keyboard: [
+      openAppButton,
+      [
+        { text: "Канал", url: "https://t.me/weezpoker" },
+        { text: "Поддержка", url: "https://t.me/weezSup" }
+      ]
+    ]
+  };
+
+  if (command === "/support") {
+    await sendBotMessage(message.chat.id, [
+      "Поддержка Weez Poker: @weezSup",
+      "",
+      "При сообщении об ошибке укажите время, экран, последовательность действий и приложите видео или скриншот.",
+      "Никому не отправляйте пароли, seed-фразы и коды подтверждения."
+    ].join("\n"), { replyMarkup: commonKeyboard });
+    return;
+  }
+
+  if (command === "/help") {
+    await sendBotMessage(message.chat.id, [
+      "Как начать игру",
+      "",
+      "1. Нажмите «Играть».",
+      "2. Начните с Rating — это режим на PLAY_CHIPS без денежных операций.",
+      "3. Cash использует отдельный реальный USDT-баланс.",
+      "4. Daily Bonus пополняет только Rating-баланс по правилам приложения.",
+      "",
+      "Игра доступна только пользователям 18+."
+    ].join("\n"), { replyMarkup: commonKeyboard });
+    return;
+  }
+
+  await sendBotMessage(message.chat.id, [
+    "Weez Poker — Texas Hold’em внутри Telegram.",
+    "",
+    "Rating на PLAY_CHIPS, Cash и турниры. Открытый тест · 18+.",
+    "Нажмите «Играть», чтобы открыть лобби."
+  ].join("\n"), { replyMarkup: commonKeyboard });
 }
 
 async function handleAdminBalanceCommand(message, args) {
@@ -6225,7 +6279,7 @@ async function fetchTonTransactions(address) {
 
 function findTonPaymentForOrder(order, transactions) {
   const expectedNano = Math.round(Number(order.cryptoAmount || 0) * 1_000_000_000);
-  const expectedComment = order.payload || `qwz:${order.id}`;
+  const expectedComment = order.payload || `weez:${order.id}`;
 
   for (const tx of transactions) {
     const transfer = extractTonInboundTransfer(tx);
@@ -6287,9 +6341,12 @@ async function paymentOrderFromId(orderId) {
 }
 
 async function orderFromPayload(payload) {
-  const orderId = String(payload).startsWith("qwz:") ? payload.slice(4) : "";
-  if (!orderId) return null;
-  return starOrders.get(orderId) || await dbGetPaymentOrder(orderId);
+  const value = String(payload || "").trim();
+  const orderId = ["weez:", "qwz:"]
+    .find((prefix) => value.startsWith(prefix));
+  const normalizedOrderId = orderId ? value.slice(orderId.length) : "";
+  if (!normalizedOrderId) return null;
+  return starOrders.get(normalizedOrderId) || await dbGetPaymentOrder(normalizedOrderId);
 }
 
 async function callTelegram(method, payload) {
@@ -6313,6 +6370,19 @@ async function requireTelegramPaymentsReady() {
   const error = new Error("Платежи Stars временно недоступны: сервер не готов принять подтверждение Telegram");
   error.status = 503;
   throw error;
+}
+
+async function ensureTelegramWebhookConfiguration() {
+  if (!isProduction || !REAL_MONEY_ENABLED || !BOT_TOKEN || !APP_PUBLIC_URL || !TELEGRAM_WEBHOOK_SECRET) {
+    return checkTelegramWebhookConfiguration();
+  }
+  await callTelegram("setWebhook", {
+    url: `${APP_PUBLIC_URL}/api/telegram/webhook`,
+    secret_token: TELEGRAM_WEBHOOK_SECRET,
+    allowed_updates: ["message", "pre_checkout_query"],
+    drop_pending_updates: false
+  });
+  return checkTelegramWebhookConfiguration();
 }
 
 async function checkTelegramWebhookConfiguration({ notify = true } = {}) {
@@ -6365,15 +6435,38 @@ async function checkTelegramWebhookConfiguration({ notify = true } = {}) {
   return telegramWebhookDiagnostics;
 }
 
-async function sendBotMessage(chatId, text) {
+async function sendBotMessage(chatId, text, options = {}) {
   if (!chatId || !BOT_TOKEN || BOT_TOKEN.includes("replace_with") || BOT_TOKEN === "test-token") return;
   await callTelegram("sendMessage", {
     chat_id: chatId,
     text,
-    disable_web_page_preview: true
+    disable_web_page_preview: true,
+    ...(options.replyMarkup ? { reply_markup: options.replyMarkup } : {})
   }).catch((error) => {
     console.error("Bot message failed:", error.message);
   });
+}
+
+async function configureTelegramBotInterface() {
+  if (!BOT_TOKEN || !APP_PUBLIC_URL || BOT_TOKEN.includes("replace_with") || BOT_TOKEN === "test-token") return false;
+  await Promise.all([
+    callTelegram("setMyCommands", {
+      scope: { type: "all_private_chats" },
+      commands: [
+        { command: "start", description: "Открыть Weez Poker" },
+        { command: "help", description: "Как начать игру" },
+        { command: "support", description: "Поддержка" }
+      ]
+    }),
+    callTelegram("setChatMenuButton", {
+      menu_button: {
+        type: "web_app",
+        text: "Играть",
+        web_app: { url: APP_PUBLIC_URL }
+      }
+    })
+  ]);
+  return true;
 }
 
 function yekaterinburgClock(now = new Date()) {
@@ -7037,7 +7130,7 @@ function validateEnvironment() {
     console.warn("[warn] CRYPTO_WEBHOOK_SECRET is empty — crypto confirmations will be rejected in production.");
   }
   if (process.env.REAL_MONEY_ENABLED === "true" && !process.env.CRYPTOBOT_API_KEY && !process.env.XROCKET_PAY_API_KEY && process.env.TON_PAYMENTS_ENABLED !== "true") {
-    console.warn("[warn] No payment rail configured yet — Stars/Crypto Bot/xRocket/TON invoices will stay disabled.");
+    console.warn("[warn] No separate crypto payment rail configured — deposits are limited to Telegram Stars.");
   }
   if (problems.length) {
     for (const message of problems) console.error(`[fatal] ${message}`);

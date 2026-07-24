@@ -60,3 +60,15 @@ test("global withdrawal rake gate is visible as a launch warning", () => {
   assert.equal(result.ok, true);
   assert.equal(result.warnings.some((item) => item.code === "withdrawals.global_rake_gate"), true);
 });
+
+test("Stars-only launch is allowed but missing a separate crypto rail is visible", () => {
+  const result = evaluateLaunchReadiness(validEnv);
+  assert.equal(result.ok, true);
+  assert.equal(result.warnings.some((item) => item.code === "payments.crypto_rail"), true);
+
+  const withCryptoBot = evaluateLaunchReadiness({
+    ...validEnv,
+    CRYPTOBOT_API_KEY: "crypto-provider-key-123456789"
+  });
+  assert.equal(withCryptoBot.warnings.some((item) => item.code === "payments.crypto_rail"), false);
+});

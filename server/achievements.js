@@ -2,7 +2,7 @@ export const ACHIEVEMENT_CATALOG = Object.freeze([
   definition({
     code: "beta_tester",
     title: "Бета-тестер",
-    description: "Участник закрытого тестирования Weez Poker.",
+    description: "Участник открытой beta Weez Poker.",
     category: "founder",
     rarity: "founder",
     trigger: "manual",

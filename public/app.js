@@ -5271,7 +5271,7 @@ function getLocalFairnessSeed() {
   const existing = window.localStorage.getItem(storageKey);
   if (existing && existing.length >= 32) return existing;
 
-  const seed = `qwz:${userId}:${Date.now()}:${cryptoRandomHex(32)}`;
+  const seed = `weez:${userId}:${Date.now()}:${cryptoRandomHex(32)}`;
   window.localStorage.setItem(storageKey, seed);
   return seed;
 }

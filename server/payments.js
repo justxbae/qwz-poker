@@ -57,7 +57,10 @@ export function parseXRocketInvoiceWebhook(rawBody) {
 export function normalizeExternalInvoiceOrderId(value) {
   const text = String(value || "").trim();
   if (!text) return "";
-  return text.startsWith("qwz:") ? text.slice(4) : text;
+  for (const prefix of ["weez:", "qwz:"]) {
+    if (text.startsWith(prefix)) return text.slice(prefix.length);
+  }
+  return text;
 }
 
 async function requestJson(url, options = {}) {
