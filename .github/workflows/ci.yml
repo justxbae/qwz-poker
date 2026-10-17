@@ -23,7 +23,7 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Install Cloudflare development tools
+      - name: Use Node 22 for Cloudflare tooling
         uses: actions/setup-node@v4
         with:
           node-version: "22"

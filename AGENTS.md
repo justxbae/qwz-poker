@@ -63,12 +63,19 @@ strings. Infrastructure tests are opt-in; use disposable test services only.
 
 ## Modes and deployment
 
+The target hosting is Cloudflare Workers Free, PLAY only. See `docs/CLOUDFLARE.md`.
+Unlike Node's memory fallback, this runtime persists the room in SQLite Durable Object
+storage and runs deadlines through alarms. `npm run test:cloudflare` checks a real
+workerd restart. Wrangler tooling requires Node >=22; app tests also run on Node 20.
+Do not enable real money in Workers by changing an environment flag.
+
 `REAL_MONEY_ENABLED=false` defaults to demo; PostgreSQL/Redis are optional and
 memory data resets on restart. `true` requires both services and production secrets.
 Implement both PostgreSQL and memory paths for operations that support both modes.
 
-`render.yaml` currently enables real-money mode. Pushes to `main` auto-deploy to
-production. `render.staging.yaml` is a separate staging blueprint; its existence
+The legacy `render.yaml` enables real-money mode. Pushes to `main` still auto-deploy to
+the old Render host. Use `codex/cloudflare-production` for the Cloudflare deployment.
+`render.staging.yaml` is a separate staging blueprint; its existence
 is not evidence of a deployed staging service. Follow `docs/STAGING.md`.
 Never push or deploy as part of routine cleanup without user authorization.
 

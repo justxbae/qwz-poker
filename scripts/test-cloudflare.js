@@ -63,6 +63,10 @@ try {
   config.vars = { ...config.vars, BOT_TOKEN: botToken, METRICS_TOKEN: "m".repeat(32), TELEGRAM_WEBHOOK_SECRET: "s".repeat(32) };
   await writeFile(path.join(work, "wrangler.json"), JSON.stringify(config));
   await start();
+  const home = await fetch(base + "/");
+  assert.equal(home.status, 200);
+  assert.equal(home.headers.get("permissions-policy"), "camera=(), microphone=(), geolocation=()");
+  assert.equal((await fetch(base + "/.DS_Store")).status, 404);
   const noAuth = await fetch(base + "/api/auth", { method: "POST", headers: { "content-type": "application/json" }, body: '{"initData":""}' });
   assert.equal(noAuth.status, 401);
   const a = await auth(990001), b = await auth(990002);
@@ -86,7 +90,18 @@ try {
   await request("/api/play/daily-claim", { token: a, body: {}, key: "a-claim" });
   assert.equal((await request("/api/profile", { token: a })).profile.balance, balance);
   const actor = restored.viewer.canAct ? a : b;
+  const controller = new AbortController();
+  const lastEventId = restored.events.at(-1).id;
+  const feed = await fetch(`${base}/api/tables/${id}/events?lastEventId=${encodeURIComponent(lastEventId)}`, {
+    headers: { Authorization: `Bearer ${a}` }, signal: controller.signal
+  });
+  assert.equal(feed.status, 200);
+  const reader = feed.body.getReader();
+  await reader.read(); // initial retry directive; subsequent events must be live
   table = (await request(`/api/tables/${id}/act`, { token: actor, body: { action: "fold", turnToken: token } })).table;
+  const event = await Promise.race([reader.read(), sleep(3000).then(() => { throw new Error("Workers SSE did not deliver a live action"); })]);
+  assert.match(new TextDecoder().decode(event.value), /event: (fold|pot_push)/);
+  controller.abort();
   assert.equal(table.status, "showdown"); assert.equal(table.pot, 0);
   await request(`/api/tables/${id}/leave`, { token: a, body: {}, key: "a-leave" });
   await request(`/api/tables/${id}/leave`, { token: b, body: {}, key: "b-leave" });
@@ -96,5 +111,5 @@ try {
   const manifest = await request("/tonconnect-manifest.json");
   assert.equal(new URL(manifest.iconUrl).origin, config.vars.APP_PUBLIC_URL);
   const configView = await request("/api/config"); assert.equal(configView.realMoneyEnabled, false);
-  console.log("Cloudflare runtime passed: Telegram auth, daily claim, two-player hand, durable restart, idempotency, settlement and money conservation.");
+  console.log("Cloudflare runtime passed: Telegram auth, daily claim, two-player hand, durable restart, idempotency, live SSE, settlement and money conservation.");
 } finally { await stop(); await rm(work, { recursive: true, force: true }); }

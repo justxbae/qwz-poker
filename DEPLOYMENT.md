@@ -1,5 +1,16 @@
 # Развёртывание Weez Poker
 
+## Текущий Cloudflare Workers Free
+
+Публичная PLAY-beta: [weez-poker.wizzssm.workers.dev](https://weez-poker.wizzssm.workers.dev).
+Worker обслуживает assets, а один SQLite Durable Object сохраняет состояние комнаты
+и запускает игровые deadlines через alarms. Containers, Render, PostgreSQL и Redis
+для этого окружения не используются. Платежи и выводы принудительно выключены.
+
+Инструкция: [docs/CLOUDFLARE.md](docs/CLOUDFLARE.md). Проверка: `npm run test:cloudflare`.
+Публиковать из `codex/cloudflare-production`; `main` пока связан со старым Render.
+Ниже сохранены инструкции прежнего окружения; они не задают Cloudflare-конфигурацию.
+
 ## Контракты окружения
 
 - `.env.example` — шаблон локальных настроек; по умолчанию demo.
