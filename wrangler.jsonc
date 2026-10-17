@@ -19,7 +19,7 @@
   "vars": {
     "APP_NAME": "Weez Poker",
     "APP_PUBLIC_URL": "https://weez-poker.wizzssm.workers.dev",
-    "BOT_USERNAME": "qwzpokerbot",
+    "BOT_USERNAME": "weezpokerbot",
     "REAL_MONEY_ENABLED": "false",
     "WITHDRAWALS_ENABLED": "false",
     "TEST_PLAYERS_ENABLED": "false",

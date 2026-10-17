@@ -1,7 +1,9 @@
 # Cloudflare Workers Free
 
 Выбор владельца от 17.10.2026: бесплатный Workers, без Containers и Render.
-Адрес конфигурации: `https://weez-poker.wizzssm.workers.dev`, бот `@qwzpokerbot`.
+Адрес конфигурации: `https://weez-poker.wizzssm.workers.dev`, бот `@weezpokerbot`.
+Старый локальный `.env` был привязан к `@qwzpokerbot`; не использовать его ключ
+для новой публикации. Перед изменением Telegram проверять `getMe` и имя бота.
 
 ## Что запускается
 
