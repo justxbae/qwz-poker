@@ -105,9 +105,6 @@ button:hover {
   background: #35dc80;
 }
 
-button:active {
-  transform: translateY(1px) scale(0.98);
-}
 
 button.secondary,
 .icon-button {
@@ -657,10 +654,6 @@ h2 {
   background: rgba(255, 255, 255, 0.03);
 }
 
-.tg-menu-row:active {
-  transform: none;
-  background: rgba(255, 255, 255, 0.06);
-}
 
 .tg-row-icon {
   display: grid;
@@ -1020,7 +1013,6 @@ h2 {
 
 .continue-card,
 .profile-card,
-.profile-hero,
 .home-action-card,
 .home-mode-card {
   display: flex;
@@ -1031,7 +1023,6 @@ h2 {
 
 .continue-card span,
 .profile-card span,
-.profile-hero span,
 .home-action-card span {
   display: block;
   margin-top: 5px;
@@ -1930,41 +1921,10 @@ body:not(.in-game) .admin-view {
   background-color: #171c1e;
 }
 
-.profile-card,
-.profile-hero {
+.profile-card{
   justify-content: start;
 }
 
-.profile-hero {
-  position: relative;
-  min-height: 108px;
-  border: 1px solid var(--tg-line);
-  border-radius: 18px;
-  background: var(--tg-secondary-bg);
-  padding: 16px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 12px 30px rgba(0, 0, 0, 0.25);
-}
-
-.profile-main {
-  min-width: 0;
-}
-
-.profile-main h2 {
-  max-width: 230px;
-  overflow: hidden;
-  color: #fff;
-  font-size: 24px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.profile-hero .round-control {
-  top: 14px;
-  right: 14px;
-}
 
 .profile-progress {
   height: 9px;
@@ -2037,21 +1997,6 @@ body:not(.in-game) .bottom-nav button.active {
   color: #fff;
 }
 
-body:not(.in-game) .table-item {
-  border: 1px solid var(--tg-line);
-  background: rgba(36, 47, 61, 0.68);
-}
-
-body:not(.in-game) .table-item span {
-  color: var(--tg-hint);
-  font-weight: 500;
-}
-
-body:not(.in-game) .table-item button {
-  background: rgba(42, 171, 238, 0.18);
-  color: #eaf7ff;
-  font-weight: 650;
-}
 
 body:not(.in-game) .empty,
 body:not(.in-game) .stats-cards div {
@@ -2224,10 +2169,6 @@ body:not(.in-game) .stats-cards span {
   transform: translateY(-1px) scale(1.08);
 }
 
-.bottom-nav button.nav-pressed .nav-icon,
-.profile-nav-fab.nav-pressed .nav-profile-avatar {
-  animation: navIconPop 340ms cubic-bezier(0.18, 0.9, 0.2, 1);
-}
 
 .nav-profile-avatar {
   display: grid;
@@ -3043,8 +2984,7 @@ body.in-game .game-toolbar [data-panel-tab="hands"] {
   visibility: hidden;
 }
 
-.seat,
-.table-item {
+.seat{
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel-2);
@@ -3452,8 +3392,7 @@ body.in-game .game-toolbar [data-panel-tab="hands"] {
   transition: width 260ms linear;
 }
 
-.seat-meta,
-.table-item span {
+.seat-meta{
   display: block;
   color: rgba(232, 255, 241, 0.82);
   font-size: 13px;
@@ -3461,109 +3400,6 @@ body.in-game .game-toolbar [data-panel-tab="hands"] {
   margin-top: 4px;
 }
 
-body:not(.in-game) .table-item span {
-  font-weight: 500;
-}
-
-.table-list {
-  display: grid;
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.table-item {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  min-height: 76px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.055);
-  padding: 12px;
-}
-
-.table-avatar {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.22), transparent 30%),
-    linear-gradient(145deg, rgba(42, 171, 238, 0.82), rgba(29, 92, 138, 0.82));
-  color: #fff;
-  font-size: 22px;
-}
-
-.table-avatar.private {
-  background:
-    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.18), transparent 30%),
-    linear-gradient(145deg, rgba(217, 164, 65, 0.88), rgba(112, 77, 27, 0.88));
-  font-size: 18px;
-}
-
-.table-summary {
-  display: grid;
-  min-width: 0;
-  gap: 4px;
-}
-
-.table-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-}
-
-.table-row strong {
-  overflow: hidden;
-  color: #fff;
-  font-size: 16px;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.table-row small {
-  border-radius: 999px;
-  background: rgba(42, 171, 238, 0.14);
-  color: #bdeaff;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
-  padding: 5px 7px;
-  text-transform: uppercase;
-}
-
-.table-row small[data-status="open"] {
-  background: rgba(42, 171, 238, 0.14);
-  color: #bdeaff;
-}
-
-.table-row small[data-status="live"] {
-  background: rgba(217, 164, 65, 0.16);
-  color: #ffd98b;
-}
-
-.table-row small[data-status="full"] {
-  background: rgba(244, 247, 251, 0.08);
-  color: rgba(244, 247, 251, 0.52);
-}
-
-.table-item button {
-  min-height: 42px;
-  min-width: 74px;
-  border-radius: 999px;
-  background: rgba(42, 171, 238, 0.18);
-  color: #eaf7ff;
-  font-weight: 650;
-  padding: 0 14px;
-}
-
-.table-item button:disabled {
-  background: rgba(244, 247, 251, 0.08);
-  color: rgba(244, 247, 251, 0.42);
-}
 
 .empty {
   color: var(--muted);
@@ -5198,11 +5034,6 @@ body.in-game .game-screen[data-table-status="showdown"] .status-line {
   padding: 0;
 }
 
-.buyin-head {
-  display: grid;
-  gap: 4px;
-  padding: 2px 54px 0 2px;
-}
 
 .buyin-kicker {
   color: var(--tg-link);
@@ -5212,20 +5043,6 @@ body.in-game .game-screen[data-table-status="showdown"] .status-line {
   text-transform: uppercase;
 }
 
-.buyin-title {
-  color: #f4f5f7;
-  font-size: 30px;
-  font-weight: 700;
-  line-height: 1.05;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.buyin-head span {
-  color: var(--tg-hint);
-  font-size: 14px;
-  font-weight: 600;
-}
 
 .buyin-summary {
   display: grid;
@@ -5317,16 +5134,6 @@ body.in-game .game-screen[data-table-status="showdown"] .status-line {
   font-weight: 650;
 }
 
-.buyin-auto:disabled,
-.buyin-auto:disabled:hover,
-.buyin-auto:disabled:focus,
-.buyin-auto:disabled:active {
-  border-color: var(--tg-line);
-  background: rgba(36, 47, 61, 0.58);
-  color: rgba(244, 247, 251, 0.42);
-  opacity: 1;
-  transform: none;
-}
 
 .buyin-info-card {
   align-self: end;
@@ -5756,9 +5563,6 @@ button:hover {
   background: var(--tg-button);
 }
 
-button:active {
-  transform: scale(0.985);
-}
 
 input,
 select {
@@ -5859,8 +5663,7 @@ body:not(.in-game) .app {
 
 .lobby-avatar,
 .profile-avatar,
-.nav-profile-avatar,
-.table-avatar {
+.nav-profile-avatar{
   background-color: #334155;
   background-position: center;
   background-size: cover;
@@ -5870,7 +5673,6 @@ body:not(.in-game) .app {
 .tg-balance-hero,
 .wallet-card,
 .lobby-card,
-.profile-hero,
 .cashier-card {
   border: 0;
   border-radius: var(--tg-radius-group);
@@ -5940,9 +5742,6 @@ body:not(.in-game) .app {
   background: transparent;
 }
 
-.tg-menu-row:active {
-  background: var(--tg-surface-pressed);
-}
 
 .tg-menu-row + .tg-menu-row::before {
   left: 66px;
@@ -6061,9 +5860,7 @@ body:not(.in-game) .app {
   font-weight: 620;
 }
 
-.section-title h2,
-.profile-main h2,
-.buyin-title {
+.section-title h2{
   color: var(--tg-text);
   font-weight: 700;
   letter-spacing: 0;
@@ -6080,46 +5877,13 @@ body:not(.in-game) .app {
   padding: 10px 0 8px;
 }
 
-.table-item {
-  min-height: 72px;
-  border: 0;
-  border-radius: 20px;
-  background: var(--tg-surface);
-  box-shadow: none;
-}
 
-body:not(.in-game) .table-item {
-  border: 0;
-  background: var(--tg-surface);
-}
-
-.table-avatar {
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  background: var(--tg-button);
-  color: transparent;
-}
-
-.table-avatar::before {
-  content: "";
-  width: 19px;
-  height: 19px;
-  border-radius: 50% 50% 50% 0;
-  background: #fff;
-  transform: rotate(-45deg);
-}
-
-.table-row strong,
 .tournament-main strong,
 .cashier-transaction strong,
 .settings-row span {
   color: var(--tg-text);
   font-weight: 590;
 }
-
-.table-item button,
-body:not(.in-game) .table-item button,
 .tournament-card button,
 .cashier-pay-button,
 .buyin-submit {
@@ -6210,27 +5974,11 @@ body:not(.in-game) .table-item button,
   border-color: var(--tg-separator);
 }
 
-.profile-hero {
-  min-height: 112px;
-  padding: 16px;
-}
 
 .profile-avatar {
   width: 64px;
 }
 
-.profile-main h2 {
-  font-size: 25px;
-}
-
-.profile-hero .round-control {
-  width: 42px;
-  min-height: 42px;
-  border: 0;
-  background: var(--tg-surface-2);
-  color: var(--tg-text);
-  font-size: 20px;
-}
 
 .bottom-nav {
   left: max(10px, calc(50vw - 205px));
@@ -6345,14 +6093,6 @@ body:not(.in-game) .bottom-nav button.active {
   box-shadow: none;
 }
 
-.buyin-auto:disabled,
-.buyin-auto:disabled:hover,
-.buyin-auto:disabled:focus,
-.buyin-auto:disabled:active {
-  background: var(--tg-surface-2);
-  color: var(--tg-hint);
-  opacity: 0.72;
-}
 
 @media (max-width: 420px) {
   .app { width: 100%; padding-inline: 8px; }
@@ -6500,10 +6240,6 @@ button {
   transition: background-color 100ms ease, border-color 100ms ease, opacity 100ms ease;
 }
 
-button:active {
-  transform: none;
-  opacity: 0.82;
-}
 
 input,
 select {
@@ -6577,7 +6313,6 @@ body:not(.in-game) .app {
 .tg-balance-hero,
 .wallet-card,
 .lobby-card,
-.profile-hero,
 .cashier-card,
 .tg-menu-group {
   border: 1px solid var(--ui-line);
@@ -6686,43 +6421,7 @@ body:not(.in-game) .app {
   padding: 4px 0;
 }
 
-.table-item {
-  grid-template-columns: 40px minmax(0, 1fr) 62px;
-  gap: 8px;
-  min-height: 62px;
-  border: 1px solid var(--ui-line);
-  border-radius: var(--ui-radius);
-  padding: 8px;
-}
 
-.table-avatar {
-  width: 40px;
-  border-radius: 6px;
-}
-
-.table-row {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 2px;
-}
-
-.table-row strong {
-  font-size: 14px;
-}
-
-.table-row small {
-  justify-self: start;
-  padding: 3px 6px;
-  font-size: 10px;
-}
-
-.table-item button {
-  min-width: 62px;
-  padding-inline: 8px;
-  font-size: 14px;
-}
-
-.table-item button,
-body:not(.in-game) .table-item button,
 .tournament-card button,
 .cashier-pay-button,
 .buyin-submit,
@@ -6767,27 +6466,12 @@ body:not(.in-game) .table-item button,
   background: var(--ui-surface-active);
 }
 
-.profile-hero {
-  min-height: 82px;
-  padding: 12px;
-}
 
 .profile-avatar {
   width: 52px;
   height: 52px;
 }
 
-.profile-main h2 {
-  font-size: 21px;
-  font-weight: 600;
-}
-
-.profile-hero .round-control {
-  width: 40px;
-  min-height: 40px;
-  border: 1px solid var(--ui-line);
-  border-radius: var(--ui-radius);
-}
 
 .bottom-nav {
   right: auto;
@@ -6878,10 +6562,6 @@ body:not(.in-game) .bottom-nav button.active {
   background: var(--ui-surface);
 }
 
-.buyin-title {
-  font-size: 26px;
-  font-weight: 600;
-}
 
 .buyin-amount-grid input {
   border-radius: 6px;
@@ -6958,10 +6638,6 @@ body:not(.in-game) .bottom-nav button.active {
   display: none;
 }
 
-.buyin-head {
-  padding: 0;
-  gap: 2px;
-}
 
 .buyin-kicker {
   color: var(--tg-button);
@@ -6969,16 +6645,6 @@ body:not(.in-game) .bottom-nav button.active {
   font-weight: 650;
 }
 
-.buyin-title {
-  color: var(--tg-text);
-  font-size: 30px;
-  font-weight: 650;
-  line-height: 1.02;
-}
-
-.buyin-head span {
-  display: none;
-}
 
 .buyin-summary,
 .buyin-info-card,
@@ -7230,15 +6896,6 @@ body.in-game .betting-actions.amount-open label input {
   letter-spacing: 0;
 }
 
-.table-avatar {
-  background: var(--ui-surface-alt) !important;
-  color: var(--ui-accent);
-  font-size: 18px;
-}
-
-.table-avatar::before {
-  display: none;
-}
 
 .bottom-nav button {
   justify-content: center;
@@ -7318,7 +6975,6 @@ body:not(.in-game) .app {
 .tg-balance-hero,
 .wallet-card,
 .lobby-card,
-.profile-hero,
 .cashier-card,
 .tg-menu-group {
   border: 0;
@@ -7363,10 +7019,6 @@ body:not(.in-game) .app {
   font-weight: 400;
 }
 
-.tg-balance-hero button:active,
-.wallet-topup-button:active {
-  background: var(--native-blue-pressed);
-}
 
 .tg-menu-group {
   overflow: hidden;
@@ -7386,9 +7038,6 @@ body:not(.in-game) .app {
   background: var(--native-divider);
 }
 
-.tg-menu-row:active {
-  background: rgba(123, 145, 166, 0.1);
-}
 
 .tg-row-icon {
   width: 30px;
@@ -7512,62 +7161,7 @@ body:not(.in-game) .app {
   padding: 0;
 }
 
-.table-list {
-  gap: 0;
-  margin-top: 0;
-}
 
-.table-item,
-body:not(.in-game) .table-item {
-  grid-template-columns: 42px minmax(0, 1fr) auto;
-  min-height: 67px;
-  gap: 10px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  padding: 8px 0;
-}
-
-.table-item + .table-item {
-  border-top: 1px solid var(--native-divider);
-}
-
-.table-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--native-control) !important;
-  color: var(--native-blue);
-  font-size: 18px;
-}
-
-.table-row {
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px;
-}
-
-.table-row strong {
-  color: var(--native-text);
-  font-size: 15px;
-  font-weight: 520;
-}
-
-.table-row small {
-  border: 0;
-  border-radius: 12px;
-  background: var(--native-control);
-  color: var(--native-muted);
-  font-size: 10px;
-  font-weight: 550;
-}
-
-.table-summary > span {
-  color: var(--native-muted);
-  font-size: 13px;
-}
-
-.table-item button,
-body:not(.in-game) .table-item button,
 .tournament-card button,
 .cashier-pay-button,
 .buyin-submit,
@@ -7652,21 +7246,12 @@ body:not(.in-game) .table-item button,
   background: rgba(42, 171, 238, 0.22);
 }
 
-.profile-hero {
-  min-height: 82px;
-  padding: 14px;
-}
 
 .profile-avatar {
   width: 54px;
   height: 54px;
 }
 
-.profile-hero .round-control {
-  border: 0;
-  border-radius: 50%;
-  background: var(--native-control);
-}
 
 .settings-action,
 .settings-row {
@@ -7840,7 +7425,6 @@ body:not(.in-game) .bottom-nav button.active {
 }
 
 .tg-balance-hero small,
-.buyin-head > span,
 #tablesFilterStatus {
   display: inline-flex;
   align-items: center;
@@ -7938,11 +7522,6 @@ body:not(.in-game) {
   padding: 0;
 }
 
-.home-profile-link:hover,
-.home-profile-link:active {
-  background: transparent;
-  transform: none;
-}
 
 .home-balance {
   display: grid;
@@ -8158,19 +7737,6 @@ body:not(.in-game) {
   font-weight: 430;
 }
 
-.home-games {
-  padding: 14px;
-}
-
-.home-games .section-title {
-  align-items: end;
-  margin-bottom: 10px;
-}
-
-.home-games .section-title h2 {
-  font-size: 20px;
-  font-weight: 570;
-}
 
 .home-limit-pills {
   display: flex;
@@ -8190,60 +7756,6 @@ body:not(.in-game) {
   padding: 0 6px;
 }
 
-.home-table-list {
-  border-top: 1px solid var(--native-divider);
-  margin-bottom: 9px;
-}
-
-body:not(.in-game) .home-table-list .table-item {
-  min-height: 60px;
-}
-
-.home-table-list .table-avatar {
-  display: none;
-}
-
-body:not(.in-game) .home-table-list .table-item {
-  grid-template-columns: minmax(0, 1fr) 76px;
-  gap: 8px;
-}
-
-.home-table-list .table-summary {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.home-table-list .table-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.home-table-list .table-row strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.home-table-list .table-summary > span {
-  margin-top: 0;
-  font-size: 12px;
-}
-
-body:not(.in-game) .home-table-list .table-item button {
-  width: 76px;
-  min-width: 76px;
-  min-height: 34px;
-  margin: 0;
-  padding: 0 8px;
-}
-
-.home-table-list .empty {
-  margin: 10px 0 4px;
-  padding: 12px;
-  font-size: 13px;
-}
 
 .home-game-actions {
   display: grid;
@@ -8472,30 +7984,6 @@ body:not(.in-game) .nav-profile-avatar {
   height: 50px;
 }
 
-body:not(.in-game).is-scrolling .bottom-nav,
-body:not(.in-game).is-scrolling .profile-nav-fab {
-  opacity: 0.96;
-  transform: translateY(5px) scale(0.985);
-}
-
-body:not(.in-game).scrolling-up .bottom-nav,
-body:not(.in-game).scrolling-up .profile-nav-fab {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-
-body:not(.in-game) .lobby-view.active {
-  transform: translate3d(0, var(--scroll-bounce-y, 0px), 0);
-  will-change: transform;
-}
-
-body:not(.in-game).scroll-bounce-active .lobby-view.active {
-  transition: none;
-}
-
-body:not(.in-game).scroll-bounce-release .lobby-view.active {
-  transition: transform 260ms cubic-bezier(0.18, 0.9, 0.2, 1);
-}
 
 .scroll-reveal {
   opacity: 0;
@@ -8957,33 +8445,11 @@ body:not(.in-game) .progression-card .section-title h2 {
   font-weight: 560;
 }
 
-body:not(.in-game) .home-games {
-  margin-top: 0;
-  border: 1px solid var(--tg-separator);
-  border-radius: var(--native-group-radius);
-  background: var(--tg-surface);
-  padding: 12px;
-}
-
-body:not(.in-game) .home-games .section-title {
-  margin-bottom: 8px;
-}
-
-body:not(.in-game) .home-games .section-title h2 {
-  font-size: 18px;
-}
 
 body:not(.in-game) .home-limit-pills {
   margin-bottom: 8px;
 }
 
-body:not(.in-game) .home-games .home-offer-meta {
-  display: none;
-}
-
-body:not(.in-game) .home-games .home-game-actions {
-  margin-top: 8px;
-}
 
 .sitgo-preview {
   background:
@@ -9015,20 +8481,6 @@ body:not(.in-game) .home-games .home-game-actions {
   font-weight: 540;
 }
 
-.profile-hero {
-  background:
-    radial-gradient(circle at 12% 10%, rgba(42, 171, 238, 0.22), transparent 38%),
-    linear-gradient(135deg, rgba(52, 199, 89, 0.08), rgba(94, 92, 230, 0.1)),
-    var(--tg-surface);
-}
-
-.profile-hero .profile-avatar {
-  box-shadow: 0 0 0 3px rgba(42, 171, 238, 0.14), 0 16px 28px rgba(0, 0, 0, 0.22);
-}
-
-.profile-main h2 {
-  letter-spacing: 0;
-}
 
 .profile-progress {
   overflow: hidden;
@@ -9352,9 +8804,6 @@ body.lobby-menu-open .lobby-menu-backdrop {
   border-top: 1px solid var(--native-divider);
 }
 
-.lobby-menu-list button:active {
-  background: rgba(118, 137, 155, 0.12);
-}
 
 .lobby-menu-list strong {
   display: block;
@@ -9402,9 +8851,6 @@ body.buyin-sheet-open {
   overscroll-behavior: none;
 }
 
-.buyin-head > #buyInGameType {
-  display: none !important;
-}
 
 @media (min-width: 720px) {
   body:not(.in-game) .home-promo-banners {
@@ -9556,7 +9002,6 @@ body:not(.in-game) .lobby-card,
 body:not(.in-game) .home-wallet,
 body:not(.in-game) .product-mode-hub,
 body:not(.in-game) .progression-card,
-body:not(.in-game) .home-games,
 body:not(.in-game) .lobby-menu-sheet,
 body:not(.in-game) .cashier-sheet {
   border: 1px solid var(--premium-line);
@@ -9594,7 +9039,6 @@ body:not(.in-game) .home-wallet-actions {
 }
 
 body:not(.in-game) .home-identity strong,
-body:not(.in-game) .profile-main h2,
 body:not(.in-game) .section-title h2 {
   font-weight: 800;
   letter-spacing: -0.01em;
@@ -9633,12 +9077,6 @@ body:not(.in-game) .home-wallet-actions .home-withdraw {
   color: rgba(246, 249, 255, 0.9);
 }
 
-body:not(.in-game) .home-wallet-actions button:active,
-body:not(.in-game) .promo-banner:active,
-body:not(.in-game) .play-format-grid button:active,
-body:not(.in-game) .product-mode-segment button:active {
-  transform: scale(0.975);
-}
 
 body:not(.in-game) .promo-banner {
   position: relative;
@@ -9804,12 +9242,6 @@ body:not(.in-game) .progression-summary > div:nth-child(3) strong {
   color: var(--brand-green);
 }
 
-body:not(.in-game) .home-games {
-  border: 1px solid rgba(154, 190, 222, 0.11);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 48%),
-    var(--premium-surface);
-}
 
 body:not(.in-game) .limit-pills button,
 body:not(.in-game) .home-limit-pills button {
@@ -9826,25 +9258,12 @@ body:not(.in-game) .home-limit-pills button.active {
   box-shadow: 0 10px 24px rgba(18, 126, 255, 0.22);
 }
 
-body:not(.in-game) .table-item {
-  border: 1px solid rgba(154, 190, 222, 0.09);
-  background: rgba(13, 21, 30, 0.28);
-}
-
-body:not(.in-game) .table-item button,
 body:not(.in-game) .home-game-actions button:first-child {
   background: linear-gradient(135deg, #22b7ff, #127eff);
   color: #fff;
   box-shadow: 0 10px 22px rgba(18, 126, 255, 0.22);
 }
 
-body:not(.in-game) .profile-hero {
-  border: 0;
-  background:
-    radial-gradient(circle at 12% 10%, rgba(42, 171, 238, 0.22), transparent 38%),
-    radial-gradient(circle at 92% 22%, rgba(247, 188, 69, 0.1), transparent 30%),
-    linear-gradient(135deg, #21344a, #182433);
-}
 
 body:not(.in-game) .profile-progress span {
   background: linear-gradient(90deg, var(--brand-blue), var(--brand-green), var(--brand-gold));
@@ -9891,10 +9310,6 @@ body:not(.in-game) .lobby-menu-list button {
   background: rgba(13, 21, 30, 0.24);
 }
 
-body:not(.in-game) .lobby-menu-list button:active {
-  transform: scale(0.985);
-  background: rgba(42, 171, 238, 0.16);
-}
 
 body:not(.in-game) .scroll-reveal.is-visible {
   animation: cardFloatIn 480ms cubic-bezier(0.18, 0.9, 0.2, 1) both;
@@ -9964,9 +9379,6 @@ body.in-game .table-id {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
 }
 
-body.in-game .game-toolbar .icon-control:active {
-  transform: scale(0.96);
-}
 
 body.in-game .board {
   border: 0;
@@ -10068,10 +9480,6 @@ body.in-game .pre-actions .secondary {
   color: rgba(246, 249, 255, 0.92);
 }
 
-body.in-game .betting-actions button:active,
-body.in-game .pre-actions button:active {
-  transform: scale(0.975);
-}
 
 html.admin-mode body:not(.in-game) .app-shell,
 html.admin-mode body:not(.in-game) .lobby-shell {
@@ -11955,7 +11363,6 @@ button,
 .home-wallet-actions button,
 .play-format-grid button,
 .product-mode-segment button,
-.table-item button,
 .cashier-pay-button,
 .buyin-submit,
 .betting-actions button,
@@ -11970,8 +11377,6 @@ button,
 .section-title h2,
 .home-identity strong,
 .home-player strong,
-.profile-main h2,
-.table-item strong,
 .tournament-card strong,
 .pot,
 .player-name,
@@ -11986,7 +11391,6 @@ button,
 .player-rank,
 .mode-context-copy,
 .tg-row-value,
-.table-item span,
 .cashier-note {
   font-weight: 500;
 }
@@ -12032,7 +11436,6 @@ button,
 .wallet-actions button,
 .cashier-pay-button,
 .buyin-submit,
-.table-item button,
 .tournament-card button,
 .play-format-grid button,
 .product-mode-segment button,
@@ -12087,13 +11490,6 @@ button:hover {
   filter: brightness(1.03);
 }
 
-button:active,
-.play-format-grid button:active,
-.product-mode-segment button:active,
-.promo-banner:active,
-.tg-menu-row:active {
-  transform: scale(0.99);
-}
 
 @media (hover: none) {
   button:hover {
@@ -12328,10 +11724,6 @@ body:not(.in-game) .home-wallet-actions .home-withdraw svg {
   opacity: 0.7;
 }
 
-body:not(.in-game) .home-wallet-actions button:active {
-  transform: translateY(1px);
-  filter: brightness(0.96);
-}
 
 /* --- Promo carousel -------------------------------------------------- */
 body:not(.in-game) .home-promo-banners {
@@ -12426,8 +11818,7 @@ body:not(.in-game) .home-promo-dots span.active {
 /* --- Section cards (the rhythm) ------------------------------------- */
 body:not(.in-game) .lobby-card,
 body:not(.in-game) .product-mode-hub,
-body:not(.in-game) .progression-card,
-body:not(.in-game) .home-games {
+body:not(.in-game) .progression-card{
   border: 1px solid var(--qwz-line);
   border-radius: var(--qwz-radius-lg);
   background: linear-gradient(180deg, #161f2b 0%, #111922 100%);
@@ -12656,45 +12047,6 @@ body:not(.in-game) .limit-pills button.active {
   color: var(--qwz-emerald);
 }
 
-body:not(.in-game) .table-list {
-  gap: 8px;
-}
-
-body:not(.in-game) .table-item {
-  padding: 12px;
-  border-radius: var(--qwz-radius-md);
-  border: 1px solid var(--qwz-line);
-  background: linear-gradient(180deg, #1a2330 0%, #131a24 100%);
-  gap: 12px;
-}
-
-body:not(.in-game) .table-item .table-avatar {
-  background: rgba(47, 211, 150, 0.14);
-  color: var(--qwz-emerald);
-  border-radius: 12px;
-}
-
-body:not(.in-game) .table-item strong {
-  font-size: 14px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  color: var(--qwz-ink);
-}
-
-body:not(.in-game) .table-item small {
-  font-size: 11px;
-  color: var(--qwz-ink-mute);
-}
-
-body:not(.in-game) .table-item button {
-  min-height: 34px;
-  padding: 0 16px;
-  border-radius: 10px;
-  background: var(--qwz-emerald);
-  color: #062019;
-  font-size: 12.5px;
-  font-weight: 700;
-}
 
 /* --- Quick play CTA ------------------------------------------------- */
 body:not(.in-game) .home-game-actions {
@@ -13038,21 +12390,8 @@ body:not(.in-game) [data-lobby-view="home"].active .home-metrics {
   display: none !important;
 }
 /* Tables grow to fill remaining height; tools row pinned right above nav */
-body:not(.in-game) [data-lobby-view="home"].active .home-games {
-  flex: 1 1 auto !important;
-  display: flex !important;
-  flex-direction: column !important;
-  min-height: 0 !important;
-}
-body:not(.in-game) [data-lobby-view="home"].active .home-table-list {
-  flex: 1 1 auto !important;
-  overflow-y: auto !important;
-  scrollbar-width: none !important;
-  align-content: start !important;
-}
-body:not(.in-game) [data-lobby-view="home"].active .home-table-list::-webkit-scrollbar {
-  display: none !important;
-}
+
+
 body:not(.in-game) [data-lobby-view="home"].active .home-tools {
   display: grid !important;
   border-radius: 16px !important;
@@ -13159,14 +12498,7 @@ body:not(.in-game) .product-mode-hub button strong {
 body:not(.in-game) .product-mode-hub button small,
 body:not(.in-game) .product-mode-hub button .format-icon { display: none !important; }
 /* ---------- Tables block: open, no card-in-card, list rows ---------- */
-body:not(.in-game) .home-games {
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-  gap: 8px !important;
-}
-body:not(.in-game) .home-games .section-title { display: none !important; }
+
 
 body:not(.in-game) .home-limit-pills {
   display: flex !important;
@@ -13192,85 +12524,9 @@ body:not(.in-game) .home-limit-pills button.active {
   color: #fff !important;
 }
 
-body:not(.in-game) .home-table-list {
-  display: grid !important;
-  gap: 0 !important;
-  background: var(--qwz-card) !important;
-  border-radius: 16px !important;
-  padding: 4px 14px !important;
-  overflow: hidden !important;
-}
-body:not(.in-game) .home-table-list .table-item {
-  display: grid !important;
-  grid-template-columns: 36px minmax(0, 1fr) 18px !important;
-  align-items: center !important;
-  gap: 12px !important;
-  background: transparent !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  padding: 12px 0 !important;
-  min-height: 56px !important;
-  position: relative !important;
-}
-body:not(.in-game) .home-table-list .table-item + .table-item {
-  border-top: 1px solid var(--qwz-divider) !important;
-}
-body:not(.in-game) .home-table-list .table-item .table-avatar {
-  width: 36px !important;
-  height: 36px !important;
-  border-radius: 12px !important;
-  background: var(--qwz-acc-soft) !important;
-  color: var(--qwz-acc) !important;
-  font-size: 14px !important;
-  display: grid !important;
-  place-items: center !important;
-}
-body:not(.in-game) .home-table-list .table-summary { min-width: 0 !important; }
-body:not(.in-game) .home-table-list .table-summary strong {
-  font-size: 14px !important;
-  font-weight: 600 !important;
-  color: var(--qwz-ink) !important;
-  letter-spacing: 0 !important;
-}
-body:not(.in-game) .home-table-list .table-summary > span,
-body:not(.in-game) .home-table-list .table-summary .table-row + span {
-  font-size: 12px !important;
-  color: var(--qwz-dim) !important;
-  font-weight: 500 !important;
-}
-body:not(.in-game) .home-table-list .table-row small { display: none !important; }
 
 /* turn the Войти button into a clean chevron anchored to the right */
-body:not(.in-game) .home-table-list .table-item > button {
-  appearance: none !important;
-  width: 18px !important;
-  min-width: 18px !important;
-  max-width: 18px !important;
-  height: 36px !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  border-radius: 0 !important;
-  font-size: 0 !important;
-  color: transparent !important;
-  text-indent: -9999px !important;
-  overflow: hidden !important;
-  justify-self: end !important;
-  align-self: center !important;
-  position: relative !important;
-  cursor: pointer !important;
-}
-body:not(.in-game) .home-table-list .table-item > button::after {
-  content: "" !important;
-  position: absolute !important;
-  inset: 0 !important;
-  display: block !important;
-  background: no-repeat center / 8px 14px url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 14'><path d='M1 1l6 6-6 6' fill='none' stroke='%235d6b7c' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>") !important;
-  text-indent: 0 !important;
-}
+
 
 /* ---------- Bottom nav: floating Telegram pill, no border ---------- */
 body:not(.in-game) .bottom-nav {
@@ -13317,7 +12573,6 @@ body:not(.in-game) .lobby-view.active .cashier-card,
 body:not(.in-game) .lobby-view.active .cashier-topup-card,
 body:not(.in-game) .lobby-view.active .cashier-withdraw-card,
 body:not(.in-game) .lobby-view.active .cashier-history-card,
-body:not(.in-game) .lobby-view.active .profile-hero,
 body:not(.in-game) .lobby-view.active .affiliate-hero,
 body:not(.in-game) .lobby-view.active .create-card {
   background: var(--qwz-card) !important;
@@ -13328,73 +12583,6 @@ body:not(.in-game) .lobby-view.active .create-card {
   gap: 10px !important;
 }
 
-body:not(.in-game) .lobby-view.active .table-list {
-  display: grid !important;
-  gap: 0 !important;
-  background: transparent !important;
-  border-radius: 0 !important;
-  overflow: visible !important;
-}
-body:not(.in-game) .lobby-view.active .table-list .table-item {
-  display: grid !important;
-  grid-template-columns: 36px minmax(0, 1fr) 18px !important;
-  align-items: center !important;
-  gap: 12px !important;
-  background: transparent !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  padding: 12px 0 !important;
-  min-height: 56px !important;
-}
-body:not(.in-game) .lobby-view.active .table-list .table-item + .table-item {
-  border-top: 1px solid var(--qwz-divider) !important;
-}
-body:not(.in-game) .lobby-view.active .table-list .table-item .table-avatar {
-  width: 36px !important;
-  height: 36px !important;
-  border-radius: 12px !important;
-  background: var(--qwz-acc-soft) !important;
-  color: var(--qwz-acc) !important;
-  font-size: 14px !important;
-}
-body:not(.in-game) .lobby-view.active .table-list .table-row strong {
-  font-size: 14px !important;
-  font-weight: 600 !important;
-  color: var(--qwz-ink) !important;
-}
-body:not(.in-game) .lobby-view.active .table-list .table-row small {
-  display: none !important;
-}
-body:not(.in-game) .lobby-view.active .table-list .table-summary > span {
-  font-size: 12px !important;
-  color: var(--qwz-dim) !important;
-  font-weight: 500 !important;
-}
-body:not(.in-game) .lobby-view.active .table-list .table-item > button {
-  width: 18px !important;
-  min-width: 18px !important;
-  max-width: 18px !important;
-  height: 36px !important;
-  padding: 0 !important;
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  border-radius: 0 !important;
-  color: transparent !important;
-  font-size: 0 !important;
-  text-indent: -9999px !important;
-  overflow: hidden !important;
-  justify-self: end !important;
-  position: relative !important;
-}
-body:not(.in-game) .lobby-view.active .table-list .table-item > button::after {
-  content: "" !important;
-  position: absolute !important;
-  inset: 0 !important;
-  background: no-repeat center / 8px 14px url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 14'><path d='M1 1l6 6-6 6' fill='none' stroke='%235d6b7c' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>") !important;
-  text-indent: 0 !important;
-}
 
 body:not(.in-game) .lobby-view.active .section-title {
   display: flex !important;
@@ -13600,21 +12788,7 @@ body[data-game-mode="play"]:not(.in-game) .product-mode-hub .game-mode-switch bu
 }
 
 /* ---------- Tables list: coloured stake avatars ---------- */
-body:not(.in-game) .home-table-list .table-item:nth-child(3n+1) .table-avatar,
-body:not(.in-game) .lobby-view.active .table-list .table-item:nth-child(3n+1) .table-avatar {
-  background: rgba(42, 171, 238, 0.14) !important;
-  color: var(--qwz-acc) !important;
-}
-body:not(.in-game) .home-table-list .table-item:nth-child(3n+2) .table-avatar,
-body:not(.in-game) .lobby-view.active .table-list .table-item:nth-child(3n+2) .table-avatar {
-  background: rgba(139, 108, 255, 0.14) !important;
-  color: var(--qwz-violet) !important;
-}
-body:not(.in-game) .home-table-list .table-item:nth-child(3n+3) .table-avatar,
-body:not(.in-game) .lobby-view.active .table-list .table-item:nth-child(3n+3) .table-avatar {
-  background: rgba(54, 200, 200, 0.14) !important;
-  color: var(--qwz-teal) !important;
-}
+
 
 /* ---------- Menu sheet icons: per-row accent colours ---------- */
 body:not(.in-game) .lobby-menu-list button .menu-icon {
@@ -13903,39 +13077,18 @@ body:not(.in-game) .lobby-menu-list button .tg-chevron {
 body:not(.in-game) .lobby-view[data-lobby-view="profile"].active {
   gap: 8px !important;
 }
-
-body:not(.in-game) .lobby-view[data-lobby-view="profile"].active .profile-hero,
 body:not(.in-game) .lobby-view[data-lobby-view="profile"].active .lobby-card {
   padding: 12px !important;
   gap: 8px !important;
   border-radius: 16px !important;
 }
 
-body:not(.in-game) .lobby-view[data-lobby-view="profile"].active .profile-hero {
-  min-height: 84px !important;
-  align-items: center !important;
-}
 
 body:not(.in-game) .lobby-view[data-lobby-view="profile"].active .profile-avatar {
   width: 42px !important;
   height: 42px !important;
 }
 
-body:not(.in-game) .lobby-view[data-lobby-view="profile"].active .profile-main h2 {
-  font-size: 18px !important;
-  line-height: 1.05 !important;
-}
-
-body:not(.in-game) .lobby-view[data-lobby-view="profile"].active .profile-main span {
-  font-size: 12px !important;
-}
-
-body:not(.in-game) .lobby-view[data-lobby-view="profile"].active .profile-hero .round-control {
-  width: 34px !important;
-  height: 34px !important;
-  top: 10px !important;
-  right: 10px !important;
-}
 
 body:not(.in-game) .lobby-view[data-lobby-view="profile"].active .stats-cards {
   margin-top: 8px !important;
@@ -14233,11 +13386,8 @@ body:not(.in-game) [data-lobby-view="home"].active .home-promo-dots span.active:
 @keyframes qwzPromoProgress { to { width: 100%; } }
 
 /* ---------- Tables: tighten header→pills gap ---------- */
-body:not(.in-game) [data-lobby-view="home"].active .home-games { gap: 8px !important; }
-body:not(.in-game) [data-lobby-view="home"].active .home-games .section-title {
-  display: flex !important;
-  margin: 0 0 2px !important;
-}
+
+
 body:not(.in-game) [data-lobby-view="home"].active .home-limit-pills {
   margin: 0 !important;
   padding: 0 0 2px !important;
@@ -14657,9 +13807,7 @@ html.minimal-launch body:not(.in-game) .lobby-view {
 html.minimal-launch body:not(.in-game) .lobby-card,
 html.minimal-launch body:not(.in-game) .home-wallet,
 html.minimal-launch body:not(.in-game) .product-mode-hub,
-html.minimal-launch body:not(.in-game) .home-games,
-html.minimal-launch body:not(.in-game) .profile-dashboard,
-html.minimal-launch body:not(.in-game) .profile-hero {
+html.minimal-launch body:not(.in-game) .profile-dashboard{
   width: 100% !important;
   border: 0 !important;
   border-radius: 26px !important;
@@ -14791,9 +13939,6 @@ html.minimal-launch body:not(.in-game) .mode-context-copy {
   line-height: 1.25 !important;
 }
 
-html.minimal-launch body:not(.in-game) .home-games {
-  padding: 20px !important;
-}
 
 html.minimal-launch body:not(.in-game) .section-title {
   margin-bottom: 14px !important;
@@ -14830,8 +13975,6 @@ html.minimal-launch body:not(.in-game) .limit-pills button.active {
   background: var(--qwz-blue) !important;
   color: #fff !important;
 }
-
-html.minimal-launch body:not(.in-game) .table-item,
 html.minimal-launch body:not(.in-game) .settings-row,
 html.minimal-launch body:not(.in-game) .cashier-transaction {
   border-radius: 22px !important;
@@ -14839,26 +13982,6 @@ html.minimal-launch body:not(.in-game) .cashier-transaction {
   border: 0 !important;
 }
 
-html.minimal-launch body:not(.in-game) .profile-hero {
-  padding: 24px !important;
-  display: grid !important;
-  grid-template-columns: 86px minmax(0, 1fr) !important;
-  gap: 16px !important;
-  align-items: center !important;
-}
-
-html.minimal-launch body:not(.in-game) .profile-hero .profile-avatar {
-  width: 86px !important;
-  height: 86px !important;
-  border-radius: 28px !important;
-  font-size: 32px !important;
-}
-
-html.minimal-launch body:not(.in-game) .profile-main h2 {
-  color: #fff !important;
-  font-size: 28px !important;
-  font-weight: 750 !important;
-}
 
 html.minimal-launch body:not(.in-game) .profile-dashboard {
   padding: 20px !important;

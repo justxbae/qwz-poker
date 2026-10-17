@@ -221,3 +221,33 @@ font-variant-numeric: tabular-nums;
 Первым перенесён игровой chrome: toolbar, felt, служебные подписи, action controls, левое меню и правый info drawer. Совпадающий legacy-блок удалён из `telegram-ui-kit-overrides.css`. Архитектурный тест фиксирует порядок подключения и запрещает рост legacy-файлов/`!important` сверх текущего бюджета. Это промежуточная защита, а не завершение миграции.
 
 Финальная цель — один token layer, один primitives layer и экранные стили без каскада датированных override-блоков. Следующие компоненты переносятся по одному после визуальной проверки: cashier sheets, lobby/profile cards, tournaments/private tables, затем table seats/cards/action states.
+
+
+## 14. Проверка интерфейса 17 октября 2026
+
+- В `public/ui-runtime.js` общий press feedback (110 ms), отмена при drag/scroll, focus trap,
+  восстановление фокуса и отменяемое закрытие sheets. Нативный click активирует навигацию;
+  собственные pointerup-переходы и искусственная пружина страницы удалены.
+- `ui-state` — первый CSS layer: его important-правила владеют `[hidden]`, disabled,
+  pressed, reduced motion и drag. `weez-rows`, `weez-sheets`, `weez-game` владеют важными
+  свойствами мигрированных компонентов: layered important имеет приоритет над старым
+  unlayered important. Обычные стили полностью перенесённых списков столов и профиля
+  остаются unlayered; соответствующие legacy-селекторы удалены. Новые свойства не надо
+  добавлять в старые файлы или компенсировать увеличением специфичности.
+- `--app-height` использует `viewportStableHeight`; нестабильные события свайпа игнорируются.
+  `--app-safe-*` объединяет `max(env, Telegram safeAreaInset)` и дополнительный
+  `contentSafeAreaInset`. В iOS Telegram отступ собственных fullscreen-кнопок не включает
+  status bar: [реализация Telegram](https://github.com/TelegramMessenger/Telegram-iOS/blob/master/submodules/WebUI/Sources/WebAppController.swift).
+- Chromium: 320×740, 390×844, 430×932; главная, конец страницы, профиль, турниры, меню,
+  документы. Горизонтальный overflow 0; нижняя навигация имеет одинаковые координаты до
+  и после scroll (390×844: x=12, y=764, 366×68; 430×932: x=12, y=852, 406×68).
+- Отдельно проверены светлая палитра, вход за стол, игровое меню, drag-cancel на сегменте,
+  закрытие документа свайпом и повторное открытие без остаточного смещения, Tab внутри
+  диалога, immediate close при reduced motion. Вызовы событий SDK с system top=44,
+  content top=56 и bottom=34 дали padding-top=116 и нижнюю границу nav=798 при высоте844.
+- Снимки до/после находятся в локальном игнорируемом `output/playwright/`.
+  `tests/ui-runtime.test.js` проверяет стабильную высоту, сумму safe insets, отмену клика,
+  disabled и гонку повторного открытия sheet; CSS budgets уменьшены после удаления legacy.
+- Это браузерная проверка. Настоящие клавиатуры, жесты WebView и финальная приёмка на
+  физических iOS/Android в Telegram остаются отдельной проверкой; идеальное совпадение
+  с native UI не подтверждено. Cashier проверяется как интерфейс; платежи не подключены.

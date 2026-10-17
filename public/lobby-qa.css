@@ -40,7 +40,6 @@ body:not(.in-game) .home-balance strong,
 body:not(.in-game) .home-wallet-side strong,
 body:not(.in-game) .promo-banner strong,
 body:not(.in-game) .section-title h2,
-body:not(.in-game) .profile-main h2,
 body:not(.in-game) .lobby-menu-list button strong,
 html.admin-mode body:not(.in-game) .admin-kpi-card strong,
 html.admin-mode body:not(.in-game) .admin-report-row strong {
@@ -50,8 +49,7 @@ html.admin-mode body:not(.in-game) .admin-report-row strong {
 body:not(.in-game) .home-balance strong small,
 body:not(.in-game) .promo-banner small,
 body:not(.in-game) .lobby-menu-list button small,
-body:not(.in-game) .profile-mode-card > small,
-body:not(.in-game) .profile-dashboard-stats span {
+body:not(.in-game) .profile-mode-card > small{
   font-weight: 500 !important;
 }
 
@@ -535,20 +533,13 @@ body:not(.in-game) .bottom-nav .nav-icon::after {
 }
 
 body:not(.in-game) .lobby-view[data-lobby-view="profile"].active { gap: 8px !important; }
-body:not(.in-game) .lobby-view[data-lobby-view="profile"].active .profile-hero {
-  min-height: 72px !important;
-  padding: 10px 12px !important;
-  gap: 10px !important;
-}
+
 body:not(.in-game) .lobby-view[data-lobby-view="profile"].active .profile-avatar {
   width: 46px !important;
   height: 46px !important;
   font-size: 17px !important;
 }
-body:not(.in-game) .lobby-view[data-lobby-view="profile"].active .profile-main h2 {
-  font-size: 18px !important;
-  line-height: 1.1 !important;
-}
+
 
 body:not(.in-game) .profile-dashboard {
   display: grid !important;
@@ -556,50 +547,15 @@ body:not(.in-game) .profile-dashboard {
   gap: 8px !important;
   padding: 12px !important;
 }
-body:not(.in-game) .profile-balance-row,
-body:not(.in-game) .profile-dashboard-stats { grid-column: 1 / -1 !important; }
-body:not(.in-game) .profile-balance-row {
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) auto !important;
-  align-items: end !important;
-  gap: 2px 10px !important;
-}
-body:not(.in-game) .profile-balance-row > span {
-  grid-column: 1 / -1 !important;
-  color: var(--qwz-mute) !important;
-  font-size: 10px !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.08em !important;
-}
-body:not(.in-game) .profile-balance-row > strong { font-size: 24px !important; line-height: 1 !important; }
-body:not(.in-game) .profile-balance-row > small { color: var(--qwz-green) !important; font-size: 11px !important; }
-body:not(.in-game) .profile-dashboard-stats {
-  display: grid !important;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  gap: 6px !important;
-}
-body:not(.in-game) .profile-dashboard-stats > div {
-  min-width: 0 !important;
-  padding: 8px !important;
-  border-radius: 12px !important;
-  background: var(--qwz-card-2) !important;
-}
-body:not(.in-game) .profile-dashboard-stats span,
+
+
 body:not(.in-game) .profile-mode-card span {
   display: block !important;
   color: var(--qwz-mute) !important;
   font-size: 9px !important;
   line-height: 1.1 !important;
 }
-body:not(.in-game) .profile-dashboard-stats strong {
-  display: block !important;
-  margin-top: 3px !important;
-  overflow: hidden !important;
-  color: var(--qwz-ink) !important;
-  font-size: 13px !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-}
+
 body:not(.in-game) .profile-mode-card {
   position: relative !important;
   min-width: 0 !important;
@@ -1450,9 +1406,7 @@ html:not(.admin-mode) body:not(.in-game) .lobby-view.active {
 html:not(.admin-mode) body:not(.in-game) .lobby-card,
 html:not(.admin-mode) body:not(.in-game) .home-wallet,
 html:not(.admin-mode) body:not(.in-game) .product-mode-hub,
-html:not(.admin-mode) body:not(.in-game) .home-games,
 html:not(.admin-mode) body:not(.in-game) .continue-card,
-html:not(.admin-mode) body:not(.in-game) .profile-hero,
 html:not(.admin-mode) body:not(.in-game) .cashier-card,
 html:not(.admin-mode) body:not(.in-game) .tournament-card,
 html:not(.admin-mode) body:not(.in-game) .tg-menu-group,
@@ -1492,7 +1446,6 @@ html:not(.admin-mode) body:not(.in-game) .home-account .lobby-avatar {
 }
 
 html:not(.admin-mode) body:not(.in-game) .home-identity strong,
-html:not(.admin-mode) body:not(.in-game) .profile-main h2,
 html:not(.admin-mode) body:not(.in-game) .section-title h2 {
   color: var(--tg-native-label) !important;
   font-weight: 600 !important;
@@ -1626,8 +1579,6 @@ html:not(.admin-mode) body:not(.in-game) .product-mode-title,
 html:not(.admin-mode) body:not(.in-game) .home-offer-meta {
   display: none !important;
 }
-
-html:not(.admin-mode) body:not(.in-game) .table-row,
 html:not(.admin-mode) body:not(.in-game) .tg-menu-row,
 html:not(.admin-mode) body:not(.in-game) .settings-row,
 html:not(.admin-mode) body:not(.in-game) .lobby-menu-list button {
@@ -1638,8 +1589,6 @@ html:not(.admin-mode) body:not(.in-game) .lobby-menu-list button {
   background: transparent !important;
   box-shadow: none !important;
 }
-
-html:not(.admin-mode) body:not(.in-game) .table-row + .table-row,
 html:not(.admin-mode) body:not(.in-game) .tg-menu-row + .tg-menu-row,
 html:not(.admin-mode) body:not(.in-game) .settings-row + .settings-row,
 html:not(.admin-mode) body:not(.in-game) .lobby-menu-list button + button {
@@ -1647,8 +1596,7 @@ html:not(.admin-mode) body:not(.in-game) .lobby-menu-list button + button {
 }
 
 html:not(.admin-mode) body:not(.in-game) .tg-row-icon,
-html:not(.admin-mode) body:not(.in-game) .menu-icon,
-html:not(.admin-mode) body:not(.in-game) .table-row [data-field="avatar"] {
+html:not(.admin-mode) body:not(.in-game) .menu-icon{
   width: 44px !important;
   height: 44px !important;
   border-radius: 12px !important;
@@ -1731,25 +1679,11 @@ html:not(.admin-mode) body:not(.in-game) .bottom-nav .nav-label {
   font-weight: 500 !important;
 }
 
-html:not(.admin-mode) body:not(.in-game) .profile-hero {
-  display: grid !important;
-  justify-items: center !important;
-  gap: 10px !important;
-  padding: 38px 24px 20px !important;
-  background: transparent !important;
-}
 
-html:not(.admin-mode) body:not(.in-game) .profile-main {
-  text-align: center !important;
-}
-
-html:not(.admin-mode) body:not(.in-game) .profile-dashboard-stats,
 html:not(.admin-mode) body:not(.in-game) .progression-summary,
 html:not(.admin-mode) body:not(.in-game) .profile-tournament-grid {
   gap: 12px !important;
 }
-
-html:not(.admin-mode) body:not(.in-game) .profile-dashboard-stats div,
 html:not(.admin-mode) body:not(.in-game) .progression-summary div,
 html:not(.admin-mode) body:not(.in-game) .profile-tournament-stat,
 html:not(.admin-mode) body:not(.in-game) .tournament-detail-summary > div {
@@ -1811,7 +1745,6 @@ html:not(.admin-mode) body:not(.in-game) .lobby-view.active {
 html:not(.admin-mode) body:not(.in-game) .home-wallet,
 html:not(.admin-mode) body:not(.in-game) .lobby-card,
 html:not(.admin-mode) body:not(.in-game) .product-mode-hub,
-html:not(.admin-mode) body:not(.in-game) .home-games,
 html:not(.admin-mode) body:not(.in-game) .cashier-card,
 html:not(.admin-mode) body:not(.in-game) .profile-dashboard,
 html:not(.admin-mode) body:not(.in-game) .tournament-card,
@@ -1912,18 +1845,12 @@ html:not(.admin-mode) body:not(.in-game) .lobby-menu-sheet {
   background: var(--tg-native-surface) !important;
 }
 
-html:not(.admin-mode) body:not(.in-game) .profile-hero {
-  padding: 34px 24px 18px !important;
-}
 
 html:not(.admin-mode) body:not(.in-game) .profile-avatar {
   width: 112px !important;
   height: 112px !important;
 }
 
-html:not(.admin-mode) body:not(.in-game) .profile-main h2 {
-  font-size: 32px !important;
-}
 
 @media (max-width: 430px) {
   html:not(.admin-mode) body:not(.in-game) .lobby-shell {

@@ -11,9 +11,9 @@ const files = {
 };
 
 const legacyBudgets = {
-  styles: { lines: 15_110, important: 1_232 },
-  lobby: { lines: 2_017, important: 1_073 },
-  telegram: { lines: 12_436, important: 6_579 },
+  styles: { lines: 14_233, important: 1_074 },
+  lobby: { lines: 1_944, important: 1_032 },
+  telegram: { lines: 11_140, important: 5_906 },
 };
 
 async function source(name) {

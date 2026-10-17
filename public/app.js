@@ -1,3 +1,4 @@
+import { setupPressFeedback, setupViewport, revealSheet, dismissSheet, setupDialogFocus } from "./ui-runtime.js?v=20261017-1";
 import { acceptsTableSnapshot, matchesActionContext, actionAmountBounds } from "./table-context.js?v=20261017-2";
 
 const tg = window.Telegram?.WebApp;
@@ -394,8 +395,6 @@ let pendingBetContext = null;
 let pendingPokerAction = false;
 let pendingBuyIn = null;
 let pendingDailyPlayClaim = false;
-let bottomNavPointer = null;
-let bottomNavSuppressClick = false;
 const pendingTournamentRequests = new Set();
 const pendingAdminTournamentRequests = new Set();
 const tableEventQueue = [];
@@ -411,10 +410,10 @@ boot().then(completeBoot).catch(showBootError);
 
 async function boot() {
   resetScroll();
-  setupTapGuards();
+  setupPressFeedback();
+  setupDialogFocus();
+  setupViewport(tg);
   setupOverlayKeyboardControls();
-  setupScrollDynamics();
-  setupLobbyOverscroll();
   tg?.expand();
   setupTelegramControls();
 
@@ -442,6 +441,7 @@ async function boot() {
   });
   if (tournamentDetailSheet) wireCashierSheetDrag(tournamentDetailSheet, closeTournamentDetails);
   if (lobbyMenuSheet) wireCashierSheetDrag(lobbyMenuSheet, closeLobbyMenu);
+  wireCashierSheetDrag(document.querySelector("#docSheet"), closeDocSheet);
   cashierSheetCloseButtons.forEach((button) => {
     button.addEventListener("click", closeCashierSheet);
   });
@@ -467,20 +467,16 @@ async function boot() {
   tournamentDetailSheet?.addEventListener("click", onTournamentDetailTabSelect);
   document.querySelector(".home-tools")?.addEventListener("click", onGameFormatSelect);
   document.querySelector(".home-tools")?.addEventListener("click", onFooterLobbyAction);
-  document.querySelector(".home-tools")?.addEventListener("pointerdown", onFooterLobbyPress, { passive: true });
-  document.querySelector(".home-tools")?.addEventListener("pointermove", onFooterLobbyPointerMove, { passive: true });
-  document.querySelector(".home-tools")?.addEventListener("pointerup", onFooterLobbyPointerEnd, { passive: true });
-  document.querySelector(".home-tools")?.addEventListener("pointercancel", onFooterLobbyPointerEnd, { passive: true });
-  homeTableList?.addEventListener("pointerdown", onFooterLobbyPress, { passive: true });
-  homeTableList?.addEventListener("pointermove", onFooterLobbyPointerMove, { passive: true });
-  homeTableList?.addEventListener("pointerup", onFooterLobbyPointerEnd, { passive: true });
-  homeTableList?.addEventListener("pointercancel", onFooterLobbyPointerEnd, { passive: true });
   quickPlayButton.addEventListener("click", () => runAction(quickPlay));
   homeWalletSideAction?.addEventListener("click", () => runAction(claimDailyPlayBonus));
   dailyPlayClaimButton?.addEventListener("click", () => runAction(claimDailyPlayBonus));
   continueGameButton.addEventListener("click", continueGame);
   if (adminNavButton) adminNavButton.hidden = !ADMIN_MODE;
   updateBottomNavIndicator();
+  const bottomNav = document.querySelector(".bottom-nav");
+  if (bottomNav && "ResizeObserver" in window) {
+    new ResizeObserver(() => updateBottomNavIndicator(lobbyMenuSheet?.hidden === false ? "__menu" : currentLobbyTab)).observe(bottomNav);
+  }
   adminLookupForm?.addEventListener("submit", (event) => {
     event.preventDefault();
     runAction(() => loadAdminPlayer(adminUserId.value));
@@ -516,7 +512,6 @@ async function boot() {
       selectLobbyTab(button.dataset.lobbyTab);
     });
   });
-  wireBottomNavGestures();
   lobbyMenuButton?.addEventListener("click", toggleLobbyMenu);
   lobbyMenuBackdrop?.addEventListener("click", closeLobbyMenu);
   lobbyMenuSheet?.addEventListener("click", onLobbyMenuAction);
@@ -545,20 +540,11 @@ async function boot() {
     button.addEventListener("click", () => openDocSheet(button.dataset.doc));
   });
   document.querySelector("#docSheetClose")?.addEventListener("click", closeDocSheet);
+  document.querySelector("#docSheetBackdrop")?.addEventListener("click", closeDocSheet);
   quickBuyInButton.addEventListener("click", () => runAction(buyIn));
   backToLobbyButton.addEventListener("click", () => runAction(backToLobbyFromTable));
   sitButton.addEventListener("click", () => runAction(sitAtTable));
   observerSitButton.addEventListener("click", () => runAction(returnToSeat));
-  sideMenu.addEventListener("pointerdown", onFooterLobbyPress, { passive: true });
-  sideMenu.addEventListener("pointermove", onFooterLobbyPointerMove, { passive: true });
-  sideMenu.addEventListener("pointerup", onFooterLobbyPointerEnd, { passive: true });
-  sideMenu.addEventListener("pointercancel", onFooterLobbyPointerEnd, { passive: true });
-  sideMenu.addEventListener("click", cancelDraggedMenuClick, true);
-  infoDrawer.addEventListener("pointerdown", onFooterLobbyPress, { passive: true });
-  infoDrawer.addEventListener("pointermove", onFooterLobbyPointerMove, { passive: true });
-  infoDrawer.addEventListener("pointerup", onFooterLobbyPointerEnd, { passive: true });
-  infoDrawer.addEventListener("pointercancel", onFooterLobbyPointerEnd, { passive: true });
-  infoDrawer.addEventListener("click", cancelDraggedMenuClick, true);
   menuButton.addEventListener("click", () => {
     if (!sideMenu.hidden) {
       closeMenu();
@@ -717,7 +703,7 @@ async function loadConfig() {
     cashButton.disabled = false;
     cashButton.title = state.config.realMoneyEnabled
       ? ""
-      : "$-игра доступна только если сервер запущен с REAL_MONEY_ENABLED=true";
+      : "Игра на деньги пока недоступна";
   }
   if (state.gameMode === "cash") {
     const limits = currentLimits();
@@ -726,6 +712,7 @@ async function loadConfig() {
   }
   gameModeSwitch?.querySelectorAll("[data-game-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.gameMode === state.gameMode);
+    button.setAttribute("aria-pressed", String(button.dataset.gameMode === state.gameMode));
   });
   renderModeBalance();
   renderModeContext();
@@ -758,6 +745,7 @@ function onGameModeSelect(event) {
   }
   gameModeSwitch.querySelectorAll("[data-game-mode]").forEach((item) => {
     item.classList.toggle("active", item.dataset.gameMode === state.gameMode);
+    item.setAttribute("aria-pressed", String(item.dataset.gameMode === state.gameMode));
   });
   renderLimitOptions();
   renderModeBalance();
@@ -770,7 +758,6 @@ function onGameModeSelect(event) {
 function onGameFormatSelect(event) {
   const actionButton = event.target.closest("[data-mode-action]");
   if (!actionButton) return;
-  if (consumeFooterCancelledClick(actionButton)) return;
   const action = actionButton.dataset.modeAction;
   haptic("selection");
   if (action === "private") {
@@ -791,7 +778,6 @@ function onGameFormatSelect(event) {
 function onFooterLobbyAction(event) {
   const button = event.target.closest("[data-footer-action]");
   if (!button) return;
-  if (consumeFooterCancelledClick(button)) return;
   const action = button.dataset.footerAction;
   haptic("selection");
   if (action === "telegram") {
@@ -807,50 +793,6 @@ function onFooterLobbyAction(event) {
   }
 }
 
-function onFooterLobbyPress(event) {
-  const row = event.target.closest(".footer-lobby-row, .home-table-list .table-item, .side-menu button:not(.close-button), .drawer-tabs button");
-  if (!row) return;
-  row._pressStartX = event.clientX;
-  row._pressStartY = event.clientY;
-  row.dataset.pressCancelled = "";
-  row.classList.add("is-pressing");
-  window.clearTimeout(row._pressTimer);
-}
-
-function onFooterLobbyPointerMove(event) {
-  const row = event.target.closest(".footer-lobby-row.is-pressing, .home-table-list .table-item.is-pressing, .side-menu button.is-pressing:not(.close-button), .drawer-tabs button.is-pressing");
-  if (!row) return;
-  const dx = Math.abs(event.clientX - Number(row._pressStartX || event.clientX));
-  const dy = Math.abs(event.clientY - Number(row._pressStartY || event.clientY));
-  if (dx > 8 || dy > 8) {
-    row.dataset.pressCancelled = "1";
-    row.classList.remove("is-pressing");
-  }
-}
-
-function onFooterLobbyPointerEnd(event) {
-  const row = event.target.closest(".footer-lobby-row, .home-table-list .table-item, .side-menu button:not(.close-button), .drawer-tabs button");
-  if (!row) return;
-  window.clearTimeout(row._pressTimer);
-  row._pressTimer = window.setTimeout(() => row.classList.remove("is-pressing"), 120);
-}
-
-function consumeFooterCancelledClick(button) {
-  const row = button.closest(".footer-lobby-row, .home-table-list .table-item, .side-menu button:not(.close-button), .drawer-tabs button");
-  if (row?.dataset.pressCancelled === "1") {
-    row.dataset.pressCancelled = "";
-    row.classList.remove("is-pressing");
-    return true;
-  }
-  return false;
-}
-
-function cancelDraggedMenuClick(event) {
-  const button = event.target.closest(".side-menu button:not(.close-button), .drawer-tabs button");
-  if (!button || !consumeFooterCancelledClick(button)) return;
-  event.preventDefault();
-  event.stopImmediatePropagation();
-}
 
 function currentLimits() {
   if (state.gameMode === "play") {
@@ -1060,96 +1002,6 @@ function applyTelegramTheme() {
   }
 }
 
-function setupTapGuards() {
-  let lastTapAt = 0;
-  const editableSelector = "input, textarea, select, [contenteditable='true']";
-
-  document.addEventListener("dblclick", (event) => {
-    if (!event.target.closest(editableSelector)) event.preventDefault();
-  }, { passive: false });
-
-  document.addEventListener("touchend", (event) => {
-    if (event.target.closest(editableSelector)) return;
-
-    const now = Date.now();
-    if (now - lastTapAt < 320) {
-      event.preventDefault();
-    }
-    lastTapAt = now;
-  }, { passive: false });
-}
-
-function setupScrollDynamics() {
-  let lastY = getScrollY();
-  let ticking = false;
-  let settleTimer = 0;
-
-  const update = () => {
-    const y = getScrollY();
-    const delta = y - lastY;
-    if (Math.abs(delta) > 1) {
-      document.body.classList.add("is-scrolling");
-      document.body.classList.toggle("scrolling-down", delta > 0);
-      document.body.classList.toggle("scrolling-up", delta < 0);
-      document.body.classList.toggle("scroll-at-top", y <= 2);
-      window.clearTimeout(settleTimer);
-      settleTimer = window.setTimeout(() => {
-        document.body.classList.remove("is-scrolling", "scrolling-down", "scrolling-up");
-        document.body.classList.toggle("scroll-at-top", getScrollY() <= 2);
-      }, 150);
-    }
-    lastY = y;
-    ticking = false;
-  };
-
-  window.addEventListener("scroll", () => {
-    if (ticking) return;
-    ticking = true;
-    window.requestAnimationFrame(update);
-  }, { passive: true });
-}
-
-function setupLobbyOverscroll() {
-  let startY = 0;
-  let overscroll = 0;
-
-  const maxScrollY = () => Math.max(0, (document.scrollingElement?.scrollHeight || 0) - window.innerHeight);
-  const reset = () => {
-    if (!overscroll) return;
-    overscroll = 0;
-    document.body.classList.add("scroll-bounce-release");
-    document.body.classList.remove("scroll-bounce-active");
-    lobby?.style.setProperty("--scroll-bounce-y", "0px");
-    window.setTimeout(() => document.body.classList.remove("scroll-bounce-release"), 220);
-  };
-
-  window.addEventListener("touchstart", (event) => {
-    if (document.body.classList.contains("in-game") || event.touches.length !== 1) return;
-    startY = event.touches[0].clientY;
-    overscroll = 0;
-  }, { passive: true });
-
-  window.addEventListener("touchmove", (event) => {
-    if (document.body.classList.contains("in-game") || !lobby || event.touches.length !== 1) return;
-    if (cashierState.sheet || !buyInOverlay.hidden || !sideMenu.hidden || !infoDrawer.hidden) return;
-    const pull = event.touches[0].clientY - startY;
-    const y = getScrollY();
-    const atTop = y <= 0 && pull > 0;
-    const atBottom = y >= maxScrollY() - 2 && pull < 0;
-    if (!atTop && !atBottom) {
-      reset();
-      return;
-    }
-    overscroll = Math.max(-44, Math.min(44, pull * 0.24));
-    document.body.classList.add("scroll-bounce-active");
-    document.body.classList.remove("scroll-bounce-release");
-    lobby.style.setProperty("--scroll-bounce-y", `${overscroll.toFixed(1)}px`);
-  }, { passive: true });
-
-  window.addEventListener("touchend", reset, { passive: true });
-  window.addEventListener("touchcancel", reset, { passive: true });
-}
-
 function setupScrollReveal() {
   if (revealObserver) revealObserver.disconnect();
   const items = revealItems();
@@ -1277,15 +1129,8 @@ function revealItems() {
     .filter((item) => !item.closest(".bottom-nav") && !item.closest(".profile-nav-fab"));
 }
 
-function getScrollY() {
-  return window.scrollY
-    || document.scrollingElement?.scrollTop
-    || document.documentElement.scrollTop
-    || document.body.scrollTop
-    || 0;
-}
-
 async function handleTelegramBack() {
+  if (!document.querySelector("#docSheet").hidden) { closeDocSheet(); return; }
   if (pendingBetAction) {
     closeAmountPanel();
     return;
@@ -1333,7 +1178,8 @@ async function handleTelegramBack() {
 
 function updateTelegramBackButton() {
   if (!telegramVersionAtLeast("6.1")) return;
-  const shouldShow = Boolean(pendingBetAction)
+  const shouldShow = !document.querySelector("#docSheet").hidden
+    || Boolean(pendingBetAction)
     || Boolean(state.selectedTournamentId)
     || !buyInOverlay.hidden
     || Boolean(cashierState.sheet)
@@ -1461,6 +1307,7 @@ function renderCashierControls(deposit) {
     const button = document.createElement("button");
     button.type = "button";
     button.dataset.method = method.id;
+    button.setAttribute("aria-pressed", String(method.id === cashierState.selectedMethod));
     button.disabled = !method.enabled;
     button.className = `footer-lobby-row ${cashierMethodRowClass(method.id)}${method.id === cashierState.selectedMethod ? " active" : ""}`;
     button.innerHTML = `
@@ -1516,6 +1363,7 @@ function renderWithdrawalControls(cashier, cashMode) {
     const button = document.createElement("button");
     button.type = "button";
     button.dataset.withdrawMethod = method.id;
+    button.setAttribute("aria-pressed", String(method.id === cashierState.selectedWithdrawalMethod));
     button.disabled = !method.enabled;
     button.className = `footer-lobby-row ${cashierMethodRowClass(method.id)}${method.id === cashierState.selectedWithdrawalMethod ? " active" : ""}`;
     button.innerHTML = `
@@ -1544,6 +1392,7 @@ function onCashierMethodClick(event) {
   cashierState.selectedMethod = button.dataset.method;
   cashierMethods.querySelectorAll("button").forEach((item) => {
     item.classList.toggle("active", item.dataset.method === cashierState.selectedMethod);
+    item.setAttribute("aria-pressed", String(item.dataset.method === cashierState.selectedMethod));
   });
   syncCashierQuote();
 }
@@ -1554,6 +1403,7 @@ function onCashierWithdrawMethodClick(event) {
   cashierState.selectedWithdrawalMethod = button.dataset.withdrawMethod;
   cashierWithdrawMethods.querySelectorAll("button").forEach((item) => {
     item.classList.toggle("active", item.dataset.withdrawMethod === cashierState.selectedWithdrawalMethod);
+    item.setAttribute("aria-pressed", String(item.dataset.withdrawMethod === cashierState.selectedWithdrawalMethod));
   });
   if (cashierWithdrawDestination) cashierWithdrawDestination.placeholder = withdrawalPlaceholder(cashierState.selectedWithdrawalMethod);
   updateWithdrawalManualNotice();
@@ -2317,7 +2167,7 @@ function showDailyClaimSuccess(amount) {
 function animatePlayBalance(fromValue, toValue) {
   const from = Math.max(0, Number(fromValue) || 0);
   const to = Math.max(0, Number(toValue) || 0);
-  if (state.gameMode !== "play" || from === to) {
+  if (state.gameMode !== "play" || from === to || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     renderModeBalance();
     renderHomeWalletSide(state.homeStats || {});
     return;
@@ -4029,15 +3879,13 @@ function selectLobbyTab(tab, options = {}) {
   const tabChanged = currentLobbyTab !== tab;
   currentLobbyTab = tab;
   updateBottomNavIndicator(tab);
-  if (!options.silentHaptic) haptic("light");
   document.querySelectorAll("[data-lobby-tab]").forEach((button) => {
     button.classList.toggle("active", button.dataset.lobbyTab === tab);
-    if (tabChanged && button.dataset.lobbyTab === tab) {
-      button.classList.remove("nav-pressed");
-      void button.offsetWidth;
-      button.classList.add("nav-pressed");
-      window.setTimeout(() => button.classList.remove("nav-pressed"), 360);
+    if (button.closest(".bottom-nav")) {
+      if (button.dataset.lobbyTab === tab) button.setAttribute("aria-current", "page");
+      else button.removeAttribute("aria-current");
     }
+
   });
   document.querySelectorAll("[data-lobby-view]").forEach((view) => {
     view.classList.toggle("active", view.dataset.lobbyView === tab);
@@ -4051,83 +3899,6 @@ function selectLobbyTab(tab, options = {}) {
   }
   if (tabChanged) refreshScrollReveal();
   updateTelegramBackButton();
-}
-
-function bottomNavKeyForButton(button) {
-  if (!button) return currentLobbyTab;
-  if (button.hasAttribute("data-lobby-menu-trigger")) return "__menu";
-  return button.dataset.lobbyTab || currentLobbyTab;
-}
-
-function bottomNavButtonFromPoint(x, y) {
-  const element = document.elementFromPoint(x, y);
-  const button = element?.closest?.(".bottom-nav button");
-  return button && !button.hidden ? button : null;
-}
-
-function activateBottomNavButton(button) {
-  if (!button || button.hidden) {
-    updateBottomNavIndicator();
-    return;
-  }
-  if (button.hasAttribute("data-lobby-menu-trigger")) {
-    openLobbyMenu({ silentHaptic: true });
-    return;
-  }
-  if (button.dataset.lobbyTab === "cashier" && button.dataset.cashierSection) {
-    runAction(() => openCashierSection(button.dataset.cashierSection));
-    return;
-  }
-  selectLobbyTab(button.dataset.lobbyTab, { silentHaptic: true });
-}
-
-function wireBottomNavGestures() {
-  const nav = document.querySelector(".bottom-nav");
-  if (!nav) return;
-  nav.addEventListener("click", (event) => {
-    if (!bottomNavSuppressClick) return;
-    event.preventDefault();
-    event.stopPropagation();
-    bottomNavSuppressClick = false;
-  }, true);
-  nav.addEventListener("pointerdown", (event) => {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    const button = event.target.closest(".bottom-nav button");
-    if (!button || button.hidden) return;
-    bottomNavPointer = { id: event.pointerId, button };
-    bottomNavSuppressClick = false;
-    updateBottomNavIndicator(bottomNavKeyForButton(button));
-  });
-  nav.addEventListener("pointermove", (event) => {
-    if (!bottomNavPointer || bottomNavPointer.id !== event.pointerId) return;
-    const button = bottomNavButtonFromPoint(event.clientX, event.clientY);
-    if (!button) return;
-    bottomNavPointer.button = button;
-    updateBottomNavIndicator(bottomNavKeyForButton(button));
-  });
-  nav.addEventListener("pointercancel", (event) => {
-    if (!bottomNavPointer || bottomNavPointer.id !== event.pointerId) return;
-    bottomNavPointer = null;
-    bottomNavSuppressClick = false;
-    updateBottomNavIndicator();
-  });
-  nav.addEventListener("pointerup", (event) => {
-    if (!bottomNavPointer || bottomNavPointer.id !== event.pointerId) return;
-    const pressedButton = bottomNavPointer.button;
-    const button = bottomNavButtonFromPoint(event.clientX, event.clientY) || pressedButton;
-    bottomNavPointer = null;
-    if (button) {
-      bottomNavSuppressClick = true;
-      activateBottomNavButton(button);
-      // The native click normally follows pointerup and is consumed above.
-      // iOS Telegram may omit it, so always release the guard shortly after.
-      window.setTimeout(() => { bottomNavSuppressClick = false; }, 320);
-    }
-    else {
-      bottomNavSuppressClick = false;
-      updateBottomNavIndicator();
-    }
-  });
 }
 
 function updateBottomNavIndicator(tab = currentLobbyTab) {
@@ -4193,37 +3964,28 @@ function openCashierSheet(section = "deposit") {
   sheet.tabIndex = -1;
   sheet.classList.add("sheet-open");
   sheet.removeAttribute("hidden");
-  window.requestAnimationFrame(() => {
-    sheet.classList.add("sheet-visible");
-    sheet.focus({ preventScroll: true });
-  });
+  revealSheet(sheet);
   updateTelegramBackButton();
 }
 
 function closeCashierSheet(options = {}) {
   const sheet = cashierState.sheet ? document.querySelector(`[data-cashier-sheet="${cashierState.sheet}"]`) : null;
-  cashierState.sheet = "";
-  document.body.classList.remove("cashier-sheet-open");
-  unlockLobbyScroll("cashier");
-  cashierSheetBackdrop?.setAttribute("hidden", "");
-  document.querySelectorAll("[data-cashier-sheet].sheet-open").forEach((item) => {
-    item.classList.remove("sheet-visible", "sheet-open");
-    item.style.removeProperty("--sheet-drag-y");
-    item.removeAttribute("role");
-    item.removeAttribute("aria-modal");
-    item.removeAttribute("tabindex");
-    const home = cashierSheetHomes.get(item);
-    if (home?.parent) {
-      home.parent.insertBefore(item, home.nextSibling);
-    }
-  });
-  if (!options.silent) {
-    haptic("light");
+  if (!sheet) return;
+  const finish = () => {
+    cashierState.sheet = "";
+    document.body.classList.remove("cashier-sheet-open");
+    cashierSheetBackdrop?.setAttribute("hidden", "");
+    sheet.classList.remove("sheet-visible", "sheet-open");
+    sheet.style.removeProperty("--sheet-drag-y");
+    sheet.removeAttribute("role");
+    sheet.removeAttribute("aria-modal");
+    sheet.removeAttribute("tabindex");
+    const home = cashierSheetHomes.get(sheet);
+    if (home?.parent) home.parent.insertBefore(sheet, home.nextSibling);
+    unlockLobbyScroll("cashier");
     updateTelegramBackButton();
-  }
-  if (sheet?.contains(document.activeElement)) {
-    document.activeElement.blur();
-  }
+  };
+  dismissSheet(sheet, finish, options.silent);
 }
 
 function wireCashierSheetDrag(sheet, closeSheet = closeCashierSheet) {
@@ -4262,7 +4024,7 @@ function wireCashierSheetDrag(sheet, closeSheet = closeCashierSheet) {
       tracking = true;
       pending = false;
       dragStartY = startY;
-      sheet.style.transition = "none";
+      sheet.classList.add("is-dragging");
       if (sheet.contains(document.activeElement)) {
         document.activeElement.blur();
       }
@@ -4274,12 +4036,12 @@ function wireCashierSheetDrag(sheet, closeSheet = closeCashierSheet) {
 
   const finish = (event) => {
     if (!pending && !tracking) return;
-    const shouldClose = tracking && dragY > 58;
+    const shouldClose = tracking && dragY > 58 && !["pointercancel", "touchcancel"].includes(event?.type);
     pending = false;
     tracking = false;
-    if (pointerId !== null) sheet.releasePointerCapture?.(pointerId);
+    if (pointerId !== null && sheet.hasPointerCapture?.(pointerId)) sheet.releasePointerCapture(pointerId);
     pointerId = null;
-    sheet.style.transition = "";
+    sheet.classList.remove("is-dragging");
     if (shouldClose) {
       closeSheet();
       return;
@@ -4300,21 +4062,23 @@ function wireCashierSheetDrag(sheet, closeSheet = closeCashierSheet) {
   sheet.addEventListener("pointerup", finish);
   sheet.addEventListener("pointercancel", finish);
 
-  sheet.addEventListener("touchstart", (event) => {
-    if (event.target.closest("input, textarea, select, button, a") || document.body.classList.contains("keyboard-open")) return;
-    const touch = event.touches?.[0];
-    if (!touch) return;
-    begin(touch.clientY);
-  }, { passive: true });
+  if (!("PointerEvent" in window)) {
+    sheet.addEventListener("touchstart", (event) => {
+      if (event.target.closest("input, textarea, select, button, a") || document.body.classList.contains("keyboard-open")) return;
+      const touch = event.touches?.[0];
+      if (!touch) return;
+      begin(touch.clientY);
+    }, { passive: true });
 
-  sheet.addEventListener("touchmove", (event) => {
-    const touch = event.touches?.[0];
-    if (!touch) return;
-    move(touch.clientY, event);
-  }, { passive: false });
+    sheet.addEventListener("touchmove", (event) => {
+      const touch = event.touches?.[0];
+      if (!touch) return;
+      move(touch.clientY, event);
+    }, { passive: false });
 
-  sheet.addEventListener("touchend", finish);
-  sheet.addEventListener("touchcancel", finish);
+    sheet.addEventListener("touchend", finish);
+    sheet.addEventListener("touchcancel", finish);
+  }
 }
 
 function wireBuyInSheetDrag() {
@@ -4354,7 +4118,7 @@ function wireBuyInSheetDrag() {
       tracking = true;
       pending = false;
       dragStartY = startY;
-      buyInSheet.style.transition = "none";
+      buyInSheet.classList.add("is-dragging");
       if (pointerId !== null) buyInSheet.setPointerCapture?.(pointerId);
       if (buyInSheet.contains(document.activeElement)) {
         document.activeElement.blur();
@@ -4365,14 +4129,14 @@ function wireBuyInSheetDrag() {
     buyInSheet.style.setProperty("--buyin-drag-y", `${Math.round(dragY)}px`);
   };
 
-  const finish = () => {
+  const finish = (event) => {
     if (!pending && !tracking) return;
-    const shouldClose = tracking && dragY > 58;
+    const shouldClose = tracking && dragY > 58 && !["pointercancel", "touchcancel"].includes(event?.type);
     pending = false;
     tracking = false;
-    if (pointerId !== null) buyInSheet.releasePointerCapture?.(pointerId);
+    if (pointerId !== null && buyInSheet.hasPointerCapture?.(pointerId)) buyInSheet.releasePointerCapture(pointerId);
     pointerId = null;
-    buyInSheet.style.transition = "";
+    buyInSheet.classList.remove("is-dragging");
     if (shouldClose) {
       hideBuyInOverlay();
       return;
@@ -4387,17 +4151,19 @@ function wireBuyInSheetDrag() {
   buyInSheet.addEventListener("pointermove", (event) => move(event.clientY, event));
   buyInSheet.addEventListener("pointerup", finish);
   buyInSheet.addEventListener("pointercancel", finish);
-  buyInSheet.addEventListener("touchstart", (event) => {
-    if (event.target.closest("button, input, select, textarea, a, [role=slider]")) return;
-    const touch = event.touches?.[0];
-    if (touch) begin(touch.clientY);
-  }, { passive: true });
-  buyInSheet.addEventListener("touchmove", (event) => {
-    const touch = event.touches?.[0];
-    if (touch) move(touch.clientY, event);
-  }, { passive: false });
-  buyInSheet.addEventListener("touchend", finish);
-  buyInSheet.addEventListener("touchcancel", finish);
+  if (!("PointerEvent" in window)) {
+    buyInSheet.addEventListener("touchstart", (event) => {
+      if (event.target.closest("button, input, select, textarea, a, [role=slider]")) return;
+      const touch = event.touches?.[0];
+      if (touch) begin(touch.clientY);
+    }, { passive: true });
+    buyInSheet.addEventListener("touchmove", (event) => {
+      const touch = event.touches?.[0];
+      if (touch) move(touch.clientY, event);
+    }, { passive: false });
+    buyInSheet.addEventListener("touchend", finish);
+    buyInSheet.addEventListener("touchcancel", finish);
+  }
 }
 
 async function loadTables() {
@@ -4946,7 +4712,6 @@ function renderTableList(container, tables, emptyText, options = {}) {
     button.textContent = isViewerSeated ? "За стол" : isFull ? "Заполнен" : "Войти";
     button.disabled = isFull && !isViewerSeated;
     button.addEventListener("click", () => {
-      if (options.home && consumeFooterCancelledClick(button)) return;
       joinTable(table.id);
     });
     if (options.home && article) {
@@ -4955,7 +4720,7 @@ function renderTableList(container, tables, emptyText, options = {}) {
       article.dataset.joinable = button.disabled ? "0" : "1";
       article.addEventListener("click", (event) => {
         if (event.target.closest('[data-action="join"]')) return;
-        if (button.disabled || consumeFooterCancelledClick(article)) return;
+        if (button.disabled) return;
         joinTable(table.id);
       });
       article.addEventListener("keydown", (event) => {
@@ -5100,6 +4865,7 @@ function openBuyInOverlay(intent) {
   renderMoneyValue(buyInMinButton.querySelector("span"), minAmount, cashMode);
   renderMoneyValue(buyInMaxButton.querySelector("span"), maxAmount, cashMode);
   setBuyInAmount(defaultAmount);
+  lockLobbyScroll("buyin");
   buyInOverlay.hidden = false;
   document.documentElement.classList.add("buyin-sheet-open");
   document.body.classList.add("buyin-sheet-open");
@@ -5134,6 +4900,7 @@ function hideBuyInOverlay() {
   document.body.classList.remove("buyin-sheet-open");
   buyInOverlay.classList.remove("sheet-open");
   buyInOverlay.hidden = true;
+  unlockLobbyScroll("buyin");
   pendingBuyIn = null;
   haptic("light");
   updateTelegramBackButton();
@@ -5150,6 +4917,7 @@ async function confirmBuyIn() {
   document.body.classList.remove("buyin-sheet-open");
   buyInOverlay.classList.remove("sheet-open");
   buyInOverlay.hidden = true;
+  unlockLobbyScroll("buyin");
   pendingBuyIn = null;
   updateTelegramBackButton();
 
@@ -6252,6 +6020,8 @@ const DOC_SHEET_CONTENT = {
 };
 
 function openDocSheet(docId) {
+  closeLobbyMenu({ silent: true });
+  closeCashierSheet({ silent: true });
   const doc = DOC_SHEET_CONTENT[docId];
   const sheet = document.querySelector("#docSheet");
   if (!doc || !sheet) return;
@@ -6268,44 +6038,40 @@ function openDocSheet(docId) {
       return row;
     }));
   }
-  sheet.hidden = false;
-  window.requestAnimationFrame(() => {
-    sheet.classList.add("sheet-visible");
-    sheet.focus({ preventScroll: true });
-  });
-  haptic("light");
+  lockLobbyScroll("doc");
+  document.body.classList.add("doc-sheet-open");
+  document.querySelector("#docSheetBackdrop").hidden = false;
+  revealSheet(sheet);
+  updateTelegramBackButton();
 }
 
 function closeDocSheet() {
   const sheet = document.querySelector("#docSheet");
   if (!sheet) return;
-  sheet.classList.remove("sheet-visible");
-  window.setTimeout(() => {
+  dismissSheet(sheet, () => {
     sheet.hidden = true;
-  }, 180);
+    sheet.classList.remove("sheet-open");
+    document.querySelector("#docSheetBackdrop").hidden = true;
+    document.body.classList.remove("doc-sheet-open");
+    unlockLobbyScroll("doc");
+    updateTelegramBackButton();
+  });
 }
 
-function openLobbyMenu(options = {}) {
+function openLobbyMenu() {
   if (!lobbyMenuSheet || !lobbyMenuBackdrop) return;
-  if (!options.silentHaptic) haptic("light");
   closeCashierSheet({ silent: true });
-  lobbyMenuButton?.classList.add("active", "nav-pressed");
+  lobbyMenuButton?.classList.add("active");
   lobbyMenuButton?.setAttribute("aria-expanded", "true");
-  window.setTimeout(() => lobbyMenuButton?.classList.remove("nav-pressed"), 360);
   updateBottomNavIndicator("__menu");
-  window.setTimeout(() => {
-    lobbyMenuBackdrop.hidden = false;
-    lobbyMenuSheet.hidden = false;
-    lobbyMenuSheet.classList.add("sheet-open");
-    lobbyMenuSheet.style.setProperty("--sheet-drag-y", "0px");
-    lockLobbyScroll("menu");
-    document.body.classList.add("lobby-menu-open");
-    window.requestAnimationFrame(() => {
-      lobbyMenuSheet.classList.add("sheet-visible");
-      lobbyMenuSheet.focus({ preventScroll: true });
-    });
-    updateTelegramBackButton();
-  }, 120);
+  lobbyMenuBackdrop.hidden = false;
+  lobbyMenuSheet.hidden = false;
+  lobbyMenuSheet.classList.add("sheet-open");
+  lobbyMenuSheet.style.setProperty("--sheet-drag-y", "0px");
+  lockLobbyScroll("menu");
+  document.body.classList.add("lobby-menu-open");
+  revealSheet(lobbyMenuSheet);
+  updateTelegramBackButton();
 }
 
 function toggleLobbyMenu(event) {
@@ -6320,9 +6086,9 @@ function toggleLobbyMenu(event) {
 function closeLobbyMenu(options = {}) {
   if (!lobbyMenuSheet || !lobbyMenuBackdrop || lobbyMenuSheet.hidden) return;
   lobbyMenuSheet.classList.remove("sheet-visible");
-  document.body.classList.remove("lobby-menu-open");
-  unlockLobbyScroll("menu");
   const finish = () => {
+    document.body.classList.remove("lobby-menu-open");
+    unlockLobbyScroll("menu");
     lobbyMenuSheet.hidden = true;
     lobbyMenuBackdrop.hidden = true;
     lobbyMenuSheet.classList.remove("sheet-open");
@@ -6332,8 +6098,7 @@ function closeLobbyMenu(options = {}) {
     updateBottomNavIndicator();
     if (!options.silent) updateTelegramBackButton();
   };
-  if (options.silent) finish();
-  else window.setTimeout(finish, 180);
+  dismissSheet(lobbyMenuSheet, finish, options.silent);
 }
 
 function onLobbyMenuAction(event) {
