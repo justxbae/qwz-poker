@@ -5557,7 +5557,7 @@ async function runAction(action) {
 }
 
 function showError(message) {
-  if (tg?.showAlert) {
+  if (telegramVersionAtLeast("6.2") && tg?.showAlert) {
     try {
       const result = tg.showAlert(message);
       if (result?.catch) result.catch(() => window.alert(message));
@@ -5572,7 +5572,7 @@ function showError(message) {
 
 function showConfirm(message) {
   return new Promise((resolve) => {
-    if (tg?.showConfirm) {
+    if (telegramVersionAtLeast("6.2") && tg?.showConfirm) {
       try {
         tg.showConfirm(message, (confirmed) => resolve(Boolean(confirmed)));
         return;
@@ -5587,7 +5587,7 @@ function showConfirm(message) {
 
 function showStatus(message) {
   haptic("success");
-  if (tg?.showPopup) {
+  if (telegramVersionAtLeast("6.2") && tg?.showPopup) {
     try {
       tg.showPopup({
         title: "Weez Poker",
