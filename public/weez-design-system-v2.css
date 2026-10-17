@@ -576,6 +576,7 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-sheet {
   gap: 10px !important;
 }
 
+html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open > *,
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-sheet .tg-menu-group {
   flex: 0 0 auto !important;
 }
