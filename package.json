@@ -7,6 +7,9 @@
     "dev": "node server/index.js",
     "start": "NODE_ENV=production node server/index.js",
     "test": "node --test tests/*.test.js",
+    "test:cloudflare": "node scripts/test-cloudflare.js",
+    "test:poker": "node --test tests/poker*.test.js tests/holdem-kernel.test.js tests/table-context.test.js tests/state-store.test.js tests/tournament-engine.test.js",
+    "compare:poker": "node scripts/compare-holdem.js",
     "preflight:launch": "node scripts/launch-preflight.js",
     "release:clean": "node scripts/create-clean-release.js"
   },

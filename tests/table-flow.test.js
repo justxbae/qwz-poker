@@ -34,15 +34,32 @@ test("table auto-starts, accepts custom raise, and pays the pot at showdown", as
     assert.equal(table.status, "preflop");
     assert.equal(table.pot, 75);
     assert.equal(table.viewer.canAct, true);
+    const originalTurn = table.turnToken;
+    assert.ok(originalTurn);
+    const missingTurn = await requestResponse(`/api/tables/${table.id}/act`, {
+      method: "POST", token: auth.token, body: { action: "call" }
+    });
+    assert.equal(missingTurn.status, 409);
+    assert.equal((await request(`/api/tables/${table.id}`, { token: auth.token })).table.pot, 75);
 
     table = (await request(`/api/tables/${table.id}/act`, {
       method: "POST",
       token: auth.token,
-      body: { action: "raise", amount: 200 }
+      body: { action: "raise", amount: 200, turnToken: table.turnToken }
     })).table;
 
     assert.equal(table.currentBet, 250);
     assert.equal(table.pot, 300);
+    table = (await request(`/api/tables/${table.id}/auto-act`, { method: "POST", token: auth.token })).table;
+    table = (await request(`/api/tables/${table.id}/auto-act`, { method: "POST", token: auth.token })).table;
+    assert.equal(table.viewer.canAct, true);
+    assert.equal(table.status, "flop");
+    const staleTurn = await requestResponse(`/api/tables/${table.id}/act`, {
+      method: "POST", token: auth.token,
+      body: { action: "check", turnToken: originalTurn }
+    });
+    assert.equal(staleTurn.status, 409);
+    assert.equal((await request(`/api/tables/${table.id}`, { token: auth.token })).table.turnToken, table.turnToken);
 
     let steps = 0;
     while (table.status !== "showdown" && steps < 20) {
@@ -50,7 +67,7 @@ test("table auto-starts, accepts custom raise, and pays the pot at showdown", as
         table = (await request(`/api/tables/${table.id}/act`, {
           method: "POST",
           token: auth.token,
-          body: { action: table.viewer.canCall ? "call" : "check" }
+          body: { action: table.viewer.canCall ? "call" : "check", turnToken: table.turnToken }
         })).table;
       } else {
         table = (await request(`/api/tables/${table.id}/auto-act`, {
@@ -119,6 +136,28 @@ test("public lobby tables are seeded and stay available when empty", async () =>
   }
 });
 
+test("first-opponent timeout returns the buy-in once through the wallet ledger", async () => {
+  const server = await startServer({ TABLE_INITIAL_WAIT_TIMEOUT_MS: "300" });
+  try {
+    const auth = await request("/api/auth", { method: "POST", body: { initData: "" } });
+    await topUp(auth.token, 4);
+    const table = (await request("/api/tables", {
+      method: "POST", token: auth.token,
+      body: { name: "No opponent", maxPlayers: 2, smallBlind: 25, buyInAmount: 10000 }
+    })).table;
+    assert.ok(table.waitingDeadline > 0);
+    assert.equal(table.viewer.balance, 10000);
+    await sleep(1400);
+    assert.equal((await requestResponse(`/api/tables/${table.id}`, { token: auth.token })).status, 404);
+    const first = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(first.balance, 20000);
+    await sleep(1100);
+    const later = (await request("/api/cashier", { token: auth.token })).cashier;
+    assert.equal(later.balance, 20000);
+    assert.deepEqual(later.transactions, first.transactions);
+  } finally { server.kill(); }
+});
+
 test("health endpoint is public and admin dashboard exposes diagnostics", async () => {
   const server = await startServer({ ADMIN_USER_IDS: "dev-user" });
   try {
@@ -135,6 +174,30 @@ test("health endpoint is public and admin dashboard exposes diagnostics", async 
     assert.equal(dashboard.diagnostics.database.mode, "memory");
     assert.equal(typeof dashboard.diagnostics.sessions, "number");
     assert.equal(typeof dashboard.diagnostics.memory.heapUsedMb, "number");
+  } finally {
+    server.kill();
+  }
+});
+
+test("wallet metadata exposes a public 180px PNG instead of the old SVG placeholder", async () => {
+  const server = await startServer();
+  try {
+    const metadata = await fetch(`${BASE_URL}/tonconnect-manifest.json`, {
+      headers: { origin: "https://wallet.example" }
+    });
+    assert.equal(metadata.status, 200);
+    assert.equal(metadata.headers.get("access-control-allow-origin"), "*");
+    const manifest = await metadata.json();
+    const iconPath = new URL(manifest.iconUrl).pathname;
+    assert.equal(iconPath, "/brand.png");
+    const response = await fetch(`${BASE_URL}${iconPath}`);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("content-type"), "image/png");
+    assert.equal(response.headers.get("access-control-allow-origin"), "*");
+    const icon = Buffer.from(await response.arrayBuffer());
+    assert.deepEqual([...icon.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+    assert.equal(icon.readUInt32BE(16), 180);
+    assert.equal(icon.readUInt32BE(20), 180);
   } finally {
     server.kill();
   }
@@ -719,7 +782,7 @@ test("idempotency key prevents duplicated table actions and replays a completed 
       method: "POST",
       token: auth.token,
       idempotencyKey: "same-table-action",
-      body: { action: "raise", amount: 200 }
+      body: { action: "raise", amount: 200, turnToken: table.turnToken }
     };
     const firstAction = await request(`/api/tables/${table.id}/act`, actionRequest);
     const replayAction = await request(`/api/tables/${table.id}/act`, actionRequest);
@@ -1144,22 +1207,22 @@ test("Stars, Crypto Bot, and xRocket deposit rails create invoices and credit ca
     cashTable = (await request(`/api/tables/${cashTable.id}/act`, {
       method: "POST",
       token: auth.token,
-      body: { action: "call" }
+      body: { action: "call", turnToken: cashTable.turnToken }
     })).table;
     cashTable = (await request(`/api/tables/${cashTable.id}/act`, {
       method: "POST",
       token: opponentAuth.token,
-      body: { action: "check" }
+      body: { action: "check", turnToken: cashTable.turnToken }
     })).table;
     cashTable = (await request(`/api/tables/${cashTable.id}/act`, {
       method: "POST",
       token: opponentAuth.token,
-      body: { action: "bet", amount: 1_000_000 }
+      body: { action: "bet", amount: 1_000_000, turnToken: cashTable.turnToken }
     })).table;
     cashTable = (await request(`/api/tables/${cashTable.id}/act`, {
       method: "POST",
       token: auth.token,
-      body: { action: "fold" }
+      body: { action: "fold", turnToken: cashTable.turnToken }
     })).table;
     assert.equal(cashTable.status, "showdown");
 
@@ -1816,7 +1879,7 @@ test("admin can issue post-season reward tickets from leaderboard", async () => 
         table = (await request(`/api/tables/${table.id}/act`, {
           method: "POST",
           token: auth.token,
-          body: { action: table.viewer.canCall ? "call" : "check" }
+          body: { action: table.viewer.canCall ? "call" : "check", turnToken: table.turnToken }
         })).table;
       } else {
         table = (await request(`/api/tables/${table.id}/auto-act`, {
@@ -1863,6 +1926,13 @@ test("rebuy adds chips only between hands and spends wallet balance", async () =
       body: { name: "Rebuy", maxPlayers: 2, smallBlind: 25, buyInAmount: 10000 }
     })).table;
 
+    for (const amount of [1.5, -1, 0]) {
+      const rejected = await requestResponse(`/api/tables/${table.id}/rebuy`, {
+        method: "POST", token: auth.token, body: { amount }
+      });
+      assert.equal(rejected.status, 400);
+    }
+    assert.equal((await request(`/api/tables/${table.id}`, { token: auth.token })).table.seats[0].stack, 10000);
     const rebuy = await request(`/api/tables/${table.id}/rebuy`, {
       method: "POST",
       token: auth.token,
@@ -2036,14 +2106,7 @@ async function startServerAndWaitForExit(extraEnv = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ["server/index.js"], {
       cwd: process.cwd(),
-      env: {
-        ...process.env,
-        PORT: String(PORT),
-        BOT_TOKEN: "test-token",
-        NODE_ENV: "test",
-        AUTO_SEED_TOURNAMENTS: "true",
-        ...extraEnv
-      },
+      env: serverEnvironment(PORT, extraEnv),
       stdio: ["ignore", "pipe", "pipe"]
     });
 
@@ -2056,8 +2119,16 @@ async function startServerAndWaitForExit(extraEnv = {}) {
     child.stderr.on("data", (chunk) => {
       stderr += String(chunk);
     });
-    child.on("error", reject);
+    const timeout = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error("Server did not exit in time"));
+    }, 5000);
+    child.on("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
     child.on("exit", (code) => {
+      clearTimeout(timeout);
       resolve({ code, stdout, stderr });
     });
   });
@@ -2100,14 +2171,7 @@ async function startServer(extraEnv = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ["server/index.js"], {
       cwd: process.cwd(),
-      env: {
-        ...process.env,
-        PORT: String(PORT),
-        BOT_TOKEN: "test-token",
-        NODE_ENV: "test",
-        AUTO_SEED_TOURNAMENTS: "true",
-        ...extraEnv
-      },
+      env: serverEnvironment(PORT, extraEnv),
       stdio: ["ignore", "pipe", "pipe"]
     });
 
@@ -2137,4 +2201,24 @@ async function startServer(extraEnv = {}) {
     child.stdout?.unref?.();
     child.stderr?.unref?.();
   });
+}
+
+function serverEnvironment(port, extraEnv) {
+  return {
+    ...process.env,
+    PORT: String(port),
+    HOST: "127.0.0.1",
+    NODE_ENV: "test",
+    BOT_TOKEN: "test-token",
+    DATABASE_URL: "",
+    REDIS_URL: "",
+    REAL_MONEY_ENABLED: "false",
+    SENTRY_DSN: "",
+    ADMIN_CHAT_ID: "",
+    ADMIN_DAILY_REPORT_ENABLED: "false",
+    TELEGRAM_WEBHOOK_SECRET: "",
+    METRICS_TOKEN: "",
+    AUTO_SEED_TOURNAMENTS: "true",
+    ...extraEnv
+  };
 }

@@ -1,14 +1,21 @@
 .env
-node_modules
+.env.*
+!.env.example
+node_modules/
 .DS_Store
 *.log
 .idea
 references photo/
 *.docx
-.docx_render_qwz_economics/
-.docx_render_tz/
 .docx_render_*/
 release/
 tmp/
-output/playwright/
+output/
+.codex-tmp/
+.playwright-cli/
+.local/
+coverage/
+.wrangler/
+.dev.vars
+.dev.vars.*
 *.inspect.ndjson

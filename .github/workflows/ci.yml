@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, staging]
+    branches: [main, staging, codex/cloudflare-production]
   pull_request:
 
 jobs:
@@ -22,3 +22,14 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Install Cloudflare development tools
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Cloudflare development tools
+        run: npm ci --prefix infra/cloudflare
+
+      - name: Verify Workers runtime and durable restart
+        run: npm run test:cloudflare

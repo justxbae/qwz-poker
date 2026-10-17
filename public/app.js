@@ -1,3 +1,5 @@
+import { acceptsTableSnapshot, matchesActionContext, actionAmountBounds } from "./table-context.js?v=20261017-2";
+
 const tg = window.Telegram?.WebApp;
 let botUsername = "weezpokerbot";
 const params = new URLSearchParams(window.location.search);
@@ -386,7 +388,9 @@ let showdownPayoutKey = "";
 let rebuyPromptKey = "";
 let queuedPreAction = "";
 let queuedPreActionKey = "";
+let queuedPreActionHand = null;
 let pendingBetAction = "";
+let pendingBetContext = null;
 let pendingPokerAction = false;
 let pendingBuyIn = null;
 let pendingDailyPlayClaim = false;
@@ -4351,6 +4355,7 @@ function wireBuyInSheetDrag() {
       pending = false;
       dragStartY = startY;
       buyInSheet.style.transition = "none";
+      if (pointerId !== null) buyInSheet.setPointerCapture?.(pointerId);
       if (buyInSheet.contains(document.activeElement)) {
         document.activeElement.blur();
       }
@@ -4376,13 +4381,14 @@ function wireBuyInSheetDrag() {
   };
 
   buyInSheet.addEventListener("pointerdown", (event) => {
-    if (!begin(event.clientY, event.pointerId)) return;
-    buyInSheet.setPointerCapture?.(event.pointerId);
+    if (event.target.closest("button, input, select, textarea, a, [role=slider]")) return;
+    begin(event.clientY, event.pointerId);
   });
   buyInSheet.addEventListener("pointermove", (event) => move(event.clientY, event));
   buyInSheet.addEventListener("pointerup", finish);
   buyInSheet.addEventListener("pointercancel", finish);
   buyInSheet.addEventListener("touchstart", (event) => {
+    if (event.target.closest("button, input, select, textarea, a, [role=slider]")) return;
     const touch = event.touches?.[0];
     if (touch) begin(touch.clientY);
   }, { passive: true });
@@ -5220,9 +5226,21 @@ function setBuyInAmount(amount) {
 }
 
 async function loadCurrentTable() {
-  const data = await api(`/api/tables/${state.currentTableId}`);
+  const tableId = state.currentTableId;
+  if (!tableId) return;
+  let data;
+  try { data = await api(`/api/tables/${tableId}`); }
+  catch (error) {
+    if (error.status === 404 && state.currentTableId === tableId) {
+      await goToLobby();
+      showStatus("Стол закрыт. Проверьте баланс и историю операций");
+      return;
+    }
+    throw error;
+  }
+  if (state.currentTableId !== tableId) return;
   renderCurrentTable(data.table);
-  syncTableEventCursor(data.table);
+  syncTableEventCursor(state.currentTable);
   await ensurePlayerFairnessSeed(data.table);
   startTableEventStream(state.currentTableId);
 }
@@ -5292,25 +5310,27 @@ async function onPokerAction(event) {
 async function onConfirmBet() {
   if (!pendingBetAction) return;
   const action = pendingBetAction;
+  const context = pendingBetContext;
   closeAmountPanel();
-  await submitPokerAction(action);
+  await submitPokerAction(action, context);
 }
 
-async function submitPokerAction(action) {
-  if (pendingPokerAction || !state.currentTableId) return;
+async function submitPokerAction(action, context = state.currentTable) {
+  if (pendingPokerAction || !state.currentTableId || !context?.turnToken) return;
+  if (!matchesActionContext(context, state.currentTableId, state.currentTable)) return;
+  const tableId = context.id;
   pendingPokerAction = true;
   haptic(action === "fold" ? "warning" : "medium");
-  const body = { action };
+  const body = { action, turnToken: context.turnToken };
   if (action === "raise" || action === "bet") body.amount = Number(actionAmount.value || 0);
   try {
     await runAction(async () => {
-      const tableId = state.currentTableId;
       const data = await api(`/api/tables/${tableId}/act`, {
         method: "POST",
         idempotencyKey: requestKey(`table-act-${tableId}-${state.currentTable?.handNumber || 0}`),
         body
       });
-      renderCurrentTable(data.table);
+      if (state.currentTableId === tableId) renderCurrentTable(data.table);
     });
   } finally {
     pendingPokerAction = false;
@@ -5321,16 +5341,20 @@ async function onShowMuckChoice(event) {
   const button = event.target.closest("button[data-show-muck]");
   if (!button || !state.currentTableId || button.disabled) return;
   const choice = button.dataset.showMuck;
+  const context = state.currentTable;
+  const tableId = state.currentTableId;
+  const windowToken = context?.showMuck?.windowToken;
+  if (!windowToken) return;
   showMuckActions.querySelectorAll("button").forEach((item) => {
     item.disabled = true;
   });
   await runAction(async () => {
-    const data = await api(`/api/tables/${state.currentTableId}/show-muck`, {
+    const data = await api(`/api/tables/${tableId}/show-muck`, {
       method: "POST",
       idempotencyKey: requestKey(`table-show-muck-${state.currentTableId}-${state.currentTable?.handNumber || 0}`),
-      body: { choice }
+      body: { choice, windowToken }
     });
-    renderCurrentTable(data.table);
+    if (state.currentTableId === tableId) renderCurrentTable(data.table);
   });
 }
 
@@ -5379,7 +5403,8 @@ async function leaveCurrentTable() {
   const table = state.currentTable;
   const stack = Number(table?.viewer?.stack || 0);
   const amountText = table ? formatTableAmount(table, stack) : "";
-  const confirmed = await showConfirm(`Покинуть стол?${amountText ? `\nСтек ${amountText} вернётся на баланс.` : ""}`);
+  const activeHand = ["preflop", "flop", "turn", "river"].includes(table?.status);
+  const confirmed = await showConfirm(`Покинуть стол?${amountText ? `\nСтек ${amountText} вернётся на баланс.` : ""}${activeHand ? "\nРука будет сброшена. Уже внесённые ставки останутся в банке." : ""}`);
   if (!confirmed) return;
 
   const tableId = state.currentTableId;
@@ -5821,6 +5846,8 @@ function showStatus(message) {
 }
 
 function renderCurrentTable(table) {
+  if (!acceptsTableSnapshot(state.currentTable, table, state.currentTableId)) return;
+  if (pendingBetContext && !matchesActionContext(pendingBetContext, table.id, table)) closeAmountPanel();
   state.currentTable = table;
   currentTable.hidden = false;
   enterGameMode();
@@ -6466,15 +6493,16 @@ function renderBettingActions(table) {
   call.hidden = !viewer.canCall;
   bet.hidden = !viewer.canBet;
   raise.hidden = viewer.canBet;
-  call.replaceChildren("Колл ");
-  renderTableValue(call, table, viewer.toCall, { append: true });
+  call.replaceChildren(viewer.stack <= viewer.toCall ? "All-in " : "Колл ");
+  renderTableValue(call, table, Math.min(viewer.toCall, viewer.stack), { append: true });
   bet.textContent = "Ставка";
   raise.textContent = "Рейз";
   amountLabel.textContent = viewer.canBet ? "Ставка" : "Рейз";
   raise.disabled = !viewer.canRaise;
   fold.disabled = false;
-  const minAmount = viewer.canBet ? viewer.bigBlind || viewer.minRaise || 1 : viewer.minRaise || 1;
-  const maxAmount = Math.max(minAmount, viewer.stack || minAmount);
+  const bounds = actionAmountBounds(viewer);
+  const minAmount = bounds.min;
+  const maxAmount = bounds.max;
   const context = [
     table.id,
     table.handNumber,
@@ -7259,6 +7287,7 @@ function onPreAction(event) {
   const wasSelected = button.classList.contains("selected");
   preActions.querySelectorAll("button").forEach((item) => item.classList.remove("selected"));
   queuedPreAction = wasSelected ? "" : button.dataset.preAction;
+  queuedPreActionHand = wasSelected ? null : { id: state.currentTable?.id, handNumber: state.currentTable?.handNumber };
   queuedPreActionKey = "";
   if (!wasSelected) button.classList.add("selected");
 }
@@ -7273,6 +7302,10 @@ function onTableBackdropClick(event) {
 }
 
 function tryQueuedPreAction(table, viewer) {
+  if (queuedPreAction && (queuedPreActionHand?.id !== table.id || queuedPreActionHand?.handNumber !== table.handNumber)) {
+    queuedPreAction = "";
+    queuedPreActionHand = null;
+  }
   if (!queuedPreAction || !viewer.canAct || !state.currentTableId) return;
 
   const key = [
@@ -7290,7 +7323,8 @@ function tryQueuedPreAction(table, viewer) {
 
   queuedPreActionKey = key;
   queuedPreAction = "";
-  window.setTimeout(() => submitPokerAction(action), 80);
+  queuedPreActionHand = null;
+  window.setTimeout(() => submitPokerAction(action, table), 80);
 }
 
 function resolveQueuedAction(preAction, viewer) {
@@ -7325,6 +7359,7 @@ function setActionAmount(amount) {
 
 function openAmountPanel(action) {
   pendingBetAction = action;
+  pendingBetContext = state.currentTable;
   bettingActions.classList.add("amount-open");
   updateAmountPanel(action);
   updateTelegramBackButton();
@@ -7332,6 +7367,7 @@ function openAmountPanel(action) {
 
 function closeAmountPanel() {
   pendingBetAction = "";
+  pendingBetContext = null;
   bettingActions.classList.remove("amount-open");
   updateTelegramBackButton();
 }

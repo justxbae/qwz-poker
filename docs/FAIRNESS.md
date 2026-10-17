@@ -1,51 +1,42 @@
-# Provably Fair Раздача
+# Проверяемость раздач — фактический контракт
 
-QWZ Poker больше не использует `Math.random()` для перемешивания колоды. Каждая раздача создается через SHA-256 commit/reveal схему.
+Сверено с кодом 2026-10-16. Предыдущее описание сохранено в
+[архиве](../archive/contracts/FAIRNESS_previous.md): оно ошибочно называло
+двухфазный player commit/reveal полностью отсутствующим.
 
-## Как работает
+## Что реализовано
 
-1. Перед раздачей сервер генерирует секретный `serverSeed`.
-2. До перемешивания считается `serverSeedHash = sha256(serverSeed)`.
-3. Каждый игрок за столом имеет player seed:
-   - если игрок задал seed вручную, используется `source = player`;
-   - если seed еще не задан, используется безопасный fallback `source = server-fallback`, чтобы раздача не блокировалась.
-4. Для руки формируется `clientSeed = sha256(userId:playerSeed|...)` и `nonce = handNumber`.
-5. Колода перемешивается Fisher-Yates алгоритмом, но каждый индекс берется из SHA-256 потока:
-   `algorithm:serverSeed:clientSeed:nonce:tableId:cursor`.
-6. После завершения руки в историю пишется `fairnessProof`:
-   - `algorithm`;
-   - `serverSeedHash`;
-   - `serverSeed`;
-   - `clientSeed`;
-   - `playerSeeds`;
-   - `nonce`;
-   - `deckHash`;
-   - `tableId`, `handNumber`, `playerIds`.
+`server/poker-engine.js` формирует колоду из `serverSeed`, player seeds, table ID
+и hand nonce. `serverSeedHash` — SHA-256; перемешивание детерминировано по proof.
+`verifyProvablyFairDeck` проверяет хеши и восстановленную колоду.
 
-## Что это дает
+Доступны серверные действия:
 
-- Сервер не может тихо поменять seed после раздачи: хеш уже привязан к seed.
-- Раздачу можно пересобрать тем же алгоритмом и проверить, что `deckHash` совпадает.
-- В истории PostgreSQL есть отдельная колонка `hand_histories.fairness_proof`.
+- `POST /api/tables/:id/fairness-seed` — прямое задание seed между раздачами.
+- `POST /api/tables/:id/fairness-commit` — SHA-256 хеш player seed.
+- `POST /api/tables/:id/fairness-reveal` — seed, совпадающий с commit; только
+  в статусе `starting` после появления `pendingServerSeedHash`.
 
-## Backend API
+`prepareStartIntro` создаёт server seed/hash и событие `fairness_server_commit`.
+Player commit/reveal также добавляет события. Незавершённый player commit при
+старте заменяется серверным fallback; игра не блокируется.
+После завершения руки proof позволяет воспроизвести колоду. Скрытые карты
+фильтруются serializer для конкретного наблюдателя.
 
-Игрок может обновить seed между раздачами:
+## Границы гарантий
 
-```http
-POST /api/tables/:tableId/fairness-seed
-Content-Type: application/json
+Наличие endpoint и unit-теста не доказывает завершённый независимый fairness-протокол.
+`maybeStartHand` открывает intro для первой руки, а последующие может запускать
+напрямую через `startHand`. Прямой seed и серверный fallback по-прежнему разрешены.
+Следовательно, нельзя обещать обязательный player commit/reveal с опубликованным
+server commit перед каждой рукой.
 
-{ "seed": "any private player seed, 16-256 chars" }
-```
+До заявления о полноценной проверяемой честности необходимо:
 
-Во время активной раздачи публично доступен только `serverSeedHash` и хеши player seeds. Сами seed раскрываются только после завершения руки в `handHistory.fairnessProof`.
+1. Зафиксировать единый порядок commit/reveal для каждой руки и правила отказа.
+2. Проверить клиентский UX и отсутствие раскрытия секретов до нужного момента.
+3. Проверить сохранение и проверку proof после перезапуска на PostgreSQL/Redis.
+4. Отдельно определить требования к неизменяемому журналу событий и внешней проверке.
 
-## Ограничение текущей версии
-
-Сейчас player seed задается обычным backend endpoint и хранится в снапшоте стола. Для финального real-money уровня нужно сделать полноценный двухфазный commit/reveal:
-
-1. Игрок отправляет только `seedHash` до раздачи.
-2. После фиксации server hash игрок раскрывает seed.
-3. Если игрок не раскрыл seed вовремя, применяется заранее описанное правило fallback/auto-fold/skip-hand.
-4. Все события commit/reveal пишутся в отдельный audit ledger.
+Тесты: `tests/poker-engine.test.js`, включая `two-phase fairness validates player
+reveal after server commit`. Это проверка конкретного сценария, а не сертификация.

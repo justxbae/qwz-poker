@@ -8,6 +8,9 @@ the real-money service. Its Render blueprint is `render.staging.yaml`.
 - Use a separate Telegram bot, PostgreSQL database and Redis instance.
 - Never copy production `DATABASE_URL`, `REDIS_URL`, bot token, webhook secret or admin token.
 - Withdrawals and external TON/TRC20 payment polling stay disabled.
+- This does not disable Telegram Stars: `REAL_MONEY_ENABLED=true` and a configured
+  bot can expose Stars invoices. Use a separate Telegram payment-test setup or add
+  an explicit deposit gate before treating this environment as payment-free.
 - Test balances have no monetary value and must not be copied into production.
 - Only the `staging` branch auto-deploys this service. `main` remains the production branch.
 

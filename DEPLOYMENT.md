@@ -1,111 +1,68 @@
-# Deploy Weez Poker
+# Развёртывание Weez Poker
 
-## Recommended MVP hosting
+## Контракты окружения
 
-### Render
+- `.env.example` — шаблон локальных настроек; по умолчанию demo.
+- `render.yaml` — production blueprint; сейчас `REAL_MONEY_ENABLED=true`,
+  `WITHDRAWALS_ENABLED=true`, `TEST_PLAYERS_ENABLED=false`.
+- `render.staging.yaml` — отдельный blueprint для ветки `staging`;
+  см. [изоляцию и приёмку](docs/STAGING.md).
 
-Render is the simplest free option for this project. It provides HTTPS and can deploy a Node.js web service from GitHub using `render.yaml`.
+Коммит в `main` автоматически запускает production deploy. В рамках локальной
+разработки или уборки не отправлять изменения в `main` без поручения владельца.
 
-Tradeoff: free web services can sleep after inactivity, so the first request after idle can be slow.
+## Production на Render
 
-Steps:
+Создать Blueprint из репозитория и заполнить секреты с `sync: false` через настройки
+сервиса. `render.yaml` задаёт `npm ci`, `npm start` и health check `/api/health`.
+Фактическую доступность staging нужно проверять отдельно: в репозитории есть
+его конфигурация, а не подтверждение развёртывания.
 
-1. Push this project to GitHub.
-2. Open Render and create a new Blueprint from the repository.
-3. Render will read `render.yaml` and start the app with `npm start`.
-4. Add the secret environment variable:
-   - `BOT_TOKEN`
-   - `REAL_MONEY_ENABLED=false` for demo/play mode, or `true` for live-money mode
-   - `DATABASE_URL` and `REDIS_URL` when `REAL_MONEY_ENABLED=true`
-   - `TELEGRAM_WEBHOOK_SECRET` (if setWebhook uses `secret_token`)
-5. Deploy.
+Сервер проверяет обязательные настройки при запуске:
 
-After deploy, copy the public Render URL, for example:
+- `BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` (16–256 допустимых символов),
+  `METRICS_TOKEN` (не короче 32 символов);
+- для real-money: `DATABASE_URL`, `REDIS_URL`, HTTPS `APP_PUBLIC_URL`,
+  `DEVICE_HASH_SECRET` от 32 символов и owner/admin Telegram ID;
+- при включённых выводах: `ADMIN_FINANCE_IDS`.
 
-```text
-https://qwz-poker-t8mc.onrender.com
-```
+Платёжные ключи, адреса, администраторы и оповещения настраиваются по
+[PAYMENTS.md](PAYMENTS.md), [BETA_OPERATIONS](docs/BETA_OPERATIONS.md)
+и действующему blueprint. Не копировать секреты production в тестовую среду.
 
-Set Telegram webhook (with a secret_token, see ниже):
+В настройках Telegram Mini App указать публичный HTTPS URL сервиса.
+Webhook бота должен вести на `/api/telegram/webhook`; его `secret_token`
+должен совпадать с `TELEGRAM_WEBHOOK_SECRET`.
+
+## Контейнер или экспорт
+
+`Dockerfile` устанавливает зависимости через `npm ci --omit=dev` и копирует
+`server/`, `public/`, runtime-файлы `vendor/pokersolver` и лицензию.
+Локальные `.env`, архивы, исходные дизайнерские референсы и временные результаты
+исключены из контекста сборки. Передавать настройки контейнеру через окружение.
+
+Для экспорта без контейнера:
 
 ```bash
-SECRET=$(openssl rand -hex 32)
-curl "https://api.telegram.org/bot$BOT_TOKEN/setWebhook?url=https://qwz-poker-t8mc.onrender.com/api/telegram/webhook&secret_token=$SECRET"
-# затем добавить $SECRET в TELEGRAM_WEBHOOK_SECRET на Render
+npm run release:clean
+cd release
+npm ci --omit=dev
+npm start
 ```
 
-В `@BotFather` поставь Mini App / menu button URL на тот же публичный URL.
+Команда пересоздаёт `release/`. Экспорт не содержит `.env`; необходимые настройки
+нужно задать отдельно. `npm start` включает production-проверки даже в demo.
+В `render.yaml`, входящем в экспорт, включён режим реальных денег.
 
-### Koyeb
+## Приёмка
 
-Koyeb is also suitable and has a free web service tier in some regions. Use the included `Dockerfile`.
+1. Запустить `npm test` и отдельные инфраструктурные проверки на тестовых сервисах.
+2. Проверить production-настройки командой `npm run preflight:launch` в нужном
+   окружении. Эта проверка оценивает конфигурацию; подключения и платежи проверяются отдельно.
+3. Пройти checklist из [STAGING](docs/STAGING.md) и проверить `/api/health`.
+4. Проверить оповещения, reconciliation и сценарий возврата к прошлому релизу.
 
-Required environment variables:
-
-```text
-NODE_ENV=production
-HOST=0.0.0.0
-BOT_USERNAME=weezpokerbot
-BOT_TOKEN=<token from BotFather>
-REAL_MONEY_ENABLED=false
-TELEGRAM_WEBHOOK_SECRET=<random hex, см. setWebhook ниже>
-ADMIN_CHAT_ID=<your Telegram numeric user id for private admin logs>
-ADMIN_USER_IDS=<comma-separated Telegram user ids allowed to use admin commands>
-ADMIN_GRANT_MAX_CHIPS=500000
-APP_NAME=Weez Poker
-SENTRY_DSN=<optional, Sentry/GlitchTip DSN>
-SENTRY_TRACES_SAMPLE_RATE=0.1
-```
-
-For real-money mode, add:
-
-```text
-REAL_MONEY_ENABLED=true
-DATABASE_URL=<postgres connection string>
-REDIS_URL=<redis connection string>
-```
-
-## PostgreSQL
-
-Create a PostgreSQL database on Render and copy its internal connection string into `DATABASE_URL` for the web service. On startup, the app automatically creates the required tables.
-
-If `REAL_MONEY_ENABLED=true`, both `DATABASE_URL` and `REDIS_URL` are mandatory. Without them the server exits on startup because money storage, sessions, and active table state cannot fall back to memory in real-money mode.
-
-If `REAL_MONEY_ENABLED=false`, the app can run in demo/play mode without PostgreSQL or Redis. That is acceptable for local testing and temporary preview deployments only.
-
-After deploy, set webhook exactly like above, replacing the domain with the Koyeb app URL.
-
-## Telegram Stars
-
-Stars payments require:
-
-- `BOT_TOKEN` configured on the server.
-- Public HTTPS URL.
-- Telegram webhook pointing to `/api/telegram/webhook`.
-- Mini App opened inside Telegram.
-
-The app creates invoices with `currency: XTR`. Successful payments are processed from Telegram `successful_payment` webhook updates.
-
-## Admin wallet commands
-
-Add your Telegram numeric user id to `ADMIN_USER_IDS` on Render. Then you can send commands to the bot:
-
-```text
-/balance <telegram_id>
-/grant <telegram_id> <chips> <reason>
-/deduct <telegram_id> <chips> <reason>
-```
-
-Example:
-
-```text
-/grant 123456789 50000 welcome_bonus
-```
-
-Each operation is written to the player's cashier history and sent to the admin log.
-
-You can also open the Mini App with `?admin=1` to show the hidden admin tab. The server still checks `ADMIN_USER_IDS`, so the tab is only usable by allowed Telegram accounts.
-
-## Important
-
-With `DATABASE_URL` and `REDIS_URL` in real-money mode, wallets, ledger, payments, saved stacks, tournaments, hand histories, sessions, and active table snapshots are persisted across restarts. Demo mode can still run without them, but balances and runtime state may reset after a restart and it must never be used for paid traffic.
+PostgreSQL создаёт схему при запуске. В demo без PostgreSQL/Redis данные теряются
+при перезапуске. Real-money отказывает в запуске без этих служб.
+Активные столы и таймеры принадлежат одному процессу; несколько game writers
+требуют отдельной архитектуры. Подробности — [DATABASE.md](DATABASE.md).

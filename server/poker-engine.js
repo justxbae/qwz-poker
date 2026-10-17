@@ -1,11 +1,13 @@
 import { createHash, randomBytes } from "node:crypto";
 import { calculateRake } from "./economy.js";
 import { resolveShowdown } from "./poker-evaluator.js";
+import { holdemLegalActions, holdemRoundComplete, processHoldemAction } from "./holdem-kernel.js";
 
 export const ACTION_TIMEOUT_MS = 20000;
 export const NEXT_HAND_DELAY_MS = 5000;
 export const SHOW_MUCK_TIMEOUT_MS = envMs("SHOW_MUCK_TIMEOUT_MS", 3000);
 export const START_INTRO_MS = 3500;
+export const INITIAL_WAIT_TIMEOUT_MS = envMs("TABLE_INITIAL_WAIT_TIMEOUT_MS", 120_000);
 export const RUNOUT_CARD_DELAY_MS = 900;
 export const REBUY_TIMEOUT_MS = 3 * 60 * 1000;
 export const SIT_OUT_TIMEOUT_MS = envMs("TABLE_SIT_OUT_TIMEOUT_MS", 5 * 60 * 1000);
@@ -19,7 +21,13 @@ function envMs(name, fallback) {
 }
 
 export function createTable(owner, body = {}, options = {}) {
-  const maxPlayers = clamp(Number(body.maxPlayers || 6), 2, 6);
+  if ((body.variant && body.variant !== "NLH") || (body.gameVariant && body.gameVariant !== "NLH")) {
+    throwHttp(400, "Сейчас доступен только Texas Hold’em");
+  }
+  for (const key of ["smallBlind", "bigBlind", "minBuyIn", "maxBuyIn"]) {
+    if (body[key] !== undefined) requireIntegerAmount(Number(body[key]), { positive: true });
+  }
+  const maxPlayers = clamp(Math.trunc(Number(body.maxPlayers) || 6), 2, 9);
   const gameMode = body.gameMode === "cash" ? "cash" : body.gameMode === "tournament" ? "tournament" : "play";
   const currency = gameMode === "cash" ? "USDT" : gameMode === "tournament" ? "TOURNAMENT_CHIPS" : "PLAY_CHIPS";
   const smallBlind = clamp(Number(body.smallBlind || 25), 1, 10_000_000_000);
@@ -81,9 +89,12 @@ export function joinTable(table, user) {
   if (table.seats.some((seat) => seat.userId === user.id)) return;
   if (table.seats.length >= table.maxPlayers) throwHttp(409, "Table is full");
 
-  const startingStack = Math.max(0, Math.round(Number(user.stack) || 10_000));
+  const startingStack = Number(user.stack ?? 10_000);
+  requireIntegerAmount(startingStack);
+  ensureSeatNumbers(table);
 
   table.seats.push({
+    seatNumber: ++table.seatSequence,
     userId: user.id,
     name: user.name,
     username: user.username,
@@ -108,6 +119,7 @@ export function joinTable(table, user) {
     fairnessCommit: null,
     cards: []
   });
+  if (!table.tableSessionId && table.seats.length === 1) table.waitingSince = Date.now();
 }
 
 export function setPlayerFairnessSeed(table, user, seed) {
@@ -177,6 +189,8 @@ export function leaveTable(table, user) {
   if (handInProgress) {
     if (activeSeats(table).length === 1) {
       finishByFold(table);
+    } else if (isBettingRoundComplete(table)) {
+      advanceStreet(table);
     } else if (table.activeSeatIndex === -1) {
       setActiveTurn(table, nextActiveIndex(table, seatIndex - 1));
     }
@@ -220,11 +234,14 @@ export function addBuyIn(table, user, amount) {
 
   const availableTopUp = Math.max(0, Number(table.maxBuyIn || 10_000_000_000) - seat.stack);
   if (availableTopUp <= 0) throwHttp(409, "Стек уже достиг максимума стола");
-  const chips = clamp(Number(amount || 0), 1, availableTopUp);
+  requireIntegerAmount(Number(amount), { positive: true });
+  const chips = Math.min(Number(amount), availableTopUp);
   const recordedBuyIn = Math.max(
     0,
     Math.round(Number(seat.totalBuyIn ?? seat.initialStack ?? seat.handStartStack ?? seat.stack) || 0)
   );
+  requireIntegerAmount(seat.stack + chips);
+  requireIntegerAmount(recordedBuyIn + chips);
   seat.stack += chips;
   seat.totalBuyIn = recordedBuyIn + chips;
   seat.sittingOut = false;
@@ -315,9 +332,7 @@ export function prepareStartIntro(table) {
   table.startIntroUntil = Date.now() + START_INTRO_MS;
   table.pendingServerSeed = randomBytes(32).toString("hex");
   table.pendingServerSeedHash = sha256Hex(table.pendingServerSeed);
-  table.dealerIndex = nextSeatedIndex(table, table.dealerIndex);
-  table.smallBlindIndex = playableSeats(table).length === 2 ? table.dealerIndex : nextSeatedIndex(table, table.dealerIndex);
-  table.bigBlindIndex = nextSeatedIndex(table, table.smallBlindIndex);
+  assignHandPositions(table, true);
   table.message = `Игра ${formatTableAmount(table, table.smallBlind)}/${formatTableAmount(table, table.bigBlind)}. ${table.seats[table.smallBlindIndex].name} SB, ${table.seats[table.bigBlindIndex].name} BB`;
   addLog(table, table.message);
   emitTableEvent(table, "fairness_server_commit", { serverSeedHash: table.pendingServerSeedHash });
@@ -325,6 +340,9 @@ export function prepareStartIntro(table) {
 
 export function startHand(table, user) {
   if (user && !canControlTestPlayers(table, user)) throwHttp(403, "Only table owner can start the hand");
+  if (["preflop", "flop", "turn", "river", "runout"].includes(table.status)) {
+    throwHttp(409, "Текущая раздача ещё не завершена");
+  }
   if (table.showMuckWindow?.status === "open") {
     if (Date.now() < Number(table.showMuckWindow.deadline || 0)) {
       throwHttp(409, "Дождитесь завершения show/muck");
@@ -345,6 +363,7 @@ export function startHand(table, user) {
       seat.totalBet = 0;
       seat.folded = !canReceiveHand(seat);
       seat.acted = false;
+      seat.lastActionBet = null;
       seat.sitOutNextHand = false;
     }
     return;
@@ -356,13 +375,11 @@ export function startHand(table, user) {
     table.handHistory = [];
   }
 
-  if (table.status !== "starting") {
-    table.dealerIndex = nextSeatedIndex(table, table.dealerIndex);
-    table.smallBlindIndex = playableSeats(table).length === 2 ? table.dealerIndex : nextSeatedIndex(table, table.dealerIndex);
-    table.bigBlindIndex = nextSeatedIndex(table, table.smallBlindIndex);
-  }
+  // Recompute blinds even after the intro: a player may have left or sat out.
+  assignHandPositions(table, table.status !== "starting");
 
   table.handNumber += 1;
+  table.lastBigBlindSeatNumber = table.seats[table.bigBlindIndex].seatNumber;
   table.actionLog = [];
   for (const seat of playableSeats(table)) {
     if (!seat.fairnessSeed || seat.fairnessSeed.source === "player-commit-pending") {
@@ -404,6 +421,7 @@ export function startHand(table, user) {
     seat.handStartStack = seat.stack;
     seat.folded = !canReceiveHand(seat);
     seat.acted = false;
+    seat.lastActionBet = null;
     seat.sitOutNextHand = false;
   }
 
@@ -435,10 +453,19 @@ export function startHand(table, user) {
 
   table.currentBet = table.bigBlind;
   table.lastAggressorIndex = table.bigBlindIndex;
-  setActiveTurn(table, playableSeats(table).length === 2 ? table.smallBlindIndex : nextSeatedIndex(table, table.bigBlindIndex));
+  // Count dealt-in seats, including players made all-in by a blind. Counting
+  // positive stacks here incorrectly turns a three-way hand into heads-up.
+  if (actionableSeats(table).length < 2) {
+    table.currentBet = Math.max(...activeSeats(table).map((seat) => seat.bet));
+    if (isBettingRoundComplete(table)) {
+      runOutToShowdown(table);
+      return;
+    }
+  }
+  setActiveTurn(table, activeSeats(table).length === 2 ? table.smallBlindIndex : nextActiveIndex(table, table.bigBlindIndex));
 }
 
-export function act(table, user, body = {}) {
+export function act(table, user, body = {}, { requireTurnToken = false } = {}) {
   if (table.status === "waiting" || table.status === "showdown" || table.status === "runout") {
     throwHttp(409, "Раздача не активна");
   }
@@ -446,11 +473,17 @@ export function act(table, user, body = {}) {
   const seatIndex = table.seats.findIndex((seat) => seat.userId === user.id);
   if (seatIndex === -1) throwHttp(403, "Вы не сидите за этим столом");
   if (seatIndex !== table.activeSeatIndex) throwHttp(409, "Сейчас ход другого игрока");
+  if ((requireTurnToken || body.turnToken !== undefined) && (
+    !body.turnToken || body.turnToken !== currentTurnToken(table)
+  )) throwHttp(409, "Этот ход уже завершён. Обновите состояние стола");
+  if (table.actionDeadline && Date.now() >= table.actionDeadline) {
+    throwHttp(409, "Время хода истекло");
+  }
 
   applyAction(table, seatIndex, body);
 }
 
-export function chooseShowMuck(table, user, choice) {
+export function chooseShowMuck(table, user, choice, { windowToken, requireWindowToken = false } = {}) {
   const normalizedChoice = String(choice || "").trim().toLowerCase();
   if (!['show', 'muck'].includes(normalizedChoice)) {
     throwHttp(400, "Выберите show или muck");
@@ -458,6 +491,9 @@ export function chooseShowMuck(table, user, choice) {
 
   const userId = String(user?.id || "");
   const windowState = table.showMuckWindow;
+  if ((requireWindowToken || windowToken !== undefined) && (
+    !windowToken || windowToken !== showMuckToken(table)
+  )) throwHttp(409, "Это окно show/muck уже завершено");
   if (table.status === "showdown" && windowState?.eligibleUserIds?.includes(userId)
     && windowState.choices?.[userId] === normalizedChoice) {
     return publicShowMuckWindow(table, userId);
@@ -531,7 +567,7 @@ export function tickTables(tables) {
   for (const table of tables.values()) {
     updateTablePresence(table);
     if (table.status === "waiting") {
-      maybeStartHand(table);
+      if (!expireInitialWait(table)) maybeStartHand(table);
       continue;
     }
 
@@ -564,6 +600,7 @@ export function publicTable(table, viewerId = "") {
   const activeSeat = table.activeSeatIndex >= 0 ? table.seats[table.activeSeatIndex] : null;
   const toCall = viewerSeat ? Math.max(0, table.currentBet - viewerSeat.bet) : 0;
   const canAct = table.activeSeatIndex >= 0 && table.seats[table.activeSeatIndex]?.userId === viewerId;
+  const legalActions = canAct ? holdemLegalActions(table, viewerId) : [];
 
   return {
     id: table.id,
@@ -573,6 +610,10 @@ export function publicTable(table, viewerId = "") {
     isSystem: table.isSystem,
     gameMode: table.gameMode || "play",
     currency: table.currency || "PLAY_CHIPS",
+    variant: "NLH",
+    rulesEngine: "poker-kernel",
+    stateRevision: Number(table.stateRevision || 0),
+    eventSequence: Number(table.eventSequence || 0),
     maxPlayers: table.maxPlayers,
     smallBlind: table.smallBlind,
     bigBlind: table.bigBlind,
@@ -581,6 +622,8 @@ export function publicTable(table, viewerId = "") {
     status: table.status,
     handNumber: table.handNumber,
     startIntroUntil: table.startIntroUntil,
+    waitingDeadline: table.status === "waiting" && !table.tableSessionId && table.waitingSince
+      ? table.waitingSince + INITIAL_WAIT_TIMEOUT_MS : 0,
     runoutCardsLeft: table.runoutQueue.length,
     communityCards: table.communityCards,
     pot: table.pot,
@@ -591,6 +634,7 @@ export function publicTable(table, viewerId = "") {
     currentBet: table.currentBet,
     minRaise: table.minRaise,
     actionDeadline: table.actionDeadline,
+    turnToken: currentTurnToken(table),
     now: Date.now(),
     message: table.message,
     actionLog: table.actionLog,
@@ -616,8 +660,10 @@ export function publicTable(table, viewerId = "") {
       testBotToCall: activeSeat ? Math.max(0, table.currentBet - activeSeat.bet) : 0,
       canCheck: canAct && toCall === 0,
       canCall: canAct && toCall > 0,
-      canBet: canAct && toCall === 0 && table.currentBet === 0 && Boolean(viewerSeat?.stack),
-      canRaise: canAct && Boolean(viewerSeat?.stack) && viewerSeat.stack > toCall
+      canBet: legalActions.some((action) => action.type === "bet" || (action.type === "all-in" && table.currentBet === 0)),
+      // The existing client uses canRaise for its shared bet/raise button.
+      canRaise: legalActions.some((action) => ["bet", "raise", "all-in"].includes(action.type)),
+      legalActions
     },
     seats: table.seats.map((seat) => ({
       userId: seat.userId,
@@ -707,119 +753,48 @@ export function createTestUser(index) {
   };
 }
 
-function applyAction(table, seatIndex, body = {}) {
+function applyAction(table, seatIndex, body = {}, options = {}) {
   const seat = table.seats[seatIndex];
-  const action = String(body.action || "");
-  const toCall = Math.max(0, table.currentBet - seat.bet);
-
+  const result = processHoldemAction(table, seatIndex, body);
+  const { action, paid, fullRaise } = result;
+  const prefix = options.prefix ? `${options.prefix}-` : "";
   if (action === "fold") {
-    seat.folded = true;
-    seat.acted = true;
-    table.message = `${seat.name} сбросил карты`;
-    addLog(table, `${seat.name}: fold`);
-    emitTableEvent(table, "fold", { userId: seat.userId });
+    table.message = `${seat.name} ${prefix}fold`;
+    addLog(table, `${seat.name}: ${prefix}fold`);
+  } else if (action === "check") {
+    table.message = `${seat.name} ${prefix}чек`;
+    addLog(table, `${seat.name}: ${prefix}check`);
+  } else if (action === "call") {
+    table.message = `${seat.name} ${prefix}колл ${formatTableAmount(table, paid)}`;
+    addLog(table, `${seat.name}: ${prefix}call ${formatTableAmount(table, paid)}`);
+  } else {
+    const verb = seat.stack === 0 ? "all-in" : action === "raise" ? "raise до" : "bet";
+    table.message = `${seat.name} ${verb} ${formatTableAmount(table, seat.bet)}`;
+    addLog(table, `${seat.name}: ${verb} ${formatTableAmount(table, seat.bet)}`);
+  }
+  emitTableEvent(table, action, {
+    userId: seat.userId,
+    ...(action === "call" || action === "bet" || action === "raise" ? { amount: paid, allIn: seat.stack === 0 } : {}),
+    ...(action === "raise" ? { to: seat.bet, fullRaise } : {}),
+    ...(options.automatic ? { automatic: true } : {}),
+    ...(options.reason ? { reason: options.reason } : {})
+  });
+  if (action === "fold") {
+    applyPendingSitOut(table, seat);
     if (activeSeats(table).length === 1) {
-      applyPendingSitOut(table, seat);
       finishByFold(table);
       return;
     }
-    applyPendingSitOut(table, seat);
-    advanceAfterAction(table);
-    return;
   }
-
-  if (action === "check") {
-    if (toCall > 0) throwHttp(409, "Нельзя чекнуть, нужно коллировать или сбросить");
-    seat.acted = true;
-    table.message = `${seat.name} чек`;
-    addLog(table, `${seat.name}: check`);
-    emitTableEvent(table, "check", { userId: seat.userId });
-    advanceAfterAction(table);
-    return;
-  }
-
-  if (action === "call") {
-    if (toCall <= 0) throwHttp(409, "Сейчас нечего коллировать");
-    const called = moveChipsToPot(table, seat, toCall);
-    seat.acted = true;
-    table.message = `${seat.name} колл ${formatTableAmount(table, toCall)}`;
-    addLog(table, `${seat.name}: call ${formatTableAmount(table, called)}`);
-    emitTableEvent(table, "call", { userId: seat.userId, amount: called, allIn: seat.stack === 0 });
-    advanceAfterAction(table);
-    return;
-  }
-
-  if (action === "raise") {
-    if (table.currentBet === 0) throwHttp(409, "Сейчас нужно сделать ставку, а не рейз");
-    const requestedRaiseBy = Math.max(Number(body.amount || table.minRaise), table.minRaise);
-    const fullTargetBet = table.currentBet + requestedRaiseBy;
-    const allInTargetBet = seat.bet + seat.stack;
-    const targetBet = Math.min(fullTargetBet, allInTargetBet);
-    const needed = targetBet - seat.bet;
-    const raiseBy = targetBet - table.currentBet;
-    if (needed <= 0 || raiseBy <= 0) throwHttp(409, table.gameMode === "cash" ? "Недостаточно средств для рейза" : "Недостаточно фишек для рейза");
-
-    moveChipsToPot(table, seat, needed);
-    const isFullRaise = raiseBy >= table.minRaise;
-    if (isFullRaise) table.minRaise = raiseBy;
-    table.currentBet = seat.bet;
-    if (isFullRaise) {
-      table.lastAggressorIndex = seatIndex;
-      for (const otherSeat of activeSeats(table)) {
-        otherSeat.acted = otherSeat.userId === seat.userId;
-      }
-    } else {
-      seat.acted = true;
-    }
-    table.message = seat.stack === 0 ? `${seat.name} all-in ${formatTableAmount(table, seat.bet)}` : `${seat.name} рейз до ${formatTableAmount(table, seat.bet)}`;
-    addLog(table, seat.stack === 0 ? `${seat.name}: all-in ${formatTableAmount(table, seat.bet)}` : `${seat.name}: raise до ${formatTableAmount(table, seat.bet)}`);
-    emitTableEvent(table, "raise", { userId: seat.userId, amount: needed, to: seat.bet, allIn: seat.stack === 0, fullRaise: isFullRaise });
-    advanceAfterAction(table);
-    return;
-  }
-
-  if (action === "bet") {
-    if (table.currentBet > 0 || toCall > 0) throwHttp(409, "Сейчас доступен рейз или колл, не ставка");
-    const requestedAmount = Math.max(Number(body.amount || table.bigBlind), Math.min(table.bigBlind, seat.stack));
-    const amount = Math.min(requestedAmount, seat.stack);
-    moveChipsToPot(table, seat, amount);
-    if (amount >= table.bigBlind) table.minRaise = amount;
-    table.currentBet = seat.bet;
-    if (amount >= table.bigBlind) {
-      table.lastAggressorIndex = seatIndex;
-      for (const otherSeat of activeSeats(table)) {
-        otherSeat.acted = otherSeat.userId === seat.userId;
-      }
-    } else {
-      seat.acted = true;
-    }
-    table.message = seat.stack === 0 ? `${seat.name} all-in ${formatTableAmount(table, seat.bet)}` : `${seat.name} ставка ${formatTableAmount(table, seat.bet)}`;
-    addLog(table, seat.stack === 0 ? `${seat.name}: all-in ${formatTableAmount(table, seat.bet)}` : `${seat.name}: bet ${formatTableAmount(table, seat.bet)}`);
-    emitTableEvent(table, "bet", { userId: seat.userId, amount, allIn: seat.stack === 0 });
-    advanceAfterAction(table);
-    return;
-  }
-
-  throwHttp(400, "Неизвестное действие");
+  if (result.roundComplete) advanceStreet(table);
+  else setActiveTurn(table, result.nextSeatIndex);
 }
 
 function applyAutoCheckOrCall(table, seatIndex, prefix) {
   const seat = table.seats[seatIndex];
-  const toCall = Math.max(0, table.currentBet - seat.bet);
-  if (toCall > 0) {
-    const called = moveChipsToPot(table, seat, toCall);
-    seat.acted = true;
-    table.message = `${seat.name} ${prefix}-колл ${formatTableAmount(table, toCall)}`;
-    addLog(table, `${seat.name}: ${prefix}-call ${formatTableAmount(table, toCall)}`);
-    emitTableEvent(table, "call", { userId: seat.userId, amount: called, automatic: true, allIn: seat.stack === 0 });
-  } else {
-    seat.acted = true;
-    table.message = `${seat.name} ${prefix}-чек`;
-    addLog(table, `${seat.name}: ${prefix}-check`);
-    emitTableEvent(table, "check", { userId: seat.userId, automatic: true });
-  }
-
-  advanceAfterAction(table);
+  applyAction(table, seatIndex, {
+    action: table.currentBet > seat.bet ? "call" : "check"
+  }, { automatic: true, prefix });
 }
 
 function advanceAfterAction(table) {
@@ -835,6 +810,7 @@ function advanceStreet(table) {
   for (const seat of table.seats) {
     seat.bet = 0;
     seat.acted = false;
+    seat.lastActionBet = null;
   }
   table.currentBet = 0;
   table.minRaise = table.bigBlind;
@@ -1113,6 +1089,7 @@ function publicShowMuckWindow(table, viewerId = "") {
   }
   return {
     canDecide: windowState.status === "open" && windowState.choices[userId] === "pending",
+    windowToken: showMuckToken(table),
     deadline: Number(windowState.deadline || 0),
     choice: windowState.choices[userId] || "pending",
     status: windowState.status
@@ -1172,7 +1149,8 @@ function applyPendingSitOut(table, seat) {
   seat.sittingOut = true;
   seat.sittingOutUntil = Date.now() + SIT_OUT_TIMEOUT_MS;
   seat.sittingOutReason = "away";
-  seat.folded = true;
+  // A queued sit-out takes effect after settlement. Preserve the completed
+  // hand's fold/showdown status, including mandatory all-in disclosure.
   table.message = `${seat.name} отошёл от стола на 5 минут`;
   addLog(table, table.message);
   emitTableEvent(table, "seat_sit_out", { userId: seat.userId, afterHand: true });
@@ -1200,6 +1178,13 @@ function buildPots(table) {
         isUncalled,
         label: isUncalled ? "возврат" : contestedIndex++ === 0 ? "банк" : `сайд-пот ${contestedIndex - 1}`
       });
+    } else if (amount > 0 && pots.length > 0) {
+      // A player can leave/fold out of turn after putting in more than the
+      // surviving stacks. Committed folded money stays in the last contestable
+      // pot; dropping this layer silently destroys money.
+      const last = pots.at(-1);
+      last.amount += amount;
+      last.isUncalled = false;
     }
     previousLevel = level;
   }
@@ -1269,15 +1254,7 @@ function oddChipDistance(table, seatIndex) {
 }
 
 function isBettingRoundComplete(table) {
-  const players = activeSeats(table);
-  const actionable = actionableSeats(table);
-  if (players.length > 1 && actionable.length < 2) {
-    return actionable.every((seat) => seat.bet === table.currentBet);
-  }
-  return players.length > 1 && players.every((seat) => {
-    if (seat.stack === 0) return true;
-    return seat.acted && seat.bet === table.currentBet;
-  });
+  return holdemRoundComplete(table);
 }
 
 function postBlind(table, seatIndex, amount) {
@@ -1314,24 +1291,9 @@ function autoTimeoutAction(table) {
     seat.sittingOutReason = "away";
   }
 
-  if (toCall > 0) {
-    seat.folded = true;
-    seat.acted = true;
-    table.message = `${seat.name} авто-fold по таймеру`;
-    addLog(table, `${seat.name}: авто-fold`);
-    emitTableEvent(table, "fold", { userId: seat.userId, automatic: true, reason: "timeout" });
-    if (activeSeats(table).length === 1) {
-      finishByFold(table);
-      return;
-    }
-  } else {
-    seat.acted = true;
-    table.message = `${seat.name} авто-check по таймеру`;
-    addLog(table, `${seat.name}: авто-check`);
-    emitTableEvent(table, "check", { userId: seat.userId, automatic: true, reason: "timeout" });
-  }
-
-  advanceAfterAction(table);
+  applyAction(table, table.activeSeatIndex, { action: toCall > 0 ? "fold" : "check" }, {
+    automatic: true, reason: "timeout", prefix: "авто"
+  });
 }
 
 function shouldAutoSitOutOnTimeout(seat, now = Date.now()) {
@@ -1372,11 +1334,70 @@ function nextSeatedIndex(table, fromIndex) {
   return -1;
 }
 
+function ensureSeatNumbers(table) {
+  let sequence = Math.max(-1, Number.isSafeInteger(table.seatSequence) ? table.seatSequence : -1,
+    ...table.seats.filter((seat) => Number.isSafeInteger(seat.seatNumber)).map((seat) => seat.seatNumber));
+  for (const seat of table.seats) {
+    if (!Number.isSafeInteger(seat.seatNumber)) seat.seatNumber = ++sequence;
+  }
+  table.seatSequence = sequence;
+}
+
+function requireIntegerAmount(value, { positive = false } = {}) {
+  if (!Number.isSafeInteger(value) || value < (positive ? 1 : 0)) {
+    throwHttp(400, "Сумма должна быть целым числом в допустимом диапазоне");
+  }
+}
+
+function expireInitialWait(table, now = Date.now()) {
+  if (table.tableSessionId || !table.waitingSince || playableSeats(table).length >= 2
+    || now < table.waitingSince + INITIAL_WAIT_TIMEOUT_MS) return false;
+  for (const seat of table.seats) {
+    if (seat.sittingOutReason === "waiting_timeout") continue;
+    // The HTTP host settles this through the existing atomic wallet/ledger/seat
+    // return operation. The engine itself never credits a wallet.
+    seat.sittingOut = true;
+    seat.sittingOutReason = "waiting_timeout";
+    seat.sittingOutUntil = now;
+    emitTableEvent(table, "seat_sit_out", { userId: seat.userId, automatic: true, reason: "waiting_timeout" });
+  }
+  table.message = "Соперник не подключился. Бай-ин возвращается на баланс";
+  return true;
+}
+
+function assignHandPositions(table, advance) {
+  ensureSeatNumbers(table);
+  const eligible = table.seats.map((seat, index) => ({ seat, index }))
+    .filter(({ seat }) => canReceiveHand(seat))
+    .sort((a, b) => a.seat.seatNumber - b.seat.seatNumber);
+  if (eligible.length < 2) return;
+  if (table.handNumber > 0 && !Number.isSafeInteger(table.lastBigBlindSeatNumber)
+    && table.seats[table.bigBlindIndex]) {
+    table.lastBigBlindSeatNumber = table.seats[table.bigBlindIndex].seatNumber;
+  }
+  if (advance && table.handNumber > 0 && Number.isSafeInteger(table.lastBigBlindSeatNumber)) {
+    // Anchor to the previous BB's durable seat order, even after that seat left.
+    // In particular, 3 -> 2 must not make the previous BB pay it twice.
+    const nextBB = eligible.findIndex(({ seat }) => seat.seatNumber > table.lastBigBlindSeatNumber);
+    const bb = nextBB < 0 ? 0 : nextBB;
+    table.bigBlindIndex = eligible[bb].index;
+    table.smallBlindIndex = eligible[(bb - 1 + eligible.length) % eligible.length].index;
+    table.dealerIndex = eligible.length === 2 ? table.smallBlindIndex
+      : eligible[(bb - 2 + eligible.length) % eligible.length].index;
+    return;
+  }
+  if (advance || !canReceiveHand(table.seats[table.dealerIndex] || { sittingOut: true })) {
+    table.dealerIndex = nextSeatedIndex(table, table.dealerIndex);
+  }
+  table.smallBlindIndex = eligible.length === 2 ? table.dealerIndex : nextSeatedIndex(table, table.dealerIndex);
+  table.bigBlindIndex = nextSeatedIndex(table, table.smallBlindIndex);
+}
+
 function nextActiveIndex(table, fromIndex) {
   if (actionableSeats(table).length === 0) return -1;
   for (let offset = 1; offset <= table.seats.length; offset += 1) {
     const index = (fromIndex + offset + table.seats.length) % table.seats.length;
-    if (!table.seats[index].folded && table.seats[index].stack > 0) return index;
+    if (!table.seats[index].folded && table.seats[index].cards.length > 0 && table.seats[index].stack > 0) return index;
   }
   return -1;
 }
@@ -1387,17 +1408,31 @@ function setActiveTurn(table, seatIndex, prefix = "") {
     return;
   }
   table.activeSeatIndex = seatIndex;
+  table.turnToken = randomId("turn");
   table.actionDeadline = Date.now() + Math.max(1_000, Number(table.actionTimeoutMs || ACTION_TIMEOUT_MS));
   table.message = `${prefix}${table.seats[seatIndex].name} ходит`;
   const seat = table.seats[seatIndex];
   const toCall = Math.max(0, table.currentBet - seat.bet);
   emitTableEvent(table, "action_prompt", {
     userId: seat.userId,
+    turnToken: currentTurnToken(table),
     deadline: table.actionDeadline,
     toCall,
     minRaise: table.minRaise,
-    actions: ["fold", toCall > 0 ? "call" : "check", table.currentBet > 0 ? "raise" : "bet"]
+    actions: holdemLegalActions(table, seat.userId).map((action) => action.type)
   });
+}
+
+function currentTurnToken(table) {
+  if (!["preflop", "flop", "turn", "river"].includes(table.status) || table.activeSeatIndex < 0) return "";
+  // Legacy snapshots have no token yet. Their fallback remains stable for the
+  // current turn; the next setActiveTurn always issues a new opaque identity.
+  return table.turnToken || `${table.id}:${table.handNumber}:${table.status}:${table.seats[table.activeSeatIndex]?.userId}:${table.actionDeadline}`;
+}
+
+function showMuckToken(table) {
+  const window = table.showMuckWindow;
+  return window ? `${table.id}:${window.handNumber}:${window.openedAt}` : "";
 }
 
 function runOutToShowdown(table) {

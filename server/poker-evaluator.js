@@ -1,7 +1,5 @@
-import { createRequire } from "node:module";
-
-const require = createRequire(import.meta.url);
-const { Hand } = require("../vendor/pokersolver/pokersolver.js");
+import solver from "../vendor/pokersolver/pokersolver.js";
+const { Hand } = solver;
 
 export function resolveShowdown(contenders, communityCards) {
   const solved = contenders.map((seat) => ({

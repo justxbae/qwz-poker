@@ -1,0 +1,28 @@
+{
+  "$schema": "./infra/cloudflare/node_modules/wrangler/config-schema.json",
+  "name": "weez-poker",
+  "account_id": "b45639050dd5ccb787db6a416df1e2de",
+  "main": "infra/cloudflare/worker.js",
+  "compatibility_date": "2026-10-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "POKER_ROOM", "class_name": "PokerRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PokerRoom"] }],
+  "vars": {
+    "APP_NAME": "Weez Poker",
+    "APP_PUBLIC_URL": "https://weez-poker.wizzssm.workers.dev",
+    "BOT_USERNAME": "qwzpokerbot",
+    "REAL_MONEY_ENABLED": "false",
+    "WITHDRAWALS_ENABLED": "false",
+    "TEST_PLAYERS_ENABLED": "false",
+    "MINIMAL_LAUNCH": "true"
+  },
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 }
+}

@@ -27,7 +27,7 @@
 
 **Зона:** product / gameplay / architecture / operations / brand / growth
 
-**Решение:** Документ `docs/WEEZ_ENTERPRISE_MASTER_TZ.md` используется как единая
+**Решение:** Документ `archive/planning/WEEZ_ENTERPRISE_MASTER_TZ.md` используется как единая
 программа развития от текущей controlled beta до публичного real-money продукта и
 масштаба в тысячи пользователей. Он не меняет приоритет `MASTER_SPEC.md` и более
 новых датированных решений, а связывает существующие ТЗ в work packages, release
@@ -122,7 +122,7 @@ review/appeal workflow, immutable season close и публичный tie-break.
 
 **Почему:** Старый 25% playthrough выглядит как скрытое ограничение доступа к собственным средствам и не соответствует уже реализованной launch-политике сервера. Риск транзитных депозитов безопаснее закрывать ручной проверкой, source-of-funds/risk flags и прозрачной комиссией.
 
-**Влияет на:** `server/economy.js`, withdrawal settings/API, cashier UI, пользовательские документы, `docs/ECONOMICS.md`, admin withdrawal queue.
+**Влияет на:** `server/economy.js`, withdrawal settings/API, cashier UI, пользовательские документы, `archive/contracts/ECONOMICS.md`, admin withdrawal queue.
 
 **Что обновлено:** Канон и пользовательский текст синхронизированы с существующим default `rakeThresholdPercent=0`; 25% остаётся только как аварийный env-override для конкретной abuse-wave/test среды, а не публичное условие.
 
@@ -136,7 +136,7 @@ review/appeal workflow, immutable season close и публичный tie-break.
 
 **Почему:** Rabbit Hunt не является обязательным правилом Hold'em. Poker TDA запрещает его в турнирах, а крупные онлайн-румы внедряют его как отдельную настраиваемую продуктовую функцию и отдельно дорабатывают окно активации. Для Weez он добавляет новый денежный flow, post-hand state, SSE/reconnect semantics и задержку следующей руки, но не улучшает надёжность базовой игры перед первым набором пользователей.
 
-**Влияет на:** `MASTER_SPEC.md`, `docs/GPT56_SOL_BETA_PLUS_PLUS_BACKEND_TZ.md`, `docs/TECH_ROADMAP.md`, poker event contract, ledger scope и launch checklist.
+**Влияет на:** `MASTER_SPEC.md`, `archive/planning/GPT56_SOL_BETA_PLUS_PLUS_BACKEND_TZ.md`, `archive/planning/TECH_ROADMAP_2026-07-20.md`, poker event contract, ledger scope и launch checklist.
 
 **Что обновлено:** Rabbit Hunt перенесён в отдельный future product discovery; из обязательных beta++ событий, тестов, админки и reconciliation он удалён. Правило daily claim позднее уточнено решением от 2026-07-15 как refill при балансе не выше `34 999`.
 
@@ -146,13 +146,13 @@ review/appeal workflow, immutable season close и публичный tie-break.
 
 **Зона:** product / architecture / economy / development
 
-**Решение:** Для первого real-money beta launch вводится отдельное backend ТЗ `docs/GPT56_SOL_BETA_PLUS_PLUS_BACKEND_TZ.md`, которое дополняет `docs/CLAUDE_NEXT_PHASE_TZ.md` и фокусируется не на общем next-phase pass, а на launch hardening: hand/table timings, show/muck window, cash/rating/tournament separation, rating anti-abuse, statuses/achievements, admin operations, finance lifecycle, измеримый launch contract и event contract для анимаций. Rabbit Hunt этой итерацией не реализуется.
+**Решение:** Для первого real-money beta launch вводится отдельное backend ТЗ `archive/planning/GPT56_SOL_BETA_PLUS_PLUS_BACKEND_TZ.md`, которое дополняет `archive/planning/CLAUDE_NEXT_PHASE_TZ.md` и фокусируется не на общем next-phase pass, а на launch hardening: hand/table timings, show/muck window, cash/rating/tournament separation, rating anti-abuse, statuses/achievements, admin operations, finance lifecycle, измеримый launch contract и event contract для анимаций. Rabbit Hunt этой итерацией не реализуется.
 
 **Почему:** Старое ТЗ уже покрывало широкий product-grade pass, но для beta launch нужен отдельный документ с минимальным дублированием и с упором на операционную полноту, спорные post-hand flow и real-money readiness.
 
-**Влияет на:** `MASTER_SPEC.md`, `docs/TECH_ROADMAP.md`, backend gameplay audit, admin API, finance operations, rating season flow, event model.
+**Влияет на:** `MASTER_SPEC.md`, `archive/planning/TECH_ROADMAP_2026-07-20.md`, backend gameplay audit, admin API, finance operations, rating season flow, event model.
 
-**Что обновлено:** Добавлен `docs/GPT56_SOL_BETA_PLUS_PLUS_BACKEND_TZ.md`, синхронизированы `MASTER_SPEC.md` и roadmap по show/muck, launch gates, аналитике и границам optional-функций.
+**Что обновлено:** Добавлен `archive/planning/GPT56_SOL_BETA_PLUS_PLUS_BACKEND_TZ.md`, синхронизированы `MASTER_SPEC.md` и roadmap по show/muck, launch gates, аналитике и границам optional-функций.
 
 **Открытые вопросы:** `Run It Twice`, `All-in Cash Out`, seat-me/waiting-list и social/chat слой остаются вне beta++ default scope до отдельного решения.
 
@@ -252,7 +252,7 @@ Disconnect/sit-out policy для cash/rating утверждён отдельно
 
 **Почему:** Play chips — отдельная free-to-play валюта для рейтинга и удержания, а не турнирная валюта. Смешивание её с обычными турнирами ломает продуктовую логику и создаёт нежелательный UX.
 
-**Влияет на:** tournament product scope, `MASTER_SPEC.md`, `docs/TECH_ROADMAP.md`, tournament admin flow, reward tournaments, leaderboard rewards.
+**Влияет на:** tournament product scope, `MASTER_SPEC.md`, `archive/planning/TECH_ROADMAP_2026-07-20.md`, tournament admin flow, reward tournaments, leaderboard rewards.
 
 **Что обновлено:** Зафиксирован запрет на spontaneous play-chip tournaments и введён отдельный сезонный ticket-based reward tournament flow.
 

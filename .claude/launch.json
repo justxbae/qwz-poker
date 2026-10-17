@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "qwz",
+      "name": "weez-poker",
       "runtimeExecutable": "node",
       "runtimeArgs": ["server/index.js"],
       "port": 4100,

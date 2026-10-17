@@ -1,38 +1,65 @@
 # Weez Poker
 
-Telegram Mini App poker room: Node.js backend, PostgreSQL, Redis and a static
-vanilla-JS client. The repository is a modular monolith with no build step.
+Покерная комната в Telegram Mini App. Node.js ≥ 20, PostgreSQL, Redis, обычные JS/CSS.
+Сборки и frontend-фреймворка нет; сервер обслуживает API и клиент из `public/`.
 
-## Start locally
+## Начать работу
+
+1. [AGENTS.md](AGENTS.md) — короткие правила и финансовые ограничения.
+2. [Разбор готовности к запуску](docs/LAUNCH_REVIEW.md) — что работает, что мешает
+   запуску и как использовать Cloudflare.
+3. [Карта текущих документов](docs/README.md) — контракты по конкретной задаче.
+
+Текущая цель: закончить и проверить продукт, затем подключить выбранную владельцем
+платёжную систему. Наличие старых платёжных адаптеров не означает готовность к запуску.
+
+## Локальный запуск и проверка
 
 ```bash
 npm ci
 npm run dev
+npm test
 ```
 
-Without `DATABASE_URL` and `REDIS_URL`, development uses in-process memory.
-Real-money mode requires both services and refuses to start without them.
+Открыть `http://127.0.0.1:3000`. `.env` необязателен; шаблон — `.env.example`.
+По умолчанию `REAL_MONEY_ENABLED=false`. Без PostgreSQL/Redis данные хранятся
+в памяти и теряются при перезапуске. Явно заданное окружение имеет приоритет над
+`.env`, включая пустые значения. HTTP-тесты по умолчанию отключают унаследованные
+подключения к PostgreSQL/Redis.
 
-## Tests
+9 внешних проверок требуют отдельного тестового окружения, см.
+[условия запуска](docs/README.md#проверки-внешних-сервисов).
 
-```bash
-env -u DATABASE_URL -u REDIS_URL npm test
-```
+## Структура
 
-The environment reset avoids inheriting local production URLs in child-process
-tests. Infrastructure/provider suites are separately gated until a disposable
-PostgreSQL/Redis environment is available.
+| Каталог | Назначение |
+| --- | --- |
+| `server/` | API, покер, турниры, хранение, платежи и фоновые процессы |
+| `public/` | Действующий клиент и используемые им изображения |
+| `tests/` | Проверки встроенного Node.js runner |
+| `scripts/` | Проверка конфигурации запуска и экспорт релиза |
+| `vendor/pokersolver/` | Необходимая серверу библиотека оценки комбинаций |
+| `vendor/poker-kernel/` | Закреплённые исходники/исполняемый код Poker Kernel и лицензия; адаптер ставок Hold’em |
+| `docs/` | Текущие контракты, эксплуатация и свежий разбор готовности |
+| `archive/` | Все отложенные материалы, старые задания, дизайн-исходники и прежняя иконка |
+| `.local/` | Личные файлы и локальные документы; не входят в Git |
+| `release/`, `output/`, `tmp/` | Локальные результаты и временные файлы; не входят в Git |
 
-## Product and engineering canon
+[MASTER_SPEC.md](MASTER_SPEC.md) — продуктовый канон,
+[DATABASE.md](DATABASE.md) — контракт БД, [PAYMENTS.md](PAYMENTS.md) — существующие
+платёжные процессы. Архив не является текущим списком работ.
 
-- `MASTER_SPEC.md` — product and economy source of truth.
-- `docs/13-decisions.md` — newer approved decisions.
-- `docs/WEEZ_ENTERPRISE_MASTER_TZ.md` — complete development and operations plan.
-- `DATABASE.md` — persistence and ledger contract.
-- `PAYMENTS.md` — payment lifecycle.
-- `docs/DESIGN_SYSTEM.md` — UI/UX contract.
+## Экспорт и размещение
 
-## Security
+`npm run release:clean` пересоздаёт `release/` с необходимыми для запуска файлами.
+Внутри: `npm ci --omit=dev`, затем `npm start` с нужным окружением.
 
-Never commit `.env`, bot tokens, provider keys or production database URLs.
-Rotate any token that has appeared in chat, logs or Git history.
+Целевой хостинг — бесплатный Cloudflare Workers + SQLite Durable Object.
+Инструкция и ограничения: [CLOUDFLARE.md](docs/CLOUDFLARE.md). Публикация выполняется
+отдельно от Render; игровой режим PLAY, реальные платежи и выводы выключены.
+
+Старый `main` всё ещё связан с Render; push туда может запустить старый хостинг.
+`render.yaml` — прежняя конфигурация с реальными деньгами. Не использовать её
+для новой Cloudflare-публикации. [DEPLOYMENT.md](DEPLOYMENT.md) описывает оба варианта.
+
+Не добавлять в Git `.env`, токены и ключи. Токены, попавшие в историю Git, заменить.
