@@ -8,18 +8,14 @@
 
 /* Layered important declarations outrank legacy unlayered declarations regardless
    of selector specificity. Hidden state and input feedback have one owner. */
+@layer ui-state, weez-components, weez-game;
+
 @layer ui-state {
-html.minimal-launch .footer-lobby-icon {
-  width: 40px !important;
-  height: 40px !important;
-  border-radius: 13px !important;
-}
-html.minimal-launch .footer-lobby-icon img {
-  width: 22px !important; height: 22px !important; object-fit: contain !important;
-}
+
+
   [hidden] { display: none !important; }
   .is-dragging { transition: none !important; }
-  :is(.cashier-sheet-grabber, .buyin-sheet-grabber, .buyin-head, .lobby-menu-head) { touch-action: none !important; }
+
   html.minimal-launch .bottom-nav .nav-icon:has(img) {
     background: currentColor !important; color: inherit !important;
     mask: var(--nav-icon) center / contain no-repeat !important;
@@ -29,10 +25,10 @@ html.minimal-launch .footer-lobby-icon img {
   .bottom-nav [data-lobby-tab="tournaments"] { --nav-icon: url("/assets/nav/tournament-icon.svg?v=20261017-1"); }
   .bottom-nav [data-lobby-tab="profile"] { --nav-icon: url("/assets/nav/botprofile2.svg"); }
   .bottom-nav [data-lobby-menu-trigger] { --nav-icon: url("/assets/nav/ic_bot2.svg"); }
-  html.minimal-launch :is(button, a[href], .home-table-list .table-item[tabindex]) {
+  html.minimal-launch :is(button, a[href], .home-table-list .table-item[tabindex]):not(.ui-segment--expanding > button) {
     animation: none !important;
     transform: none !important;
-    transition: opacity 110ms ease-out, background-color 110ms ease-out, color 110ms ease-out !important;
+    transition: opacity var(--weez-motion-press) ease-out, background-color var(--weez-motion-press) ease-out, color var(--weez-motion-press) ease-out !important;
     touch-action: manipulation !important;
     -webkit-tap-highlight-color: transparent;
   }
@@ -65,8 +61,199 @@ html.minimal-launch .footer-lobby-icon img {
   --weez-radius-section: 24px;
   --weez-radius-row: 16px;
   --weez-radius-control: 16px;
+  --weez-space-2: 8px;
+  --weez-space-4: 16px;
+  --weez-touch-size: 44px;
+  --weez-control-height: 52px;
+  --weez-row-height: 52px;
+  --weez-chevron: url("/assets/ui/chevronright.svg") center / 14px 14px no-repeat;
+  --weez-motion-press: 110ms;
+  --weez-motion-selection: 260ms;
+  --weez-motion-sheet: 320ms;
+  --weez-motion-popover: 180ms;
   --weez-ease: cubic-bezier(.22, .72, .18, 1);
 }
+
+/* Shared primitives. Important is limited to this migration layer while legacy
+   generic button/input rules remain; screen-specific copies are removed. */
+@layer weez-components {
+  .ui-card, .ui-surface, .ui-group {
+    box-sizing: border-box !important; min-width: 0 !important; border: 0 !important;
+    border-radius: var(--weez-radius-section) !important; background: var(--weez-section) !important;
+    color: var(--weez-text) !important; box-shadow: none !important;
+  }
+  .ui-card, .ui-surface { padding: var(--weez-space-4) !important; }
+  .ui-surface { border-radius: var(--weez-radius-row) !important; }
+  .ui-group { display: block !important; padding: var(--weez-space-2) !important; overflow: hidden !important; }
+  .ui-stack { display: grid !important; gap: var(--weez-space-4) !important; min-width: 0 !important; }
+  .ui-title { margin: 0 !important; color: var(--weez-text) !important; font: 600 20px/1.25 var(--weez-font) !important; }
+  .ui-title--screen { font-size: 24px !important; font-weight: 700 !important; }
+  .ui-button {
+    box-sizing: border-box !important; display: inline-flex !important; align-items: center !important;
+    justify-content: center !important; gap: var(--weez-space-2) !important; min-width: 44px !important;
+    min-height: var(--weez-control-height) !important; height: auto !important; padding: 12px 16px !important;
+    border: 0 !important; border-radius: var(--weez-radius-control) !important; box-shadow: none !important;
+    background: var(--weez-cell) !important; color: var(--weez-text) !important;
+    font: 600 16px/1.25 var(--weez-font) !important; text-align: center !important;
+    white-space: normal !important; text-decoration: none !important;
+  }
+  .ui-button--primary { background: var(--weez-accent) !important; color: var(--weez-accent-text) !important; }
+  .ui-button--danger { background: color-mix(in srgb, var(--weez-danger) 16%, var(--weez-section)) !important; color: var(--weez-danger) !important; }
+  .ui-button:is(.selected, .active, [aria-pressed="true"]) { background: var(--weez-accent) !important; color: var(--weez-accent-text) !important; }
+  .ui-button--compact { min-height: var(--weez-touch-size) !important; padding: 10px 12px !important; font-size: 14px !important; }
+  .ui-button--stacked { flex-direction: column !important; gap: 4px !important; padding: 8px !important; font-size: 13px !important; }
+  .ui-button--stacked > span { font-size: 13px !important; overflow-wrap: anywhere; }
+  .ui-button--icon { position: relative !important; flex: 0 0 44px !important; width: 44px !important; height: 44px !important; min-height: 44px !important; padding: 0 !important; pointer-events: auto; }
+  .ui-icon { display: inline-block !important; flex: 0 0 22px; width: 22px; height: 22px; background: currentColor !important; mask: var(--ui-icon) center / contain no-repeat !important; }
+  .ui-button img { width: 22px; height: 22px; object-fit: contain; }
+  .ui-actions { display: flex !important; flex-wrap: wrap !important; gap: 12px !important; position: static !important; padding: 0 !important; margin: 0 !important; background: transparent !important; }
+  .ui-actions > .ui-button { flex: 1 1 120px !important; width: auto !important; margin: 0 !important; }
+  .ui-actions > [role="status"] { flex-basis: 100%; }
+  .ui-input {
+    box-sizing: border-box !important; width: 100% !important; min-width: 0 !important;
+    min-height: var(--weez-control-height) !important; padding: 12px !important; border: 0 !important;
+    border-radius: var(--weez-radius-control) !important; background: var(--weez-cell) !important;
+    color: var(--weez-text) !important; font: 500 17px/1.3 var(--weez-font) !important;
+    box-shadow: none !important; text-align: left !important;
+  }
+  .ui-input--money { padding-left: 32px !important; }
+  [role="status"]:empty { display: none !important; }
+  .ui-range { width: 100% !important; height: 44px !important; min-height: 44px !important; margin: 0 !important; accent-color: var(--weez-accent) !important; }
+  .ui-row {
+    box-sizing: border-box !important; position: relative !important; display: grid !important;
+    grid-template-columns: 40px minmax(0, 1fr) auto 8px !important; align-items: center !important;
+    gap: 12px !important; width: 100% !important; min-width: 0 !important; min-height: var(--weez-row-height) !important;
+    height: auto !important; padding: 6px 8px !important; margin: 0 !important;
+    border: 0 !important; border-radius: var(--weez-radius-control) !important;
+    background: transparent !important; color: var(--weez-text) !important; box-shadow: none !important;
+    font: 400 16px/1.25 var(--weez-font) !important; text-align: left !important;
+  }
+  .ui-row--plain { display: flex !important; padding: 12px 16px !important; }
+  .ui-row::before { content: none !important; }
+  .ui-row:not(:last-child)::after { content: ""; position: absolute; left: 60px; right: 8px; bottom: 0; height: 1px; background: var(--weez-separator); }
+  .ui-row--plain::after { left: 16px !important; right: 16px !important; }
+  .ui-row__icon { display: grid !important; place-items: center !important; width: 40px !important; height: 40px !important; border-radius: 12px !important; background: var(--weez-accent) !important; color: var(--weez-accent-text) !important; }
+  .ui-row__icon img { display: block !important; width: 22px !important; height: 22px !important; object-fit: contain !important; }
+  .ui-row__icon img[src*=".svg"] { filter: brightness(0) invert(1) !important; }
+  .ui-row__text { min-width: 0 !important; font: inherit !important; color: inherit !important; white-space: normal !important; overflow-wrap: anywhere !important; }
+  .ui-row__value { grid-column: 3; max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--weez-secondary); font-size: 13px; }
+  .ui-row__chevron { grid-column: 4 !important; width: 8px !important; height: 14px !important; font-size: 0 !important; background: var(--weez-secondary) !important; mask: var(--weez-chevron) !important; }
+  .ui-row[aria-pressed="true"] { background: color-mix(in srgb, var(--weez-accent) 14%, transparent) !important; }
+  .ui-data-row { display: grid !important; grid-template-columns: minmax(80px, .9fr) minmax(0, 1.5fr) !important; align-items: center !important; justify-content: space-between !important; gap: 12px !important; min-height: 44px !important; padding: 8px 0 !important; border-bottom: 1px solid var(--weez-separator) !important; font-size: 14px !important; }
+  .ui-data-row:last-child { border-bottom: 0 !important; }
+  .ui-data-row > :first-child { color: var(--weez-secondary); }
+  .ui-data-row > :last-child { min-width: 0; text-align: right; overflow-wrap: anywhere; }
+  .ui-segment {
+    position: relative !important; isolation: isolate !important; display: flex !important; width: 100% !important; gap: 0 !important;
+    min-height: 58px !important; padding: 4px !important; border: 0 !important; border-radius: 20px !important;
+    background: var(--weez-cell) !important; overflow: hidden !important; box-shadow: none !important;
+  }
+  .ui-segment::before, .ui-segment::after { content: none !important; }
+  .ui-segment > button { display: inline-flex !important; justify-content: center !important; align-items: center !important; gap: 8px !important; position: relative !important; z-index: 1 !important; flex: 1 1 0 !important; min-width: 0 !important; min-height: 50px !important; padding: 8px !important; border: 0 !important; border-radius: 16px !important; background: transparent !important; color: var(--weez-secondary) !important; font: 600 15px/1.2 var(--weez-font) !important; box-shadow: none !important; }
+  .ui-segment > button.active { color: var(--weez-accent-text) !important; }
+  .ui-segment > button small { display: none !important; }
+  .ui-segment--expanding { gap: 4px !important; min-height: 52px !important; }
+  .ui-segment--expanding > button { transform: none !important; animation: none !important; touch-action: manipulation; flex: 0 1 44px !important; min-width: 44px !important; min-height: 44px !important; gap: 0 !important; padding: 10px !important; overflow: hidden !important; font-size: 14px !important; transition: flex-grow var(--weez-motion-selection) var(--weez-ease), gap var(--weez-motion-selection) var(--weez-ease), background-color var(--weez-motion-press) ease-out, opacity var(--weez-motion-press) ease-out !important; }
+  .ui-segment--expanding > button.active { flex-grow: 1 !important; gap: 8px !important; background: var(--weez-accent) !important; }
+  .ui-segment--expanding .dt-label { min-width: 0; max-width: 0; overflow: hidden; white-space: nowrap; opacity: 0; transition: max-width var(--weez-motion-selection) var(--weez-ease), opacity var(--weez-motion-press) ease-out; }
+  .ui-segment--expanding > button.active .dt-label { max-width: 180px; opacity: 1; }
+  .ui-popover__close { position: absolute !important; top: 8px !important; left: 8px !important; }
+  .ui-segment__pill { position: absolute; z-index: 0; top: 4px; bottom: 4px; left: 0; width: var(--selection-width, 0px); border-radius: 16px; background: var(--weez-accent); transform: translateX(var(--selection-x, 4px)); transition: transform var(--weez-motion-selection) var(--weez-ease), width var(--weez-motion-selection) var(--weez-ease); pointer-events: none; }
+  .ui-backdrop { position: fixed !important; inset: 0 !important; z-index: 1000 !important; display: block !important; margin: 0 !important; padding: 0 !important; background: rgb(0 0 0 / .42) !important; opacity: 0 !important; transition: opacity var(--weez-motion-sheet) var(--weez-ease) !important; }
+  .ui-sheet {
+    box-sizing: border-box !important; position: fixed !important; z-index: 1002 !important;
+    top: auto !important; left: 0 !important; right: 0 !important; bottom: var(--keyboard-height, 0px) !important;
+    display: flex !important; flex-direction: column !important; gap: 16px !important; width: 100% !important;
+    max-width: 590px !important; min-height: 0 !important; height: auto !important;
+    max-height: min(760px, calc(var(--app-height, 100dvh) - var(--keyboard-height, 0px) - var(--app-safe-top, 0px) - 16px)) !important;
+    margin: 0 auto !important; padding: 0 16px calc(16px + var(--app-safe-bottom, 0px)) !important;
+    border: 0 !important; border-radius: 28px 28px 0 0 !important;
+    background: var(--weez-bg) !important; color: var(--weez-text) !important;
+    box-shadow: 0 -12px 36px rgb(0 0 0 / .20) !important;
+    overflow: auto !important; overscroll-behavior: contain !important; touch-action: pan-y !important;
+    opacity: 0 !important; transform: translateY(calc(100% + var(--sheet-drag-y, 0px))) !important;
+    transition: transform var(--weez-motion-sheet) var(--weez-ease), opacity var(--weez-motion-sheet) var(--weez-ease) !important;
+  }
+  .ui-sheet > * { flex: 0 0 auto !important; min-width: 0; }
+  .ui-sheet[data-overlay-state="open"] { opacity: 1 !important; transform: translateY(var(--sheet-drag-y, 0px)) !important; }
+  .ui-backdrop[data-overlay-state="open"], .ui-backdrop[data-overlay-state="opening"] { opacity: 1 !important; }
+  .ui-sheet__handle { position: relative !important; display: block !important; align-self: center !important; flex: 0 0 44px !important; width: 64px !important; height: 44px !important; min-height: 44px !important; margin: 0 0 -8px !important; background: transparent !important; border: 0 !important; touch-action: none !important; cursor: grab; }
+  .ui-sheet__handle::before { content: "" !important; position: absolute; top: 12px; left: 14px; width: 36px; height: 5px; border-radius: 999px; background: var(--weez-secondary); opacity: .6; }
+  .ui-sheet__handle::after { content: none !important; }
+  .ui-sheet__header { display: grid !important; gap: 8px !important; margin: 0 !important; padding: 0 !important; }
+  .ui-popover { position: fixed !important; top: max(14px, var(--app-safe-top, 0px)) !important; z-index: 80 !important; width: min(300px, calc(100vw - 28px)) !important; max-height: calc(var(--app-height, 100dvh) - var(--app-safe-top, 0px) - 28px) !important; min-height: 0 !important; padding: 52px 8px 8px !important; border: 0 !important; border-radius: 24px !important; background: var(--weez-section) !important; color: var(--weez-text) !important; overflow: auto !important; opacity: 0 !important; transform: translateY(-8px) !important; transition: opacity var(--weez-motion-popover) var(--weez-ease), transform var(--weez-motion-popover) var(--weez-ease) !important; }
+  .ui-popover[data-overlay-state="open"] { opacity: 1 !important; transform: none !important; }
+  .ui-popover[data-overlay-state="closing"], .ui-sheet[data-overlay-state="closing"] { pointer-events: none !important; }
+  .ui-popover--actions { top: auto !important; right: 16px !important; bottom: calc(90px + var(--app-safe-bottom, 0px)) !important; left: auto !important; padding: 16px !important; }
+  .ui-popover--left { left: 14px !important; right: auto !important; }
+  .ui-popover--right { right: 14px !important; left: auto !important; }
+  .ui-popover > .close-button { display: none !important; }
+}
+
+/* Game actions compose the same controls; visibility is semantic [hidden]. */
+.betting-actions {
+  position: fixed; z-index: 48; left: 12px; right: 12px; animation: none; transform: none;
+  bottom: calc(12px + var(--app-safe-bottom, 0px));
+  width: min(566px, calc(100vw - 24px)); margin: 0 auto; padding: 8px;
+  display: grid; grid-template-columns: 44px repeat(3, minmax(0, 1fr)); gap: 8px;
+  border: 0; border-radius: 24px; background: var(--weez-section);
+}
+.betting-actions.amount-open { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 16px; }
+.betting-actions.amount-open > :is(.quick-bets, label, .bet-slider) { grid-column: 1 / -1; }
+.betting-actions > label { display: grid; gap: 8px; color: var(--weez-secondary); font-size: 13px; }
+.quick-bets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.betting-actions > .ui-button { min-width: 0 !important; padding-inline: 8px !important; font-size: 14px !important; overflow-wrap: anywhere; }
+.betting-actions > .ui-button--icon { align-self: center; padding: 0 !important; }
+.betting-actions .money-value { font: inherit; }
+
+.ui-field { display: grid; min-width: 0; gap: 8px; color: var(--weez-secondary); font-size: 13px; }
+.ui-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 12px; align-items: end; }
+.affiliate-hero > p, .affiliate-card > p { margin: 0; font-size: 15px; line-height: 1.35; color: var(--weez-secondary); }
+.affiliate-card > span { color: var(--weez-secondary); font-size: 13px; }
+.affiliate-hero > .eyebrow { display: none; }
+.affiliate-link-preview { overflow-wrap: anywhere; font-size: 13px; color: var(--weez-accent); }
+
+/* Content layouts compose primitives; none owns sheet position, motion or scroll. */
+.buyin-summary, .buyin-info-card, .doc-sheet-body, .tournament-detail-body { display: grid; gap: 12px; }
+.buyin-row, .buyin-info-card > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.buyin-row > span, .buyin-info-card span { color: var(--weez-secondary); font-size: 13px; }
+.buyin-row strong { font-size: clamp(14px, 4vw, 18px); text-align: right; }
+.buyin-amount-grid { display: grid; grid-template-columns: minmax(64px, 1fr) minmax(0, 1.5fr) minmax(64px, 1fr); gap: 8px; }
+.buyin-amount-grid > label { display: grid; gap: 4px; font-size: 13px; color: var(--weez-secondary); text-align: center; }
+.buyin-kicker, .buyin-auto, #buyInGameType { display: none; }
+.buyin-close, .cashier-sheet-close { display: none; }
+.buyin-sheet > .ui-button { width: 100%; }
+.doc-sheet-row { display: grid; gap: 6px; }
+.doc-sheet-row strong { font-size: 15px; }
+.doc-sheet-row span { color: var(--weez-secondary); font-size: 14px; line-height: 1.4; }
+.doc-sheet > .ui-button { width: 100%; }
+.doc-sheet .lobby-menu-head > p { display: none; }
+.cashier-withdraw-card > .section-title, .cashier-topup-card > .section-title, .cashier-note, .cashier-quote { display: none; }
+.cashier-amount-field { position: relative; display: block; }
+.cashier-amount-field > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.cashier-amount-field > small { position: absolute; top: 16px; left: 12px; font-size: 17px; color: var(--weez-secondary); }
+.cashier-presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin-top: 12px; }
+.cashier-presets .ui-button { min-width: 0 !important; }
+.cashier-withdraw-state { display: grid; gap: 12px; line-height: 1.4; }
+.cashier-withdraw-state > span, .withdraw-warning { font-size: 14px; color: var(--weez-secondary); }
+.withdraw-balance-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 8px 0; }
+.withdraw-balance-copy { display: grid; gap: 4px; font-size: 14px; }
+.withdraw-balance-copy small { color: var(--weez-secondary); }
+.withdraw-section-heading { margin: 0; font-size: 15px; }
+.withdraw-fee-row { display: flex; justify-content: space-between; gap: 12px; }
+.tournament-detail-summary, .tournament-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.tournament-detail-summary > div, .tournament-detail-grid > div { display: grid; gap: 4px; padding: 12px; border-radius: 16px; background: var(--weez-section); }
+.tournament-detail-summary span, .tournament-detail-grid span { font-size: 13px; color: var(--weez-secondary); }
+.tournament-detail-countdown { display: grid; gap: 8px; text-align: center; padding: 16px; }
+.tournament-detail-countdown strong { font: 600 30px/1.2 var(--weez-font-rounded); }
+.tournament-detail-countdown small { color: var(--weez-secondary); }
+.tournament-detail-panel { display: none; }
+.tournament-detail-panel.active { display: grid; gap: 12px; }
+.tournament-detail-row { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--weez-separator); }
+.tournament-detail-status { display: grid; gap: 8px; }
+.tournament-detail-description, .tournament-detail-note { font-size: 14px; color: var(--weez-secondary); }
+.drawer-page { display: block; padding: 0; }
+.drawer-tabs { margin-bottom: 12px; }
 
 html.minimal-launch,
 html.minimal-launch body,
@@ -286,134 +473,12 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-wallet-actions but
 }
 
 /* Segmented control: one moving capsule, no fade layer. */
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment {
-  position: relative !important;
-  isolation: isolate !important;
-  display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  min-height: 58px !important;
-  padding: 4px !important;
-  border: 0 !important;
-  border-radius: 22px !important;
-  background: var(--weez-cell) !important;
-  box-shadow: none !important;
-  overflow: hidden !important;
-}
 
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment::before {
-  content: none !important;
-}
-
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment::after {
-  content: "" !important;
-  position: absolute !important;
-  z-index: -1 !important;
-  inset: 4px auto 4px 4px !important;
-  width: calc(50% - 4px) !important;
-  border-radius: 18px !important;
-  background: var(--weez-accent) !important;
-  opacity: 1 !important;
-  transform: translate3d(0, 0, 0) !important;
-  transition: transform 280ms var(--weez-ease) !important;
-}
-
-html.minimal-launch:not(.admin-mode) body[data-game-mode="cash"]:not(.in-game) .product-mode-segment::after {
-  transform: translate3d(100%, 0, 0) !important;
-}
-
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment button {
-  z-index: 1 !important;
-  min-height: 50px !important;
-  border: 0 !important;
-  border-radius: 18px !important;
-  background: transparent !important;
-  color: var(--weez-secondary) !important;
-  box-shadow: none !important;
-}
-
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .product-mode-segment button.active {
-  background: transparent !important;
-  color: var(--weez-accent-text) !important;
-}
 
 @layer weez-rows {
 /* Grouped rows shared by footer and menu. */
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby.tg-menu-group,
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-list.footer-lobby.tg-menu-group {
-  width: 100% !important;
-  min-height: 0 !important;
-  padding: 6px 10px !important;
-  border: 0 !important;
-  border-radius: var(--weez-radius-section) !important;
-  background: var(--weez-section) !important;
-  box-shadow: none !important;
-  overflow: hidden !important;
-}
-
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-row {
-  position: relative !important;
-  display: grid !important;
-  grid-template-columns: 40px minmax(0, 1fr) auto 8px !important;
-  align-items: center !important;
-  gap: 12px !important;
-  width: 100% !important;
-  min-height: 52px !important;
-  height: auto !important;
-  padding: 8px 4px !important;
-  border: 0 !important;
-  border-radius: 16px !important;
-  background: transparent !important;
-  color: var(--weez-text) !important;
-  box-shadow: none !important;
-  overflow: hidden !important;
-}
-
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-row::after {
-  content: "" !important;
-  position: absolute !important;
-  right: 4px !important;
-  bottom: 0 !important;
-  left: 60px !important;
-  height: 1px !important;
-  background: var(--weez-separator) !important;
-}
-
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-row:last-child::after {
-  content: none !important;
-}
 
 
-
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-main {
-  min-width: 0 !important;
-  color: var(--weez-text) !important;
-  font-size: 16px !important;
-  font-weight: 400 !important;
-  line-height: 20px !important;
-  text-align: left !important;
-}
-
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-value {
-  color: var(--weez-secondary) !important;
-  font-size: 14px !important;
-  font-weight: 400 !important;
-  line-height: 20px !important;
-}
-
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-chevron,
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .profile-detail-chevron {
-  width: 9px !important;
-  min-width: 9px !important;
-  height: 16px !important;
-  color: transparent !important;
-  font-size: 0 !important;
-  background: color-mix(in srgb, var(--weez-text) 34%, transparent) !important;
-  -webkit-mask: url("/assets/ui/chevronright.svg") center / contain no-repeat !important;
-  mask: url("/assets/ui/chevronright.svg") center / contain no-repeat !important;
-  transform: none !important;
-}
-
-html.minimal-launch .cashier-methods .footer-lobby-row.active { background: color-mix(in srgb, var(--weez-accent) 14%, transparent) !important; }
 }
 
 /* Bottom navigation: one moving capsule and enough content clearance. */
@@ -458,7 +523,7 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .bottom-nav .bottom-nav-
   background: color-mix(in srgb, var(--weez-text) 16%, transparent) !important;
   opacity: 1 !important;
   transform: translate3d(var(--nav-active-x, 4px), 0, 0) !important;
-  transition: transform 260ms var(--weez-ease), width 260ms var(--weez-ease) !important;
+  transition: transform var(--weez-motion-selection) var(--weez-ease), width var(--weez-motion-selection) var(--weez-ease) !important;
   pointer-events: none !important;
 }
 
@@ -500,176 +565,14 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .bottom-nav .nav-label {
 }
 
 @layer weez-sheets {
-html.minimal-launch .cashier-amount-title { font: 600 20px/1.25 var(--weez-font) !important; }
-html.minimal-launch .cashier-presets button { min-height: 44px !important; }
+
+
 /* Sheets: one opaque surface, one scroll owner, no keyboard-attached CTA. */
-html.minimal-launch:not(.admin-mode) body.lobby-menu-open:not(.in-game) .lobby-menu-sheet,
-html.minimal-launch:not(.admin-mode) body.doc-sheet-open:not(.in-game) .doc-sheet,
-html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open {
-  position: fixed !important;
-  z-index: 1002 !important;
-  top: auto !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 14px !important;
-  width: 100% !important;
-  max-width: 590px !important;
-  max-height: min(calc(var(--app-height, 100dvh) - var(--app-safe-top, 0px) - 16px), 760px) !important;
-  margin: 0 auto !important;
-  padding: 14px 14px calc(18px + var(--app-safe-bottom, 0px)) !important;
-  border: 0 !important;
-  border-radius: 30px 30px 0 0 !important;
-  background: var(--weez-bg) !important;
-  box-shadow: 0 -18px 48px rgba(0, 0, 0, .32) !important;
-  overflow-x: hidden !important;
-  overflow-y: auto !important;
-  overscroll-behavior: contain !important;
-  -webkit-overflow-scrolling: touch !important;
-  touch-action: pan-y !important;
-  opacity: 0 !important;
-  transform: translate3d(0, calc(100% + var(--sheet-drag-y, 0px)), 0) !important;
-  transition: transform 320ms var(--weez-ease), opacity 320ms var(--weez-ease) !important;
-}
-
-html.minimal-launch:not(.admin-mode) body:not(.in-game) :is(.lobby-menu-sheet, [data-cashier-sheet]).sheet-visible {
-  opacity: 1 !important;
-  transform: translate3d(0, var(--sheet-drag-y, 0px), 0) !important;
-}
-
-html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-topup-card,
-html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open.cashier-withdraw-card {
-  display: flex !important;
-  flex-direction: column !important;
-  grid-template-rows: none !important;
-  height: auto !important;
-  min-height: 0 !important;
-}
-
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-backdrop,
-html.minimal-launch body:not(.in-game) .cashier-sheet-backdrop {
-  z-index: 1000 !important;
-}
-
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-sheet > .cashier-sheet-grabber,
-html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open > .cashier-sheet-grabber {
-  display: block !important;
-  flex: 0 0 5px !important;
-  width: 38px !important;
-  height: 5px !important;
-  min-height: 5px !important;
-  margin: 0 auto 4px !important;
-  border-radius: 999px !important;
-  background: color-mix(in srgb, var(--weez-text) 30%, transparent) !important;
-}
-
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-sheet > .cashier-sheet-grabber::before,
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-sheet > .cashier-sheet-grabber::after,
-html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open > .cashier-sheet-grabber::before,
-html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open > .cashier-sheet-grabber::after {
-  content: none !important;
-}
-
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-sheet {
-  gap: 10px !important;
-}
-
-html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open > *,
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-menu-sheet .tg-menu-group {
-  flex: 0 0 auto !important;
-}
-
-html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open {
-  padding-top: 16px !important;
-}
-
-html.minimal-launch body.keyboard-open.cashier-sheet-open [data-cashier-sheet].sheet-open {
-  bottom: var(--keyboard-height, 0px) !important;
-  max-height: calc(var(--app-height, 100dvh) - var(--keyboard-height, 0px) - 16px) !important;
-  transform: translate3d(0, var(--sheet-drag-y, 0px), 0) !important;
-}
-
-html.minimal-launch body.cashier-sheet-open .cashier-calculator,
-html.minimal-launch body.cashier-sheet-open .cashier-methods,
-html.minimal-launch body.cashier-sheet-open .withdraw-balance-card,
-html.minimal-launch body.cashier-sheet-open .withdraw-fee-preview,
-html.minimal-launch body.cashier-sheet-open .withdraw-rake-progress,
-html.minimal-launch body.cashier-sheet-open .withdraw-address-card {
-  border: 0 !important;
-  border-radius: var(--weez-radius-section) !important;
-  background: var(--weez-section) !important;
-  box-shadow: none !important;
-}
-
-html.minimal-launch body.cashier-sheet-open .cashier-topup-card .cashier-methods.footer-lobby.tg-menu-group,
-html.minimal-launch body.cashier-sheet-open .cashier-withdraw-card .cashier-methods.footer-lobby.tg-menu-group {
-  display: block !important;
-  min-height: 0 !important;
-  height: auto !important;
-  grid-template-rows: none !important;
-  padding: 6px 10px !important;
-  overflow: hidden !important;
-}
-
-html.minimal-launch body.cashier-sheet-open .cashier-methods .footer-lobby-row {
-  margin: 0 !important;
-}
-
-html.minimal-launch body.cashier-sheet-open .cashier-amount-field,
-html.minimal-launch body.cashier-sheet-open .cashier-presets,
-html.minimal-launch body.cashier-sheet-open .cashier-method-row {
-  background: var(--weez-cell) !important;
-}
-
-html.minimal-launch body.cashier-sheet-open .cashier-sticky-footer {
-  position: static !important;
-  inset: auto !important;
-  z-index: auto !important;
-  width: 100% !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  transform: none !important;
-}
-
-html.minimal-launch .buyin-sheet .buyin-submit,
-html.minimal-launch body.doc-sheet-open .doc-sheet .cashier-pay-button,
-html.minimal-launch body.cashier-sheet-open .cashier-pay-button {
-  width: 100% !important;
-  margin: 0 !important;
-  min-height: 52px !important;
-  border: 0 !important;
-  border-radius: var(--weez-radius-control) !important;
-  background: var(--weez-accent) !important;
-  color: var(--weez-accent-text) !important;
-  box-shadow: none !important;
-}
-
-html.minimal-launch body.cashier-sheet-open .cashier-presets button,
-html.minimal-launch body.cashier-sheet-open .cashier-amount-field input,
-html.minimal-launch body.cashier-sheet-open .cashier-amount-field small {
-  color: var(--weez-text) !important;
-  font-family: var(--weez-font-rounded) !important;
-  font-variant-numeric: tabular-nums !important;
-}
 
 
 }
 
-@layer weez-sheets {
-  html.minimal-launch .buyin-sheet {
-    background: var(--weez-bg) !important; color: var(--weez-text) !important;
-    max-height: calc(var(--app-height, 100dvh) - var(--app-safe-top, 0px) - 16px) !important;
-    overflow-y: auto !important; transition: transform 320ms var(--weez-ease), opacity 320ms var(--weez-ease) !important;
-  }
-  html.minimal-launch :is(.buyin-summary, .buyin-info-card, .buyin-amount-grid > label, .buyin-amount-grid > button) { background: var(--weez-section) !important; }
-  html.minimal-launch [data-method="stars"] .footer-lobby-icon { background: var(--weez-accent) !important; }
-}
-html.minimal-launch .buyin-head { display: grid; gap: 8px; }
-html.minimal-launch .buyin-title { display: block; margin: 0; font-size: 20px; line-height: 1.25; color: var(--weez-text); }
+
 html.minimal-launch .profile-balance-row { display: none; }
 
 /* Profile and tournament values must shrink inside their own cells. */
@@ -706,7 +609,7 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .tournament-history-card
 }
 
 /* Lobby geometry: content sizes its rows; labels never compete with fixed tracks. */
-html.minimal-launch:not(.admin-mode) body.doc-sheet-open .doc-sheet .lobby-menu-head { display: block !important; }
+
 
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .home-games { display: grid !important; gap: 16px !important; }
 html.minimal-launch:not(.admin-mode) body:not(.in-game) :is(.home-game-actions, .home-offer-meta) { display: none !important; }
@@ -720,7 +623,6 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) :is(.section-title, .pro
   gap: 12px !important;
 }
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-view.active .section-title > div { min-width: 0 !important; }
-html.minimal-launch:not(.admin-mode) body.doc-sheet-open .doc-sheet .lobby-menu-head h2,
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .lobby-view.active .section-title h2 {
   margin: 0 !important; color: var(--weez-text) !important; font-size: 20px !important; line-height: 1.25 !important;
   font-weight: 600 !important; letter-spacing: -.025em !important;
@@ -810,7 +712,7 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .table-list [data-action
 }
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .table-list [data-action="join"]::after {
   content: ""; display: block; width: 8px; height: 14px;
-  background: currentColor; mask: url("/assets/ui/chevronright.svg") center / contain no-repeat;
+  background: currentColor; mask: var(--weez-chevron);
 }
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .table-list .table-row { display: flex; min-height: 0; padding: 0; }
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .profile-hero { justify-content: flex-start !important; }
@@ -823,8 +725,6 @@ html.minimal-launch:not(.admin-mode) body:not(.in-game) .profile-dashboard-stats
 html.minimal-launch:not(.admin-mode) body:not(.in-game) :is(.profile-dashboard-stats > div, .profile-tournament-grid > div) {
   min-width: 0; padding: 12px; border-radius: 16px;
 }
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-main { overflow-wrap: anywhere !important; white-space: normal !important; }
-html.minimal-launch:not(.admin-mode) body:not(.in-game) .footer-lobby-value { max-width: 90px !important; }
 
 
 html.minimal-launch:not(.admin-mode) body:not(.in-game) .profile-dashboard-stats > div {
@@ -874,25 +774,6 @@ html.minimal-launch body.in-game .game-toolbar {
   transform: none !important;
 }
 
-html.minimal-launch body.in-game .game-toolbar #menuButton,
-html.minimal-launch body.in-game .game-toolbar [data-panel-tab="info"] {
-  position: relative !important;
-  display: grid !important;
-  place-items: center !important;
-  width: 44px !important;
-  min-width: 44px !important;
-  height: 44px !important;
-  min-height: 44px !important;
-  padding: 0 !important;
-  border: 0 !important;
-  border-radius: 14px !important;
-  background: var(--weez-game-panel) !important;
-  color: color-mix(in srgb, var(--weez-text) 88%, transparent) !important;
-  box-shadow: none !important;
-  pointer-events: auto !important;
-  touch-action: manipulation !important;
-}
-
 html.minimal-launch body.in-game .game-toolbar #menuButton {
   grid-column: 1 !important;
   justify-self: start !important;
@@ -925,7 +806,7 @@ html.minimal-launch body.in-game .game-toolbar .control-glyph {
   height: 23px !important;
   object-fit: contain !important;
   opacity: .88 !important;
-  filter: brightness(0) invert(1) !important;
+  filter: none !important;
   transform: translate(-50%, -50%) scale(1) !important;
   transition: opacity 160ms ease, transform 220ms var(--weez-ease) !important;
   pointer-events: none !important;
@@ -942,12 +823,12 @@ html.minimal-launch body.in-game .game-toolbar .icon-control.is-open {
   background: var(--weez-game-row) !important;
 }
 
-html.minimal-launch body.in-game .game-toolbar .icon-control.is-open .control-glyph--closed {
+html.minimal-launch body.in-game .game-toolbar #menuButton.is-open .control-glyph--closed {
   opacity: 0 !important;
   transform: translate(-50%, -50%) scale(.82) !important;
 }
 
-html.minimal-launch body.in-game .game-toolbar .icon-control.is-open .control-glyph--open {
+html.minimal-launch body.in-game .game-toolbar #menuButton.is-open .control-glyph--open {
   opacity: .9 !important;
   transform: translate(-50%, -50%) scale(1) !important;
 }
@@ -1056,156 +937,22 @@ html.minimal-launch body.in-game .seat.winner .card.best-card {
 }
 
 /* Both game panels use one component and one state owner (`hidden`). */
-html.minimal-launch body.in-game .side-menu,
-html.minimal-launch body.in-game .info-drawer {
-  position: fixed !important;
-  z-index: 69 !important;
-  top: max(14px, var(--app-safe-top, 0px)) !important;
-  width: min(300px, calc(100vw - 40px)) !important;
-  max-height: calc(100dvh - 28px - var(--app-safe-top, 0px)) !important;
-  transform: none !important;
-  padding: 52px 8px 8px !important;
-  border: 0 !important;
-  border-radius: var(--weez-radius-section) !important;
-  background: var(--weez-game-panel) !important;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, .32) !important;
-  overflow: hidden !important;
-  opacity: 1 !important;
-}
-
-html.minimal-launch body.in-game .side-menu {
-  right: auto !important;
-  left: 14px !important;
-}
-
-html.minimal-launch body.in-game .info-drawer {
-  right: 14px !important;
-  left: auto !important;
-}
-
-html.minimal-launch body.in-game .side-menu button:not(.close-button) {
-  position: relative !important;
-  width: 100% !important;
-  height: 44px !important;
-  min-height: 44px !important;
-  padding: 0 14px !important;
-  border: 0 !important;
-  border-radius: 14px !important;
-  background: transparent !important;
-  color: color-mix(in srgb, var(--weez-text) 92%, transparent) !important;
-  box-shadow: none !important;
-  font-size: 15px !important;
-  font-weight: 400 !important;
-  line-height: 20px !important;
-  text-align: left !important;
-}
-
-html.minimal-launch body.in-game .side-menu button:not(.close-button)::after {
-  content: "" !important;
-  position: absolute !important;
-  right: 14px !important;
-  bottom: 0 !important;
-  left: 14px !important;
-  height: 1px !important;
-  background: var(--weez-game-divider) !important;
-}
-
-html.minimal-launch body.in-game .side-menu button:not(.close-button):last-child::after {
-  content: none !important;
-}
-
-html.minimal-launch body.in-game .side-menu .close-button,
-html.minimal-launch body.in-game .info-drawer .drawer-tabs .close-button {
-  display: none !important;
-}
-
-html.minimal-launch body.in-game .info-drawer .drawer-tabs {
-  display: flex !important;
-  align-items: center !important;
-  height: 42px !important;
-  margin: 0 0 8px !important;
-  padding: 0 !important;
-  gap: 6px !important;
-  background: transparent !important;
-  overflow: hidden !important;
-}
-
-html.minimal-launch body.in-game .info-drawer .drawer-tabs button:not(.close-button) {
-  display: inline-flex !important;
-  flex: 0 0 42px !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 7px !important;
-  width: 42px !important;
-  min-width: 42px !important;
-  height: 42px !important;
-  min-height: 42px !important;
-  padding: 0 !important;
-  border: 0 !important;
-  border-radius: 14px !important;
-  background: var(--weez-game-row) !important;
-  color: color-mix(in srgb, var(--weez-text) 52%, transparent) !important;
-  box-shadow: none !important;
-  overflow: hidden !important;
-  transition: flex-basis 240ms var(--weez-ease), color 160ms ease, background-color 160ms ease !important;
-}
-
-html.minimal-launch body.in-game .info-drawer .drawer-tabs button.active {
-  flex-basis: 118px !important;
-  width: 118px !important;
-  min-width: 118px !important;
-  background: var(--weez-accent) !important;
-  color: var(--weez-accent-text) !important;
-}
-
-html.minimal-launch body.in-game .info-drawer .drawer-tabs .dt-label {
-  display: none !important;
-  overflow: hidden !important;
-  font-size: 12px !important;
-  font-weight: 600 !important;
-  line-height: 16px !important;
-  white-space: nowrap !important;
-}
-
-html.minimal-launch body.in-game .info-drawer .drawer-tabs button.active .dt-label {
-  display: inline !important;
-}
-
-html.minimal-launch body.in-game .info-drawer .drawer-page:not([hidden]) {
-  display: block !important;
-  max-height: calc(100dvh - 100px - var(--app-safe-top, 0px)) !important;
-  margin: 0 !important;
-  padding: 4px 10px 10px !important;
-  border: 0 !important;
-  border-radius: 20px !important;
-  background: var(--weez-game-row) !important;
-  overflow: auto !important;
-  overscroll-behavior: contain !important;
-  -webkit-overflow-scrolling: touch !important;
-}
-
-html.minimal-launch body.in-game .info-row,
 html.minimal-launch body.in-game .stats-row,
 html.minimal-launch body.in-game .stats-row.stats-head {
   min-height: 44px !important;
   border-bottom-color: var(--weez-game-divider) !important;
 }
-
-html.minimal-launch body.in-game .info-row span,
 html.minimal-launch body.in-game .stats-row span {
   color: color-mix(in srgb, var(--weez-text) 54%, transparent) !important;
   font-size: 13px !important;
   font-weight: 400 !important;
 }
-
-html.minimal-launch body.in-game .info-row strong,
 html.minimal-launch body.in-game .stats-row strong {
   color: var(--weez-text) !important;
   font-size: 13px !important;
   font-weight: 600 !important;
 }
 
-html.minimal-launch body.in-game .betting-actions,
 html.minimal-launch body.in-game .pre-actions,
 html.minimal-launch body.in-game .bot-actions,
 html.minimal-launch body.in-game .show-muck-actions {
@@ -1214,17 +961,6 @@ html.minimal-launch body.in-game .show-muck-actions {
   background: color-mix(in srgb, var(--weez-bg) 90%, transparent) !important;
   box-shadow: 0 -12px 34px rgba(0, 0, 0, .28) !important;
 }
-
-html.minimal-launch body.in-game .betting-actions button,
-html.minimal-launch body.in-game .pre-actions button,
-html.minimal-launch body.in-game .bot-actions button,
-html.minimal-launch body.in-game .show-muck-actions button {
-  border: 0 !important;
-  border-radius: var(--weez-radius-control) !important;
-  font-size: 15px !important;
-  font-weight: 600 !important;
-}
-
 html.minimal-launch body.in-game .game-screen.has-actions .viewer-hand-badge:not([hidden]),
 html.minimal-launch body.in-game .game-screen.has-pre-actions .viewer-hand-badge:not([hidden]) {
   position: fixed !important;

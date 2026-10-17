@@ -6,10 +6,10 @@
     <title>Weez Poker</title>
     <link rel="icon" type="image/png" href="/brand.png" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="/styles.css?v=20261017-1" />
-    <link rel="stylesheet" href="/lobby-qa.css?v=20261017-1" />
-    <link rel="stylesheet" href="/telegram-ui-kit-overrides.css?v=20261017-1" />
-    <link rel="stylesheet" href="/weez-design-system-v2.css?v=20261017-1" />
+    <link rel="stylesheet" href="/styles.css?v=20261017-2" />
+    <link rel="stylesheet" href="/lobby-qa.css?v=20261017-2" />
+    <link rel="stylesheet" href="/telegram-ui-kit-overrides.css?v=20261017-2" />
+    <link rel="stylesheet" href="/weez-design-system-v2.css?v=20261017-2" />
   </head>
   <body>
     <section class="app-boot" id="appBoot" aria-live="polite" aria-label="Загрузка Weez Poker">
@@ -30,15 +30,15 @@
       <section class="table-panel game-screen" id="currentTable" hidden>
         <div class="game-toolbar">
           <button type="button" id="menuButton" class="icon-control" title="Меню" aria-label="Меню" aria-expanded="false">
-            <img class="control-glyph control-glyph--closed" src="/assets/ui/ic_list.svg" alt="" aria-hidden="true" />
-            <img class="control-glyph control-glyph--open" src="/assets/ui/cancel.svg" alt="" aria-hidden="true" />
+            <span class="control-glyph control-glyph--closed ui-icon" style="--ui-icon:url('/assets/ui/ic_list.svg')" aria-hidden="true"></span>
+            <span class="control-glyph control-glyph--open ui-icon" style="--ui-icon:url('/assets/ui/cancel.svg')" aria-hidden="true"></span>
           </button>
           <div class="table-id" id="tableCode">#table</div>
           <button type="button" id="quickBuyInButton" class="icon-control" title="Докупить фишки" aria-label="Докупить фишки">+</button>
           <div class="toolbar-spacer"></div>
           <button type="button" class="icon-control" data-panel-tab="info" title="Инфо" aria-label="Инфо" aria-expanded="false">
-            <svg class="control-glyph control-glyph--closed" viewBox="0 0 28 28" fill="none" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M15.25 8.75C15.25 9.44036 14.6904 10 14 10C13.3096 10 12.75 9.44036 12.75 8.75C12.75 8.05964 13.3096 7.5 14 7.5C14.6904 7.5 15.25 8.05964 15.25 8.75ZM11.165 12.5C11.165 12.0388 11.5389 11.665 12 11.665H14.25C14.7112 11.665 15.085 12.0388 15.085 12.5V18.665H16.5C16.9612 18.665 17.335 19.0388 17.335 19.5C17.335 19.9612 16.9612 20.335 16.5 20.335H12C11.5389 20.335 11.165 19.9612 11.165 19.5C11.165 19.0388 11.5389 18.665 12 18.665H13.415V13.335H12C11.5389 13.335 11.165 12.9611 11.165 12.5Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M14 3C20.0751 3 25 7.92487 25 14C25 20.0751 20.0751 25 14 25C7.92487 25 3 20.0751 3 14C3 7.92487 7.92487 3 14 3ZM14 4.5C8.75329 4.5 4.5 8.75329 4.5 14C4.5 19.2467 8.75329 23.5 14 23.5C19.2467 23.5 23.5 19.2467 23.5 14C23.5 8.75329 19.2467 4.5 14 4.5Z" fill="currentColor"/></svg>
-            <img class="control-glyph control-glyph--open" src="/assets/ui/cancel.svg" alt="" aria-hidden="true" />
+            <span class="control-glyph control-glyph--closed ui-icon" style="--ui-icon:url('/assets/ui/info.svg')" aria-hidden="true"></span>
+            <span class="control-glyph control-glyph--open ui-icon" style="--ui-icon:url('/assets/ui/cancel.svg')" aria-hidden="true"></span>
           </button>
           <button type="button" id="sitButton" class="sit-button" hidden>Сесть за стол</button>
         </div>
@@ -80,7 +80,7 @@
             <button type="button" data-bet-preset="pot">Банк</button>
             <button type="button" data-bet-preset="max">Макс.</button>
           </div>
-          <button type="button" class="sitout-action" id="quickSitOutButton" title="Отойти" aria-label="Отойти">□</button>
+          <button type="button" class="sitout-action" id="quickSitOutButton" title="Отойти" aria-label="Отойти"><span class="ui-icon" style="--ui-icon:url('/assets/tables/delmsgusers.svg')" aria-hidden="true"></span></button>
           <button type="button" data-poker-action="fold" class="danger">Fold</button>
           <button type="button" data-poker-action="check" class="secondary">Check</button>
           <button type="button" data-poker-action="call">Call</button>
@@ -89,7 +89,8 @@
             <input id="actionAmount" inputmode="numeric" pattern="[0-9]*" value="50" />
           </label>
           <input class="bet-slider" id="betSlider" type="range" min="1" max="10000" step="1" value="50" />
-          <button type="button" class="bet-confirm" id="confirmBetButton">Подтвердить<br /><span>50</span></button>
+          <button type="button" class="secondary" id="cancelBetButton" hidden>Отмена</button>
+          <button type="button" class="bet-confirm" id="confirmBetButton">Подтвердить<span>50</span></button>
           <button type="button" data-poker-action="bet">Bet</button>
           <button type="button" data-poker-action="raise">Raise</button>
         </div>
@@ -100,7 +101,7 @@
         </div>
         <div class="sitout-popover" id="sitOutPopover" hidden>
           <button type="button" id="confirmSitOutButton">Отошёл</button>
-          <button type="button" class="sitout-info-button" id="sitOutInfoButton" aria-label="Информация">!</button>
+          <button type="button" class="sitout-info-button" id="sitOutInfoButton" aria-label="Информация"><span class="ui-icon" style="--ui-icon:url('/assets/ui/info.svg')" aria-hidden="true"></span></button>
           <p id="sitOutInfoText" hidden>Вы перейдёте в sit-out. Если раздача активна, режим включится после фолда или завершения руки.</p>
         </div>
         <div class="pre-actions" id="preActions" hidden>
@@ -139,15 +140,15 @@
             </div>
           </div>
           <div class="buyin-amount-grid">
-            <button type="button" id="buyInMinButton">Мин.<br /><span>10 000</span></button>
+            <button type="button" id="buyInMinButton">Мин.<span>10 000</span></button>
             <label>
               Сумма
               <input id="buyInAmount" inputmode="decimal" value="10000" />
             </label>
-            <button type="button" id="buyInMaxButton">Макс.<br /><span>40 000</span></button>
+            <button type="button" id="buyInMaxButton">Макс.<span>40 000</span></button>
           </div>
           <input id="buyInSlider" class="buyin-slider" type="range" min="10000" max="40000" step="500" value="10000" />
-          <button type="button" class="buyin-auto" disabled>
+          <button type="button" class="buyin-auto" hidden disabled>
             <strong>Авто Бай-ин / Ребай</strong>
             <small>скоро</small>
           </button>
@@ -175,7 +176,7 @@
                 <span id="lobbyUsername">@player</span>
                 <small class="player-rank" id="lobbyRank">Новичок · Уровень 1</small>
               </div>
-              <button type="button" class="home-profile-link" data-lobby-tab="profile" aria-label="Открыть профиль">›</button>
+              <button type="button" class="home-profile-link" hidden data-lobby-tab="profile" aria-label="Открыть профиль">›</button>
             </div>
             <div class="home-balance">
               <span>Баланс</span>
@@ -186,7 +187,7 @@
               <strong><b id="homeWalletSideValue">0</b><small id="homeWalletSideCurrency"> фишек</small></strong>
               <small id="homeWalletSideHint">нет активных</small>
               <div class="home-wallet-side-meter" aria-hidden="true"><span id="homeWalletSideMeter"></span></div>
-              <button type="button" class="home-wallet-side-action" id="homeWalletSideAction" disabled>Скоро</button>
+              <button type="button" class="home-wallet-side-action" hidden id="homeWalletSideAction" disabled>Скоро</button>
             </div>
             <div class="home-wallet-actions">
               <button type="button" id="walletTopupButton" aria-label="Депозит" title="Депозит">
@@ -232,10 +233,12 @@
             </div>
             <div class="game-mode-switch product-mode-segment" id="gameModeSwitch" aria-label="Режим игры">
               <button type="button" class="active" data-game-mode="play">
+                <span class="ui-icon" style="--ui-icon: url(/assets/mode/wear.svg)" aria-hidden="true"></span>
                 <span>Рейтинг</span>
                 <small>RP-сезон</small>
               </button>
               <button type="button" data-game-mode="cash">
+                <span class="ui-icon" style="--ui-icon: url(/assets/mode/monetization.svg)" aria-hidden="true"></span>
                 <span>Cash</span>
                 <small>cash-столы</small>
               </button>
@@ -449,7 +452,7 @@
           </section>
           <section class="lobby-card cashier-topup-card" data-cashier-sheet="deposit">
             <div class="cashier-sheet-grabber" aria-hidden="true"></div>
-            <div class="section-title">
+            <div class="section-title" hidden>
               <div>
                 <p class="eyebrow">Пополнение</p>
                 <h2 id="cashierTopupTitle">Стартовый баланс</h2>
@@ -484,7 +487,7 @@
           </section>
           <section class="lobby-card cashier-withdraw-card" data-cashier-sheet="withdraw">
             <div class="cashier-sheet-grabber" aria-hidden="true"></div>
-            <div class="section-title">
+            <div class="section-title" hidden>
               <button type="button" class="cashier-sheet-close" data-cashier-sheet-close aria-label="Закрыть">×</button>
             </div>
             <div class="cashier-withdraw-state">
@@ -587,7 +590,7 @@
               </div>
               <nav class="tournament-detail-tabs" aria-label="Разделы турнира">
                 <button type="button" class="active" data-tournament-detail-tab="payout">Призовые</button>
-                <button type="button" data-tournament-detail-tab="info">Информация</button>
+                <button type="button" data-tournament-detail-tab="info" aria-label="Информация">Инфо</button>
                 <button type="button" data-tournament-detail-tab="blinds">Блайнды</button>
               </nav>
               <section class="tournament-detail-panel active" data-tournament-detail-panel="payout" id="tournamentDetailPayout"></section>
@@ -1083,7 +1086,7 @@
     </section>
 
     <aside class="side-menu" id="sideMenu" hidden>
-      <button type="button" class="close-button" id="closeMenuButton" aria-label="Закрыть меню">×</button>
+      <button type="button" class="ui-button ui-button--icon ui-popover__close" id="closeMenuButton" aria-label="Закрыть меню"><span class="ui-icon" style="--ui-icon:url('/assets/ui/cancel.svg')" aria-hidden="true"></span></button>
       <button type="button" id="standButton">Покинуть стол</button>
       <button type="button" id="sitOutButton">Отойти</button>
       <button type="button" id="buyInButton">Добавить средства на стол</button>
@@ -1092,11 +1095,11 @@
     </aside>
 
     <aside class="info-drawer" id="infoDrawer" hidden>
-      <div class="drawer-tabs">
-        <button type="button" data-drawer-tab="log" aria-label="История"><span class="dt-icon" aria-hidden="true"></span><span class="dt-label">История</span></button>
-        <button type="button" data-drawer-tab="info" aria-label="Информация"><span class="dt-icon" aria-hidden="true"></span><span class="dt-label">Информация</span></button>
-        <button type="button" data-drawer-tab="stats" aria-label="Статистика"><span class="dt-icon" aria-hidden="true"></span><span class="dt-label">Статистика</span></button>
-        <button type="button" class="close-button" id="closeDrawerButton" aria-label="Закрыть панель">×</button>
+      <button type="button" class="ui-button ui-button--icon ui-popover__close" id="closeDrawerButton" aria-label="Закрыть панель"><span class="ui-icon" style="--ui-icon:url('/assets/ui/cancel.svg')" aria-hidden="true"></span></button>
+      <div class="drawer-tabs ui-segment--expanding">
+        <button type="button" data-drawer-tab="log" aria-label="История"><span class="ui-icon" style="--ui-icon:url('/assets/ui/ic_list.svg')" aria-hidden="true"></span><span class="dt-label">История</span></button>
+        <button type="button" data-drawer-tab="info" aria-label="Информация"><span class="ui-icon" style="--ui-icon:url('/assets/ui/info.svg')" aria-hidden="true"></span><span class="dt-label">Информация</span></button>
+        <button type="button" data-drawer-tab="stats" aria-label="Статистика"><span class="ui-icon" style="--ui-icon:url('/assets/nav/botprofile2.svg')" aria-hidden="true"></span><span class="dt-label">Статистика</span></button>
       </div>
       <section class="drawer-page" id="drawerLog">
         <div class="log-list drawer-log" id="actionLog"></div>
@@ -1123,6 +1126,6 @@
       </article>
     </template>
 
-    <script src="/app.js?v=20261017-4" type="module"></script>
+    <script src="/app.js?v=20261017-5" type="module"></script>
   </body>
 </html>

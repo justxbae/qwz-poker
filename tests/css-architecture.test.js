@@ -11,9 +11,9 @@ const files = {
 };
 
 const legacyBudgets = {
-  styles: { lines: 14_233, important: 1_074 },
-  lobby: { lines: 1_944, important: 1_032 },
-  telegram: { lines: 11_140, important: 5_906 },
+  styles: { lines: 11_994, important: 914 },
+  lobby: { lines: 1_571, important: 816 },
+  telegram: { lines: 6_058, important: 2_815 },
 };
 
 async function source(name) {
@@ -62,7 +62,7 @@ test("canonical CSS exposes core tokens and accessibility guards", async () => {
   }
   assert.match(css, /\[hidden\]\s*\{[^}]*display:\s*none\s*!important/s);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
-  assert.match(css, /body\.in-game \.side-menu/);
-  assert.match(css, /body\.in-game \.info-drawer/);
+  assert.match(css, /\.ui-sheet\s*\{/);
+  assert.match(css, /\.ui-popover\s*\{/);
   assert.doesNotMatch(css, /transition:\s*all\b/);
 });

@@ -220,7 +220,7 @@ font-variant-numeric: tabular-nums;
 
 Первым перенесён игровой chrome: toolbar, felt, служебные подписи, action controls, левое меню и правый info drawer. Совпадающий legacy-блок удалён из `telegram-ui-kit-overrides.css`. Архитектурный тест фиксирует порядок подключения и запрещает рост legacy-файлов/`!important` сверх текущего бюджета. Это промежуточная защита, а не завершение миграции.
 
-Финальная цель — один token layer, один primitives layer и экранные стили без каскада датированных override-блоков. Следующие компоненты переносятся по одному после визуальной проверки: cashier sheets, lobby/profile cards, tournaments/private tables, затем table seats/cards/action states.
+Финальная цель — один token layer, один primitives layer и экранные стили без каскада датированных override-блоков. Общие панели, строки, поля, кнопки и переключатели перенесены в primitives layer. Специализированные layouts турниров, приватных столов, игровых мест, карт и отдельных состояний ещё содержат исторические стили; это остающийся долг, а не второй источник оформления общих компонентов.
 
 
 ## 14. Проверка интерфейса 17 октября 2026
@@ -229,7 +229,7 @@ font-variant-numeric: tabular-nums;
   восстановление фокуса и отменяемое закрытие sheets. Нативный click активирует навигацию;
   собственные pointerup-переходы и искусственная пружина страницы удалены.
 - `ui-state` — первый CSS layer: его important-правила владеют `[hidden]`, disabled,
-  pressed, reduced motion и drag. `weez-rows`, `weez-sheets`, `weez-game` владеют важными
+  pressed, reduced motion и drag. `weez-components` и `weez-game` владеют важными
   свойствами мигрированных компонентов: layered important имеет приоритет над старым
   unlayered important. Обычные стили полностью перенесённых списков столов и профиля
   остаются unlayered; соответствующие legacy-селекторы удалены. Новые свойства не надо
@@ -251,3 +251,44 @@ font-variant-numeric: tabular-nums;
 - Это браузерная проверка. Настоящие клавиатуры, жесты WebView и финальная приёмка на
   физических iOS/Android в Telegram остаются отдельной проверкой; идеальное совпадение
   с native UI не подтверждено. Cashier проверяется как интерфейс; платежи не подключены.
+
+## 15. Общие компоненты и контроллер панелей
+
+Новые экраны собираются из `ui-*` primitives в `public/weez-design-system-v2.css`.
+`public/ui-components.js` — единственный compatibility registry для старых semantic hooks
+и динамического контента. Новая разметка может сразу использовать общие классы.
+
+| Семейство | Классы и варианты |
+|---|---|
+| Контейнер | `ui-card`, `ui-surface`, `ui-stack` |
+| Группа строк | `ui-group`, `ui-row`, `ui-row--plain`, `ui-row__icon/text/value/chevron` |
+| Кнопка | `ui-button`, `--primary`, `--secondary`, `--danger`, `--compact`, `--stacked`, `--icon` |
+| Поле | `ui-input`, `ui-input--money`, `ui-range`, `ui-field`, `ui-form-grid` |
+| Данные | `ui-data-row` — подпись и значение; статистическая таблица сохраняет три колонки |
+| Переключатель | `ui-segment` с moving pill; `ui-segment--expanding` с раскрытием активной подписи |
+| Диалог | `ui-sheet`, `ui-sheet__handle/header`, `ui-backdrop`, `ui-actions` |
+| Всплывающее меню | `ui-popover`, `--left/right/actions`, `ui-popover__close` |
+
+Все шесть sheets и три игровых popovers регистрируются в `setupOverlays()` приложения.
+`createOverlayManager()` в `public/ui-runtime.js` единолично управляет фазами
+`closed → opening → open → closing`, таймерами, отменой устаревших кадров, клавиатурой,
+свайпом, backdrop, блокировкой страницы, Escape/Telegram Back и возвратом фокуса.
+Экран готовит данные и вызывает `show`/`close`; собственные таймеры и drag handlers запрещены.
+Выбранное состояние обычных кнопок (`selected`/`active`/`aria-pressed`) также общее.
+Press feedback и focus trap также общие. Длительности берутся из CSS tokens.
+Редактор ставки имеет явную отмену; Escape сначала закрывает верхнее меню, затем редактор.
+Видимость его полей и основных игровых действий задаётся `[hidden]`, а не конкурирующими display-правилами.
+
+В раскрывающемся переключателе неактивные кнопки имеют только иконку и зону касания
+44×44. Выбранная кнопка раскрывает подпись за 260 ms; предыдущая сворачивается.
+Подпись обрезается внутри своей кнопки во время движения, не накладываясь на соседей.
+Крестик расположен отдельной кнопкой сверху слева, вне группы вкладок. Popover находится
+выше игровых toolbar controls, чтобы они не перехватывали нажатие на крестик.
+При reduced motion изменение состояния мгновенное. Контейнер всего игрового экрана
+не анимируется через transform: это меняет containing block у fixed controls и заставляет их прыгать.
+
+Проверка после переноса: шесть sheets имеют одинаковые radius/padding/gap/motion,
+одного scroll owner и handle 44 px; после закрытия снимаются inert и scroll lock.
+Проверены Chromium 320/390/430 px, обе палитры, переключение игровых вкладок по кадрам,
+быстрые повторные нажатия и reduced motion. Снимки — `output/playwright/` (локальные).
+Проверка на физических устройствах Telegram остаётся незавершённой.

@@ -1,4 +1,5 @@
-import { setupPressFeedback, setupViewport, revealSheet, dismissSheet, setupDialogFocus } from "./ui-runtime.js?v=20261017-1";
+import { setupPressFeedback, setupViewport, createOverlayManager, setupDialogFocus } from "./ui-runtime.js?v=20261017-2";
+import { setupUIComponents } from "./ui-components.js?v=20261017-1";
 import { acceptsTableSnapshot, matchesActionContext, actionAmountBounds } from "./table-context.js?v=20261017-2";
 
 const tg = window.Telegram?.WebApp;
@@ -64,33 +65,7 @@ const cashierState = {
 };
 let adminAnalyticsDays = Number(window.localStorage.getItem("qwzAdminAnalyticsDays") || 7);
 if (![1, 7, 30].includes(adminAnalyticsDays)) adminAnalyticsDays = 7;
-const cashierSheetHomes = new Map();
-const modalScrollOwners = new Set();
-let modalScrollY = 0;
-
-function lockLobbyScroll(owner) {
-  if (!owner || modalScrollOwners.has(owner)) return;
-  if (!modalScrollOwners.size) {
-    modalScrollY = window.scrollY;
-    document.body.style.position = "fixed";
-    document.body.style.top = `${-modalScrollY}px`;
-    document.body.style.left = "0";
-    document.body.style.right = "0";
-    document.body.style.width = "100%";
-  }
-  modalScrollOwners.add(owner);
-}
-
-function unlockLobbyScroll(owner) {
-  modalScrollOwners.delete(owner);
-  if (modalScrollOwners.size) return;
-  document.body.style.removeProperty("position");
-  document.body.style.removeProperty("top");
-  document.body.style.removeProperty("left");
-  document.body.style.removeProperty("right");
-  document.body.style.removeProperty("width");
-  window.scrollTo({ top: modalScrollY, left: 0, behavior: "auto" });
-}
+let overlays;
 
 const profile = document.querySelector("#profile");
 const appBoot = document.querySelector("#appBoot");
@@ -258,12 +233,6 @@ const tournamentDetailStructure = document.querySelector("#tournamentDetailStruc
 const tournamentDetailNote = document.querySelector("#tournamentDetailNote");
 const tournamentDetailAction = document.querySelector("#tournamentDetailAction");
 const tournamentRegistrationBadge = document.querySelector("#tournamentRegistrationBadge");
-const tournamentDetailHome = tournamentDetailSheet && tournamentDetailBackdrop ? {
-  sheetParent: tournamentDetailSheet.parentNode,
-  sheetNextSibling: tournamentDetailSheet.nextSibling,
-  backdropParent: tournamentDetailBackdrop.parentNode,
-  backdropNextSibling: tournamentDetailBackdrop.nextSibling
-} : null;
 const continueCard = document.querySelector("#continueCard");
 const continueMeta = document.querySelector("#continueMeta");
 const continueGameButton = document.querySelector("#continueGameButton");
@@ -410,10 +379,12 @@ boot().then(completeBoot).catch(showBootError);
 
 async function boot() {
   resetScroll();
+  setupUIComponents();
+  setupOverlays();
   setupPressFeedback();
   setupDialogFocus();
   setupViewport(tg);
-  setupOverlayKeyboardControls();
+  document.querySelector("#cancelBetButton").addEventListener("click", closeAmountPanel);
   tg?.expand();
   setupTelegramControls();
 
@@ -435,13 +406,6 @@ async function boot() {
   createTableForm.addEventListener("submit", onCreateTable);
   profileRefreshButton?.addEventListener("click", () => runAction(loadProfile));
   walletTopupButton?.addEventListener("click", () => runAction(openCashierTopup));
-  cashierSheetBackdrop?.addEventListener("click", closeCashierSheet);
-  document.querySelectorAll("[data-cashier-sheet]").forEach((sheet) => {
-    wireCashierSheetDrag(sheet);
-  });
-  if (tournamentDetailSheet) wireCashierSheetDrag(tournamentDetailSheet, closeTournamentDetails);
-  if (lobbyMenuSheet) wireCashierSheetDrag(lobbyMenuSheet, closeLobbyMenu);
-  wireCashierSheetDrag(document.querySelector("#docSheet"), closeDocSheet);
   cashierSheetCloseButtons.forEach((button) => {
     button.addEventListener("click", closeCashierSheet);
   });
@@ -459,9 +423,7 @@ async function boot() {
     event.preventDefault();
     runAction(submitWithdrawalRequest);
   });
-  setupKeyboardAwareSheets();
   tournamentList?.addEventListener("click", onTournamentAction);
-  tournamentDetailBackdrop?.addEventListener("click", closeTournamentDetails);
   tournamentDetailSecondary?.addEventListener("click", closeTournamentDetails);
   tournamentDetailAction?.addEventListener("click", onTournamentDetailAction);
   tournamentDetailSheet?.addEventListener("click", onTournamentDetailTabSelect);
@@ -513,7 +475,6 @@ async function boot() {
     });
   });
   lobbyMenuButton?.addEventListener("click", toggleLobbyMenu);
-  lobbyMenuBackdrop?.addEventListener("click", closeLobbyMenu);
   lobbyMenuSheet?.addEventListener("click", onLobbyMenuAction);
   if (DEV_MODE) {
     addTestPlayerButton.addEventListener("click", () => runAction(addTestPlayer));
@@ -540,7 +501,6 @@ async function boot() {
     button.addEventListener("click", () => openDocSheet(button.dataset.doc));
   });
   document.querySelector("#docSheetClose")?.addEventListener("click", closeDocSheet);
-  document.querySelector("#docSheetBackdrop")?.addEventListener("click", closeDocSheet);
   quickBuyInButton.addEventListener("click", () => runAction(buyIn));
   backToLobbyButton.addEventListener("click", () => runAction(backToLobbyFromTable));
   sitButton.addEventListener("click", () => runAction(sitAtTable));
@@ -574,11 +534,6 @@ async function boot() {
   currentTable.addEventListener("click", onTableBackdropClick);
   actionAmount.addEventListener("input", syncSliderFromAmount);
   betSlider.addEventListener("input", syncAmountFromSlider);
-  buyInOverlay.addEventListener("click", (event) => {
-    if (event.target === buyInOverlay) hideBuyInOverlay();
-  });
-  buyInSheet?.addEventListener("click", (event) => event.stopPropagation());
-  wireBuyInSheetDrag();
   closeBuyInOverlay.addEventListener("click", hideBuyInOverlay);
   buyInAmount.addEventListener("input", syncBuyInSliderFromAmount);
   buyInSlider.addEventListener("input", syncBuyInAmountFromSlider);
@@ -1130,6 +1085,7 @@ function revealItems() {
 }
 
 async function handleTelegramBack() {
+  if (overlays.closeTop()) return;
   if (!document.querySelector("#docSheet").hidden) { closeDocSheet(); return; }
   if (pendingBetAction) {
     closeAmountPanel();
@@ -1178,7 +1134,8 @@ async function handleTelegramBack() {
 
 function updateTelegramBackButton() {
   if (!telegramVersionAtLeast("6.1")) return;
-  const shouldShow = !document.querySelector("#docSheet").hidden
+  const shouldShow = overlays?.hasOpen()
+    || !document.querySelector("#docSheet").hidden
     || Boolean(pendingBetAction)
     || Boolean(state.selectedTournamentId)
     || !buyInOverlay.hidden
@@ -1266,7 +1223,7 @@ function renderCashierControls(deposit) {
     cashierRubAmount.value = "";
     cashierRubAmount.placeholder = "Недоступно";
     cashierPresets.replaceChildren();
-    cashierMethods.className = "cashier-methods footer-lobby tg-menu-group";
+    cashierMethods.className = "cashier-methods footer-lobby tg-menu-group ui-group";
     cashierMethods.replaceChildren();
     if (cashierQuoteChips) cashierQuoteChips.textContent = "—";
     if (cashierQuoteStars) cashierQuoteStars.textContent = "Без оплаты";
@@ -1302,7 +1259,7 @@ function renderCashierControls(deposit) {
     return button;
   }));
 
-  cashierMethods.className = "cashier-methods footer-lobby tg-menu-group";
+  cashierMethods.className = "cashier-methods footer-lobby tg-menu-group ui-group";
   cashierMethods.replaceChildren(...methods.map((method) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -3943,227 +3900,47 @@ async function openCashierSection(section = "deposit") {
   });
 }
 
-function openCashierSheet(section = "deposit") {
-  const normalized = section === "withdraw" ? "withdraw" : "deposit";
-  closeCashierSheet({ silent: true });
-  const sheet = document.querySelector(`[data-cashier-sheet="${normalized}"]`);
-  if (!sheet) return;
-  if (!cashierSheetHomes.has(sheet)) {
-    cashierSheetHomes.set(sheet, {
-      parent: sheet.parentNode,
-      nextSibling: sheet.nextSibling
+function setupOverlays() {
+  overlays = createOverlayManager({ onChange: updateTelegramBackButton, onUnhandledEscape: () => { if (pendingBetAction) closeAmountPanel(); } });
+  for (const section of ["deposit", "withdraw"]) {
+    overlays.register(`cashier-${section}`, {
+      element: document.querySelector(`[data-cashier-sheet="${section}"]`), backdrop: cashierSheetBackdrop,
+      label: section === "deposit" ? "Пополнение" : "Вывод",
+      bodyClasses: ["cashier-sheet-open"], onClose: () => { cashierState.sheet = ""; }
     });
   }
-  cashierSheetBackdrop?.before(sheet);
+  overlays.register("buyin", { element: buyInSheet, backdrop: buyInOverlay, bodyClasses: ["buyin-sheet-open"],
+    onClose: () => { pendingBuyIn = null; document.documentElement.classList.remove("buyin-sheet-open"); } });
+  overlays.register("tournament", { element: tournamentDetailSheet, backdrop: tournamentDetailBackdrop,
+    bodyClasses: ["tournament-sheet-open"], onClose: () => {
+      window.clearInterval(tournamentCountdownTimer); state.selectedTournamentId = ""; state.selectedTournamentDetails = null;
+    } });
+  overlays.register("doc", { element: document.querySelector("#docSheet"), backdrop: document.querySelector("#docSheetBackdrop"), bodyClasses: ["doc-sheet-open"] });
+  overlays.register("menu", { element: lobbyMenuSheet, backdrop: lobbyMenuBackdrop, bodyClasses: ["lobby-menu-open"], onClose: () => {
+    lobbyMenuButton?.classList.remove("active"); lobbyMenuButton?.setAttribute("aria-expanded", "false"); updateBottomNavIndicator();
+  } });
+  sideMenu.classList.add("ui-popover--left");
+  infoDrawer.classList.add("ui-popover--right");
+  sitOutPopover.classList.add("ui-popover--actions");
+  overlays.register("sitout", { element: sitOutPopover, kind: "popover", label: "Пауза за столом", onClose: () => { sitOutInfoText.hidden = true; } });
+  overlays.register("table-menu", { element: sideMenu, kind: "popover", label: "Меню стола", onClose: () => {
+    menuButton.classList.remove("is-open"); menuButton.setAttribute("aria-expanded", "false");
+  } });
+  overlays.register("table-info", { element: infoDrawer, kind: "popover", label: "Информация о столе", onClose: () => {
+    document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach(button => {
+      button.classList.remove("is-open"); button.setAttribute("aria-expanded", "false");
+    });
+  } });
+}
+
+function openCashierSheet(section = "deposit") {
+  const normalized = section === "withdraw" ? "withdraw" : "deposit";
+  overlays.show(`cashier-${normalized}`);
   cashierState.sheet = normalized;
-  lockLobbyScroll("cashier");
-  document.body.classList.add("cashier-sheet-open");
-  if (cashierSheetBackdrop) cashierSheetBackdrop.hidden = false;
-  sheet.setAttribute("role", "dialog");
-  sheet.setAttribute("aria-modal", "true");
-  sheet.tabIndex = -1;
-  sheet.classList.add("sheet-open");
-  sheet.removeAttribute("hidden");
-  revealSheet(sheet);
-  updateTelegramBackButton();
 }
 
 function closeCashierSheet(options = {}) {
-  const sheet = cashierState.sheet ? document.querySelector(`[data-cashier-sheet="${cashierState.sheet}"]`) : null;
-  if (!sheet) return;
-  const finish = () => {
-    cashierState.sheet = "";
-    document.body.classList.remove("cashier-sheet-open");
-    cashierSheetBackdrop?.setAttribute("hidden", "");
-    sheet.classList.remove("sheet-visible", "sheet-open");
-    sheet.style.removeProperty("--sheet-drag-y");
-    sheet.removeAttribute("role");
-    sheet.removeAttribute("aria-modal");
-    sheet.removeAttribute("tabindex");
-    const home = cashierSheetHomes.get(sheet);
-    if (home?.parent) home.parent.insertBefore(sheet, home.nextSibling);
-    unlockLobbyScroll("cashier");
-    updateTelegramBackButton();
-  };
-  dismissSheet(sheet, finish, options.silent);
-}
-
-function wireCashierSheetDrag(sheet, closeSheet = closeCashierSheet) {
-  let startY = 0;
-  let dragStartY = 0;
-  let dragY = 0;
-  let pending = false;
-  let tracking = false;
-  let pointerId = null;
-
-  const begin = (clientY, id = null) => {
-    if (!sheet.classList.contains("sheet-open")) return false;
-    startY = clientY;
-    dragStartY = clientY;
-    dragY = 0;
-    pending = true;
-    tracking = false;
-    pointerId = id;
-    sheet.style.setProperty("--sheet-drag-y", "0px");
-    return true;
-  };
-
-  const move = (clientY, event) => {
-    if (!pending && !tracking) return;
-    const delta = clientY - startY;
-    if (!tracking) {
-      if (delta < -4) {
-        pending = false;
-        return;
-      }
-      if (delta <= 4) return;
-      if (sheet.scrollTop > 2) {
-        startY = clientY;
-        return;
-      }
-      tracking = true;
-      pending = false;
-      dragStartY = startY;
-      sheet.classList.add("is-dragging");
-      if (sheet.contains(document.activeElement)) {
-        document.activeElement.blur();
-      }
-    }
-    dragY = Math.max(0, clientY - dragStartY);
-    if (dragY > 0) event?.preventDefault?.();
-    sheet.style.setProperty("--sheet-drag-y", `${Math.round(dragY)}px`);
-  };
-
-  const finish = (event) => {
-    if (!pending && !tracking) return;
-    const shouldClose = tracking && dragY > 58 && !["pointercancel", "touchcancel"].includes(event?.type);
-    pending = false;
-    tracking = false;
-    if (pointerId !== null && sheet.hasPointerCapture?.(pointerId)) sheet.releasePointerCapture(pointerId);
-    pointerId = null;
-    sheet.classList.remove("is-dragging");
-    if (shouldClose) {
-      closeSheet();
-      return;
-    }
-    sheet.style.setProperty("--sheet-drag-y", "0px");
-  };
-
-  sheet.addEventListener("pointerdown", (event) => {
-    if (event.target.closest("input, textarea, select, button, a") || document.body.classList.contains("keyboard-open")) return;
-    if (!begin(event.clientY, event.pointerId)) return;
-    sheet.setPointerCapture?.(event.pointerId);
-  });
-
-  sheet.addEventListener("pointermove", (event) => {
-    move(event.clientY, event);
-  });
-
-  sheet.addEventListener("pointerup", finish);
-  sheet.addEventListener("pointercancel", finish);
-
-  if (!("PointerEvent" in window)) {
-    sheet.addEventListener("touchstart", (event) => {
-      if (event.target.closest("input, textarea, select, button, a") || document.body.classList.contains("keyboard-open")) return;
-      const touch = event.touches?.[0];
-      if (!touch) return;
-      begin(touch.clientY);
-    }, { passive: true });
-
-    sheet.addEventListener("touchmove", (event) => {
-      const touch = event.touches?.[0];
-      if (!touch) return;
-      move(touch.clientY, event);
-    }, { passive: false });
-
-    sheet.addEventListener("touchend", finish);
-    sheet.addEventListener("touchcancel", finish);
-  }
-}
-
-function wireBuyInSheetDrag() {
-  if (!buyInSheet || !buyInOverlay) return;
-  let startY = 0;
-  let dragStartY = 0;
-  let dragY = 0;
-  let pending = false;
-  let tracking = false;
-  let pointerId = null;
-
-  const begin = (clientY, id = null) => {
-    if (buyInOverlay.hidden) return false;
-    startY = clientY;
-    dragStartY = clientY;
-    dragY = 0;
-    pending = true;
-    tracking = false;
-    pointerId = id;
-    buyInSheet.style.setProperty("--buyin-drag-y", "0px");
-    return true;
-  };
-
-  const move = (clientY, event) => {
-    if (!pending && !tracking) return;
-    const delta = clientY - startY;
-    if (!tracking) {
-      if (delta < -4) {
-        pending = false;
-        return;
-      }
-      if (delta <= 4) return;
-      if (buyInSheet.scrollTop > 2) {
-        startY = clientY;
-        return;
-      }
-      tracking = true;
-      pending = false;
-      dragStartY = startY;
-      buyInSheet.classList.add("is-dragging");
-      if (pointerId !== null) buyInSheet.setPointerCapture?.(pointerId);
-      if (buyInSheet.contains(document.activeElement)) {
-        document.activeElement.blur();
-      }
-    }
-    dragY = Math.max(0, clientY - dragStartY);
-    if (dragY > 0) event?.preventDefault?.();
-    buyInSheet.style.setProperty("--buyin-drag-y", `${Math.round(dragY)}px`);
-  };
-
-  const finish = (event) => {
-    if (!pending && !tracking) return;
-    const shouldClose = tracking && dragY > 58 && !["pointercancel", "touchcancel"].includes(event?.type);
-    pending = false;
-    tracking = false;
-    if (pointerId !== null && buyInSheet.hasPointerCapture?.(pointerId)) buyInSheet.releasePointerCapture(pointerId);
-    pointerId = null;
-    buyInSheet.classList.remove("is-dragging");
-    if (shouldClose) {
-      hideBuyInOverlay();
-      return;
-    }
-    buyInSheet.style.setProperty("--buyin-drag-y", "0px");
-  };
-
-  buyInSheet.addEventListener("pointerdown", (event) => {
-    if (event.target.closest("button, input, select, textarea, a, [role=slider]")) return;
-    begin(event.clientY, event.pointerId);
-  });
-  buyInSheet.addEventListener("pointermove", (event) => move(event.clientY, event));
-  buyInSheet.addEventListener("pointerup", finish);
-  buyInSheet.addEventListener("pointercancel", finish);
-  if (!("PointerEvent" in window)) {
-    buyInSheet.addEventListener("touchstart", (event) => {
-      if (event.target.closest("button, input, select, textarea, a, [role=slider]")) return;
-      const touch = event.touches?.[0];
-      if (touch) begin(touch.clientY);
-    }, { passive: true });
-    buyInSheet.addEventListener("touchmove", (event) => {
-      const touch = event.touches?.[0];
-      if (touch) move(touch.clientY, event);
-    }, { passive: false });
-    buyInSheet.addEventListener("touchend", finish);
-    buyInSheet.addEventListener("touchcancel", finish);
-  }
+  if (cashierState.sheet) overlays.close(`cashier-${cashierState.sheet}`, { immediate: options.silent === true });
 }
 
 async function loadTables() {
@@ -4393,69 +4170,8 @@ async function onTournamentDetailAction() {
   await handleTournamentActionButton(tournamentDetailAction);
 }
 
-function closeTournamentDetails() {
-  window.clearInterval(tournamentCountdownTimer);
-  state.selectedTournamentId = "";
-  state.selectedTournamentDetails = null;
-  document.body.classList.remove("cashier-sheet-open", "tournament-sheet-open");
-  if (tournamentDetailBackdrop) tournamentDetailBackdrop.hidden = true;
-  if (tournamentDetailSheet) {
-    tournamentDetailSheet.hidden = true;
-    tournamentDetailSheet.classList.remove("sheet-visible", "sheet-open");
-    tournamentDetailSheet.style.removeProperty("--sheet-drag-y");
-  }
-  if (tournamentDetailHome?.sheetParent) {
-    tournamentDetailHome.sheetParent.insertBefore(tournamentDetailSheet, tournamentDetailHome.sheetNextSibling);
-  }
-  if (tournamentDetailHome?.backdropParent) {
-    tournamentDetailHome.backdropParent.insertBefore(tournamentDetailBackdrop, tournamentDetailHome.backdropNextSibling);
-  }
-  updateTelegramBackButton();
-}
-
-function setupKeyboardAwareSheets() {
-  const viewport = window.visualViewport;
-  const update = () => {
-    const keyboardHeight = viewport
-      ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
-      : 0;
-    document.documentElement.style.setProperty("--keyboard-height", `${Math.round(keyboardHeight)}px`);
-    document.body.classList.toggle("keyboard-open", keyboardHeight > 80);
-  };
-  viewport?.addEventListener("resize", update);
-  viewport?.addEventListener("scroll", update);
-  window.addEventListener("resize", update);
-  document.querySelectorAll("[data-cashier-sheet]").forEach((sheet) => {
-    sheet.addEventListener("click", (event) => {
-      const interactive = event.target.closest("input, textarea, select, button, a");
-      if (!interactive && document.activeElement?.matches?.("input, textarea, select, [contenteditable='true']")) {
-        document.activeElement.blur();
-      }
-    });
-  });
-  update();
-}
-
-function setupOverlayKeyboardControls() {
-  document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
-    if (lobbyMenuSheet && !lobbyMenuSheet.hidden) {
-      closeLobbyMenu();
-      return;
-    }
-    if (document.querySelector("#docSheet:not([hidden])")) {
-      closeDocSheet();
-      return;
-    }
-    if (state.selectedTournamentId) {
-      closeTournamentDetails();
-      return;
-    }
-    if (document.querySelector("[data-cashier-sheet].sheet-open")) {
-      closeCashierSheet();
-      return;
-    }
-  });
+function closeTournamentDetails(options = {}) {
+  overlays.close("tournament", { immediate: options.immediate === true });
 }
 
 function onTournamentDetailTabSelect(event) {
@@ -4579,7 +4295,7 @@ function renderTournamentDetails(tournament) {
 async function refreshOpenTournamentDetails(id = state.selectedTournamentId) {
   if (!id) return;
   const data = await api(`/api/tournaments/${id}`);
-  state.selectedTournamentId = id;
+  if (!overlays.isOpen("tournament") || state.selectedTournamentId !== id) return;
   state.selectedTournamentDetails = data.tournament;
   processTournamentEvents([data.tournament]);
   renderTournamentDetails(data.tournament);
@@ -4602,17 +4318,8 @@ async function openTournamentDetails(id) {
   tournamentDetailSheet.querySelectorAll("[data-tournament-detail-panel]").forEach((panel) => {
     panel.classList.toggle("active", panel.dataset.tournamentDetailPanel === "payout");
   });
-  document.body.append(tournamentDetailBackdrop, tournamentDetailSheet);
-  tournamentDetailBackdrop.hidden = false;
-  tournamentDetailSheet.hidden = false;
-  tournamentDetailSheet.classList.remove("sheet-visible");
-  tournamentDetailSheet.classList.add("sheet-open");
-  document.body.classList.add("cashier-sheet-open", "tournament-sheet-open");
-  window.requestAnimationFrame(() => {
-    tournamentDetailSheet.classList.add("sheet-visible");
-    tournamentDetailSheet.focus({ preventScroll: true });
-  });
-  updateTelegramBackButton();
+  overlays.show("tournament");
+  state.selectedTournamentId = id;
   try {
     await refreshOpenTournamentDetails(id);
   } catch (error) {
@@ -4865,18 +4572,9 @@ function openBuyInOverlay(intent) {
   renderMoneyValue(buyInMinButton.querySelector("span"), minAmount, cashMode);
   renderMoneyValue(buyInMaxButton.querySelector("span"), maxAmount, cashMode);
   setBuyInAmount(defaultAmount);
-  lockLobbyScroll("buyin");
-  buyInOverlay.hidden = false;
-  document.documentElement.classList.add("buyin-sheet-open");
-  document.body.classList.add("buyin-sheet-open");
-  buyInOverlay.classList.add("sheet-open");
-  buyInSheet?.classList.remove("sheet-visible");
-  buyInSheet?.style.removeProperty("--buyin-drag-y");
-  window.requestAnimationFrame(() => {
-    buyInSheet?.classList.add("sheet-visible");
-    buyInSheet?.focus({ preventScroll: true });
-  });
-  updateTelegramBackButton();
+  overlays.show("buyin");
+  pendingBuyIn = intent;
+
 }
 
 function buyInBounds(bigBlind, balance, intent = {}) {
@@ -4894,16 +4592,7 @@ function buyInBounds(bigBlind, balance, intent = {}) {
 }
 
 function hideBuyInOverlay() {
-  buyInSheet?.classList.remove("sheet-visible");
-  buyInSheet?.style.removeProperty("--buyin-drag-y");
-  document.documentElement.classList.remove("buyin-sheet-open");
-  document.body.classList.remove("buyin-sheet-open");
-  buyInOverlay.classList.remove("sheet-open");
-  buyInOverlay.hidden = true;
-  unlockLobbyScroll("buyin");
-  pendingBuyIn = null;
-  haptic("light");
-  updateTelegramBackButton();
+  overlays.close("buyin");
 }
 
 async function confirmBuyIn() {
@@ -4911,15 +4600,7 @@ async function confirmBuyIn() {
   haptic("medium");
   const buyInAmount = Number(buyInAmountValue());
   const intent = pendingBuyIn;
-  buyInSheet?.classList.remove("sheet-visible");
-  buyInSheet?.style.removeProperty("--buyin-drag-y");
-  document.documentElement.classList.remove("buyin-sheet-open");
-  document.body.classList.remove("buyin-sheet-open");
-  buyInOverlay.classList.remove("sheet-open");
-  buyInOverlay.hidden = true;
-  unlockLobbyScroll("buyin");
-  pendingBuyIn = null;
-  updateTelegramBackButton();
+  overlays.close("buyin", { immediate: true, restoreFocus: false });
 
   if (intent.mode === "create") {
     const data = await api("/api/tables", {
@@ -5865,7 +5546,6 @@ function renderSeatControls(table) {
   }
   standButton.hidden = !isSeated;
   sitOutButton.hidden = !isSeated || isSittingOut || sitOutNextHand;
-  quickSitOutButton.hidden = !isSeated || isSittingOut || sitOutNextHand;
   buyInButton.disabled = !table.viewer?.canBuyIn;
   quickBuyInButton.disabled = !table.viewer?.canBuyIn;
   quickBuyInButton.hidden = !isSeated;
@@ -5912,59 +5592,18 @@ function renderBotControls(table) {
 }
 
 function openMenu() {
-  if (!state.currentTableId && currentTable.hidden) {
-    openLobbyMenu();
-    return;
-  }
-  haptic("light");
-  window.clearTimeout(openMenu.closeTimer);
-  window.clearTimeout(openDrawer.closeTimer);
-  infoDrawer.hidden = true;
-  infoDrawer.classList.remove("is-closing");
-  document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => {
-    button.classList.remove("is-open");
-    button.setAttribute("aria-expanded", "false");
-  });
-  sideMenu.classList.remove("is-closing");
-  sideMenu.hidden = false;
-  menuButton.classList.add("is-open");
-  menuButton.setAttribute("aria-expanded", "true");
+  if (!state.currentTableId && currentTable.hidden) { openLobbyMenu(); return; }
+  overlays.show("table-menu");
+  menuButton.classList.add("is-open"); menuButton.setAttribute("aria-expanded", "true");
   inviteButton.hidden = !state.currentTableId;
   closeSitOutPopover();
-  updateTelegramBackButton();
 }
 
-function closeMenu() {
-  if (sideMenu.hidden) {
-    menuButton.classList.remove("is-open");
-    menuButton.setAttribute("aria-expanded", "false");
-    updateTelegramBackButton();
-    return;
-  }
-  window.clearTimeout(openMenu.closeTimer);
-  sideMenu.classList.add("is-closing");
-  openMenu.closeTimer = window.setTimeout(() => {
-    sideMenu.hidden = true;
-    sideMenu.classList.remove("is-closing");
-    menuButton.classList.remove("is-open");
-    menuButton.setAttribute("aria-expanded", "false");
-    updateTelegramBackButton();
-  }, 180);
-}
+function closeMenu() { overlays.close("table-menu"); }
 
 function hideTablePanels({ updateBack = true } = {}) {
-  window.clearTimeout(openMenu.closeTimer);
-  window.clearTimeout(openDrawer.closeTimer);
-  sideMenu.hidden = true;
-  sideMenu.classList.remove("is-closing");
-  infoDrawer.hidden = true;
-  infoDrawer.classList.remove("is-closing");
-  menuButton.classList.remove("is-open");
-  menuButton.setAttribute("aria-expanded", "false");
-  document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => {
-    button.classList.remove("is-open");
-    button.setAttribute("aria-expanded", "false");
-  });
+  overlays.close("table-menu", { immediate: true, restoreFocus: false });
+  overlays.close("table-info", { immediate: true, restoreFocus: false });
   if (updateBack) updateTelegramBackButton();
 }
 
@@ -6038,68 +5677,25 @@ function openDocSheet(docId) {
       return row;
     }));
   }
-  lockLobbyScroll("doc");
-  document.body.classList.add("doc-sheet-open");
-  document.querySelector("#docSheetBackdrop").hidden = false;
-  revealSheet(sheet);
-  updateTelegramBackButton();
+  overlays.show("doc");
 }
 
-function closeDocSheet() {
-  const sheet = document.querySelector("#docSheet");
-  if (!sheet) return;
-  dismissSheet(sheet, () => {
-    sheet.hidden = true;
-    sheet.classList.remove("sheet-open");
-    document.querySelector("#docSheetBackdrop").hidden = true;
-    document.body.classList.remove("doc-sheet-open");
-    unlockLobbyScroll("doc");
-    updateTelegramBackButton();
-  });
-}
+function closeDocSheet() { overlays.close("doc"); }
 
 function openLobbyMenu() {
-  if (!lobbyMenuSheet || !lobbyMenuBackdrop) return;
-  closeCashierSheet({ silent: true });
+  overlays.show("menu");
   lobbyMenuButton?.classList.add("active");
   lobbyMenuButton?.setAttribute("aria-expanded", "true");
   updateBottomNavIndicator("__menu");
-  lobbyMenuBackdrop.hidden = false;
-  lobbyMenuSheet.hidden = false;
-  lobbyMenuSheet.classList.add("sheet-open");
-  lobbyMenuSheet.style.setProperty("--sheet-drag-y", "0px");
-  lockLobbyScroll("menu");
-  document.body.classList.add("lobby-menu-open");
-  revealSheet(lobbyMenuSheet);
-  updateTelegramBackButton();
 }
 
 function toggleLobbyMenu(event) {
   event?.preventDefault?.();
-  if (lobbyMenuSheet && !lobbyMenuSheet.hidden) {
-    closeLobbyMenu();
-    return;
-  }
-  openLobbyMenu();
+  if (overlays.isOpen("menu")) closeLobbyMenu();
+  else openLobbyMenu();
 }
 
-function closeLobbyMenu(options = {}) {
-  if (!lobbyMenuSheet || !lobbyMenuBackdrop || lobbyMenuSheet.hidden) return;
-  lobbyMenuSheet.classList.remove("sheet-visible");
-  const finish = () => {
-    document.body.classList.remove("lobby-menu-open");
-    unlockLobbyScroll("menu");
-    lobbyMenuSheet.hidden = true;
-    lobbyMenuBackdrop.hidden = true;
-    lobbyMenuSheet.classList.remove("sheet-open");
-    lobbyMenuSheet.style.removeProperty("--sheet-drag-y");
-    lobbyMenuButton?.classList.remove("active");
-    lobbyMenuButton?.setAttribute("aria-expanded", "false");
-    updateBottomNavIndicator();
-    if (!options.silent) updateTelegramBackButton();
-  };
-  dismissSheet(lobbyMenuSheet, finish, options.silent);
-}
+function closeLobbyMenu(options = {}) { overlays.close("menu", { immediate: options.silent === true }); }
 
 function onLobbyMenuAction(event) {
   const button = event.target.closest("[data-menu-action]");
@@ -6150,62 +5746,24 @@ function tableInviteLink(tableId) {
 }
 
 function openSitOutPopover() {
-  haptic("light");
-  closeMenu();
   sitOutInfoText.hidden = true;
-  sitOutPopover.hidden = false;
-  updateTelegramBackButton();
+  overlays.show("sitout");
 }
 
-function closeSitOutPopover() {
-  sitOutPopover.hidden = true;
-  sitOutInfoText.hidden = true;
-  updateTelegramBackButton();
-}
+function closeSitOutPopover() { overlays.close("sitout"); }
 
 function openDrawer(tab = "info") {
-  haptic("light");
-  window.clearTimeout(openDrawer.closeTimer);
-  window.clearTimeout(openMenu.closeTimer);
-  sideMenu.hidden = true;
-  sideMenu.classList.remove("is-closing");
-  menuButton.classList.remove("is-open");
-  menuButton.setAttribute("aria-expanded", "false");
-  infoDrawer.classList.remove("is-closing");
-  infoDrawer.hidden = false;
-  const infoButton = document.querySelector('.game-toolbar [data-panel-tab="info"]');
-  infoButton?.classList.add("is-open");
-  infoButton?.setAttribute("aria-expanded", "true");
+  overlays.show("table-info");
+  const button = document.querySelector('.game-toolbar [data-panel-tab="info"]');
+  button?.classList.add("is-open"); button?.setAttribute("aria-expanded", "true");
   if (state.currentTable) {
     renderActionLog(state.currentTable.actionLog || [], state.currentTable.handHistory || []);
-    renderTableInfo(state.currentTable);
-    renderStats(state.currentTable);
+    renderTableInfo(state.currentTable); renderStats(state.currentTable);
   }
   switchDrawerTab(tab);
-  updateTelegramBackButton();
 }
 
-function closeDrawer() {
-  if (infoDrawer.hidden) {
-    document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => {
-      button.classList.remove("is-open");
-      button.setAttribute("aria-expanded", "false");
-    });
-    updateTelegramBackButton();
-    return;
-  }
-  window.clearTimeout(openDrawer.closeTimer);
-  infoDrawer.classList.add("is-closing");
-  openDrawer.closeTimer = window.setTimeout(() => {
-    infoDrawer.hidden = true;
-    infoDrawer.classList.remove("is-closing");
-    document.querySelectorAll(".game-toolbar [data-panel-tab]").forEach((button) => {
-      button.classList.remove("is-open");
-      button.setAttribute("aria-expanded", "false");
-    });
-    updateTelegramBackButton();
-  }, 170);
-}
+function closeDrawer() { overlays.close("table-info"); }
 
 function switchDrawerTab(tab) {
   infoDrawer.dataset.activeTab = tab;
@@ -6313,7 +5871,9 @@ function renderPreActions(table) {
   preActions.hidden = !show;
   currentTable.classList.toggle("has-pre-actions", show);
   preActions.querySelectorAll("button").forEach((button) => {
-    button.classList.toggle("selected", button.dataset.preAction === queuedPreAction);
+    const selected = button.dataset.preAction === queuedPreAction;
+    button.classList.toggle("selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
   });
 }
 
@@ -6495,8 +6055,10 @@ function renderTableInfo(table) {
 
 function renderStats(table) {
   const seats = (table.seats || []).filter((seat) => seat?.userId);
+  const amount = value => table.gameMode === "cash" ? formatTableAmount(table, value) : formatChips(value);
+  statsTable.setAttribute("aria-label", `Статистика стола: ${table.gameMode === "cash" ? "USDT" : "игровые фишки"}`);
   statsTable.replaceChildren(
-    headerRow(["Ник", "Бай-ин", "Результат"]),
+    headerRow(["Игрок", "Бай-ин", "Итог"]),
     ...seats.map((seat) => {
       const buyIn = Number(seat.totalBuyIn ?? seat.initialStack ?? seat.handStartStack ?? seat.stack + seat.totalBet);
       const result = Number(seat.stack || 0) + Number(seat.totalBet || 0) - buyIn;
@@ -6504,8 +6066,8 @@ function renderStats(table) {
       row.className = "stats-row";
       row.innerHTML = `<span></span><span></span><strong></strong>`;
       row.children[0].textContent = seat.name;
-      row.children[1].textContent = formatTableAmount(table, buyIn);
-      row.children[2].textContent = `${result >= 0 ? "+" : ""}${formatTableAmount(table, result)}`;
+      row.children[1].textContent = amount(buyIn);
+      row.children[2].textContent = `${result >= 0 ? "+" : ""}${amount(result)}`;
       row.children[2].className = result >= 0 ? "positive" : "negative";
       return row;
     })
@@ -7055,6 +6617,7 @@ function onPreAction(event) {
   queuedPreActionHand = wasSelected ? null : { id: state.currentTable?.id, handNumber: state.currentTable?.handNumber };
   queuedPreActionKey = "";
   if (!wasSelected) button.classList.add("selected");
+  preActions.querySelectorAll("button").forEach(item => item.setAttribute("aria-pressed", String(item.classList.contains("selected"))));
 }
 
 function onTableBackdropClick(event) {
@@ -7134,6 +6697,7 @@ function closeAmountPanel() {
   pendingBetAction = "";
   pendingBetContext = null;
   bettingActions.classList.remove("amount-open");
+  syncBettingLayout();
   updateTelegramBackButton();
 }
 
@@ -7142,6 +6706,20 @@ function updateAmountPanel(action) {
   amountLabel.textContent = label;
   confirmBetButton.firstChild.textContent = "Подтвердить";
   updateConfirmAmount();
+  syncBettingLayout();
+}
+
+function syncBettingLayout() {
+  const expanded = Boolean(pendingBetAction);
+  const viewer = state.currentTable?.viewer || {};
+  for (const control of bettingActions.querySelectorAll(".quick-bets, label, .bet-slider, .bet-confirm, #cancelBetButton")) control.hidden = !expanded;
+  const viewerSeat = state.currentTable?.seats?.find(seat => String(seat.userId) === String(state.user?.id));
+  quickSitOutButton.hidden = expanded || !viewer.isSeated || viewer.sittingOut || Boolean(viewerSeat?.sitOutNextHand);
+  for (const button of bettingActions.querySelectorAll("[data-poker-action]")) {
+    const action = button.dataset.pokerAction;
+    const available = action === "fold" || (action === "raise" ? !viewer.canBet : viewer[`can${action[0].toUpperCase()}${action.slice(1)}`]);
+    button.hidden = expanded || !available;
+  }
 }
 
 function updateConfirmAmount() {

@@ -348,7 +348,6 @@ h2 {
 
 .lobby-view.active {
   display: grid;
-  animation: tableIn 180ms ease-out;
 }
 
 .wallet-card,
@@ -883,8 +882,7 @@ h2 {
   margin-top: 16px;
 }
 
-.wallet-actions button,
-.create-grid button {
+.wallet-actions button{
   min-height: 52px;
   border-radius: 999px;
   background: var(--tg-button);
@@ -998,18 +996,6 @@ h2 {
   gap: 14px;
 }
 
-.create-card input,
-.create-card select {
-  border-radius: 18px;
-  background: rgba(14, 22, 33, 0.54);
-}
-
-.create-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  align-items: end;
-}
 
 .continue-card,
 .profile-card,
@@ -1184,179 +1170,6 @@ h2 {
   white-space: nowrap;
 }
 
-.cashier-topup-card {
-  scroll-margin-top: 14px;
-}
-
-.cashier-note {
-  margin-top: 12px;
-  color: var(--tg-hint);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.35;
-}
-
-.cashier-calculator {
-  display: grid;
-  gap: 12px;
-  margin-top: 16px;
-  border: 1px solid var(--tg-line);
-  border-radius: 18px;
-  background: rgba(14, 22, 33, 0.34);
-  padding: 14px;
-}
-
-.cashier-amount-field {
-  position: relative;
-  display: grid;
-  gap: 8px;
-}
-
-.cashier-amount-field span,
-.cashier-quote span {
-  color: var(--tg-hint);
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.cashier-amount-field input {
-  width: 100%;
-  border: 1px solid rgba(42, 171, 238, 0.35);
-  border-radius: 14px;
-  background: rgba(9, 16, 25, 0.72);
-  color: #fff;
-  padding: 13px 58px 13px 14px;
-  font: inherit;
-  font-size: 28px;
-  font-weight: 700;
-  outline: none;
-}
-
-.cashier-amount-field small {
-  position: absolute;
-  right: 14px;
-  bottom: 16px;
-  color: var(--tg-link);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.cashier-presets,
-.cashier-methods {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.cashier-presets button,
-.cashier-methods button {
-  border: 1px solid var(--tg-line);
-  border-radius: 13px;
-  background: rgba(36, 47, 61, 0.56);
-  color: #fff;
-  padding: 10px 8px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.cashier-methods {
-  grid-template-columns: 1fr;
-  margin-top: 12px;
-}
-
-.cashier-methods button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 54px;
-  padding: 12px 14px;
-  text-align: left;
-}
-
-.cashier-methods button.active {
-  border-color: rgba(42, 171, 238, 0.74);
-  background: rgba(42, 171, 238, 0.16);
-}
-
-.cashier-methods button:disabled {
-  opacity: 0.48;
-}
-
-.cashier-methods strong {
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.cashier-methods span {
-  color: var(--tg-hint);
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.cashier-quote {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.cashier-quote div {
-  display: grid;
-  gap: 5px;
-  border-radius: 14px;
-  background: rgba(36, 47, 61, 0.46);
-  padding: 12px;
-}
-
-.cashier-quote strong {
-  color: #fff;
-  font-size: 17px;
-  font-weight: 700;
-}
-
-.cashier-pay-button {
-  width: 100%;
-  min-height: 58px;
-  margin-top: 12px;
-  border: 0;
-  border-radius: 18px;
-  background: var(--tg-link);
-  color: #fff;
-  font: inherit;
-  font-size: 17px;
-  font-weight: 750;
-}
-
-.cashier-pay-button:disabled {
-  opacity: 0.62;
-}
-
-.cashier-withdraw-card .section-title span {
-  color: var(--tg-hint);
-}
-
-.cashier-withdraw-state {
-  display: grid;
-  gap: 7px;
-  margin-top: 14px;
-  border: 1px dashed rgba(139, 152, 166, 0.34);
-  border-radius: 16px;
-  background: rgba(36, 47, 61, 0.28);
-  padding: 14px;
-}
-
-.cashier-withdraw-state strong {
-  color: #fff;
-  font-size: 15px;
-  font-weight: 650;
-}
-
-.cashier-withdraw-state span {
-  color: var(--tg-hint);
-  font-size: 12px;
-  font-weight: 550;
-  line-height: 1.4;
-}
 
 .cashier-status {
   min-height: 18px;
@@ -2256,7 +2069,6 @@ form.panel {
 
 .game-screen {
   min-height: calc(100vh - 120px);
-  animation: tableIn 220ms ease-out;
 }
 
 body.in-game .game-screen {
@@ -2760,187 +2572,6 @@ body.in-game .game-toolbar [data-panel-tab="hands"] {
   content: "WEEZ POKER";
 }
 
-.betting-actions {
-  position: fixed;
-  right: 6px;
-  bottom: max(6px, env(safe-area-inset-bottom));
-  left: 6px;
-  z-index: 18;
-  display: grid;
-  grid-template-columns: 54px repeat(3, 1fr);
-  gap: 4px;
-  width: min(430px, calc(100vw - 12px));
-  min-height: 0;
-  margin: 0 auto;
-  border: 0;
-  border-radius: 4px;
-  background: rgba(8, 9, 11, 0.7);
-  padding: 4px;
-  box-shadow: 0 -10px 34px rgba(0, 0, 0, 0.38);
-  backdrop-filter: blur(8px);
-  animation: actionBarIn 180ms ease-out both;
-}
-
-.sitout-action {
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(184, 207, 194, 0.16);
-  background: rgba(25, 28, 32, 0.9);
-  color: #d9e8de;
-  font-size: 24px;
-}
-
-.quick-bets {
-  display: none;
-}
-
-.quick-bets button {
-  min-height: 54px;
-  border: 1px solid rgba(184, 207, 194, 0.18);
-  border-radius: 4px;
-  background: rgba(25, 28, 32, 0.94);
-  color: #d9e8de;
-  font-size: 18px;
-  font-weight: 800;
-  padding: 0 6px;
-}
-
-.quick-bets button:hover {
-  background: rgba(39, 47, 44, 0.96);
-}
-
-.bet-slider {
-  display: none;
-  width: 44px;
-  height: min(34vh, 240px);
-  accent-color: var(--accent);
-}
-
-.betting-actions label {
-  display: none;
-  color: #e8fff1;
-  text-align: left;
-}
-
-.betting-actions label span {
-  display: none;
-}
-
-.betting-actions button {
-  min-height: 52px;
-  border-radius: 4px;
-  padding: 0 6px;
-  color: #eef5f1;
-  font-size: 18px;
-  font-weight: 900;
-}
-
-.betting-actions [data-poker-action="fold"] {
-  background: #773239;
-}
-
-.betting-actions [data-poker-action="check"],
-.betting-actions [data-poker-action="call"] {
-  background: #2f6f4a;
-}
-
-.betting-actions [data-poker-action="bet"],
-.betting-actions [data-poker-action="raise"] {
-  background: #9f7a34;
-  color: #101114;
-}
-
-.bet-confirm {
-  display: none;
-}
-
-.betting-actions.amount-open .quick-bets {
-  position: fixed;
-  right: 116px;
-  bottom: max(6px, env(safe-area-inset-bottom));
-  left: 6px;
-  z-index: 19;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 4px;
-  width: auto;
-  max-width: 306px;
-  margin: 0 auto;
-}
-
-.betting-actions.amount-open {
-  background: transparent;
-  box-shadow: none;
-  backdrop-filter: none;
-  pointer-events: none;
-}
-
-.betting-actions.amount-open .quick-bets,
-.betting-actions.amount-open label,
-.betting-actions.amount-open .bet-slider,
-.betting-actions.amount-open .bet-confirm {
-  pointer-events: auto;
-}
-
-.betting-actions.amount-open label {
-  position: fixed;
-  right: 8px;
-  bottom: max(126px, calc(env(safe-area-inset-bottom) + 126px));
-  z-index: 20;
-  display: block;
-  width: 104px;
-}
-
-.betting-actions.amount-open label input {
-  min-height: 42px;
-  border-radius: 4px;
-  border-color: rgba(184, 207, 194, 0.18);
-  background: rgba(11, 12, 15, 0.96);
-  color: #eef5f1;
-  font-size: 18px;
-  font-weight: 900;
-  text-align: center;
-  padding: 0 6px;
-}
-
-.betting-actions.amount-open .bet-slider {
-  position: fixed;
-  right: 38px;
-  bottom: max(178px, calc(env(safe-area-inset-bottom) + 178px));
-  z-index: 20;
-  display: block;
-  writing-mode: vertical-lr;
-  direction: rtl;
-}
-
-.betting-actions.amount-open .bet-confirm {
-  position: fixed;
-  right: 6px;
-  bottom: max(6px, env(safe-area-inset-bottom));
-  z-index: 20;
-  display: block;
-  width: 108px;
-  min-height: 58px;
-  background: #a9853a;
-  color: #111318;
-  font-size: 15px;
-  line-height: 1.12;
-  padding: 4px 6px;
-}
-
-.betting-actions.amount-open > button[data-poker-action] {
-  display: none;
-}
-
-.betting-actions.amount-open .sitout-action {
-  display: none;
-}
-
-.bet-confirm span {
-  display: block;
-  margin-top: 3px;
-  font-size: 19px;
-}
 
 .pre-actions {
   position: fixed;
@@ -3496,50 +3127,6 @@ body.in-game .game-toolbar [data-panel-tab="hands"] {
   gap: 3px;
 }
 
-.side-menu,
-.info-drawer {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  z-index: 20;
-  background: var(--tg-bg);
-  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.42);
-}
-
-.side-menu {
-  left: 0;
-  width: min(86vw, 340px);
-  display: grid;
-  align-content: start;
-  gap: 6px;
-  padding: calc(18px + env(safe-area-inset-top)) 14px 18px;
-  animation: drawerLeft 180ms ease-out;
-}
-
-.side-menu button {
-  justify-content: start;
-  min-height: 52px;
-  border: 0;
-  border-radius: 12px;
-  background: transparent;
-  color: var(--tg-text);
-  font-size: 20px;
-  font-weight: 650;
-  text-align: left;
-  padding: 0 12px;
-}
-
-.side-menu .close-button {
-  position: static;
-  justify-self: end;
-  min-height: 42px;
-  margin-bottom: 10px;
-  padding: 0;
-}
-
-.side-menu button:disabled {
-  color: rgba(244, 247, 251, 0.24);
-}
 
 .table-invite-card {
   display: grid;
@@ -3657,46 +3244,6 @@ body.in-game .game-toolbar [data-panel-tab="hands"] {
   padding: 0;
 }
 
-.info-drawer {
-  right: 0;
-  width: min(100vw, 520px);
-  display: grid;
-  grid-template-rows: auto 1fr;
-  animation: drawerRight 180ms ease-out;
-}
-
-.drawer-tabs {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr) 46px;
-  align-items: stretch;
-  border-bottom: 1px solid rgba(122, 162, 194, 0.1);
-  background: var(--tg-secondary-bg);
-  padding-top: env(safe-area-inset-top);
-}
-
-.drawer-tabs button {
-  min-height: 56px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--tg-hint);
-  font-size: 18px;
-  padding: 0 8px;
-}
-
-.drawer-tabs button.active {
-  box-shadow: inset 0 -3px 0 var(--tg-link);
-  color: var(--tg-text);
-}
-
-.drawer-tabs span {
-  display: none;
-}
-
-.drawer-page {
-  overflow: auto;
-  padding: 20px 16px calc(22px + env(safe-area-inset-bottom));
-}
 
 .drawer-log {
   max-height: none;
@@ -3712,12 +3259,6 @@ body.in-game .game-toolbar [data-panel-tab="hands"] {
   padding: 10px 12px;
 }
 
-.info-list {
-  display: grid;
-  gap: 14px;
-}
-
-.info-row,
 .stats-row {
   display: grid;
   grid-template-columns: minmax(110px, 1fr) minmax(120px, 1fr);
@@ -3726,8 +3267,6 @@ body.in-game .game-toolbar [data-panel-tab="hands"] {
   padding: 14px 0;
   color: var(--tg-text);
 }
-
-.info-row span,
 .stats-head {
   color: var(--tg-hint);
 }
@@ -3819,9 +3358,6 @@ body.in-game .game-toolbar [data-panel-tab="hands"] {
     bottom: auto;
   }
 
-  .quick-bets {
-    grid-template-columns: repeat(2, minmax(100px, 1fr));
-  }
 
   .game-toolbar {
     gap: 6px;
@@ -3837,24 +3373,7 @@ body.in-game .game-toolbar [data-panel-tab="hands"] {
     padding: 7px 10px;
   }
 
-  .info-drawer {
-    width: min(100vw, 430px);
-  }
 
-  .drawer-tabs {
-    grid-template-columns: repeat(4, 1fr) 44px;
-  }
-}
-
-@keyframes tableIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
 }
 
 @keyframes introPulse {
@@ -4396,33 +3915,6 @@ body.in-game .game-screen {
   animation: potPayoutPop 620ms cubic-bezier(0.18, 0.9, 0.2, 1) both;
 }
 
-.betting-actions {
-  grid-template-columns: repeat(3, 1fr);
-}
-
-.sitout-action {
-  position: fixed;
-  left: max(10px, calc((100vw - 430px) / 2 + 10px));
-  bottom: max(66px, calc(env(safe-area-inset-bottom) + 66px));
-  z-index: 19;
-  width: 42px;
-  min-height: 42px;
-  border-radius: 8px;
-  font-size: 0;
-}
-
-.sitout-action::before {
-  content: "";
-  width: 22px;
-  height: 22px;
-  border: 2px solid rgba(232, 255, 241, 0.72);
-  border-radius: 4px;
-}
-
-.sitout-action:hover::before,
-.sitout-action:focus-visible::before {
-  background: linear-gradient(135deg, transparent 0 42%, rgba(232, 255, 241, 0.92) 43% 56%, transparent 57%);
-}
 
 .sitout-popover {
   position: fixed;
@@ -4494,8 +3986,6 @@ body.in-game .board {
   max-height: none;
   margin: 8px auto 0;
 }
-
-body.in-game .betting-actions,
 body.in-game .pre-actions,
 body.in-game .bot-actions {
   right: 10px;
@@ -4504,27 +3994,6 @@ body.in-game .bot-actions {
   width: min(410px, calc(100vw - 20px));
 }
 
-body.in-game .betting-actions.amount-open .quick-bets {
-  bottom: max(14px, env(safe-area-inset-bottom));
-  left: max(10px, calc((100vw - 410px) / 2 + 10px));
-  right: max(122px, calc((100vw - 410px) / 2 + 122px));
-  max-width: 286px;
-}
-
-body.in-game .betting-actions.amount-open .bet-confirm {
-  right: max(10px, calc((100vw - 410px) / 2 + 10px));
-  bottom: max(14px, env(safe-area-inset-bottom));
-}
-
-body.in-game .betting-actions.amount-open label {
-  right: max(10px, calc((100vw - 410px) / 2 + 10px));
-  bottom: max(138px, calc(env(safe-area-inset-bottom) + 138px));
-}
-
-body.in-game .betting-actions.amount-open .bet-slider {
-  right: max(40px, calc((100vw - 410px) / 2 + 40px));
-  bottom: max(190px, calc(env(safe-area-inset-bottom) + 190px));
-}
 
 body.in-game .dev-floating {
   position: fixed;
@@ -4994,191 +4463,6 @@ body.in-game .game-screen[data-table-status="showdown"] .status-line {
   }
 }
 
-.buyin-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: grid;
-  place-items: stretch;
-  background: var(--tg-bg);
-}
-
-.buyin-sheet {
-  position: relative;
-  display: grid;
-  align-content: start;
-  grid-template-rows: auto auto auto auto auto 1fr auto;
-  gap: 14px;
-  width: min(430px, 100%);
-  min-height: 100dvh;
-  margin: 0 auto;
-  background: var(--tg-bg);
-  padding: max(22px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
-}
-
-.buyin-close {
-  position: absolute;
-  top: max(18px, env(safe-area-inset-top));
-  right: 14px;
-  display: grid;
-  place-items: center;
-  width: 42px;
-  min-height: 42px;
-  border: 1px solid rgba(122, 162, 194, 0.12);
-  border-radius: 13px;
-  background: rgba(36, 47, 61, 0.68);
-  color: rgba(244, 247, 251, 0.7);
-  font-size: 28px;
-  font-weight: 500;
-  line-height: 1;
-  padding: 0;
-}
-
-
-.buyin-kicker {
-  color: var(--tg-link);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-
-.buyin-summary {
-  display: grid;
-  border: 1px solid var(--tg-line);
-  border-radius: 16px;
-  overflow: hidden;
-  background: rgba(36, 47, 61, 0.5);
-}
-
-.buyin-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  min-height: 54px;
-  color: var(--tg-hint);
-  font-size: 14px;
-  font-weight: 600;
-  align-items: center;
-  padding: 12px 14px;
-}
-
-.buyin-row + .buyin-row {
-  border-top: 1px solid var(--tg-line);
-}
-
-.buyin-row strong {
-  color: #f4f5f7;
-  font-size: 17px;
-  font-weight: 650;
-}
-
-.buyin-amount-grid {
-  display: grid;
-  grid-template-columns: 0.95fr 1.2fr 0.95fr;
-  gap: 10px;
-  align-items: end;
-  margin-top: 2px;
-}
-
-.buyin-amount-grid button {
-  min-height: 62px;
-  border: 1px solid rgba(42, 171, 238, 0.24);
-  border-radius: 14px;
-  background: rgba(42, 171, 238, 0.16);
-  color: #fff;
-  font-size: 16px;
-  font-weight: 650;
-  line-height: 1.15;
-  padding: 0 10px;
-}
-
-.buyin-amount-grid button span {
-  color: rgba(244, 247, 251, 0.78);
-  font-weight: 600;
-}
-
-.buyin-amount-grid label {
-  position: relative;
-  gap: 6px;
-  color: var(--tg-hint);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.buyin-amount-grid input {
-  min-height: 62px;
-  border: 1px solid rgba(122, 162, 194, 0.16);
-  border-radius: 14px;
-  background: rgba(5, 10, 15, 0.62);
-  color: #fff;
-  font-size: 18px;
-  font-weight: 600;
-  text-align: center;
-}
-
-.buyin-slider {
-  width: 100%;
-  height: 28px;
-  accent-color: var(--tg-link);
-}
-
-.buyin-auto {
-  min-height: 52px;
-  border: 1px solid var(--tg-line);
-  border-radius: 14px;
-  background: rgba(36, 47, 61, 0.58);
-  color: rgba(244, 247, 251, 0.42);
-  font-size: 15px;
-  font-weight: 650;
-}
-
-
-.buyin-info-card {
-  align-self: end;
-  display: grid;
-  border: 1px solid var(--tg-line);
-  border-radius: 16px;
-  overflow: hidden;
-  background: rgba(36, 47, 61, 0.38);
-}
-
-.buyin-info-card div {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-  min-height: 48px;
-  padding: 11px 14px;
-}
-
-.buyin-info-card div + div {
-  border-top: 1px solid var(--tg-line);
-}
-
-.buyin-info-card span {
-  color: var(--tg-hint);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.buyin-info-card strong {
-  color: rgba(244, 247, 251, 0.92);
-  font-size: 14px;
-  font-weight: 650;
-  text-align: right;
-}
-
-.buyin-submit {
-  align-self: end;
-  min-height: 56px;
-  border-radius: 16px;
-  background: var(--tg-button);
-  color: var(--tg-button-text);
-  font-size: 17px;
-  font-weight: 700;
-}
 
 body.in-game .game-toolbar {
   position: relative;
@@ -5228,8 +4512,6 @@ body.in-game .game-toolbar .toolbar-spacer {
 body.in-game .game-toolbar #quickBuyInButton {
   color: var(--tg-link);
 }
-
-body.in-game .betting-actions,
 body.in-game .pre-actions {
   gap: 6px;
   border: 1px solid rgba(122, 162, 194, 0.12);
@@ -5239,10 +4521,7 @@ body.in-game .pre-actions {
   box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.36);
   backdrop-filter: blur(14px);
 }
-
-body.in-game .betting-actions button,
-body.in-game .pre-actions button,
-body.in-game .sitout-action {
+body.in-game .pre-actions button{
   min-height: 50px;
   border: 1px solid rgba(122, 162, 194, 0.14);
   border-radius: 11px;
@@ -5252,129 +4531,6 @@ body.in-game .sitout-action {
   font-weight: 700;
 }
 
-body.in-game .betting-actions [data-poker-action="fold"] {
-  border-color: rgba(255, 95, 87, 0.24);
-  background: rgba(255, 95, 87, 0.18);
-  color: #ffd6d3;
-}
-
-body.in-game .betting-actions [data-poker-action="check"],
-body.in-game .betting-actions [data-poker-action="call"] {
-  border-color: rgba(42, 171, 238, 0.28);
-  background: rgba(42, 171, 238, 0.2);
-  color: #eaf7ff;
-}
-
-body.in-game .betting-actions [data-poker-action="bet"],
-body.in-game .betting-actions [data-poker-action="raise"],
-body.in-game .bet-confirm {
-  border-color: rgba(42, 171, 238, 0.34);
-  background: var(--tg-button);
-  color: var(--tg-button-text);
-}
-
-body.in-game .quick-bets button {
-  min-height: 50px;
-  border-radius: 11px;
-  background: rgba(36, 47, 61, 0.9);
-  color: rgba(244, 247, 251, 0.86);
-  font-size: 15px;
-}
-
-body.in-game .betting-actions.amount-open label input {
-  border-color: rgba(42, 171, 238, 0.3);
-  border-radius: 12px;
-  background: rgba(14, 22, 33, 0.94);
-  color: #fff;
-}
-
-body.in-game .betting-actions.amount-open .bet-slider,
-body.in-game .bet-slider {
-  accent-color: var(--tg-link);
-}
-
-body.in-game .betting-actions.amount-open {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-  right: 10px;
-  bottom: max(10px, env(safe-area-inset-bottom));
-  left: 10px;
-  z-index: 22;
-  width: min(410px, calc(100vw - 20px));
-  border: 1px solid rgba(122, 162, 194, 0.14);
-  border-radius: 18px;
-  background: rgba(14, 22, 33, 0.88);
-  padding: 12px;
-  box-shadow: 0 -22px 52px rgba(0, 0, 0, 0.46);
-  backdrop-filter: blur(16px);
-  pointer-events: auto;
-}
-
-body.in-game .betting-actions.amount-open label {
-  position: static;
-  display: grid;
-  width: 100%;
-  gap: 7px;
-  color: var(--tg-hint);
-  font-size: 12px;
-  font-weight: 700;
-  text-align: left;
-}
-
-body.in-game .betting-actions.amount-open label span {
-  display: block;
-  color: var(--tg-link);
-  text-transform: uppercase;
-}
-
-body.in-game .betting-actions.amount-open label input {
-  min-height: 44px;
-  border-radius: 12px;
-  font-size: 24px;
-  font-weight: 750;
-}
-
-body.in-game .betting-actions.amount-open .bet-slider {
-  position: static;
-  display: block;
-  width: 100%;
-  height: 22px;
-  writing-mode: horizontal-tb;
-  direction: ltr;
-}
-
-body.in-game .betting-actions.amount-open .quick-bets {
-  position: static;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 7px;
-  width: 100%;
-  max-width: none;
-}
-
-body.in-game .betting-actions.amount-open .quick-bets button {
-  min-height: 42px;
-  padding: 0 4px;
-  font-size: 15px;
-}
-
-body.in-game .betting-actions.amount-open .bet-confirm {
-  position: static;
-  display: block;
-  width: 100%;
-  min-height: 48px;
-  border: 1px solid rgba(42, 171, 238, 0.42);
-  border-radius: 14px;
-  background: var(--tg-button) !important;
-  color: var(--tg-button-text) !important;
-  font-size: 16px;
-  line-height: 1.08;
-}
-
-body.in-game .betting-actions.amount-open .bet-confirm span {
-  font-size: 20px;
-}
 
 @media (max-width: 420px) {
   body.in-game .game-toolbar {
@@ -5688,8 +4844,7 @@ body:not(.in-game) .app {
 }
 
 .tg-balance-hero span,
-.eyebrow,
-.buyin-kicker {
+.eyebrow{
   color: var(--tg-link);
   font-size: 12px;
   font-weight: 700;
@@ -5832,7 +4987,6 @@ body:not(.in-game) .app {
 .home-metrics div,
 .cashier-breakdown div,
 .stats-cards div,
-.cashier-quote div,
 .admin-grid div,
 .tournament-meta span {
   border: 0;
@@ -5843,13 +4997,10 @@ body:not(.in-game) .app {
 .cashier-breakdown span,
 .stats-cards span,
 .settings-row strong,
-.cashier-note,
 .cashier-transaction span,
 .cashier-empty,
 .tournament-main small,
-.tournament-meta span,
-.buyin-row span,
-.buyin-info-card span {
+.tournament-meta span{
   color: var(--tg-hint);
   font-weight: 430;
 }
@@ -5884,9 +5035,7 @@ body:not(.in-game) .app {
   color: var(--tg-text);
   font-weight: 590;
 }
-.tournament-card button,
-.cashier-pay-button,
-.buyin-submit {
+.tournament-card button{
   border-radius: 17px;
   background: var(--tg-button);
   color: var(--tg-button-text);
@@ -5900,8 +5049,7 @@ body:not(.in-game) .app {
   font-weight: 760;
 }
 
-.wallet-actions button,
-.create-grid button {
+.wallet-actions button{
   border-radius: 18px;
   background: var(--tg-button);
   font-weight: 650;
@@ -5912,8 +5060,6 @@ body:not(.in-game) .app {
   background: var(--tg-surface-2);
   color: var(--tg-text);
 }
-
-.cashier-calculator,
 .cashier-history,
 .settings-list,
 .stats-cards,
@@ -5924,38 +5070,6 @@ body:not(.in-game) .app {
   background: var(--tg-surface);
 }
 
-.cashier-calculator {
-  padding: 0;
-  background: transparent;
-}
-
-.cashier-amount-field input {
-  border: 0;
-  border-radius: 20px;
-  background: var(--tg-surface);
-  color: var(--tg-text);
-  font-size: 30px;
-  font-weight: 700;
-}
-
-.cashier-presets button,
-.cashier-methods button {
-  border: 0;
-  border-radius: 16px;
-  background: var(--tg-surface);
-  color: var(--tg-text);
-}
-
-.cashier-methods button.active {
-  border: 0;
-  background: rgba(42, 171, 238, 0.22);
-}
-
-.cashier-withdraw-state {
-  border: 0;
-  border-radius: 18px;
-  background: var(--tg-surface-2);
-}
 
 .cashier-transaction,
 .cashier-empty,
@@ -6053,46 +5167,6 @@ body:not(.in-game) .bottom-nav button.active {
   box-shadow: none;
 }
 
-.buyin-overlay,
-.buyin-sheet {
-  background: var(--tg-bg);
-}
-
-.buyin-sheet {
-  gap: 12px;
-  padding: max(18px, env(safe-area-inset-top)) 16px max(14px, env(safe-area-inset-bottom));
-}
-
-.buyin-close {
-  width: 44px;
-  min-height: 44px;
-  border: 0;
-  border-radius: 16px;
-  background: var(--tg-surface);
-  color: var(--tg-hint);
-}
-
-.buyin-summary,
-.buyin-info-card {
-  border: 0;
-  border-radius: 20px;
-  background: var(--tg-surface);
-}
-
-.buyin-amount-grid button,
-.buyin-amount-grid label,
-.buyin-auto {
-  border: 0;
-  border-radius: 18px;
-  background: var(--tg-surface);
-}
-
-.buyin-amount-grid input {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
 
 @media (max-width: 420px) {
   .app { width: 100%; padding-inline: 8px; }
@@ -6173,29 +5247,8 @@ body:not(.in-game) .bottom-nav button.active {
 }
 
 /* Minimal functional UI layer: stable geometry while product flows are built out. */
-.game-mode-switch {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  margin: 10px 0;
-  padding: 4px;
-  border-radius: 10px;
-  background: var(--tg-surface, #232e3b);
-}
 
-.game-mode-switch button {
-  min-height: 38px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--tg-hint, #8c99a5);
-  font-size: 14px;
-}
 
-.game-mode-switch button.active {
-  background: var(--tg-button, #2aabee);
-  color: var(--tg-button-text, #fff);
-}
 :root {
   --ui-bg: #17212b;
   --ui-surface: #202b36;
@@ -6423,10 +5476,7 @@ body:not(.in-game) .app {
 
 
 .tournament-card button,
-.cashier-pay-button,
-.buyin-submit,
-.wallet-actions button,
-.create-grid button {
+.wallet-actions button{
   border-radius: var(--ui-radius);
   font-weight: 600;
 }
@@ -6436,34 +5486,13 @@ body:not(.in-game) .app {
   font-size: 38px;
   font-weight: 650;
 }
-
-.cashier-calculator,
 .cashier-history,
 .settings-list,
 .stats-cards,
 .cashier-breakdown,
-.cashier-withdraw-state,
 .start-guide-list {
   border: 1px solid var(--ui-line);
   border-radius: var(--ui-radius);
-}
-
-.cashier-amount-field input {
-  border: 1px solid var(--ui-line);
-  border-radius: var(--ui-radius);
-  font-size: 26px;
-  font-weight: 600;
-}
-
-.cashier-presets button,
-.cashier-methods button {
-  border: 1px solid var(--ui-line);
-  border-radius: var(--ui-radius);
-}
-
-.cashier-methods button.active {
-  border-color: var(--ui-accent);
-  background: var(--ui-surface-active);
 }
 
 
@@ -6541,242 +5570,6 @@ body:not(.in-game) .bottom-nav button.active {
   box-shadow: none;
 }
 
-.buyin-overlay,
-.buyin-sheet {
-  background: var(--ui-bg);
-}
-
-.buyin-sheet {
-  gap: 10px;
-  padding: max(14px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
-}
-
-.buyin-close,
-.buyin-summary,
-.buyin-info-card,
-.buyin-amount-grid button,
-.buyin-amount-grid label,
-.buyin-auto {
-  border: 1px solid var(--ui-line);
-  border-radius: var(--ui-radius);
-  background: var(--ui-surface);
-}
-
-
-.buyin-amount-grid input {
-  border-radius: 6px;
-}
-
-.buyin-submit {
-  min-height: 50px;
-}
-
-.buyin-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  display: block;
-  background: rgba(0, 0, 0, 0.38);
-  opacity: 0;
-  transition: opacity 180ms ease;
-  touch-action: none;
-  overscroll-behavior: contain;
-}
-
-.buyin-overlay.sheet-open {
-  opacity: 1;
-}
-
-.buyin-sheet {
-  position: fixed;
-  left: max(10px, env(safe-area-inset-left));
-  right: max(10px, env(safe-area-inset-right));
-  bottom: 0;
-  display: grid;
-  align-content: start;
-  gap: 10px;
-  width: auto;
-  max-width: 520px;
-  min-height: 0;
-  max-height: min(84vh, 720px);
-  margin: 0 auto;
-  overflow: auto;
-  border: 0;
-  border-radius: 24px 24px 0 0;
-  background: var(--native-surface, var(--ui-surface));
-  padding: 8px 16px calc(18px + env(safe-area-inset-bottom));
-  box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.38);
-  transform: translateY(calc(102% + var(--buyin-drag-y, 0px)));
-  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
-  touch-action: pan-y;
-  overscroll-behavior: contain;
-}
-
-.buyin-sheet.sheet-visible {
-  transform: translateY(var(--buyin-drag-y, 0px));
-}
-
-.buyin-sheet-grabber {
-  display: block;
-  width: 100%;
-  height: 30px;
-  margin: 0 0 2px;
-  touch-action: none;
-}
-
-.buyin-sheet-grabber::before {
-  content: "";
-  display: block;
-  width: 38px;
-  height: 4px;
-  margin: 8px auto 0;
-  border-radius: 999px;
-  background: rgba(142, 155, 170, 0.42);
-}
-
-.buyin-close {
-  display: none;
-}
-
-
-.buyin-kicker {
-  color: var(--tg-button);
-  font-size: 12px;
-  font-weight: 650;
-}
-
-
-.buyin-summary,
-.buyin-info-card,
-.buyin-auto {
-  border: 0;
-  border-radius: 16px;
-  background: var(--native-control, var(--ui-surface-active));
-}
-
-.buyin-summary {
-  overflow: hidden;
-}
-
-.buyin-row {
-  min-height: 48px;
-  padding: 10px 13px;
-}
-
-.buyin-row strong {
-  font-size: 18px;
-}
-
-.buyin-amount-grid {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px;
-  align-items: stretch;
-}
-
-.buyin-amount-grid button,
-.buyin-amount-grid label {
-  display: grid;
-  place-items: center;
-  min-height: 72px;
-  border: 0;
-  border-radius: 15px;
-  background: var(--native-control, var(--ui-surface-active));
-  color: var(--tg-text);
-  padding: 8px;
-  text-align: center;
-}
-
-.buyin-amount-grid button {
-  align-content: center;
-  font-size: 17px;
-  line-height: 1.05;
-}
-
-.buyin-amount-grid button span {
-  margin-top: 3px;
-  color: var(--tg-hint);
-  font-size: 15px;
-  line-height: 1.08;
-}
-
-.buyin-amount-grid label {
-  align-content: center;
-  gap: 6px;
-  color: var(--tg-hint);
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.buyin-row strong,
-.buyin-info-card strong {
-  color: var(--tg-text);
-}
-
-.buyin-amount-grid input {
-  width: 100%;
-  min-height: 36px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--tg-text);
-  font-size: 20px;
-  font-weight: 650;
-  text-align: center;
-  box-shadow: none;
-}
-
-.buyin-slider {
-  height: 24px;
-  margin: 0;
-}
-
-.buyin-auto {
-  min-height: 48px;
-  border-radius: 15px;
-  color: var(--tg-hint);
-  display: grid;
-  place-items: center;
-  gap: 2px;
-  text-align: center;
-}
-
-.buyin-auto strong {
-  color: var(--tg-text);
-  font-size: 15px;
-  font-weight: 650;
-}
-
-.buyin-auto small {
-  color: var(--tg-hint);
-  font-size: 12px;
-  font-weight: 560;
-}
-
-.buyin-info-card {
-  overflow: hidden;
-}
-
-.buyin-info-card div {
-  min-height: 46px;
-  padding: 10px 13px;
-}
-
-.buyin-info-card strong {
-  display: inline-flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 5px;
-  max-width: 205px;
-  font-size: 14px;
-  line-height: 1.15;
-}
-
-.buyin-submit {
-  min-height: 56px;
-  border-radius: 16px;
-  background: var(--tg-button);
-  color: var(--tg-button-text);
-}
 
 body.in-game .game-toolbar {
   min-height: 44px;
@@ -6793,46 +5586,19 @@ body.in-game .game-toolbar .table-id {
   border-radius: 6px;
   background: var(--ui-bg);
 }
-
-body.in-game .betting-actions,
-body.in-game .pre-actions,
-body.in-game .betting-actions.amount-open {
+body.in-game .pre-actions{
   border: 1px solid var(--ui-line);
   border-radius: var(--ui-radius);
   background: var(--ui-surface);
   box-shadow: none;
   backdrop-filter: none;
 }
-
-body.in-game .betting-actions button,
-body.in-game .pre-actions button,
-body.in-game .sitout-action,
-body.in-game .quick-bets button {
+body.in-game .pre-actions button{
   border: 1px solid var(--ui-line);
   border-radius: 6px;
   background: var(--ui-surface-alt);
 }
 
-body.in-game .betting-actions [data-poker-action="fold"] {
-  border-color: var(--ui-danger);
-  background: var(--ui-danger);
-  color: #fff;
-}
-
-body.in-game .betting-actions [data-poker-action="check"],
-body.in-game .betting-actions [data-poker-action="call"],
-body.in-game .betting-actions [data-poker-action="bet"],
-body.in-game .betting-actions [data-poker-action="raise"],
-body.in-game .bet-confirm {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent);
-  color: var(--ui-accent-text);
-}
-
-body.in-game .betting-actions.amount-open label input {
-  border: 1px solid var(--ui-line);
-  background: var(--ui-bg);
-}
 
 @media (max-width: 420px) {
   .app {
@@ -6990,8 +5756,7 @@ body:not(.in-game) .app {
 }
 
 .tg-balance-hero span,
-.eyebrow,
-.buyin-kicker {
+.eyebrow{
   color: var(--native-blue);
   font-size: 12px;
   font-weight: 600;
@@ -7163,10 +5928,7 @@ body:not(.in-game) .app {
 
 
 .tournament-card button,
-.cashier-pay-button,
-.buyin-submit,
-.wallet-actions button,
-.create-grid button {
+.wallet-actions button{
   min-width: 68px;
   border: 0;
   border-radius: 18px;
@@ -7203,7 +5965,6 @@ body:not(.in-game) .app {
 .stats-cards,
 .settings-list,
 .cashier-history,
-.cashier-withdraw-state,
 .start-guide-list {
   overflow: hidden;
   border: 0;
@@ -7213,37 +5974,9 @@ body:not(.in-game) .app {
 
 .cashier-breakdown div,
 .stats-cards div,
-.cashier-quote div,
 .admin-grid div,
 .tournament-meta span {
   background: transparent;
-}
-
-.cashier-calculator {
-  border: 0;
-  background: transparent;
-}
-
-.cashier-amount-field input {
-  border: 0;
-  border-radius: 12px;
-  background: var(--native-control);
-  color: var(--native-text);
-  font-weight: 550;
-}
-
-.cashier-presets button,
-.cashier-methods button {
-  border: 0;
-  border-radius: 12px;
-  background: var(--native-control);
-  color: var(--native-text);
-  font-weight: 500;
-}
-
-.cashier-methods button.active {
-  border: 0;
-  background: rgba(42, 171, 238, 0.22);
 }
 
 
@@ -7393,23 +6126,15 @@ body:not(.in-game) .bottom-nav button.active {
 .mode-banner[data-mode="play"] {
   background: var(--native-surface);
 }
-
-.game-mode-switch button,
 .limit-pills button,
 .money-value,
-.cashier-presets button,
-.cashier-pay-button,
 .seat-meta,
 .bet-amount,
 .pot,
 .blinds {
   align-items: center;
 }
-
-.game-mode-switch button,
-.limit-pills button,
-.cashier-presets button,
-.cashier-pay-button {
+.limit-pills button{
   display: inline-flex;
   justify-content: center;
   gap: 4px;
@@ -7672,34 +6397,6 @@ body:not(.in-game) {
   color: var(--tg-button-text);
 }
 
-.game-mode-switch {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  width: 100%;
-  min-height: 45px;
-  margin: 2px 0 0;
-  border-radius: 13px;
-  background: var(--tg-surface);
-  padding: 4px;
-}
-
-.game-mode-switch button {
-  min-height: 37px;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--tg-hint);
-  font-size: 14px;
-  font-weight: 540;
-}
-
-.game-mode-switch button.active {
-  background: var(--tg-button);
-  color: var(--tg-button-text);
-}
-
-.game-mode-switch button:disabled {
-  opacity: 0.48;
-}
 
 .mode-banner {
   grid-template-columns: minmax(0, 1fr);
@@ -7887,10 +6584,6 @@ body:not(.in-game) .lobby-view > * {
   line-height: 1.38;
 }
 
-.training-switcher .game-mode-switch {
-  margin: 0;
-  background: var(--native-control);
-}
 
 .training-switcher .mode-banner {
   border-top: 1px solid var(--native-divider);
@@ -8110,50 +6803,6 @@ body:not(.in-game) .training-switcher .mode-banner {
   display: none;
 }
 
-body:not(.in-game) .training-switcher .game-mode-switch {
-  gap: 8px;
-  min-height: 64px;
-  border-radius: 16px;
-  background: transparent;
-  padding: 0;
-}
-
-body:not(.in-game) .training-switcher .game-mode-switch button {
-  display: grid;
-  place-items: center;
-  gap: 3px;
-  min-height: 64px;
-  border-radius: 15px;
-  background: var(--native-control);
-  color: var(--tg-hint);
-  font-size: 13px;
-  line-height: 1.1;
-}
-
-body:not(.in-game) .training-switcher .game-mode-switch button span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: inherit;
-  font-size: 16px;
-  font-weight: 650;
-}
-
-body:not(.in-game) .training-switcher .game-mode-switch button small {
-  color: inherit;
-  font-size: 11px;
-  font-weight: 480;
-  opacity: 0.82;
-}
-
-body:not(.in-game) .training-switcher .game-mode-switch button.active {
-  background: var(--tg-button);
-  color: var(--tg-button-text);
-}
-
-body:not(.in-game) .training-switcher .game-mode-switch button:disabled {
-  opacity: 0.46;
-}
 
 body:not(.in-game) .product-mode-hub {
   display: grid;
@@ -8205,54 +6854,6 @@ body:not(.in-game) .product-mode-title h2 {
   font-size: 19px;
 }
 
-body:not(.in-game) .product-mode-segment {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  margin: 0;
-  padding: 4px;
-  border-radius: 16px;
-  background: var(--native-control);
-}
-
-body:not(.in-game) .product-mode-segment button {
-  display: grid;
-  place-items: center;
-  gap: 2px;
-  min-height: 48px;
-  border: 0;
-  border-radius: 13px;
-  background: transparent;
-  color: var(--tg-hint);
-  padding: 5px 8px;
-  text-align: center;
-}
-
-body:not(.in-game) .product-mode-segment button.active {
-  background: var(--tg-button);
-  color: var(--tg-button-text);
-}
-
-body:not(.in-game) .product-mode-segment button:disabled {
-  opacity: 0.42;
-}
-
-body:not(.in-game) .product-mode-segment button small {
-  color: inherit;
-  font-size: 11px;
-  font-weight: 520;
-  opacity: 0.78;
-}
-
-body:not(.in-game) .product-mode-segment button span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: inherit;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.1;
-}
 
 .play-format-grid {
   display: grid;
@@ -8496,328 +7097,6 @@ body:not(.in-game) .home-limit-pills {
   background: linear-gradient(90deg, var(--tg-button), #37d67a);
 }
 
-.affiliate-view {
-  display: none;
-  gap: 12px;
-}
-
-.affiliate-view.active {
-  display: grid;
-}
-
-.affiliate-hero,
-.affiliate-card {
-  position: relative;
-  overflow: hidden;
-  border-radius: var(--native-group-radius);
-}
-
-.affiliate-hero {
-  display: grid;
-  gap: 12px;
-  background:
-    radial-gradient(circle at 86% 8%, rgba(52, 199, 89, 0.26), transparent 32%),
-    radial-gradient(circle at 0 95%, rgba(94, 92, 230, 0.24), transparent 38%),
-    var(--tg-surface);
-  padding: 18px;
-}
-
-.affiliate-hero h2 {
-  margin: 0;
-  color: var(--tg-text);
-  font-size: 28px;
-  line-height: 1.02;
-}
-
-.affiliate-hero p {
-  margin: 0;
-  color: var(--tg-hint);
-  font-size: 14px;
-  font-weight: 540;
-  line-height: 1.36;
-}
-
-.affiliate-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.affiliate-actions button {
-  min-height: 48px;
-  border: 0;
-  border-radius: 14px;
-  background: var(--tg-button);
-  color: var(--tg-button-text);
-  font-size: 15px;
-  font-weight: 750;
-}
-
-.affiliate-actions button + button {
-  background: var(--native-control);
-  color: var(--tg-text);
-}
-
-.affiliate-grid {
-  display: grid;
-  gap: 10px;
-}
-
-.affiliate-card {
-  display: grid;
-  gap: 6px;
-  min-height: 128px;
-  padding: 16px;
-  color: #fff;
-}
-
-.affiliate-card span {
-  color: rgba(255, 255, 255, 0.74);
-  font-size: 12px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.affiliate-card strong {
-  font-size: 30px;
-  line-height: 1;
-}
-
-.affiliate-card p {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 13px;
-  line-height: 1.3;
-}
-
-.affiliate-card--green {
-  background: linear-gradient(135deg, #11996f, #156dba);
-}
-
-.affiliate-card--gold {
-  background: linear-gradient(135deg, #b17a13, #e5534b);
-}
-
-.affiliate-card--violet {
-  background: linear-gradient(135deg, #5e5ce6, #2aabee);
-}
-
-.affiliate-link-preview {
-  overflow: hidden;
-  border-radius: 14px;
-  background: var(--native-control);
-  color: var(--tg-link);
-  padding: 13px;
-  font-size: 13px;
-  font-weight: 680;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cashier-sheet-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 70;
-  background: rgba(0, 0, 0, 0.38);
-  opacity: 0;
-  transition: opacity 180ms ease;
-}
-
-body.cashier-sheet-open .cashier-sheet-backdrop {
-  opacity: 1;
-}
-
-.cashier-sheet-close {
-  display: none;
-}
-
-body.cashier-sheet-open [data-cashier-sheet].sheet-open {
-  position: fixed;
-  left: max(10px, env(safe-area-inset-left));
-  right: max(10px, env(safe-area-inset-right));
-  bottom: 0;
-  z-index: 80;
-  display: block;
-  width: auto;
-  max-width: 520px;
-  max-height: min(82vh, 720px);
-  margin: 0 auto;
-  overflow: auto;
-  border: 0;
-  border-radius: 24px 24px 0 0;
-  background: var(--native-surface);
-  padding: 8px 16px calc(18px + env(safe-area-inset-bottom));
-  box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.38);
-  transform: translateY(calc(102% + var(--sheet-drag-y, 0px)));
-  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
-  touch-action: pan-y;
-  overscroll-behavior: contain;
-}
-
-body.cashier-sheet-open [data-cashier-sheet].sheet-visible {
-  transform: translateY(var(--sheet-drag-y, 0px));
-}
-
-body.cashier-sheet-open [data-cashier-sheet].sheet-open::before {
-  display: none;
-}
-
-.cashier-sheet-grabber {
-  display: none;
-}
-
-body.cashier-sheet-open .cashier-sheet-grabber {
-  display: block;
-  width: 100%;
-  height: 30px;
-  margin: 0 0 4px;
-  touch-action: none;
-}
-
-body.cashier-sheet-open .cashier-sheet-grabber::before {
-  content: "";
-  display: block;
-  width: 38px;
-  height: 4px;
-  margin: 8px auto 0;
-  border-radius: 999px;
-  background: rgba(142, 155, 170, 0.42);
-}
-
-body.cashier-sheet-open .cashier-sheet-close {
-  display: none;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border: 0;
-  border-radius: 50%;
-  background: var(--native-control);
-  color: var(--native-muted);
-  font: inherit;
-  font-size: 24px;
-  line-height: 1;
-}
-
-body.cashier-sheet-open [data-cashier-sheet].sheet-open .section-title {
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: start;
-}
-
-body.cashier-sheet-open .bottom-nav,
-body.cashier-sheet-open .profile-nav-fab {
-  transform: translateY(120%);
-}
-
-body.lobby-menu-open {
-  overflow: hidden;
-}
-
-body.lobby-menu-open .bottom-nav {
-  transform: translateY(120%);
-}
-
-.lobby-menu-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 70;
-  background: rgba(0, 0, 0, 0.38);
-  opacity: 0;
-  transition: opacity 180ms ease;
-}
-
-body.lobby-menu-open .lobby-menu-backdrop {
-  opacity: 1;
-}
-
-.lobby-menu-sheet {
-  position: fixed;
-  left: max(10px, env(safe-area-inset-left));
-  right: max(10px, env(safe-area-inset-right));
-  bottom: 0;
-  z-index: 80;
-  display: block;
-  width: auto;
-  max-width: 520px;
-  max-height: min(82vh, 720px);
-  margin: 0 auto;
-  overflow: auto;
-  border: 0;
-  border-radius: 24px 24px 0 0;
-  background: var(--native-surface);
-  padding: 8px 16px calc(18px + env(safe-area-inset-bottom));
-  box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.38);
-  transform: translateY(calc(102% + var(--sheet-drag-y, 0px)));
-  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
-  touch-action: pan-y;
-  overscroll-behavior: contain;
-}
-
-.lobby-menu-sheet.sheet-visible {
-  transform: translateY(var(--sheet-drag-y, 0px));
-}
-
-.lobby-menu-head {
-  display: grid;
-  gap: 4px;
-  padding: 8px 4px 14px;
-}
-
-.lobby-menu-head p {
-  margin: 0;
-  color: var(--native-blue);
-  font-size: 12px;
-  font-weight: 760;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.lobby-menu-head h2 {
-  margin: 0;
-  color: var(--native-text);
-  font-size: 30px;
-  line-height: 1.05;
-}
-
-.lobby-menu-list {
-  overflow: hidden;
-  border-radius: var(--native-group-radius);
-  background: var(--native-surface-elevated);
-}
-
-.lobby-menu-list button {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-  width: 100%;
-  min-height: 68px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--native-text);
-  padding: 10px 14px;
-  text-align: left;
-  transform: none;
-}
-
-.lobby-menu-list button + button {
-  border-top: 1px solid var(--native-divider);
-}
-
-
-.lobby-menu-list strong {
-  display: block;
-  font-size: 17px;
-  line-height: 1.2;
-}
-
-.lobby-menu-list small {
-  display: block;
-  margin-top: 3px;
-  color: var(--native-muted);
-  font-size: 13px;
-  font-weight: 560;
-}
 
 .menu-icon {
   display: grid;
@@ -8837,18 +7116,6 @@ body.lobby-menu-open .lobby-menu-backdrop {
   stroke-width: 2.1;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-body.buyin-sheet-open .bottom-nav,
-body.buyin-sheet-open .profile-nav-fab {
-  transform: translateY(120%);
-}
-
-html.buyin-sheet-open,
-html.buyin-sheet-open body,
-body.buyin-sheet-open {
-  overflow: hidden;
-  overscroll-behavior: none;
 }
 
 
@@ -8878,64 +7145,13 @@ body.buyin-sheet-open {
   .scroll-reveal,
   .scroll-reveal.is-visible,
   body:not(.in-game) .bottom-nav,
-  body:not(.in-game) .profile-nav-fab,
-  body.cashier-sheet-open [data-cashier-sheet].sheet-open,
-  .cashier-sheet-backdrop {
+  body:not(.in-game) .profile-nav-fab{
     opacity: 1;
     transform: none;
   transition: none;
   }
 }
 
-body.in-game .side-menu .close-button,
-body.in-game .drawer-tabs .close-button {
-  display: grid;
-  place-items: center;
-  justify-content: center;
-  align-items: center;
-  border: 0;
-  box-shadow: none;
-  line-height: 1;
-}
-
-body.in-game .side-menu .close-button {
-  position: static;
-  width: 42px;
-  height: 42px;
-  min-height: 42px;
-  justify-self: end;
-  margin: 0 0 10px;
-  border-radius: 50%;
-  background: transparent !important;
-  color: var(--tg-hint);
-  font-size: 30px;
-  padding: 0;
-}
-
-body.in-game .drawer-tabs .close-button {
-  position: static;
-  width: 100%;
-  height: auto;
-  min-height: 56px;
-  border-radius: 0;
-  background: transparent !important;
-  color: var(--tg-hint);
-  font-size: 24px;
-  padding: 0;
-}
-
-body.in-game .drawer-tabs button:focus,
-body.in-game .drawer-tabs button:focus-visible,
-body.in-game .side-menu .close-button:focus,
-body.in-game .side-menu .close-button:focus-visible {
-  outline: 0;
-  box-shadow: none;
-}
-
-body.in-game .drawer-tabs button.active:focus,
-body.in-game .drawer-tabs button.active:focus-visible {
-  box-shadow: inset 0 -3px 0 var(--tg-link);
-}
 
 /* Final mobile nav guard: the lobby tab bar must stay pinned to the viewport,
    independent of page height or Telegram WebView scroll quirks. */
@@ -8952,9 +7168,7 @@ body:not(.in-game) .profile-nav-fab {
 }
 
 html.admin-mode body:not(.in-game) .bottom-nav,
-html.admin-mode body:not(.in-game) .profile-nav-fab,
-html.admin-mode body:not(.in-game) .lobby-menu-backdrop,
-html.admin-mode body:not(.in-game) .lobby-menu-sheet {
+html.admin-mode body:not(.in-game) .profile-nav-fab{
   display: none !important;
 }
 
@@ -9001,9 +7215,7 @@ body:not(.in-game) .wallet-card,
 body:not(.in-game) .lobby-card,
 body:not(.in-game) .home-wallet,
 body:not(.in-game) .product-mode-hub,
-body:not(.in-game) .progression-card,
-body:not(.in-game) .lobby-menu-sheet,
-body:not(.in-game) .cashier-sheet {
+body:not(.in-game) .progression-card{
   border: 1px solid var(--premium-line);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 42%),
@@ -9152,31 +7364,6 @@ body:not(.in-game) .product-mode-hub {
     linear-gradient(180deg, #1d2b3b, #182433);
 }
 
-body:not(.in-game) .product-mode-segment {
-  gap: 5px;
-  padding: 5px;
-  border-radius: 19px;
-  background: rgba(13, 21, 30, 0.5);
-}
-
-body:not(.in-game) .product-mode-segment button {
-  min-height: 52px;
-  border-radius: 15px;
-}
-
-body:not(.in-game) .product-mode-segment button.active {
-  background:
-    radial-gradient(circle at 50% -24%, rgba(255, 255, 255, 0.34), transparent 44%),
-    linear-gradient(135deg, #25b9ff, #127eff);
-  box-shadow: 0 12px 28px rgba(18, 126, 255, 0.26);
-}
-
-body[data-game-mode="play"]:not(.in-game) .product-mode-segment button.active {
-  background:
-    radial-gradient(circle at 50% -24%, rgba(255, 255, 255, 0.28), transparent 44%),
-    linear-gradient(135deg, #8c6cff, #2aabee);
-  box-shadow: 0 12px 28px rgba(140, 108, 255, 0.24);
-}
 
 body:not(.in-game) .mode-context-copy {
   border-radius: 14px;
@@ -9270,21 +7457,6 @@ body:not(.in-game) .profile-progress span {
   box-shadow: 0 0 18px rgba(53, 208, 127, 0.28);
 }
 
-body:not(.in-game) .affiliate-hero {
-  border: 0;
-  background:
-    radial-gradient(circle at 88% 0%, rgba(53, 208, 127, 0.28), transparent 34%),
-    radial-gradient(circle at 0 100%, rgba(140, 108, 255, 0.28), transparent 40%),
-    linear-gradient(150deg, #243a52, #162231 62%, #151d2b);
-}
-
-body:not(.in-game) .affiliate-actions button,
-body:not(.in-game) .cashier-pay-button,
-body:not(.in-game) .buyin-submit {
-  background:
-    radial-gradient(circle at 50% -18%, rgba(255, 255, 255, 0.28), transparent 40%),
-    linear-gradient(135deg, #22b7ff, #127eff);
-}
 
 body:not(.in-game) .bottom-nav {
   border: 1px solid rgba(154, 190, 222, 0.1);
@@ -9303,11 +7475,6 @@ body:not(.in-game) .bottom-nav button.active {
 
 body:not(.in-game) .bottom-nav button.active .nav-icon {
   color: var(--brand-cyan);
-}
-
-body:not(.in-game) .lobby-menu-list button {
-  border-radius: 18px;
-  background: rgba(13, 21, 30, 0.24);
 }
 
 
@@ -9447,34 +7614,24 @@ body.in-game .seat.is-turn .seat-avatar {
     0 0 0 3px rgba(53, 208, 127, 0.36),
     0 0 30px rgba(53, 208, 127, 0.34);
 }
-
-body.in-game .betting-actions,
 body.in-game .pre-actions {
   border: 1px solid rgba(154, 190, 222, 0.14);
   background: rgba(20, 31, 43, 0.94);
   box-shadow: 0 -12px 34px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(18px);
 }
-
-body.in-game .betting-actions button,
 body.in-game .pre-actions button {
   border-radius: 14px;
   transition: transform 150ms ease, filter 160ms ease;
 }
-
-body.in-game .betting-actions button:not(.danger):not(.secondary),
 body.in-game .pre-actions button:not(.danger):not(.secondary) {
   background: linear-gradient(135deg, #22b7ff, #127eff);
   color: #fff;
 }
-
-body.in-game .betting-actions .danger,
 body.in-game .pre-actions .danger {
   background: linear-gradient(135deg, #ff5263, #d93648);
   color: #fff;
 }
-
-body.in-game .betting-actions .secondary,
 body.in-game .pre-actions .secondary {
   background: linear-gradient(135deg, #26384b, #203142);
   color: rgba(246, 249, 255, 0.92);
@@ -11135,8 +9292,6 @@ body.in-game .seat:not([data-bet]) .bet-spot {
 body.in-game .bet-spot {
   z-index: 7;
 }
-
-body.in-game .betting-actions,
 body.in-game .pre-actions {
   right: 8px;
   bottom: max(4px, env(safe-area-inset-bottom));
@@ -11146,38 +9301,12 @@ body.in-game .pre-actions {
   gap: 5px;
   border-radius: 12px;
 }
-
-body.in-game .betting-actions button,
-body.in-game .pre-actions button,
-body.in-game .sitout-action {
+body.in-game .pre-actions button{
   min-height: 46px;
   border-radius: 9px;
   font-size: 15px;
 }
 
-body.in-game .betting-actions.amount-open {
-  bottom: max(4px, env(safe-area-inset-bottom));
-  width: min(390px, calc(100vw - 16px));
-  padding: 9px;
-  gap: 8px;
-  border-radius: 14px;
-}
-
-body.in-game .betting-actions.amount-open label input {
-  min-height: 38px;
-  font-size: 20px;
-}
-
-body.in-game .betting-actions.amount-open .quick-bets button {
-  min-height: 38px;
-  font-size: 14px;
-}
-
-body.in-game .betting-actions.amount-open .bet-confirm {
-  min-height: 42px;
-  border-radius: 11px;
-  font-size: 15px;
-}
 
 @media (min-height: 840px) and (min-width: 390px) {
   body.in-game .game-screen {
@@ -11232,10 +9361,7 @@ body.in-game .betting-actions.amount-open .bet-confirm {
     margin-top: -4px;
     margin-bottom: -104px;
   }
-
-  body.in-game .betting-actions button,
-  body.in-game .pre-actions button,
-  body.in-game .sitout-action {
+  body.in-game .pre-actions button{
     min-height: 42px;
   }
 }
@@ -11362,10 +9488,6 @@ button,
 .wallet-actions button,
 .home-wallet-actions button,
 .play-format-grid button,
-.product-mode-segment button,
-.cashier-pay-button,
-.buyin-submit,
-.betting-actions button,
 .pre-actions button {
   font-weight: 600;
   letter-spacing: 0;
@@ -11390,8 +9512,7 @@ button,
 .home-identity small,
 .player-rank,
 .mode-context-copy,
-.tg-row-value,
-.cashier-note {
+.tg-row-value{
   font-weight: 500;
 }
 
@@ -11434,19 +9555,14 @@ button,
 
 .home-wallet-actions button,
 .wallet-actions button,
-.cashier-pay-button,
-.buyin-submit,
 .tournament-card button,
 .play-format-grid button,
-.product-mode-segment button,
 .limit-pills button,
 .icon-control,
 .sit-button {
   border-radius: 16px;
   box-shadow: none;
 }
-
-.betting-actions,
 .pre-actions,
 .bot-actions {
   border: 1px solid rgba(122, 162, 194, 0.14);
@@ -11454,35 +9570,17 @@ button,
   background: rgba(23, 33, 43, 0.92);
   padding: 5px;
 }
-
-.betting-actions button,
 .pre-actions button,
 .bot-actions button {
   border-radius: 11px;
   font-size: 16px;
 }
 
-.betting-actions [data-poker-action="fold"] {
-  background: #d9505c;
-}
-
-.betting-actions [data-poker-action="check"],
-.betting-actions [data-poker-action="call"] {
-  background: #2aabee;
-}
-
-.betting-actions [data-poker-action="bet"],
-.betting-actions [data-poker-action="raise"],
-.bet-confirm {
-  background: #d8a542;
-  color: #151719;
-}
 
 button,
 .tg-menu-row,
 .promo-banner,
-.play-format-grid button,
-.product-mode-segment button {
+.play-format-grid button{
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -11861,60 +9959,7 @@ body:not(.in-game) .section-title > span {
 }
 
 /* --- Mode hub (Cash / Rating) --------------------------------------- */
-body:not(.in-game) .product-mode-segment {
-  gap: 4px;
-  padding: 4px;
-  border-radius: 14px;
-  background: rgba(0, 0, 0, 0.28);
-  border: 1px solid var(--qwz-line);
-}
 
-body:not(.in-game) .product-mode-segment button {
-  min-height: 46px;
-  border-radius: 11px;
-  background: transparent;
-  color: var(--qwz-ink-dim);
-  box-shadow: none;
-  font-size: 14px;
-  font-weight: 650;
-  transition: background 160ms ease, color 160ms ease;
-}
-
-body:not(.in-game) .product-mode-segment button small {
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--qwz-ink-mute);
-  margin-top: 2px;
-}
-
-body:not(.in-game) .product-mode-segment button.active {
-  background: linear-gradient(180deg, #1f2c3d, #182230);
-  color: var(--qwz-ink);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.06) inset,
-    0 6px 14px rgba(0, 0, 0, 0.28);
-}
-
-body[data-game-mode="cash"]:not(.in-game) .product-mode-segment button.active {
-  background: linear-gradient(180deg, #1f3a30, #143226);
-  box-shadow:
-    0 1px 0 rgba(47, 211, 150, 0.2) inset,
-    0 6px 14px rgba(33, 176, 126, 0.18);
-}
-
-body[data-game-mode="cash"]:not(.in-game) .product-mode-segment button.active small {
-  color: var(--qwz-emerald);
-}
-
-body[data-game-mode="play"]:not(.in-game) .product-mode-segment button.active small {
-  color: var(--qwz-gold);
-}
-
-body:not(.in-game) .product-mode-segment button.active small {
-  opacity: 1;
-}
 
 body:not(.in-game) .mode-context-copy {
   margin-top: 0;
@@ -12218,22 +10263,7 @@ body:not(.in-game) .bottom-nav .nav-icon svg {
 }
 
 /* --- Lobby menu sheet (the "More" sheet) ---------------------------- */
-body:not(.in-game) .lobby-menu-sheet {
-  border-radius: var(--qwz-radius-lg) var(--qwz-radius-lg) 0 0;
-  background: linear-gradient(180deg, #182230 0%, #0e1620 100%);
-  border-top: 1px solid var(--qwz-line-strong);
-}
 
-body:not(.in-game) .lobby-menu-list button {
-  background: transparent;
-  color: var(--qwz-ink);
-}
-
-body:not(.in-game) .lobby-menu-list button .menu-icon {
-  background: rgba(47, 211, 150, 0.12);
-  color: var(--qwz-emerald);
-  border-radius: 12px;
-}
 
 /* =====================================================================
    Weez Lobby v2 — Telegram-native breathing room
@@ -12456,8 +10486,6 @@ body:not(.in-game) .product-mode-hub {
 body:not(.in-game) .product-mode-hub::-webkit-scrollbar { display: none !important; }
 body:not(.in-game) .product-mode-hub::before,
 body:not(.in-game) .product-mode-hub::after { display: none !important; }
-
-body:not(.in-game) .game-mode-switch.product-mode-segment,
 body:not(.in-game) .play-format-grid,
 body[data-game-mode="play"]:not(.in-game) .play-format-grid,
 body[data-game-mode="cash"]:not(.in-game) .play-format-grid {
@@ -12570,10 +10598,7 @@ body:not(.in-game) .lobby-view.active {
 body:not(.in-game) .lobby-view.active .lobby-card,
 body:not(.in-game) .lobby-view.active .wallet-card,
 body:not(.in-game) .lobby-view.active .cashier-card,
-body:not(.in-game) .lobby-view.active .cashier-topup-card,
-body:not(.in-game) .lobby-view.active .cashier-withdraw-card,
 body:not(.in-game) .lobby-view.active .cashier-history-card,
-body:not(.in-game) .lobby-view.active .affiliate-hero,
 body:not(.in-game) .lobby-view.active .create-card {
   background: var(--qwz-card) !important;
   border: 0 !important;
@@ -12630,18 +10655,6 @@ body:not(.in-game) .lobby-view.active .limit-pills button.active {
   color: #fff !important;
 }
 
-body:not(.in-game) .lobby-view.active .cashier-pay-button,
-body:not(.in-game) .lobby-view.active .create-grid button,
-body:not(.in-game) .lobby-view.active .affiliate-actions button:first-child {
-  background: var(--qwz-acc) !important;
-  color: #fff !important;
-  border: 0 !important;
-  border-radius: 14px !important;
-  min-height: 46px !important;
-  font-size: 14px !important;
-  font-weight: 700 !important;
-  box-shadow: none !important;
-}
 
 /* Re-suppress the format hub title only on home (overridden by general rules above) */
 body:not(.in-game) [data-lobby-view="home"].active .product-mode-hub .section-title,
@@ -12781,37 +10794,13 @@ body:not(.in-game) .product-mode-hub button {
 }
 
 /* ---------- Coloured accents on game-mode tabs to break monotony ---------- */
-body[data-game-mode="cash"]:not(.in-game) .product-mode-hub .game-mode-switch button[data-game-mode="cash"],
-body[data-game-mode="play"]:not(.in-game) .product-mode-hub .game-mode-switch button[data-game-mode="play"] {
-  background: var(--qwz-acc) !important;
-  color: #fff !important;
-}
+
 
 /* ---------- Tables list: coloured stake avatars ---------- */
 
 
 /* ---------- Menu sheet icons: per-row accent colours ---------- */
-body:not(.in-game) .lobby-menu-list button .menu-icon {
-  background: rgba(42, 171, 238, 0.14) !important;
-  color: var(--qwz-acc) !important;
-  border-radius: 11px !important;
-}
-body:not(.in-game) .lobby-menu-list button[data-menu-action="cashier"] .menu-icon {
-  background: rgba(47, 201, 126, 0.14) !important;
-  color: var(--qwz-green) !important;
-}
-body:not(.in-game) .lobby-menu-list button[data-menu-action="details"] .menu-icon {
-  background: rgba(139, 108, 255, 0.14) !important;
-  color: var(--qwz-violet) !important;
-}
-body:not(.in-game) .lobby-menu-list button[data-menu-action="affiliate"] .menu-icon {
-  background: rgba(244, 193, 74, 0.14) !important;
-  color: var(--qwz-gold) !important;
-}
-body:not(.in-game) .lobby-menu-list button[data-menu-action="support"] .menu-icon {
-  background: rgba(54, 200, 200, 0.14) !important;
-  color: var(--qwz-teal) !important;
-}
+
 
 /* Bottom nav final polish: one native blurred rail + one moving active pill. */
 html.minimal-launch body:not(.in-game) .bottom-nav,
@@ -13028,51 +11017,6 @@ body:not(.in-game) .play-format-grid strong {
   line-height: 1 !important;
 }
 
-body:not(.in-game) .lobby-menu-list {
-  display: grid !important;
-  gap: 0 !important;
-}
-
-body:not(.in-game) .lobby-menu-list button {
-  display: flex !important;
-  align-items: center !important;
-  gap: 12px !important;
-  min-height: 56px !important;
-  padding: 10px 12px !important;
-  border-radius: 14px !important;
-  border: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
-body:not(.in-game) .lobby-menu-list button + button {
-  border-top: 1px solid var(--qwz-divider) !important;
-  border-radius: 0 !important;
-}
-
-body:not(.in-game) .lobby-menu-list button .menu-copy {
-  display: grid !important;
-  gap: 2px !important;
-}
-
-body:not(.in-game) .lobby-menu-list button .menu-meta {
-  display: none !important;
-}
-
-body:not(.in-game) .lobby-menu-list button .menu-icon {
-  width: 32px !important;
-  height: 32px !important;
-  flex: 0 0 auto !important;
-}
-
-body:not(.in-game) .lobby-menu-list button .menu-icon svg {
-  width: 16px !important;
-  height: 16px !important;
-}
-
-body:not(.in-game) .lobby-menu-list button .tg-chevron {
-  margin-left: auto !important;
-}
 
 body:not(.in-game) .lobby-view[data-lobby-view="profile"].active {
   gap: 8px !important;
@@ -13268,37 +11212,8 @@ body:not(.in-game) .product-mode-hub {
   -webkit-mask-image: none !important;
 }
 /* primary 2-segment control */
-body:not(.in-game) .game-mode-switch.product-mode-segment {
-  display: flex !important;
-  gap: 4px !important;
-  padding: 4px !important;
-  border-radius: 14px !important;
-  background: var(--qwz-card) !important;
-  border: 0 !important;
-}
-body:not(.in-game) .game-mode-switch.product-mode-segment button {
-  flex: 1 1 0 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 6px !important;
-  min-height: 40px !important;
-  padding: 0 !important;
-  border-radius: 11px !important;
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  color: var(--qwz-dim) !important;
-  font-size: 14px !important;
-  font-weight: 700 !important;
-  transition: background 240ms ease, color 240ms ease !important;
-}
-body:not(.in-game) .game-mode-switch.product-mode-segment button.active {
-  background: var(--qwz-acc) !important;
-  color: #fff !important;
-  box-shadow: 0 4px 14px rgba(42, 171, 238, 0.3) !important;
-}
-body:not(.in-game) .game-mode-switch.product-mode-segment button small { display: none !important; }
+
+
 /* secondary format pills, 3 equal, fit 390 */
 body:not(.in-game) .play-format-grid,
 body[data-game-mode="play"]:not(.in-game) .play-format-grid,
@@ -13394,16 +11309,7 @@ body:not(.in-game) [data-lobby-view="home"].active .home-limit-pills {
 }
 
 /* ---------- Robust menu sheet (reachable on short screens) ---------- */
-body:not(.in-game) .lobby-menu-sheet {
-  max-height: min(78vh, 560px) !important;
-  overflow-y: auto !important;
-  padding-bottom: calc(16px + env(safe-area-inset-bottom)) !important;
-  z-index: 90 !important;
-}
-body:not(.in-game) .lobby-menu-list button {
-  min-height: 56px !important;
-  padding: 10px 12px !important;
-}
+
 
 /* Avatar images use a real replaced element so failed/expired Telegram URLs
    fall back to initials instead of leaving an indistinct background blob. */
@@ -13911,26 +11817,6 @@ html.minimal-launch body:not(.in-game) .product-mode-hub {
   border-radius: 22px !important;
 }
 
-html.minimal-launch body:not(.in-game) .product-mode-segment {
-  height: 58px !important;
-  padding: 3px !important;
-  border-radius: 20px !important;
-  background: var(--qwz-surface-2) !important;
-  box-shadow: none !important;
-}
-
-html.minimal-launch body:not(.in-game) .product-mode-segment button {
-  border-radius: 18px !important;
-  min-height: 52px !important;
-  color: var(--qwz-muted) !important;
-  font-size: 17px !important;
-}
-
-html.minimal-launch body:not(.in-game) .product-mode-segment button.active {
-  background: #5a5a63 !important;
-  color: #fff !important;
-  box-shadow: none !important;
-}
 
 html.minimal-launch body:not(.in-game) .mode-context-copy {
   margin: 10px 4px 0 !important;
@@ -13987,19 +11873,6 @@ html.minimal-launch body:not(.in-game) .profile-dashboard {
   padding: 20px !important;
 }
 
-html.minimal-launch body.cashier-sheet-open [data-cashier-sheet].sheet-open,
-html.minimal-launch body:not(.in-game) .lobby-menu-sheet {
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: min(590px, 100vw) !important;
-  max-height: min(82vh, 760px) !important;
-  margin: 0 auto !important;
-  border-radius: 30px 30px 0 0 !important;
-  background: #1c1c1f !important;
-  border: 0 !important;
-  box-shadow: 0 -18px 48px rgba(0, 0, 0, 0.55) !important;
-}
 
 html.minimal-launch body:not(.in-game) .bottom-nav {
   position: fixed !important;
@@ -14118,116 +11991,4 @@ body:not(.in-game) .play-format-grid button[data-mode-action="sitgo"] .format-ic
 body:not(.in-game) .play-format-grid button[data-mode-action="private"] .format-icon {
   background: rgba(139, 108, 255, 0.14) !important;
   color: var(--qwz-violet) !important;
-}
-
-body:not(.in-game) .lobby-menu-sheet {
-  border-radius: 28px 28px 0 0 !important;
-  background: linear-gradient(180deg, #182230 0%, #0e1620 100%) !important;
-  box-shadow: 0 -18px 44px rgba(0, 0, 0, 0.5) !important;
-}
-
-body:not(.in-game) .lobby-menu-head {
-  padding: 4px 2px 10px !important;
-}
-
-body:not(.in-game) .lobby-menu-head p {
-  letter-spacing: 0.1em !important;
-}
-
-body:not(.in-game) .lobby-menu-list {
-  display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  gap: 10px !important;
-}
-
-body:not(.in-game) .lobby-menu-list button {
-  position: relative !important;
-  min-height: 112px !important;
-  align-items: start !important;
-  border-radius: 18px !important;
-  padding: 12px !important;
-  border: 1px solid rgba(255, 255, 255, 0.06) !important;
-  background:
-    radial-gradient(120% 100% at 0% 0%, rgba(42, 171, 238, 0.08), transparent 45%),
-    rgba(255, 255, 255, 0.03) !important;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18) !important;
-  display: grid !important;
-  grid-template-columns: 36px minmax(0, 1fr) auto !important;
-  grid-template-areas:
-    "icon copy meta"
-    "icon copy chevron" !important;
-  gap: 8px 10px !important;
-}
-
-body:not(.in-game) .lobby-menu-list button .menu-icon {
-  grid-area: icon !important;
-  width: 36px !important;
-  height: 36px !important;
-  margin-top: 2px !important;
-  border-radius: 12px !important;
-  display: grid !important;
-  place-items: center !important;
-}
-
-body:not(.in-game) .lobby-menu-list button .menu-icon svg {
-  width: 18px !important;
-  height: 18px !important;
-}
-
-body:not(.in-game) .lobby-menu-list button .menu-copy {
-  grid-area: copy !important;
-  display: grid !important;
-  gap: 4px !important;
-}
-
-body:not(.in-game) .lobby-menu-list button strong {
-  font-size: 14px !important;
-  line-height: 1.05 !important;
-}
-
-body:not(.in-game) .lobby-menu-list button small {
-  font-size: 11px !important;
-  line-height: 1.25 !important;
-}
-
-body:not(.in-game) .lobby-menu-list button .menu-meta {
-  grid-area: meta !important;
-  justify-self: end !important;
-  align-self: start !important;
-  min-height: 22px !important;
-  padding: 3px 8px !important;
-  border-radius: 999px !important;
-  background: rgba(255, 255, 255, 0.06) !important;
-  color: var(--qwz-dim) !important;
-  font-size: 10px !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.06em !important;
-  text-transform: uppercase !important;
-}
-
-body:not(.in-game) .lobby-menu-list button .tg-chevron {
-  grid-area: chevron !important;
-  align-self: end !important;
-  justify-self: end !important;
-  color: var(--qwz-dim) !important;
-}
-
-body:not(.in-game) .lobby-menu-list button[data-menu-action="cashier"] .menu-icon {
-  background: rgba(47, 201, 126, 0.14) !important;
-  color: var(--qwz-green) !important;
-}
-
-body:not(.in-game) .lobby-menu-list button[data-menu-action="details"] .menu-icon {
-  background: rgba(42, 171, 238, 0.14) !important;
-  color: var(--qwz-acc) !important;
-}
-
-body:not(.in-game) .lobby-menu-list button[data-menu-action="affiliate"] .menu-icon {
-  background: rgba(244, 193, 74, 0.14) !important;
-  color: var(--qwz-gold) !important;
-}
-
-body:not(.in-game) .lobby-menu-list button[data-menu-action="support"] .menu-icon {
-  background: rgba(54, 200, 200, 0.14) !important;
-  color: var(--qwz-teal) !important;
 }
